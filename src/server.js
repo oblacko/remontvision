@@ -23,14 +23,24 @@ app.use(express.json({ limit: '1mb' }));
 // один canonical URL на документ: .html и слэш → чистый маршрут
 const CANONICAL_REDIRECTS = {
   '/index.html': '/',
-  '/prices.html': '/prices', '/prices/': '/prices',
-  '/offer.html': '/offer', '/offer/': '/offer',
-  '/delivery.html': '/delivery', '/delivery/': '/delivery',
-  '/contacts.html': '/contacts', '/contacts/': '/contacts',
-  '/privacy.html': '/privacy', '/privacy/': '/privacy',
+  '/prices.html': '/prices',
+  '/offer.html': '/offer',
+  '/delivery.html': '/delivery',
+  '/contacts.html': '/contacts',
+  '/privacy.html': '/privacy',
 };
 for (const [from, to] of Object.entries(CANONICAL_REDIRECTS)) {
   app.get(from, (_req, res) => res.redirect(301, to));
+}
+// слэш на конце — только точным regex, иначе Express матчит и /prices, получая петлю
+for (const [from, to] of Object.entries({
+  '/prices/': '/prices',
+  '/offer/': '/offer',
+  '/delivery/': '/delivery',
+  '/contacts/': '/contacts',
+  '/privacy/': '/privacy',
+})) {
+  app.get(new RegExp(`^${from}$`), (_req, res) => res.redirect(301, to));
 }
 app.use(express.static('public'));
 app.use('/assets', express.static('assets'));
