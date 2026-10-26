@@ -19,13 +19,14 @@ const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RESEND_TEMPLATE_ID = process.env.RESEND_TEMPLATE_ID || '';
 const MAIL_FROM = process.env.MAIL_FROM || 'ремонтвижн <noreply@remontvision.ru>';
+const MAIL_REPLY_TO = process.env.MAIL_REPLY_TO || 'support@remontvision.ru';
 
 let mailer = null;
 if (!RESEND_API_KEY && process.env.SMTP_URL) {
   mailer = nodemailer.createTransport(process.env.SMTP_URL);
   log({ event: 'mail_transport', mode: 'smtp' });
 } else if (RESEND_API_KEY) {
-  log({ event: 'mail_transport', mode: 'resend', from: MAIL_FROM });
+  log({ event: 'mail_transport', mode: 'resend', from: MAIL_FROM, reply_to: MAIL_REPLY_TO });
 } else {
   log({ event: 'mail_transport', mode: 'dev_log', msg: 'RESEND_API_KEY/SMTP_URL не заданы — коды авторизации пишутся в лог' });
 }
@@ -37,6 +38,7 @@ async function sendCodeEmail(email, code) {
       ? {
           from: MAIL_FROM,
           to: [email],
+          reply_to: [MAIL_REPLY_TO],
           subject: 'Код входа — ремонтвижн',
           template: {
             id: RESEND_TEMPLATE_ID,
@@ -59,6 +61,7 @@ async function sendCodeEmail(email, code) {
       : {
           from: MAIL_FROM,
           to: [email],
+          reply_to: [MAIL_REPLY_TO],
           subject: 'Код входа — ремонтвижн',
           text,
           html: `<p>Ваш код входа: <b style="font-size:22px;letter-spacing:2px">${code}</b></p>
@@ -82,6 +85,7 @@ async function sendCodeEmail(email, code) {
   await mailer.sendMail({
     from: MAIL_FROM,
     to: email,
+    replyTo: MAIL_REPLY_TO,
     subject: 'Код входа — ремонтвижн',
     text,
   });

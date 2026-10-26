@@ -4,7 +4,7 @@
 
 ## Инфраструктура
 
-- **Репозиторий**: https://github.com/oblacko/remontvision (private), автор коммитов `Oblacko <yaoblacko@gmail.com>`.
+- **Репозиторий**: https://github.com/oblacko/remontvision (private), автор коммитов `Oblacko`.
 - **VPS**: `root@77.222.38.7` (Ubuntu 24.04, Docker 29.9 + compose v5.6). Проект: `/root/remontvision`. Доступ по ключу `~/.ssh/rv_vps` (локально у разработчика и в секретах GitHub Actions), git pull — read-only deploy-key `rv_deploy`.
 - **Автодеплой**: пуш в `main` → GitHub Actions (`.github/workflows/deploy.yml`) → SSH → `git pull` + `docker compose up -d --build` + `docker image prune -f`. Секреты репо: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`. `.env` на сервере деплоем не трогается.
 - **Postgres 16** в compose (том `pgdata`), миграции из `migrations/*.sql` накатываются при старте app-контейнера (учёт в `_migrations`). Файлы (загрузки/рендеры/фото товаров) — в томе `appdata`, есть слой S3 (`src/storage.js`, reg.cloud `https://s3.regru.cloud`), включается переменными `S3_BUCKET/S3_ACCESS_KEY/S3_SECRET_KEY` в `.env`.

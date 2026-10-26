@@ -4,9 +4,9 @@ import net from 'node:net';
 import { q } from './db.js';
 
 export const LEGAL_VERSIONS = {
-  offer: '2026-10-26.4',
-  privacy: '2026-10-26.4',
-  cross_border: '2026-10-26.4',
+  offer: '2026-10-26.5',
+  privacy: '2026-10-26.5',
+  cross_border: '2026-10-26.5',
 };
 
 export const LEGAL_URLS = {
