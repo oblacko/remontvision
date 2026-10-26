@@ -1,7 +1,15 @@
 // Клиент OpenRouter: рендер через Image API, разбор рендера через chat/completions (vision).
 // Документация: https://openrouter.ai/docs/guides/overview/multimodal/image-generation
+// Если задан HTTPS_PROXY/S3-прокси — гоним через него (нативный fetch env-прокси не читает).
 
 const BASE = 'https://openrouter.ai/api/v1';
+
+const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
+if (proxyUrl) {
+  const { setGlobalDispatcher, ProxyAgent } = await import('undici');
+  setGlobalDispatcher(new ProxyAgent(proxyUrl));
+  console.log(`[openrouter] используется прокси: ${proxyUrl.replace(/\/\/.*@/, '//***@')}`);
+}
 
 export const MOCK_MODE = !process.env.OPENROUTER_API_KEY;
 
