@@ -18,3 +18,30 @@ export async function sanitizeImage(buf) {
     throw err;
   }
 }
+
+// Приводим выход модели к формату исходного фото: центр-кроп по нужной пропорции.
+// Если модель вернула правильную пропорцию — буфер не перекодируется.
+export async function fitAspect(buf, targetRatio) {
+  if (!targetRatio || !Number.isFinite(targetRatio)) return buf;
+  try {
+    const img = sharp(buf, { failOn: 'none' });
+    const meta = await img.metadata();
+    if (!meta.width || !meta.height) return buf;
+    const current = meta.width / meta.height;
+    if (Math.abs(current - targetRatio) / targetRatio < 0.01) return buf;
+
+    let width = meta.width;
+    let height = Math.round(width / targetRatio);
+    if (height > meta.height) {
+      height = meta.height;
+      width = Math.round(height * targetRatio);
+    }
+    width = Math.max(1, Math.min(width, meta.width));
+    height = Math.max(1, Math.min(height, meta.height));
+    const left = Math.floor((meta.width - width) / 2);
+    const top = Math.floor((meta.height - height) / 2);
+    return await img.extract({ left, top, width, height }).toBuffer();
+  } catch {
+    return buf;
+  }
+}

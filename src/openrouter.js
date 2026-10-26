@@ -127,7 +127,10 @@ export function buildPrompt({ style, budget, requestText, iteration, products })
 }
 
 // OpenRouter принимает только фиксированные пропорции — подбираем ближайшую к реальному фото.
-const ASPECTS = [[1, 1], [3, 2], [2, 3], [4, 3], [3, 4], [16, 9], [9, 16]];
+const ASPECTS = [
+  [1, 1], [3, 2], [2, 3], [4, 3], [3, 4], [16, 9], [9, 16],
+  [4, 5], [5, 4], [2, 1], [1, 2], [21, 9], [9, 21],
+];
 export function snapAspect(width, height) {
   if (!width || !height) return '3:2';
   const r = Math.log(width / height);
@@ -179,10 +182,13 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
       ]},
     ],
     modalities: ['image', 'text'],
+    // Gemini image-модели в chat-режиме принимают пропорции только здесь
+    image_config: { aspect_ratio: aspectRatio || '3:2' },
   };
 
   let lastErr;
-  for (const [endpoint, payload] of [[`${BASE}/chat/completions`, chatBody], [`${BASE}/images`, body]]) {
+  // Сначала официальный Image API: он принимает aspect_ratio и не сваливается в 1:1.
+  for (const [endpoint, payload] of [[`${BASE}/images`, body], [`${BASE}/chat/completions`, chatBody]]) {
     try {
       const r = await fetchWithRetry(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
       const data = await r.json();
@@ -194,7 +200,8 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
         if (typeof data.usage?.cost === 'number') lastErr.cost = data.usage.cost; // генерация была оплачена, результата нет
         continue;
       }
-      return { b64: b64out, cost: data.usage?.cost ?? null, model };
+      log({ event: 'render_endpoint', model, endpoint, aspect_ratio: aspectRatio || '3:2' });
+      return { b64: b64out, cost: data.usage?.cost ?? null, model, endpoint };
     } catch (e) { lastErr = e; }
   }
   throw lastErr || new Error('generation failed');

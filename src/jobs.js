@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { q } from './db.js';
 import { MOCK_MODE, buildPrompt, generateRender, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
+import { fitAspect } from './media.js';
 import { curateProducts, referenceImages, hasImage } from './curate.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { spendCreditForRender, restoreCreditForRender } from './payments.js';
@@ -47,7 +48,7 @@ async function processRender(renderId) {
     }
     await q.setRenderPrompt(renderId, prompt);
 
-    let imageB64, cost = null, model = null;
+    let imageB64, cost = null, model = null, targetRatio = null;
     const refs = iteration ? [] : await referenceImages(curated.filter(hasImage));
 
     if (MOCK_MODE) {
@@ -63,6 +64,7 @@ async function processRender(renderId) {
       const srcStored = parent ? parent.image_path : room.photo_path;
       const srcBuf = await getBuffer(srcStored);
       const { width, height } = imageSize(srcBuf);
+      targetRatio = width / height;
       const aspectRatio = snapAspect(width, height); // реальные пропорции, не хардкод 3:2
       const srcB64 = `data:${MIME_BY_EXT[detectImageExt(srcBuf)] || 'image/jpeg'};base64,${srcBuf.toString('base64')}`;
       const out = await generateRender({
@@ -75,10 +77,22 @@ async function processRender(renderId) {
       log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, refs: refs.length, curated: curated.length, cost_usd: cost, ms: Date.now() - t0 });
     }
 
-    const bytes = Buffer.from(imageB64, 'base64');
+    const rawBytes = Buffer.from(imageB64, 'base64');
+    const bytes = targetRatio ? await fitAspect(rawBytes, targetRatio) : rawBytes;
     const ext = detectImageExt(bytes); // модель может вернуть JPEG — не называем его .png
     const renderKey = `renders/${render.id}.${ext}`;
     await putBuffer(renderKey, bytes, MIME_BY_EXT[ext] || 'image/png');
+    const rawSize = imageSize(rawBytes);
+    const outSize = imageSize(bytes);
+    log({
+      event: 'render_aspect',
+      room_id: room.id,
+      render_id: renderId,
+      target_ratio: targetRatio ? Number(targetRatio.toFixed(3)) : null,
+      raw_ratio: Number((rawSize.width / rawSize.height).toFixed(3)),
+      out_ratio: Number((outSize.width / outSize.height).toFixed(3)),
+      out_px: [outSize.width, outSize.height],
+    });
 
     // смета строится по тому, что реально видно на готовой визуализации.
     // Если vision-разбор упал — откатываемся на товары, отобранные до генерации.
@@ -89,7 +103,7 @@ async function processRender(renderId) {
     let matched = [];
     if (!MOCK_MODE) {
       try {
-        const parsed = await parseRender(imageB64);
+        const parsed = await parseRender(bytes.toString('base64'));
         visionCost = parsed.cost;
         matched = matchCatalog(parsed.items, await q.allProducts());
         visionOk = true;
