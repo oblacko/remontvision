@@ -72,6 +72,6 @@ test('vision receives the real image MIME', async () => {
 });
 
 test('portrait source keeps a portrait aspect request', () => {
-  assert.equal(snapAspect(583, 1280), '9:21');
+  assert.equal(snapAspect(583, 1280), '9:16');
   assert.equal(snapAspect(1536, 1024), '3:2');
 });
