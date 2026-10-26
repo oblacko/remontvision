@@ -165,7 +165,7 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
   if (requestIp) await q.setRenderRequestIp(id, requestIp);
 
   if (chargedUserId) {
-    const paid = await spendCreditForRender(chargedUserId, id, 'iterate');
+    const paid = await spendCreditForRender(chargedUserId, id, requestText ? 'iterate' : 'render');
     if (!paid) {
       await q.setRenderError('Нужен кредит', id, 'credit');
       const e = new Error('Нужен кредит');

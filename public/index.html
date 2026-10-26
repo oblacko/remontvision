@@ -585,8 +585,8 @@
   // ---------- модалки ----------
   function openModal(id){ $('#'+id).classList.add('open'); }
   function closeModal(id){ $('#'+id).classList.remove('open'); }
-  $$('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
-  $$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+  $$('[data-close]').forEach(b=>b.onclick=()=>{ if(b.dataset.close==='authModal') pendingGo=false; closeModal(b.dataset.close); });
+  $$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m){ if(m.id==='authModal') pendingGo=false; m.classList.remove('open'); } }));
 
   function openAuth(){
     if(me){ openBuy(); return; }
