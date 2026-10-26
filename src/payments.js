@@ -3,6 +3,7 @@
 // Начисление за оплату идемпотентно: у payments UNIQUE(provider_payment_id),
 // выдача кредитов только при переходе в succeeded.
 import crypto from 'node:crypto';
+import { Agent } from 'undici';
 import { q, withTransaction } from './db.js';
 import { log } from './openrouter.js';
 import { issueReceipt } from './receipts.js';
@@ -10,6 +11,9 @@ import { issueReceipt } from './receipts.js';
 const SHOP_ID = process.env.YUKASSA_SHOP_ID || '';
 const SECRET_KEY = process.env.YUKASSA_SECRET_KEY || '';
 const API = 'https://api.yookassa.ru/v3';
+// ЮKassa — российский сервис, ходим напрямую, не через прокси OpenRouter.
+const DIRECT = new Agent({ connect: { timeout: 15_000 } });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // пакеты кредитов (от 99 ₽)
 export const PACKS = [
@@ -23,18 +27,36 @@ export const yukassaConfigured = () => Boolean(SHOP_ID && SECRET_KEY);
 
 async function yukassa(pathname, method, body) {
   const auth = Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString('base64');
-  const r = await fetch(`${API}${pathname}`, {
-    method,
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/json',
-      'Idempotence-Key': crypto.randomUUID(),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(`yukassa ${r.status}: ${JSON.stringify(data).slice(0, 300)}`);
-  return data;
+  const idempotenceKey = crypto.randomUUID();
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(`${API}${pathname}`, {
+        method,
+        headers: {
+          Authorization: `Basic ${auth}`,
+          'Content-Type': 'application/json',
+          'Idempotence-Key': idempotenceKey,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        dispatcher: DIRECT,
+        signal: AbortSignal.timeout(20_000),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) return data;
+      const msg = `yukassa ${r.status}: ${JSON.stringify(data).slice(0, 300)}`;
+      if (r.status !== 429 && r.status < 500) throw new Error(msg);
+      lastErr = new Error(msg);
+    } catch (e) {
+      lastErr = e;
+      if (!/fetch failed|timeout|ECONN|ENOTFOUND|ETIMEDOUT|socket|network/i.test(String(e.message || ''))) throw e;
+    }
+    if (attempt < 2) {
+      log({ event: 'yukassa_retry', pathname, attempt: attempt + 1, error: String(lastErr?.message || lastErr).slice(0, 200) });
+      await sleep(500 * 2 ** attempt);
+    }
+  }
+  throw lastErr;
 }
 
 // создание платежа: юзер уходит на confirmation_url, потом webhook донесёт результат

@@ -307,9 +307,16 @@ app.post('/api/rooms/:id/iterate', rateLimit, h(async (req, res) => {
 }));
 
 // единый обработчик ошибок async-обработчиков — отдаём json, не HTML
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   const status = err.status || 500;
-  if (status >= 500) log({ event: 'http_error', error: String(err.message || err).slice(0, 300) });
+  if (status >= 500) log({
+    event: 'http_error',
+    method: req.method,
+    path: req.path,
+    status,
+    error: String(err.message || err).slice(0, 300),
+    cause: String(err.cause?.message || '').slice(0, 300) || undefined,
+  });
   res.status(status).json({ error: status >= 500 ? 'Внутренняя ошибка' : err.message });
 });
 
