@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /files/
+Disallow: /renders/
+
+Sitemap: https://www.remontvision.ru/sitemap.xml

@@ -10,6 +10,8 @@
 - **Postgres 16** в compose (том `pgdata`), миграции из `migrations/*.sql` накатываются при старте app-контейнера (учёт в `_migrations`). Файлы (загрузки/рендеры/фото товаров) — в томе `appdata`, есть слой S3 (`src/storage.js`, reg.cloud `https://s3.regru.cloud`), включается переменными `S3_BUCKET/S3_ACCESS_KEY/S3_SECRET_KEY` в `.env`.
 - **Важно про окружение**: переменная БД называется `RV_DATABASE_URL`, не `DATABASE_URL` — стандартное имя глобально экспортировано в `~/.bashrc` другим проектом (paperclip) и перебивает `--env-file`. На машине разработчика чужой `DATABASE_URL` указывает на Postgres проекта paperclip — никогда не использовать.
 - **Прокси**: OpenRouter WAF блокирует диапазон IP хостера VPS (`403 Access denied by security policy`). На сервере в `.env` задан `HTTPS_PROXY=http://<user>:<pass>@95.164.203.249:9367` (тот же хост принимает и socks5). Код читает его в `src/openrouter.js` через undici ProxyAgent (undici v6 — v7 требует Node 22+).
+- **Прод-доступ**: `https://www.remontvision.ru` — nginx (HTTP/2, gzip, HSTS, security-заголовки) проксирует на `127.0.0.1:3000`; TLS — Let's Encrypt, автопродление `certbot.timer` (дважды в сутки, dry-run проверен). `APP_URL` на сервере — `https://www.remontvision.ru`. Порт приложения наружу закрыт (`127.0.0.1:3000` в compose).
+- **SEO**: title/description/keywords, canonical, Open Graph/Twitter, JSON-LD (`WebSite`, `Organization`, `WebApplication`, `FAQPage`), видимый блок «О сервисе» с FAQ, `robots.txt`, `sitemap.xml`, SVG-favicon.
 
 ## Функциональность (сделано)
 
@@ -38,4 +40,4 @@
 - Матчинг на эмбеддингах (SigLIP/CLIP) вместо пересечения ключевых слов.
 - Оценка размеров комнаты (metric depth — отдельный GPU-сервис).
 - PDF-смета (pdfkit/puppeteer), переключатель версий рендера в UI (`parent_render_id` уже пишется), TTL-чистка `data/`, аналитика воронки, рефералка.
-- Прод-конфиг VPS: домен + TLS (nginx/caddy), `YUKASSA_SHOP_ID/SECRET`, `SMTP_URL`, опционально отключить SSH по паролю.
+- Прод-конфиг VPS: `YUKASSA_SHOP_ID/SECRET`, `SMTP_URL`, опционально отключить SSH по паролю.
