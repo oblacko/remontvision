@@ -19,6 +19,17 @@ app.use(express.static('public'));
 app.use('/assets', express.static('assets'));
 app.use(sessionUser);
 
+const LEGAL_PAGES = {
+  '/prices': 'prices.html',
+  '/offer': 'offer.html',
+  '/delivery': 'delivery.html',
+  '/contacts': 'contacts.html',
+  '/privacy': 'privacy.html',
+};
+for (const [route, file] of Object.entries(LEGAL_PAGES)) {
+  app.get([route, `${route}/`], (_req, res) => res.sendFile(path.join(process.cwd(), 'public', file)));
+}
+
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const IMG_EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 // файлы принимаем в память и складываем в storage (S3 или диск)

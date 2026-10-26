@@ -12,6 +12,7 @@
 - **Прокси**: OpenRouter WAF блокирует диапазон IP хостера VPS (`403 Access denied by security policy`). На сервере в `.env` задан `HTTPS_PROXY=http://<user>:<pass>@95.164.203.249:9367` (тот же хост принимает и socks5). Код читает его в `src/openrouter.js` через undici ProxyAgent (undici v6 — v7 требует Node 22+).
 - **Прод-доступ**: `https://www.remontvision.ru` — nginx (HTTP/2, gzip, HSTS, security-заголовки) проксирует на `127.0.0.1:3000`; TLS — Let's Encrypt, автопродление `certbot.timer` (дважды в сутки, dry-run проверен). `APP_URL` на сервере — `https://www.remontvision.ru`. Порт приложения наружу закрыт (`127.0.0.1:3000` в compose).
 - **SEO**: title/description/keywords, canonical, Open Graph/Twitter, JSON-LD (`WebSite`, `Organization`, `WebApplication`, `FAQPage`), видимый блок «О сервисе» с FAQ, `robots.txt`, `sitemap.xml`, SVG-favicon.
+- **Юридические страницы для ЮKassa**: `/prices`, `/offer`, `/delivery`, `/contacts`, `/privacy`; цены и описания услуг, цифровое получение заказа, публичная оферта с AI-дисклеймерами (результат «как есть», ошибки ИИ, размеры и цены не гарантируются, ограничение ответственности), контакты и реквизиты самозанятого. Ссылки — в футере и окнах входа/оплаты.
 
 ## Функциональность (сделано)
 

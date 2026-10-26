@@ -239,6 +239,8 @@
   .total b{font-size:17px;font-weight:800;letter-spacing:-.5px}
   .actions{margin-top:16px}
   .empty{font-size:12.5px;color:var(--muted);text-align:center;padding:14px 0}
+  .fineprint{font-size:10.5px;color:var(--muted);line-height:1.45;margin:10px 2px 0}
+  .fineprint a{color:var(--muted)}
   .footer-links{text-align:center;margin-top:22px;font-size:11px;color:var(--muted)}
   .footer-links a{color:var(--muted)}
 
@@ -295,7 +297,8 @@
   .seo summary::before{content:'+';display:inline-block;width:16px;color:var(--accent);font-weight:800}
   .seo details[open] summary::before{content:'−'}
   .seo details p{font-size:12px;margin-top:7px}
-  .seo-nav{margin-top:18px;font-size:11px;color:var(--muted);text-align:center}
+  .seo-req{margin-top:18px;font-size:11px;color:var(--muted)}
+  .seo-nav{margin-top:8px;font-size:11px;color:var(--muted);text-align:center}
   .seo-nav a{color:var(--muted)}
 </style>
 </head>
@@ -337,7 +340,7 @@
       </div>
       <button class="btn orange" id="go">Сделать дизайн →</button>
     </div>
-    <div class="footer-links"><a href="#about">о сервисе</a> · <a href="#admin">админка каталога</a></div>
+    <div class="footer-links"><a href="/prices">услуги и цены</a> · <a href="#about">о сервисе</a> · <a href="#admin">админка каталога</a></div>
   </section>
 
   <!-- ЭКРАН 2: ожидание -->
@@ -385,6 +388,7 @@
       <span>Итого материалы (оценка)</span>
       <b id="total">—</b>
     </div>
+    <p class="fineprint">Визуализация и смета созданы ИИ и носят информационный характер. Размеры, цвета, количество материалов и цены могут не соответствовать реальности — проверяйте перед покупкой и началом работ. <a href="/offer" target="_blank" rel="noopener">Подробнее в оферте</a>.</p>
 
     <div class="actions btnrow">
       <a class="btn" id="dlBtn" href="#" download="remont.jpg" style="text-align:center;text-decoration:none">Скачать фото</a>
@@ -436,7 +440,8 @@
     <p>Нет, сервис подходит для кухни, гостиной, спальни и других жилых комнат. Стиль и бюджет на материалы выбираются в интерфейсе.</p>
   </details>
 
-  <p class="seo-nav"><a href="/">Ремонтвижн</a> · дизайн интерьера по фото с ИИ</p>
+  <p class="seo-req">Самозанятый Чернов Олег Геннадьевич, ИНН 526311206266. E-mail: <a href="mailto:yaoblacko@yandex.ru">yaoblacko@yandex.ru</a>.</p>
+  <p class="seo-nav"><a href="/prices">Услуги и цены</a> · <a href="/offer">Оферта</a> · <a href="/delivery">Получение</a> · <a href="/contacts">Контакты и реквизиты</a> · <a href="/privacy">Политика конфиденциальности</a></p>
 </footer>
 
 <!-- ВХОД -->
@@ -448,6 +453,7 @@
       <p class="hint">Пришлём код на почту. Без паролей — удобно с телефона и компьютера.</p>
       <div class="field"><label>E-mail</label><input id="authEmail" type="email" placeholder="you@yandex.ru" autocomplete="email"></div>
       <button class="btn orange" id="authSend">Получить код</button>
+      <p class="hint" style="margin-top:12px">Входя, вы принимаете <a href="/offer" target="_blank" rel="noopener" style="color:var(--accent)">оферту</a> и <a href="/privacy" target="_blank" rel="noopener" style="color:var(--accent)">политику конфиденциальности</a>.</p>
     </div>
     <div id="authStep2" style="display:none">
       <h3>Введите код</h3>
@@ -465,6 +471,7 @@
     <h3>Кредиты на правки</h3>
     <p class="hint">1 кредит = 1 правка дизайна. Оплата картой, СБП или кошельком ЮMoney.</p>
     <div id="packs"></div>
+    <p class="hint" style="margin-top:12px">Оплачивая, вы принимаете <a href="/offer" target="_blank" rel="noopener" style="color:var(--accent)">оферту</a>, <a href="/prices" target="_blank" rel="noopener" style="color:var(--accent)">условия и цены</a> и <a href="/privacy" target="_blank" rel="noopener" style="color:var(--accent)">политику конфиденциальности</a>.</p>
   </div>
 </div>
 
