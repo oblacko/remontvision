@@ -8,7 +8,7 @@ import { startWorker, enqueueRender } from './jobs.js';
 import { listImageModels, MOCK_MODE, assertConfig, log } from './openrouter.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
-import { PACKS, packById, createPayment, syncPayment, createRefund, refundQuote, yukassaConfigured } from './payments.js';
+import { PACKS, packById, createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured } from './payments.js';
 import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
@@ -79,6 +79,23 @@ function productLink(p) {
   return `https://yandex.ru/search/?text=${encodeURIComponent(query)}`;
 }
 
+function generationDto(g) {
+  return {
+    id: g.id,
+    room_id: g.room_id,
+    style: g.style,
+    budget: g.budget,
+    status: g.status,
+    error: g.error,
+    created_at: g.created_at,
+    finished_at: g.finished_at,
+    request_text: g.request_text,
+    credits_spent: g.credits_spent,
+    image_url: g.image_path ? `/renders/${path.basename(g.image_path)}` : null,
+    photo_url: g.photo_path ? `/files/${path.basename(g.photo_path)}` : null,
+  };
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true, mock: MOCK_MODE }));
 app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
@@ -119,6 +136,11 @@ app.get('/api/me', h(async (req, res) => {
 app.get('/api/my/rooms', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   res.json(await q.myRooms(req.user.id));
+}));
+
+app.get('/api/my/generations', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  res.json((await q.userGenerations(req.user.id)).map(generationDto));
 }));
 
 app.get('/api/credits', h(async (req, res) => {
@@ -208,6 +230,34 @@ app.delete('/api/admin/products/:id', h(async (req, res) => {
   res.status(ok ? 204 : 404).end();
 }));
 
+// ---------- аккаунты: только админ ----------
+app.get('/api/admin/users', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(await q.adminUsers(String(req.query.q || '').slice(0, 100)));
+}));
+
+app.get('/api/admin/users/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const user = await q.adminUserById(Number(req.params.id));
+  if (!user) return res.status(404).json({ error: 'Не найдено' });
+  res.json({
+    user,
+    credits: await q.creditHistory(user.id),
+    generations: (await q.userGenerations(user.id)).map(generationDto),
+  });
+}));
+
+app.post('/api/admin/users/:id/credits', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const out = await adjustCredits(
+    Number(req.params.id),
+    Number(req.body?.delta),
+    String(req.body?.reason || 'admin_adjust').slice(0, 120),
+    req.body?.note ? String(req.body.note).slice(0, 300) : null,
+  );
+  res.json(out);
+}));
+
 // ---------- возвраты: только админ ----------
 app.get('/api/admin/payments', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -265,7 +315,12 @@ app.post('/api/rooms', rateLimit, upload.single('photo'), h(async (req, res) => 
 app.get('/api/rooms/:id', h(async (req, res) => {
   const room = await q.getRoom(req.params.id);
   if (!room) return res.status(404).json({ error: 'Не найдено' });
-  const render = await q.latestRender(room.id);
+  let render = null;
+  if (req.query.render_id) {
+    const picked = await q.getRender(String(req.query.render_id));
+    if (picked && picked.room_id === room.id) render = picked;
+  }
+  if (!render) render = await q.latestRender(room.id);
   const items = render ? await q.itemsForRender(render.id) : [];
   const total = render ? await q.totalForRender(render.id) : 0;
   const pricesAsOf = render ? await q.pricesAsOfForRender(render.id) : null;
@@ -276,7 +331,15 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     status: room.status,
     error: room.error,
     photo_url: `/files/${path.basename(room.photo_path)}`,
-    render: render ? { id: render.id, image: `/renders/${path.basename(render.image_path)}`, cost_usd: render.cost_usd, model: render.model } : null,
+    render: render ? {
+      id: render.id,
+      image: render.image_path ? `/renders/${path.basename(render.image_path)}` : null,
+      status: render.status,
+      created_at: render.created_at,
+      request_text: render.request_text,
+      cost_usd: render.cost_usd,
+      model: render.model,
+    } : null,
     items: items.map(p => ({
       name: p.name, brand: p.brand, attrs: p.attrs || {},
       price: p.price, unit: p.unit, qty: p.qty, source: p.source, match_score: p.match_score,

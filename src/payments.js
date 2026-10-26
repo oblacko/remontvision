@@ -114,6 +114,36 @@ export async function grantCredits(userId, delta, reason, paymentId = null) {
   await q.addCreditTxn(userId, delta, reason, paymentId);
 }
 
+// ручная корректировка кредитов из админки
+export async function adjustCredits(userId, delta, reason = 'admin_adjust', note = null) {
+  if (!Number.isInteger(delta) || delta === 0) {
+    const e = new Error('Количество кредитов должно быть целым числом, не равным 0');
+    e.status = 400;
+    throw e;
+  }
+  return withTransaction(async client => {
+    const lock = await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+    if (!lock.rows[0]) {
+      const e = new Error('Пользователь не найден');
+      e.status = 404;
+      throw e;
+    }
+    const bal = await client.query(
+      `SELECT COALESCE(SUM(delta), 0)::int AS balance FROM credit_txn WHERE user_id = $1`, [userId]);
+    const next = bal.rows[0].balance + delta;
+    if (next < 0) {
+      const e = new Error(`Недостаточно кредитов: баланс ${bal.rows[0].balance}`);
+      e.status = 400;
+      throw e;
+    }
+    await client.query(
+      `INSERT INTO credit_txn (user_id, delta, reason, note) VALUES ($1, $2, $3, $4)`,
+      [userId, delta, reason || 'admin_adjust', note || null]);
+    log({ event: 'admin_credit_adjust', user_id: userId, delta, balance: next, reason, note });
+    return { user_id: userId, delta, balance: next };
+  });
+}
+
 // атомарное списание: блокируем строку юзера — списания сериализуются, гонки исключены
 export async function spendCredit(userId, reason) {
   return withTransaction(async client => {

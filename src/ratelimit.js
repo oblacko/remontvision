@@ -3,6 +3,12 @@
 
 const MAX = Number(process.env.RATE_LIMIT_MAX || 5);
 const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 3_600_000);
+const BYPASS_EMAILS = new Set(
+  String(process.env.RATE_LIMIT_BYPASS_EMAILS || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 const hits = new Map();
 
@@ -17,6 +23,8 @@ sweeper.unref();
 
 export function rateLimit(req, res, next) {
   if (!MAX || MAX <= 0) return next();
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (email && BYPASS_EMAILS.has(email)) return next();
   const now = Date.now();
   const key = req.ip || req.socket.remoteAddress || 'unknown';
   const arr = (hits.get(key) || []).filter(t => now - t < WINDOW_MS);

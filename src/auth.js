@@ -12,6 +12,12 @@ const OTP_TTL_MIN = Number(process.env.OTP_TTL_MIN || 10);
 const SESSION_DAYS = Number(process.env.SESSION_DAYS || 30);
 const RESEND_SECONDS = Number(process.env.OTP_RESEND_SECONDS || 60);
 const DAILY_LIMIT = Number(process.env.OTP_DAILY_LIMIT || 10);
+const OTP_BYPASS = new Set(
+  String(process.env.OTP_BYPASS_EMAILS || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean),
+);
 const COOKIE = 'rv_sid';
 
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
@@ -98,17 +104,19 @@ export async function requestCode(emailRaw) {
     e.status = 400;
     throw e;
   }
-  const recent = await q.otpCountRecent(email, 24 * 60);
-  if (recent >= DAILY_LIMIT) {
-    const e = new Error('Слишком много запросов кода, попробуйте завтра');
-    e.status = 429;
-    throw e;
-  }
-  const last = await q.latestOtp(email);
-  if (last && (Date.now() - new Date(last.created_at).getTime()) < RESEND_SECONDS * 1000) {
-    const e = new Error(`Код уже отправлен, повторите через ${RESEND_SECONDS} с`);
-    e.status = 429;
-    throw e;
+  if (!OTP_BYPASS.has(email)) {
+    const recent = await q.otpCountRecent(email, 24 * 60);
+    if (recent >= DAILY_LIMIT) {
+      const e = new Error('Слишком много запросов кода, попробуйте завтра');
+      e.status = 429;
+      throw e;
+    }
+    const last = await q.latestOtp(email);
+    if (last && (Date.now() - new Date(last.created_at).getTime()) < RESEND_SECONDS * 1000) {
+      const e = new Error(`Код уже отправлен, повторите через ${RESEND_SECONDS} с`);
+      e.status = 429;
+      throw e;
+    }
   }
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
   await q.createOtp(email, sha256(code), OTP_TTL_MIN);

@@ -156,6 +156,19 @@
   .consents input{width:16px;height:16px;margin-top:1px;accent-color:var(--accent);flex:none}
   .consents a{color:var(--accent)}
   .price-asof{font-size:10.5px;color:var(--muted);margin:6px 2px 0;text-align:right}
+  .hist-list{display:flex;flex-direction:column}
+  .hist-row{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .hist-row:last-child{border-bottom:none}
+  .hist-row[data-done="false"]{cursor:default;opacity:.75}
+  .hist-thumb{width:60px;height:60px;border-radius:6px;object-fit:cover;background:#eee;flex:none}
+  .hist-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);border:1px dashed var(--line)}
+  .hist-main{flex:1;min-width:0}
+  .hist-main b{display:block;font-size:12.5px;font-weight:700}
+  .hist-main .meta{font-size:11px;color:var(--muted);margin-top:2px}
+  .hist-main .req{font-size:11px;color:rgba(17,17,17,.65);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hist-empty{font-size:12px;color:var(--muted);text-align:center;padding:20px 0}
+  .u-detail{margin-top:16px}
+  .u-detail .card{padding:12px 14px}
   .drop{
     border:1.5px dashed #b9bab2;border-radius:7px;background:var(--card);
     padding:44px 20px;text-align:center;cursor:pointer;transition:border-color .2s;
@@ -494,6 +507,16 @@
   </div>
 </div>
 
+<!-- ИСТОРИЯ ГЕНЕРАЦИЙ -->
+<div class="modal top" id="historyModal">
+  <div class="sheet">
+    <button class="close-x" data-close="historyModal">×</button>
+    <h3>Мои генерации</h3>
+    <p class="hint">Нажмите на готовую генерацию, чтобы открыть её.</p>
+    <div class="hist-list" id="historyList"></div>
+  </div>
+</div>
+
 <!-- АДМИНКА КАТАЛОГА -->
 <div class="adminpage" id="adminPage">
   <div class="inner">
@@ -547,6 +570,17 @@
         <thead><tr><th></th><th>Название</th><th>Кат.</th><th>Цена</th><th>Стиль</th><th></th></tr></thead>
         <tbody id="pRows"></tbody>
       </table>
+
+      <div style="margin-top:32px">
+        <h2>Аккаунты</h2>
+        <div class="field"><label>Поиск по e-mail</label><input id="uSearch" placeholder="support@..."></div>
+        <button class="btn small" id="uSearchBtn" style="margin-top:8px">Найти</button>
+        <table class="atable" style="margin-top:12px">
+          <thead><tr><th>E-mail</th><th>Баланс</th><th>Комнат</th><th>Генераций</th><th>Последняя</th><th></th></tr></thead>
+          <tbody id="uRows"></tbody>
+        </table>
+        <div id="uDetail" class="u-detail"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -563,6 +597,8 @@
 
   function go(id){ $$('.screen').forEach(s=>s.classList.remove('active')); $('#'+id).classList.add('active'); window.scrollTo(0,0); }
   const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(n))+' ₽';
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtDate=iso=>iso?new Date(iso).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
   function toast(msg,ms=3200){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms); }
 
   // ---------- сессия ----------
@@ -573,15 +609,15 @@
   }
   function paintUser(){
     const html = me
-      ? `<div class="credits" id="creditsPill"><b>${me.balance}</b>&nbsp;кр.</div><button class="linkbtn" id="logoutBtn" title="выйти">${me.email} ✕</button>`
-      : `<button class="linkbtn" id="loginBtn">Войти</button>`;
+      ? `<div class="credits credit-pill"><b>${me.balance}</b>&nbsp;кр.</div>
+         <button class="linkbtn history-btn" title="история генераций">история</button>
+         <button class="linkbtn logout-btn" title="выйти">${esc(me.email)} ✕</button>`
+      : `<button class="linkbtn login-btn">Войти</button>`;
     ['userBlock','userBlock2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
-    if(me){
-      const pill=$('#creditsPill'); if(pill) pill.onclick=openBuy;
-      const lo=$('#logoutBtn'); if(lo) lo.onclick=async()=>{ await fetch('/api/auth/logout',{method:'POST'}); me=null; paintUser(); };
-    } else {
-      const li=$('#loginBtn'); if(li) li.onclick=openAuth;
-    }
+    $$('.credit-pill').forEach(p=>p.onclick=openBuy);
+    $$('.history-btn').forEach(b=>b.onclick=openHistory);
+    $$('.logout-btn').forEach(lo=>lo.onclick=async()=>{ await fetch('/api/auth/logout',{method:'POST'}); me=null; paintUser(); });
+    $$('.login-btn').forEach(li=>li.onclick=openAuth);
   }
 
   // ---------- модалки ----------
@@ -594,6 +630,8 @@
     if(me){ openBuy(); return; }
     $('#authStep1').style.display='block'; $('#authStep2').style.display='none';
     $('#authEmail').value=''; $('#authCode').value='';
+    const lastEmail=localStorage.getItem('rv_last_email');
+    if(lastEmail) $('#authEmail').value=lastEmail;
     ['consentOffer','consentPrivacy','consentCross'].forEach(id=>$('#'+id).checked=false);
     openModal('authModal');
   }
@@ -635,6 +673,7 @@
       const r=await fetch('/api/auth/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#authEmail').value.trim(),code,consents:authConsents()})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error||r.status);
+      localStorage.setItem('rv_last_email', d.email);
       closeModal('authModal');
       await loadMe();
       toast(d.is_new ? 'Готово! Начислено 2 кредита за регистрацию' : 'Вошли как '+d.email);
@@ -682,6 +721,58 @@
       if(tries>15){ clearInterval(t); toast('Если кредиты не появились — обновите страницу через минуту'); }
     },2000);
   })();
+
+  // ---------- история генераций ----------
+  async function openHistory(){
+    if(!me){ openAuth(); toast('Войдите, чтобы увидеть историю'); return; }
+    openModal('historyModal');
+    $('#historyList').innerHTML='<div class="hist-empty">Загружаем…</div>';
+    try{
+      const r=await fetch('/api/my/generations');
+      const list=await r.json().catch(()=>[]);
+      if(!r.ok) throw new Error(list.error||r.status);
+      if(!list.length){
+        $('#historyList').innerHTML='<div class="hist-empty">Пока нет генераций</div>';
+        return;
+      }
+      $('#historyList').innerHTML=list.map(g=>{
+        const img=g.image_url||g.photo_url;
+        const thumb=img
+          ? `<img class="hist-thumb" src="${img}" alt="" loading="lazy">`
+          : `<div class="hist-thumb ph">нет фото</div>`;
+        const title=g.request_text?`Правка: ${esc(g.request_text)}`:`Дизайн · ${esc(g.style||'—')}`;
+        const status=g.status==='done'?'готово':(g.status==='error'?'ошибка':esc(g.status||'—'));
+        const credits=Number(g.credits_spent||0);
+        return `<div class="hist-row" data-room="${g.room_id}" data-render="${g.id}" data-done="${g.status==='done'}">
+          ${thumb}
+          <div class="hist-main">
+            <b>${title}</b>
+            <div class="meta">${esc(g.style||'—')} · ${fmtDate(g.created_at)} · ${status} · ${credits} кр.</div>
+            ${g.error?`<div class="req">${esc(g.error)}</div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+      $$('#historyList .hist-row').forEach(row=>row.onclick=()=>{
+        if(row.dataset.done!=='true') return toast('Эта генерация не завершена');
+        loadHistoryRoom(row.dataset.room,row.dataset.render);
+      });
+    }catch(e){
+      $('#historyList').innerHTML=`<div class="hist-empty">Ошибка: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function loadHistoryRoom(room_id, render_id){
+    try{
+      const r=await fetch('/api/rooms/'+room_id+'?render_id='+encodeURIComponent(render_id));
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error||r.status);
+      if(!d.render?.image) throw new Error('Изображение не найдено');
+      roomId=room_id;
+      renderResult(d);
+      closeModal('historyModal');
+      go('s3');
+    }catch(e){ toast(e.message); }
+  }
 
   // ---------- экран 1 (загрузка) — без изменений ----------
   const drop=$('#drop'), fileInput=$('#fileInput');
@@ -882,7 +973,10 @@
     adminPage.classList.add('open');
     if(!adminKey){ $('#keyGate').style.display='block'; $('#adminBody').style.display='none'; return; }
     $('#keyGate').style.display='none';
-    await loadProducts();
+    try{
+      await loadProducts();
+      await loadUsers();
+    }catch(e){ toast(e.message); }
   }
   $('#adminKeySave').onclick=()=>{
     adminKey=$('#adminKey').value.trim();
@@ -918,6 +1012,77 @@
       loadProducts();
     });
   }
+  async function loadUsers(){
+    try{
+      const qv=$('#uSearch').value.trim();
+      const r=await adminFetch('/api/admin/users?q='+encodeURIComponent(qv));
+      const list=await r.json();
+      $('#uRows').innerHTML=list.length?list.map(u=>`<tr>
+        <td><b>${esc(u.email)}</b><br><span style="color:var(--muted)">${fmtDate(u.created_at)}</span></td>
+        <td>${u.balance} кр.</td>
+        <td>${u.rooms_count}</td>
+        <td>${u.renders_count}</td>
+        <td>${u.last_generation_at?fmtDate(u.last_generation_at):'—'}</td>
+        <td style="white-space:nowrap">
+          <button class="mini" data-cred="${u.id}">кредиты</button>
+          <button class="mini" data-user="${u.id}">история</button>
+        </td></tr>`).join(''):'<tr><td colspan="6" style="color:var(--muted)">Нет аккаунтов</td></tr>';
+      $$('#uRows [data-cred]').forEach(b=>b.onclick=()=>adjustUserCredits(b.dataset.cred));
+      $$('#uRows [data-user]').forEach(b=>b.onclick=()=>showUser(b.dataset.user));
+    }catch(e){ toast(e.message); }
+  }
+  $('#uSearchBtn').onclick=()=>loadUsers();
+  $('#uSearch').addEventListener('keydown',e=>{ if(e.key==='Enter') loadUsers(); });
+
+  async function adjustUserCredits(id){
+    const raw=prompt('Сколько кредитов добавить? Минус — списать.','1');
+    if(raw===null) return;
+    const delta=Number(raw);
+    if(!Number.isInteger(delta)||delta===0) return toast('Введите целое число, не равное 0');
+    const reason=prompt('Причина операции',delta>0?'бонус':'списание')||'admin_adjust';
+    try{
+      const r=await adminFetch('/api/admin/users/'+id+'/credits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({delta,reason})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error||r.status);
+      toast('Баланс: '+d.balance+' кр.');
+      loadUsers();
+      if($('#uDetail').dataset.user===String(id)) showUser(id);
+    }catch(e){ toast(e.message); }
+  }
+
+  async function showUser(id){
+    try{
+      const r=await adminFetch('/api/admin/users/'+id);
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error||r.status);
+      const u=d.user;
+      $('#uDetail').dataset.user=String(id);
+      const credits=d.credits.length?d.credits.map(c=>`<tr>
+        <td>${c.delta>0?'+':''}${c.delta}</td><td>${esc(c.reason||'')}</td>
+        <td>${esc(c.note||'')}</td><td>${fmtDate(c.created_at)}</td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--muted)">Нет операций</td></tr>';
+      const gens=d.generations.length?d.generations.map(g=>{
+        const img=g.image_url||g.photo_url;
+        const thumb=img?`<img class="hist-thumb" src="${img}" alt="" loading="lazy">`:`<div class="hist-thumb ph">нет фото</div>`;
+        const title=g.request_text?`Правка: ${esc(g.request_text)}`:`Дизайн · ${esc(g.style||'—')}`;
+        const status=g.status==='done'?'готово':(g.status==='error'?'ошибка':esc(g.status||'—'));
+        return `<div class="hist-row" data-done="false">${thumb}<div class="hist-main"><b>${title}</b><div class="meta">${fmtDate(g.created_at)} · ${status} · ${g.credits_spent||0} кр.</div>${g.error?`<div class="req">${esc(g.error)}</div>`:''}</div></div>`;
+      }).join(''):'<div class="hist-empty">Нет генераций</div>';
+      $('#uDetail').innerHTML=`<div class="card">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+          <div><b>${esc(u.email)}</b><div class="muted">с ${fmtDate(u.created_at)}</div></div>
+          <div style="text-align:right"><b>${u.balance} кр.</b><div class="muted">${u.rooms_count} комнат · ${u.renders_count} генераций</div></div>
+        </div>
+        <div style="margin-top:10px"><button class="mini" id="uCredBtn">изменить кредиты</button> <button class="mini" id="uCloseBtn">закрыть</button></div>
+      </div>
+      <h3>Кредиты</h3>
+      <table class="atable"><thead><tr><th>Δ</th><th>Причина</th><th>Заметка</th><th>Дата</th></tr></thead><tbody>${credits}</tbody></table>
+      <h3>Генерации</h3>
+      <div class="hist-list">${gens}</div>`;
+      $('#uCredBtn').onclick=()=>adjustUserCredits(id);
+      $('#uCloseBtn').onclick=()=>{ $('#uDetail').innerHTML=''; $('#uDetail').removeAttribute('data-user'); };
+    }catch(e){ toast(e.message); }
+  }
+
   function fillForm(p){
     $('#pformTitle').textContent='Товар #'+p.id;
     $('#p_id').value=p.id; $('#p_category').value=p.category; $('#p_name').value=p.name;

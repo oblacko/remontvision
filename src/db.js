@@ -164,6 +164,36 @@ export const q = {
   myRooms: userId =>
     pool.query(`SELECT id, style, budget, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
       .then(r => r.rows),
+  userGenerations: userId =>
+    pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at, r.request_text,
+                       r.image_path, rm.style, rm.budget, rm.photo_path,
+                       GREATEST(0,
+                         COALESCE((SELECT SUM(-ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.delta < 0), 0)
+                         - COALESCE((SELECT SUM(ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.reason = 'iterate_refund'), 0)
+                       )::int AS credits_spent
+                FROM renders r JOIN rooms rm ON rm.id = r.room_id
+                WHERE rm.user_id = $1 ORDER BY r.created_at DESC LIMIT 100`, [userId])
+      .then(r => r.rows),
+
+  // админка: аккаунты
+  adminUsers: search =>
+    pool.query(`SELECT u.id, u.email, u.created_at,
+                       COALESCE((SELECT SUM(delta) FROM credit_txn WHERE user_id = u.id), 0)::int AS balance,
+                       (SELECT COUNT(*) FROM rooms WHERE user_id = u.id)::int AS rooms_count,
+                       (SELECT COUNT(*) FROM renders r JOIN rooms rm ON rm.id = r.room_id WHERE rm.user_id = u.id)::int AS renders_count,
+                       (SELECT MAX(r.created_at) FROM renders r JOIN rooms rm ON rm.id = r.room_id WHERE rm.user_id = u.id) AS last_generation_at
+                FROM users u
+                WHERE ($1 = '' OR u.email ILIKE '%' || $1 || '%')
+                ORDER BY u.created_at DESC LIMIT 100`, [search || ''])
+      .then(r => r.rows),
+  adminUserById: id =>
+    pool.query(`SELECT u.id, u.email, u.created_at,
+                       COALESCE((SELECT SUM(delta) FROM credit_txn WHERE user_id = u.id), 0)::int AS balance,
+                       (SELECT COUNT(*) FROM rooms WHERE user_id = u.id)::int AS rooms_count,
+                       (SELECT COUNT(*) FROM renders r JOIN rooms rm ON rm.id = r.room_id WHERE rm.user_id = u.id)::int AS renders_count,
+                       (SELECT MAX(r.created_at) FROM renders r JOIN rooms rm ON rm.id = r.room_id WHERE rm.user_id = u.id) AS last_generation_at
+                FROM users u WHERE u.id = $1`, [id])
+      .then(r => r.rows[0] || null),
 
   // платежи
   createPaymentRow: (userId, provider, providerPaymentId, amountKopecks, payload) =>
