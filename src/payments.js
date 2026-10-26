@@ -90,9 +90,16 @@ export async function syncPayment(providerPaymentId) {
     if (!local) return { granted: false, status: 'unknown_local' };
     if (local.status === 'succeeded') return { granted: false, status: 'already', local_payment_id: local.id }; // идемпотентность
 
-    const credits = Number(remote.metadata?.credits || 0);
-    const userId = Number(remote.metadata?.user_id || local.user_id);
-    await client.query(`UPDATE payments SET status='succeeded', paid_at = now(), payload = $2 WHERE id = $1`,
+    const credits = Number(local.payload?.credits || 0);
+    const userId = local.user_id;
+    const remoteKopecks = Math.round(Number(remote.amount?.value || 0) * 100);
+    if (remote.amount?.currency !== 'RUB' || remoteKopecks !== local.amount_kopecks) {
+      log({ event: 'payment_amount_mismatch', payment_id: local.id, local_kopecks: local.amount_kopecks, remote: remote.amount });
+      return { granted: false, status: 'amount_mismatch', local_payment_id: local.id };
+    }
+    // сохраняем локальные pack_id/credits, добавляя remote-детали; refundQuote читает payload.credits
+    await client.query(`UPDATE payments SET status='succeeded', paid_at = now(),
+                        payload = $2::jsonb || payload WHERE id = $1`,
       [local.id, JSON.stringify({ amount: remote.amount, metadata: remote.metadata })]);
     if (credits > 0) {
       await client.query(`INSERT INTO credit_txn (user_id, delta, reason, payment_id) VALUES ($1,$2,'purchase',$3)`,
@@ -188,6 +195,64 @@ export async function restoreCreditForRender(renderId, note = null) {
     log({ event: 'credit_restored', user_id: userId, render_id: renderId, note });
     return true;
   });
+}
+
+// Атомарно: проверить владельца/статус комнаты, списать кредит, создать queued-рендер.
+// Worker не увидит задачу, пока транзакция не закоммичена; вторая параллельная
+// итерация получает 409, потому что ждёт lock на строке комнаты.
+export async function enqueueRenderWithCredit({
+  id,
+  roomId,
+  parentRenderId = null,
+  requestText = null,
+  chargedUserId = null,
+  requestIp = null,
+}) {
+  const iteration = Boolean(parentRenderId);
+  const out = await withTransaction(async client => {
+    const room = await client.query(`SELECT id, user_id, status FROM rooms WHERE id = $1 FOR UPDATE`, [roomId]);
+    if (!room.rows[0]) {
+      const e = new Error('Комната не найдена'); e.status = 404; throw e;
+    }
+    if (chargedUserId && room.rows[0].user_id !== chargedUserId) {
+      const e = new Error('Комната не найдена'); e.status = 404; throw e;
+    }
+    if (iteration && room.rows[0].status !== 'done') {
+      const e = new Error('Комната уже обрабатывается'); e.status = 409; throw e;
+    }
+
+    if (chargedUserId) {
+      const lock = await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [chargedUserId]);
+      if (!lock.rows[0]) {
+        const e = new Error('Пользователь не найден'); e.status = 404; throw e;
+      }
+      const bal = await client.query(
+        `SELECT COALESCE(SUM(delta), 0)::int AS balance FROM credit_txn WHERE user_id = $1`, [chargedUserId]);
+      if (bal.rows[0].balance < 1) {
+        const e = new Error('Нужен кредит'); e.status = 402; throw e;
+      }
+    }
+
+    await client.query(
+      `INSERT INTO renders (id, room_id, parent_render_id, request_text, request_ip, status)
+       VALUES ($1, $2, $3, $4, $5, 'queued')`,
+      [id, roomId, parentRenderId, requestText, requestIp]);
+
+    if (chargedUserId) {
+      await client.query(
+        `INSERT INTO credit_txn (user_id, delta, reason, render_id)
+         VALUES ($1, -1, $2, $3)`,
+        [chargedUserId, iteration ? 'iterate' : 'render', id]);
+    }
+
+    await client.query(
+      `UPDATE rooms SET status = 'queued', error = NULL, updated_at = now() WHERE id = $1`, [roomId]);
+
+    return { id, charged: Boolean(chargedUserId), iteration };
+  });
+
+  log({ event: 'enqueue', room_id: roomId, render_id: id, parent_render_id: parentRenderId, charged_user_id: chargedUserId || null, iteration });
+  return out;
 }
 
 export async function balance(userId) {

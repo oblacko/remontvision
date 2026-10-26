@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ремонт по фото — AI-дизайн интерьера и смета материалов | Ремонтвижн</title>
-<meta name="description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из товаров каталога с ценами и ссылками. 2 генерации бесплатно после регистрации.">
+<title>Ремонт по фото — AI-дизайн интерьера | Ремонтвижн</title>
+<meta name="description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и подберёт товары с ценами. 2 генерации бесплатно.">
 <meta name="keywords" content="ремонт по фото, дизайн интерьера по фото, AI дизайн, нейросеть ремонт, визуализация ремонта, смета материалов, дизайн кухни онлайн">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="author" content="Ремонтвижн">
@@ -15,16 +15,17 @@
 <meta property="og:site_name" content="Ремонтвижн">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:title" content="Ремонт по фото — AI-дизайн интерьера и смета материалов">
-<meta property="og:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из товаров каталога с ценами и ссылками. 2 генерации бесплатно после регистрации.">
+<meta property="og:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и подберёт товары с ценами. 2 генерации бесплатно.">
 <meta property="og:url" content="https://www.remontvision.ru/">
-<meta property="og:image" content="https://www.remontvision.ru/assets/kitchen_after.png">
-<meta property="og:image:width" content="1536">
-<meta property="og:image:height" content="1024">
+<meta property="og:image" content="https://www.remontvision.ru/assets/og-1200x630.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Визуализация кухни после ремонта, созданная нейросетью">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Ремонт по фото — AI-дизайн интерьера и смета материалов">
-<meta name="twitter:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из товаров каталога с ценами и ссылками.">
-<meta name="twitter:image" content="https://www.remontvision.ru/assets/kitchen_after.png">
+<meta name="twitter:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и подберёт товары с ценами. 2 генерации бесплатно.">
+<meta name="twitter:image" content="https://www.remontvision.ru/assets/og-1200x630.jpg">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -125,8 +126,8 @@
     --bg: rgb(245,246,242);
     --card: #fff;
     --ink: #111;
-    --muted: #888;
-    --accent: #FF5F1F;
+    --muted: #666;
+    --accent: #D94A0B;
     --line: #e5e6e1;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -149,7 +150,7 @@
   .mock-badge{font-size:10px;color:#fff;background:var(--accent);padding:4px 10px;border-radius:20px;display:none}
 
   .h1{font-size:26px;font-weight:800;line-height:1.15;letter-spacing:-1px;margin-bottom:6px}
-  .sub{font-size:13px;color:rgba(17,17,17,.55);margin-bottom:16px;line-height:1.45}
+  .sub{font-size:13px;color:rgba(17,17,17,.68);margin-bottom:16px;line-height:1.45}
   .ai-note{font-size:11px;color:#8a3b16;background:#fff3ec;border:1px solid #ffd6c2;border-radius:7px;padding:9px 11px;margin:0 0 18px;line-height:1.45}
   .consents{margin:12px 0 4px;display:flex;flex-direction:column;gap:8px}
   .consents label{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;line-height:1.4;color:rgba(17,17,17,.75);cursor:pointer}
@@ -178,7 +179,14 @@
   .drop b{display:block;font-size:14px;font-weight:600}
   .drop span{display:block;font-size:11.5px;color:var(--muted);margin-top:5px}
   .preview-wrap{display:none;margin-bottom:18px}
-  .preview-wrap img{width:100%;border-radius:7px;display:block}
+  .preview-wrap img{width:100%;max-height:240px;object-fit:cover;border-radius:7px;display:block}
+  .change-photo{display:none;margin:-8px auto 14px;font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline}
+  .example{margin:0 0 18px}
+  .example-imgs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .example figure{margin:0;position:relative}
+  .example img{width:100%;height:110px;object-fit:cover;border-radius:6px;display:block}
+  .example figcaption{position:absolute;left:6px;bottom:5px;background:rgba(17,17,17,.68);color:#fff;font-size:9.5px;padding:2px 6px;border-radius:3px}
+  .example-cap{font-size:10px;color:var(--muted);text-align:center;margin-top:4px}
   .chips{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
   .chip{
     flex:1;min-width:70px;text-align:center;padding:11px 6px;border-radius:7px;
@@ -219,6 +227,7 @@
   @keyframes pulse{50%{opacity:.35}}
   .eta{font-size:11.5px;color:var(--muted);text-align:center;margin-top:18px}
   .load-error{color:#c0392b;font-size:12.5px;margin-top:16px;text-align:center;display:none;line-height:1.5}
+  .load-actions{display:none;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
 
   .compare{position:relative;border-radius:7px;overflow:hidden;user-select:none;touch-action:none;cursor:ew-resize;margin-bottom:16px;background:#ddd}
   .compare img{width:100%;display:block;pointer-events:none}
@@ -282,7 +291,8 @@
     font-family:inherit;font-size:13.5px;background:#fff;outline:none;
   }
   .field input:focus,.field select:focus{border-color:var(--accent)}
-  .sheet .close-x{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1}
+  .sheet .close-x{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1;padding:8px;margin:-8px -8px 0 0}
+  .chip{min-height:36px;display:flex;align-items:center}
 
   .pack{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1.5px solid var(--line);border-radius:7px;padding:14px;margin-bottom:10px}
   .pack .t{font-size:14px;font-weight:700}
@@ -340,6 +350,14 @@
     <p class="sub">Загрузите фото комнаты. Получите визуализацию и товары из каталога со ссылками на магазины и ценами. 2 генерации бесплатно после регистрации.</p>
     <p class="ai-note">Сервис использует искусственный интеллект. Результат может содержать ошибки: размеры, цвета, количество материалов и цены могут не соответствовать реальности. Проверяйте перед покупкой и началом работ.</p>
 
+    <div class="example">
+      <div class="example-imgs">
+        <figure><img src="/assets/kitchen_before.webp" alt="Комната до" loading="lazy"><figcaption>до</figcaption></figure>
+        <figure><img src="/assets/kitchen_after.webp" alt="Комната после" loading="lazy"><figcaption>после</figcaption></figure>
+      </div>
+      <div class="example-cap">пример AI-визуализации</div>
+    </div>
+
     <div class="drop" id="drop">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
       <b>Загрузить фото</b>
@@ -348,6 +366,7 @@
     <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
 
     <div class="preview-wrap" id="previewWrap"><img id="previewImg" alt="Ваша комната"></div>
+    <button class="change-photo" id="changePhoto">выбрать другое фото</button>
 
     <div id="options" style="display:none">
       <div class="chips" id="chips">
@@ -383,6 +402,10 @@
       </ul>
       <div class="eta">Обычно занимает 30–60 секунд — не закрывайте экран</div>
       <div class="load-error" id="loadError"></div>
+      <div class="load-actions" id="loadActions">
+        <button class="btn orange" id="retryBtn">Попробовать снова</button>
+        <button class="btn ghost" id="newRoomBtn">Новая комната</button>
+      </div>
     </div>
   </section>
 
@@ -400,17 +423,17 @@
 
     <div class="sec-label">Хочу изменить <span style="text-transform:none;color:var(--muted)">· 1 кредит за генерацию</span></div>
     <div class="chat" id="chat">
-      <div class="msg ai">Дизайн готов.<span class="note">Генерации — по 1 кредиту (≈30–60 сек). Войдите, чтобы продолжить.</span></div>
+      <div class="msg ai">Дизайн готов.<span class="note">Генерации — по 1 кредиту (≈30–60 сек).</span></div>
     </div>
     <div class="chat-input">
       <input id="chatIn" type="text" placeholder="Например: пол → дерево, люстру проще">
       <button id="chatSend" aria-label="Отправить">↑</button>
     </div>
 
-    <div class="sec-label">Товары из каталога со ссылками на магазины</div>
+    <div class="sec-label">Подборка товаров (ориентировочно)</div>
     <div class="shop" id="shop"></div>
     <div class="total">
-      <span>Итого материалы (оценка)</span>
+      <span>Ориентировочная стоимость подборки</span>
       <b id="total">—</b>
     </div>
     <p class="price-asof" id="priceAsOf"></p>
@@ -471,7 +494,7 @@
 </footer>
 
 <!-- ВХОД -->
-<div class="modal top" id="authModal">
+<div class="modal top" id="authModal" role="dialog" aria-modal="true" aria-label="Вход по e-mail">
   <div class="sheet">
     <button class="close-x" data-close="authModal">×</button>
     <div id="authStep1">
@@ -488,14 +511,14 @@
     <div id="authStep2" style="display:none">
       <h3>Введите код</h3>
       <p class="hint">Отправили на <b id="authEmailShown"></b>. Код живёт 10 минут.</p>
-      <div class="field"><label>Код из письма</label><input id="authCode" type="text" inputmode="numeric" maxlength="6" placeholder="123456"></div>
+      <div class="field"><label>Код из письма</label><input id="authCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456"></div>
       <button class="btn orange" id="authVerify">Войти</button>
     </div>
   </div>
 </div>
 
 <!-- ПОКУПКА КРЕДИТОВ -->
-<div class="modal top" id="buyModal">
+<div class="modal top" id="buyModal" role="dialog" aria-modal="true" aria-label="Кредиты на генерации">
   <div class="sheet">
     <button class="close-x" data-close="buyModal">×</button>
     <h3>Кредиты на генерации</h3>
@@ -508,7 +531,7 @@
 </div>
 
 <!-- ИСТОРИЯ ГЕНЕРАЦИЙ -->
-<div class="modal top" id="historyModal">
+<div class="modal top" id="historyModal" role="dialog" aria-modal="true" aria-label="Мои генерации">
   <div class="sheet">
     <button class="close-x" data-close="historyModal">×</button>
     <h3>Мои генерации</h3>
@@ -589,9 +612,10 @@
 
 <script>
   const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-  let roomId=null, polling=null, me=null, pendingGo=false;
+  let roomId=null, polling=null, me=null, pendingGo=false, paymentsEnabled=false;
 
   fetch('/api/health').then(r=>r.json()).then(h=>{
+    paymentsEnabled=Boolean(h.payments_enabled);
     if(h.mock) $('#mockBadge').style.display='block';
   });
 
@@ -625,6 +649,7 @@
   function closeModal(id){ $('#'+id).classList.remove('open'); }
   $$('[data-close]').forEach(b=>b.onclick=()=>{ if(b.dataset.close==='authModal') pendingGo=false; closeModal(b.dataset.close); });
   $$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m){ if(m.id==='authModal') pendingGo=false; m.classList.remove('open'); } }));
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $$('.modal.open').forEach(m=>{ if(m.id==='authModal') pendingGo=false; m.classList.remove('open'); }); } });
 
   function openAuth(){
     if(me){ openBuy(); return; }
@@ -661,6 +686,7 @@
       if(!r.ok) throw new Error(d.error||r.status);
       $('#authEmailShown').textContent=email;
       $('#authStep1').style.display='none'; $('#authStep2').style.display='block';
+      $('#authCode').value=''; setTimeout(()=>$('#authCode').focus(),50);
     }catch(e){ toast(e.message); }
     finally{ $('#authSend').disabled=false; }
   };
@@ -685,6 +711,7 @@
   $('#authCode').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#authVerify').click(); });
 
   async function openBuy(){
+    if(!paymentsEnabled){ toast('Покупка кредитов временно недоступна. Напишите в поддержку.'); return; }
     if(!me){ openAuth(); toast('Сначала войдите'); return; }
     $('#buyOfferConsent').checked=false;
     try{
@@ -699,6 +726,7 @@
     }catch(e){ toast('Не удалось загрузить пакеты'); }
   }
   async function buyPack(pack_id){
+    if(!paymentsEnabled) return toast('Покупка кредитов временно недоступна');
     if(!$('#buyOfferConsent').checked) return toast('Отметьте акцепт оферты перед оплатой');
     try{
       const r=await fetch('/api/payments/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pack_id,accept_offer:true})});
@@ -707,18 +735,21 @@
       location.href=d.confirmation_url;
     }catch(e){ toast(e.message); }
   }
-  // возврат с ЮKassa: ?paid=pack2 — подождём webhook и обновим баланс
-  (function(){
+  // возврат с ЮKassa: ?paid=pack2 — сверяем платёж и ждём роста баланса
+  (async function(){
     const m=location.search.match(/[?&]paid=(\w+)/);
     if(!m) return;
     history.replaceState(null,'',location.pathname);
-    let tries=0;
+    await loadMe();
+    const startBalance=me?.balance ?? 0;
     toast('Проверяем оплату…',2000);
+    if(me) fetch('/api/payments/sync',{method:'POST'}).catch(()=>{});
+    let tries=0;
     const t=setInterval(async()=>{
       tries++;
       await loadMe();
-      if(me && me.balance>0){ clearInterval(t); toast('Оплачено! Баланс: '+me.balance+' кр.'); }
-      if(tries>15){ clearInterval(t); toast('Если кредиты не появились — обновите страницу через минуту'); }
+      if(me && me.balance>startBalance){ clearInterval(t); toast('Оплачено! Баланс: '+me.balance+' кр.'); }
+      if(tries>15){ clearInterval(t); toast('Если кредиты не появились — обновите страницу или напишите в поддержку'); }
     },2000);
   })();
 
@@ -778,20 +809,24 @@
   const drop=$('#drop'), fileInput=$('#fileInput');
   let photoFile=null;
   drop.addEventListener('click',()=>fileInput.click());
-  fileInput.addEventListener('change',()=>{
-    if(!fileInput.files[0])return;
-    photoFile=fileInput.files[0];
+  $('#changePhoto').onclick=()=>fileInput.click();
+  function showPhoto(file){
+    photoFile=file;
     $('#previewImg').src=URL.createObjectURL(photoFile);
     drop.style.display='none';
     $('#previewWrap').style.display='block';
+    $('#changePhoto').style.display='block';
     $('#options').style.display='block';
+  }
+  fileInput.addEventListener('change',()=>{
+    if(!fileInput.files[0])return;
+    showPhoto(fileInput.files[0]);
   });
   ['dragover','dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{
     e.preventDefault();
     if(ev==='drop'&&e.dataTransfer.files[0]){
-      photoFile=e.dataTransfer.files[0]; fileInput.files=e.dataTransfer.files;
-      $('#previewImg').src=URL.createObjectURL(photoFile);
-      drop.style.display='none'; $('#previewWrap').style.display='block'; $('#options').style.display='block';
+      fileInput.files=e.dataTransfer.files;
+      showPhoto(e.dataTransfer.files[0]);
     }
   }));
   $$('.chip').forEach(c=>c.addEventListener('click',()=>{
@@ -830,6 +865,8 @@
       if(!r.ok)throw new Error(data.error||r.status);
       roomId=data.id;
       $('#loadImg').src=URL.createObjectURL(photoFile);
+      pollStart=Date.now(); pollFailures=0; lastRoomStatus='';
+      $('#loadError').style.display='none'; $('#loadActions').style.display='none';
       go('s2'); poll();
     }catch(e){
       alert('Ошибка: '+e.message);
@@ -839,25 +876,53 @@
   });
 
   // ---------- экран 2: поллинг ----------
+  let pollStart=0, pollFailures=0, lastRoomStatus='';
+  function showLoadError(msg){
+    $('#loadError').textContent=msg;
+    $('#loadError').style.display='block';
+    $('#loadActions').style.display='flex';
+  }
   function poll(){
     clearTimeout(polling);
+    if(!pollStart) pollStart=Date.now();
+    if(Date.now()-pollStart > 180000){
+      showLoadError('Генерация идёт слишком долго. Проверьте результат позже или попробуйте снова.');
+      return;
+    }
     polling=setTimeout(async()=>{
       try{
         const r=await fetch('/api/rooms/'+roomId);
-        const d=await r.json();
-        if(!r.ok)throw new Error(d.error||r.status);
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok) throw new Error(d.error||r.status);
+        pollFailures=0;
         paintSteps(d.status);
+        lastRoomStatus=d.status;
         if(d.status==='done'){ renderResult(d); go('s3'); loadMe(); return; }
         if(d.status==='error'){
-          $('#loadError').textContent='Не получилось: '+(d.error||'ошибка');
-          $('#loadError').style.display='block';
+          showLoadError('Не получилось: '+(d.error||'ошибка'));
           loadMe();
           return;
         }
         poll();
-      }catch(e){ poll(); }
+      }catch(e){
+        pollFailures++;
+        if(pollFailures>=5) showLoadError('Нет связи с сервером. Проверьте интернет и попробуйте снова.');
+        else poll();
+      }
     },1500);
   }
+  $('#retryBtn').onclick=()=>{
+    $('#loadActions').style.display='none';
+    $('#loadError').style.display='none';
+    if(lastRoomStatus==='error' && photoFile){
+      go('s1');
+      setTimeout(()=>$('#go').click(),0);
+      return;
+    }
+    pollStart=Date.now(); pollFailures=0;
+    poll();
+  };
+  $('#newRoomBtn').onclick=()=>location.reload();
   function paintSteps(status){
     const order=['analyzing','rendering','matching'];
     const idx=order.indexOf(status);
@@ -874,7 +939,7 @@
     $('#imgAfter').src=d.render.image+'?t='+Date.now();
     $('#dlBtn').href=d.render.image;
     const shop=$('#shop'); shop.innerHTML='';
-    if(!d.items.length) shop.innerHTML='<div class="empty">Похожие товары в каталоге не найдены — смета не сформирована. Попробуйте другую комнату или добавьте товары в каталог.</div>';
+    if(!d.items.length) shop.innerHTML='<div class="empty">Подборка не сформирована — попробуйте другую комнату или измените запрос.</div>';
     d.items.forEach(p=>{
       const attrs=Object.values(p.attrs||{}).join(' · ');
       const sum=p.price*p.qty;
@@ -885,9 +950,10 @@
         : `<a class="detail-img placeholder" href="${p.image_search_url||p.url}" target="_blank" rel="noopener nofollow">Фото товара — открыть поиск</a>`;
       row.innerHTML=`<div style="display:flex;gap:0;align-items:center">${imgTag}<div>
           <div class="name">${p.name}</div>
-          <div class="meta">${[attrs, p.source].filter(Boolean).join(' · ')} · ${p.qty} ${p.unit}</div>
+          <div class="meta">${[attrs, p.source].filter(Boolean).join(' · ')} · ${p.qty} ${p.unit} · <a href="${p.url}" target="_blank" rel="noopener nofollow">${p.link_label||'В магазин'}</a></div>
           <div class="detail">${detailPhoto}
-            ${p.url?`<a href="${p.url}" target="_blank" rel="noopener nofollow">${p.link_label||'Открыть товар'}</a> · `:''}
+            <div>Цена: ${fmt(p.price)} × ${p.qty} ${p.unit} = ${fmt(sum)}</div>
+            ${p.url?`<a href="${p.url}" target="_blank" rel="noopener nofollow">${p.link_label||'В магазин'}</a> · `:''}
             <a href="${p.image_search_url||p.url}" target="_blank" rel="noopener nofollow">ещё фото</a><br>
             Источник цены: ${p.source||'—'}${p.match_score!=null?` · совпадение ${(p.match_score*100).toFixed(0)}%`:''}
           </div>
@@ -918,9 +984,12 @@
   cmp.addEventListener('pointerup',()=>dragging=false);
 
   // ---------- чат-правки ----------
+  let iterating=false;
   function addMsg(cls,html){const m=document.createElement('div');m.className='msg '+cls;m.innerHTML=html;$('#chat').appendChild(m);m.scrollIntoView({behavior:'smooth',block:'nearest'});return m;}
   async function send(){
+    if(iterating) return;
     const v=$('#chatIn').value.trim(); if(!v)return;
+    iterating=true;
     $('#chatSend').disabled=true;
     addMsg('user',v); $('#chatIn').value='';
     const ai=addMsg('ai','Рисуем…<span class="note">≈ 30–60 секунд</span>');
@@ -933,8 +1002,10 @@
         return;
       }
       if(r.status===402){
-        ai.innerHTML='Генерации стоят 1 кредит.<span class="act">Купить кредиты</span>';
-        ai.querySelector('.act').onclick=openBuy;
+        ai.innerHTML=paymentsEnabled
+          ? 'Генерации стоят 1 кредит.<span class="act">Купить кредиты</span>'
+          : 'Кредиты закончились. Покупка временно недоступна — напишите в поддержку.';
+        const buy=ai.querySelector('.act'); if(buy) buy.onclick=openBuy;
         return;
       }
       if(!r.ok)throw new Error(d.error||r.status);
@@ -947,18 +1018,27 @@
     }catch(e){
       ai.innerHTML='Не получилось: '+e.message;
     }finally{
+      iterating=false;
       $('#chatSend').disabled=false;
     }
   }
   function waitDone(){
     return new Promise((res,rej)=>{
+      const started=Date.now();
+      let failures=0;
       (async function tick(){
+        if(Date.now()-started > 180000) return rej(new Error('превышено время ожидания'));
         try{
           const d=await (await fetch('/api/rooms/'+roomId)).json();
+          failures=0;
           if(d.status==='done')return res();
           if(d.status==='error')return rej(new Error(d.error||'ошибка'));
           setTimeout(tick,1500);
-        }catch(e){setTimeout(tick,1500);}
+        }catch(e){
+          failures++;
+          if(failures>=5) return rej(new Error('нет связи с сервером'));
+          setTimeout(tick,1500);
+        }
       })();
     });
   }
@@ -1061,8 +1141,7 @@
         <td>${c.delta>0?'+':''}${c.delta}</td><td>${esc(c.reason||'')}</td>
         <td>${esc(c.note||'')}</td><td>${fmtDate(c.created_at)}</td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--muted)">Нет операций</td></tr>';
       const gens=d.generations.length?d.generations.map(g=>{
-        const img=g.image_url||g.photo_url;
-        const thumb=img?`<img class="hist-thumb" src="${img}" alt="" loading="lazy">`:`<div class="hist-thumb ph">нет фото</div>`;
+        const thumb='<div class="hist-thumb ph">фото</div>';
         const title=g.request_text?`Правка: ${esc(g.request_text)}`:`Дизайн · ${esc(g.style||'—')}`;
         const status=g.status==='done'?'готово':(g.status==='error'?'ошибка':esc(g.status||'—'));
         return `<div class="hist-row" data-done="false">${thumb}<div class="hist-main"><b>${title}</b><div class="meta">${fmtDate(g.created_at)} · ${status} · ${g.credits_spent||0} кр.</div>${g.error?`<div class="req">${esc(g.error)}</div>`:''}</div></div>`;

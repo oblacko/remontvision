@@ -38,17 +38,24 @@ export async function withTransaction(fn) {
 export async function migrate() {
   await pool.query(`CREATE TABLE IF NOT EXISTS _migrations (
     name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
-  const dir = path.join(__dirname, '..', 'migrations');
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
-  for (const f of files) {
-    const { rows } = await pool.query('SELECT 1 FROM _migrations WHERE name = $1', [f]);
-    if (rows.length) continue;
-    const sql = fs.readFileSync(path.join(dir, f), 'utf8');
-    await withTransaction(async client => {
-      await client.query(sql);
-      await client.query('INSERT INTO _migrations (name) VALUES ($1)', [f]);
-    });
-    console.log(`[db] миграция применена: ${f}`);
+  const lock = await pool.connect();
+  try {
+    await lock.query('SELECT pg_advisory_lock(hashtext($1))', ['remontvision_migrations']);
+    const dir = path.join(__dirname, '..', 'migrations');
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+    for (const f of files) {
+      const { rows } = await pool.query('SELECT 1 FROM _migrations WHERE name = $1', [f]);
+      if (rows.length) continue;
+      const sql = fs.readFileSync(path.join(dir, f), 'utf8');
+      await withTransaction(async client => {
+        await client.query(sql);
+        await client.query('INSERT INTO _migrations (name) VALUES ($1)', [f]);
+      });
+      console.log(`[db] миграция применена: ${f}`);
+    }
+  } finally {
+    try { await lock.query('SELECT pg_advisory_unlock(hashtext($1))', ['remontvision_migrations']); } catch { /* ignore */ }
+    lock.release();
   }
 }
 
@@ -58,6 +65,13 @@ export const q = {
   createRoom: (id, style, budget, photoPath, userId) =>
     pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id) VALUES ($1,$2,$3,$4,$5)`, [id, style, budget, photoPath, userId]),
   getRoom: id => pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  roomByPhotoKey: key =>
+    pool.query(`SELECT user_id FROM rooms WHERE photo_path = $1 OR photo_path LIKE '%/' || $1 LIMIT 1`, [key])
+      .then(r => r.rows[0] || null),
+  roomByRenderKey: key =>
+    pool.query(`SELECT rm.user_id FROM renders r JOIN rooms rm ON rm.id = r.room_id
+                WHERE r.image_path = $1 OR r.image_path LIKE '%/' || $1 LIMIT 1`, [key])
+      .then(r => r.rows[0] || null),
   setRoomStatus: (status, id) =>
     pool.query(`UPDATE rooms SET status = $1, error = NULL, updated_at = now() WHERE id = $2`, [status, id]),
   setRoomError: (error, id) =>
@@ -78,11 +92,18 @@ export const q = {
                 finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
                 WHERE id = $4`, [imagePath, costUsd, model, id]),
-  setRenderError: (error, id, stage = null) =>
+  setRenderError: (error, id, stage = null, costUsd = null) =>
     pool.query(`UPDATE renders SET status='error', error = $1, error_stage = COALESCE($3, error_stage),
+                cost_usd = COALESCE($4, cost_usd),
                 finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
-                WHERE id = $2`, [error, id, stage]),
+                WHERE id = $2`, [error, id, stage, costUsd]),
+  failStaleRender: (id, error, stage = 'timeout') =>
+    pool.query(`UPDATE renders SET status='error', error = $2, error_stage = $3,
+                finished_at = now(),
+                duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
+                WHERE id = $1 AND status IN ('queued','processing')
+                RETURNING id`, [id, error, stage]).then(r => r.rows[0] || null),
   staleRenders: minutes =>
     pool.query(`SELECT id, room_id FROM renders
                 WHERE status IN ('queued','processing')
@@ -135,6 +156,16 @@ export const q = {
     pool.query(`SELECT * FROM otp_codes WHERE email = $1 ORDER BY created_at DESC LIMIT 1`, [email]).then(r => r.rows[0] || null),
   otpMarkAttempt: id => pool.query(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, [id]),
   otpMarkUsed: id => pool.query(`UPDATE otp_codes SET used_at = now() WHERE id = $1`, [id]),
+  consumeOtp: (email, codeHash) =>
+    pool.query(`UPDATE otp_codes
+                SET attempts = attempts + 1,
+                    used_at = CASE
+                      WHEN code_hash = $2 AND expires_at > now() AND used_at IS NULL AND attempts < 5
+                      THEN now() ELSE used_at END
+                WHERE id = (SELECT id FROM otp_codes WHERE email = $1 AND used_at IS NULL
+                            ORDER BY created_at DESC LIMIT 1)
+                RETURNING (code_hash = $2 AND expires_at > now() AND attempts <= 5 AND used_at IS NOT NULL) AS matched`,
+      [email, codeHash]).then(r => r.rows[0]?.matched === true),
   otpCountRecent: (email, minutes) =>
     pool.query(`SELECT COUNT(*)::int AS n FROM otp_codes WHERE email = $1 AND created_at > now() - ($2 || ' minutes')::interval`,
       [email, String(minutes)]).then(r => r.rows[0].n),
@@ -202,6 +233,9 @@ export const q = {
       [userId, provider, providerPaymentId, amountKopecks, JSON.stringify(payload)])
       .then(r => r.rows[0] || null),
   paymentById: id => pool.query(`SELECT * FROM payments WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  latestPendingPayment: userId =>
+    pool.query(`SELECT * FROM payments WHERE user_id = $1 AND status IN ('created','pending')
+                ORDER BY created_at DESC LIMIT 1`, [userId]).then(r => r.rows[0] || null),
   paymentsByUser: userId =>
     pool.query(`SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId]).then(r => r.rows),
 

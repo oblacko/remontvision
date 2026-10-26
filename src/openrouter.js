@@ -60,6 +60,9 @@ async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = TIME
   throw lastErr;
 }
 
+let INPUT_REFS_OK = true;
+export const supportsInputRefs = () => INPUT_REFS_OK;
+
 export async function listImageModels() {
   if (MOCK_MODE) return { mock: true, models: [] };
   const r = await fetch(`${BASE}/images/models`, { headers: headers() });
@@ -85,7 +88,8 @@ export async function assertConfig() {
       `либо откройте GET /api/models у приложения.`
     );
   }
-  if (!render.input_refs) {
+  INPUT_REFS_OK = Boolean(render.input_refs);
+  if (!INPUT_REFS_OK) {
     log({ event: 'config_warning', msg: `модель ${RENDER_MODEL} не поддерживает input_references — референсы товаров в генерацию не уйдут` });
   }
   try {
@@ -129,7 +133,7 @@ export function buildPrompt({ style, budget, requestText, iteration, products })
 // OpenRouter принимает только фиксированные пропорции — подбираем ближайшую к реальному фото.
 const ASPECTS = [
   [1, 1], [3, 2], [2, 3], [4, 3], [3, 4], [16, 9], [9, 16],
-  [4, 5], [5, 4], [2, 1], [1, 2], [21, 9], [9, 21],
+  [4, 5], [5, 4], [2, 1], [1, 2], [21, 9], [9, 21], [4, 1], [1, 4], [8, 1], [1, 8],
 ];
 export function snapAspect(width, height) {
   if (!width || !height) return '3:2';
@@ -142,74 +146,87 @@ export function snapAspect(width, height) {
   return best;
 }
 
-// Референсы товаров: до MAX_REFERENCES изображений из каталога (если у товара есть картинка).
-// У демо-каталога картинок нет — поле оставлено на будущее, подписано в README.
+// Один рендер = максимум два внешних вызова: Image API, затем chat-фолбэк.
+// Без retry-каскада и без второй модели: неизвестный timeout не повторяем автоматически.
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio }) {
-  const models = RENDER_MODEL_FALLBACK ? [RENDER_MODEL, RENDER_MODEL_FALLBACK] : [RENDER_MODEL];
-  let lastErr, spent = 0; // суммируем затраты по всем попыткам (падение после начала генерации тоже стоит денег)
-  for (const model of models) {
-    try {
-      const out = await generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
-      return { ...out, cost: out.cost != null ? out.cost + spent : (spent || null) };
-    } catch (e) {
-      lastErr = e;
-      if (typeof e.cost === 'number') spent += e.cost;
-      log({ event: 'render_fallback', model, error: String(e.message || e).slice(0, 300) });
-    }
-  }
-  throw lastErr || new Error('generation failed');
+  return generateWithModel(RENDER_MODEL, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 }
 
 async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio }) {
+  const productRefs = INPUT_REFS_OK ? referenceImagesB64 : [];
+  // Исходное фото комнаты — первый обязательный reference в основном Image API.
+  const refs = [
+    { type: 'image_url', image_url: { url: sourceImageB64 } },
+    ...productRefs.map(b => ({ type: 'image_url', image_url: { url: b } })),
+  ];
   const body = {
     model,
     prompt,
     aspect_ratio: aspectRatio || '3:2',
-    ...(referenceImagesB64.length
-      ? { input_references: referenceImagesB64.map(b => ({ type: 'image_url', image_url: { url: b } })) }
-      : {}),
+    input_references: refs,
   };
 
-  // Вариант A: chat/completions с модальностью image (Nano Banana работает так:
-  // принимает image_url в messages и возвращает картинку в message.images).
   const chatBody = {
     model,
     messages: [
       { role: 'user', content: [
         { type: 'text', text: prompt },
-        { type: 'image_url', image_url: { url: sourceImageB64 } },
-        ...referenceImagesB64.map(b => ({ type: 'image_url', image_url: { url: b } })),
+        ...refs.map(r => ({ type: 'image_url', image_url: r.image_url })),
       ]},
     ],
     modalities: ['image', 'text'],
-    // Gemini image-модели в chat-режиме принимают пропорции только здесь
     image_config: { aspect_ratio: aspectRatio || '3:2' },
   };
 
-  let lastErr;
-  // Сначала официальный Image API: он принимает aspect_ratio и не сваливается в 1:1.
-  for (const [endpoint, payload] of [[`${BASE}/images`, body], [`${BASE}/chat/completions`, chatBody]]) {
+  let lastErr, spent = 0;
+  for (const [attempt, [endpoint, payload]] of [[`${BASE}/images`, body], [`${BASE}/chat/completions`, chatBody]].entries()) {
     try {
-      const r = await fetchWithRetry(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
-      const data = await r.json();
+      const r = await fetch(endpoint, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(150_000),
+      });
+      const data = await r.json().catch(() => ({}));
+      const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
+      spent += cost;
+      if (!r.ok) {
+        lastErr = new Error(`${endpoint} ${r.status}: ${JSON.stringify(data).slice(0, 300)}`);
+        lastErr.cost = cost;
+        log({ event: 'render_attempt_error', model, endpoint, attempt: attempt + 1, status: r.status, cost_usd: cost || null });
+        continue;
+      }
       const b64out =
         data.choices?.[0]?.message?.images?.[0]?.image_url?.url?.match(/base64,(.+)$/)?.[1] ||
         data.data?.[0]?.b64_json;
       if (!b64out) {
         lastErr = new Error(`${endpoint}: нет картинки в ответе`);
-        if (typeof data.usage?.cost === 'number') lastErr.cost = data.usage.cost; // генерация была оплачена, результата нет
+        lastErr.cost = cost;
+        log({ event: 'render_no_image', model, endpoint, attempt: attempt + 1, cost_usd: cost || null });
         continue;
       }
-      log({ event: 'render_endpoint', model, endpoint, aspect_ratio: aspectRatio || '3:2' });
-      return { b64: b64out, cost: data.usage?.cost ?? null, model, endpoint };
-    } catch (e) { lastErr = e; }
+      log({
+        event: 'render_endpoint',
+        model,
+        endpoint,
+        attempt: attempt + 1,
+        aspect_ratio: aspectRatio || '3:2',
+        refs: refs.length,
+        cost_usd: spent || null,
+      });
+      return { b64: b64out, cost: spent || null, model, endpoint, refs: refs.length, attempts: attempt + 1 };
+    } catch (e) {
+      lastErr = e;
+      log({ event: 'render_attempt_error', model, endpoint, attempt: attempt + 1, error: String(e.message || e).slice(0, 300) });
+    }
   }
+  if (lastErr) lastErr.cost = spent || lastErr.cost;
   throw lastErr || new Error('generation failed');
 }
 
 // Vision: читаем готовый рендер и достаём список материалов/предметов для матчинга.
 // Возвращает { items, cost } — cost нужен для полной себестоимости рендера.
-export async function parseRender(renderB64) {
+export async function parseRender(renderB64, mime = 'image/png') {
   const sys = `Ты — анализатор интерьерных рендеров. Посмотри на картинку и верни JSON-массив материалов и предметов отделки, которые видны: пол, стены, фартук, столешница, смеситель, свет, розетки/выключатели, фасады. Для каждого: {"category": одно из tile|paint|countertop|faucet|light|outlets|cabinet, "description": краткое описание на русском, "keywords": [3-5 ключевых слов]}. Только реальные отделочные материалы и сантехника/свет/электрика, без мебели-декора и растений. Только JSON, без текста вокруг.`;
   const r = await fetchWithRetry(`${BASE}/chat/completions`, {
     method: 'POST',
@@ -220,7 +237,7 @@ export async function parseRender(renderB64) {
         { role: 'system', content: sys },
         { role: 'user', content: [
           { type: 'text', text: 'Список материалов с картинки:' },
-          { type: 'image_url', image_url: { url: `data:image/png;base64,${renderB64}` } },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${renderB64}` } },
         ]},
       ],
       response_format: { type: 'json_object' },

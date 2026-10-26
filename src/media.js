@@ -6,7 +6,14 @@ import { detectImageExt } from './imagesize.js';
 export async function sanitizeImage(buf) {
   const ext = detectImageExt(buf);
   try {
-    let img = sharp(buf, { failOn: 'none' }).rotate();
+    const meta = await sharp(buf, { failOn: 'none' }).metadata();
+    if (meta.width && meta.height && meta.width * meta.height > 40_000_000) {
+      const err = new Error('Слишком большое изображение (макс. 40 МП)');
+      err.status = 400;
+      throw err;
+    }
+    let img = sharp(buf, { failOn: 'none' }).rotate()
+      .resize({ width: 3000, height: 3000, fit: 'inside', withoutEnlargement: true });
     if (ext === 'jpg') img = img.jpeg({ quality: 90, mozjpeg: true });
     else if (ext === 'webp') img = img.webp({ quality: 90 });
     else img = img.png({ compressionLevel: 9 });

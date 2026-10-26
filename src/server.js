@@ -15,8 +15,23 @@ import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, re
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const PAYMENTS_ENABLED = String(process.env.PAYMENTS_ENABLED || 'false') === 'true';
+const REFUNDS_ENABLED = String(process.env.REFUNDS_ENABLED || 'false') === 'true';
 const app = express();
+app.set('trust proxy', 1); // ровно один nginx перед приложением
 app.use(express.json({ limit: '1mb' }));
+// один canonical URL на документ: .html и слэш → чистый маршрут
+const CANONICAL_REDIRECTS = {
+  '/index.html': '/',
+  '/prices.html': '/prices', '/prices/': '/prices',
+  '/offer.html': '/offer', '/offer/': '/offer',
+  '/delivery.html': '/delivery', '/delivery/': '/delivery',
+  '/contacts.html': '/contacts', '/contacts/': '/contacts',
+  '/privacy.html': '/privacy', '/privacy/': '/privacy',
+};
+for (const [from, to] of Object.entries(CANONICAL_REDIRECTS)) {
+  app.get(from, (_req, res) => res.redirect(301, to));
+}
 app.use(express.static('public'));
 app.use('/assets', express.static('assets'));
 app.use(sessionUser);
@@ -96,7 +111,12 @@ function generationDto(g) {
   };
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, mock: MOCK_MODE }));
+app.get('/api/health', (_req, res) => res.json({
+  ok: true,
+  mock: MOCK_MODE,
+  payments_enabled: PAYMENTS_ENABLED,
+  refunds_enabled: REFUNDS_ENABLED,
+}));
 app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
 
@@ -154,6 +174,7 @@ app.get('/api/packs', (_req, res) => {
 });
 
 app.post('/api/payments/create', h(async (req, res) => {
+  if (!PAYMENTS_ENABLED) return res.status(503).json({ error: 'Платежи временно отключены (бесплатный пилот)' });
   if (!requireAuth(req, res)) return;
   if (req.body?.accept_offer !== true) {
     return res.status(400).json({ error: 'Нужен отдельный акцепт оферты', legal_version: LEGAL_VERSIONS.offer });
@@ -172,6 +193,16 @@ app.post('/api/payments/create', h(async (req, res) => {
   res.json({ confirmation_url: payment.confirmation?.confirmation_url, payment_id: payment.id });
 }));
 
+// fallback на случай задержки/отсутствия webhook: сверяем последний pending-платёж пользователя
+app.post('/api/payments/sync', h(async (req, res) => {
+  if (!PAYMENTS_ENABLED) return res.status(503).json({ error: 'Платежи отключены' });
+  if (!requireAuth(req, res)) return;
+  const payment = await q.latestPendingPayment(req.user.id);
+  if (!payment) return res.json({ ok: true, granted: false, status: 'no_pending' });
+  const out = await syncPayment(payment.provider_payment_id);
+  res.json({ ok: true, ...out });
+}));
+
 // webhook ЮKassa: типы payment.succeeded / payment.canceled / refund.succeeded
 app.post('/api/payments/webhook', h(async (req, res) => {
   const event = String(req.body?.event || '');
@@ -187,8 +218,9 @@ app.post('/api/payments/webhook', h(async (req, res) => {
     const out = await syncPayment(id);
     log({ event: 'webhook', provider_payment_id: id, result: out });
   } catch (e) {
-    // не 5xx — иначе ЮKassa уйдёт в агрессивные ретраи; разберёмся по логам
+    // transient-ошибка: отдаём 5xx, чтобы ЮKassa повторила уведомление
     log({ event: 'webhook_error', provider_payment_id: id, error: String(e.message || e).slice(0, 300) });
+    return res.status(500).json({ ok: false });
   }
   res.json({ ok: true });
 }));
@@ -267,6 +299,7 @@ app.get('/api/admin/payments', h(async (req, res) => {
 }));
 
 app.get('/api/admin/refunds/quote', h(async (req, res) => {
+  if (!REFUNDS_ENABLED) return res.status(503).json({ error: 'Возвраты отключены до полной state machine' });
   if (!requireAdmin(req, res)) return;
   const paymentId = Number(req.query.payment_id);
   if (!paymentId) return res.status(400).json({ error: 'Нужен payment_id' });
@@ -274,6 +307,7 @@ app.get('/api/admin/refunds/quote', h(async (req, res) => {
 }));
 
 app.post('/api/admin/refunds', h(async (req, res) => {
+  if (!REFUNDS_ENABLED) return res.status(503).json({ error: 'Возвраты отключены до полной state machine' });
   if (!requireAdmin(req, res)) return;
   const { payment_id, amount_kopecks, method, reason } = req.body || {};
   if (!payment_id) return res.status(400).json({ error: 'Нужен payment_id' });
@@ -290,12 +324,15 @@ app.post('/api/admin/refunds', h(async (req, res) => {
 app.post('/api/rooms', rateLimit, upload.single('photo'), h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   if (!req.file) return res.status(400).json({ error: 'Нет фото' });
-  const bal = await q.creditBalance(req.user.id);
-  if (bal < 1) {
-    return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: bal });
+  if (!MOCK_MODE) {
+    const bal = await q.creditBalance(req.user.id);
+    if (bal < 1) {
+      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: bal });
+    }
   }
   const id = crypto.randomUUID();
-  const style = req.body.style || 'Современный';
+  const allowedStyles = ['Современный', 'Светлый', 'Тёмный', 'Классика'];
+  const style = allowedStyles.includes(req.body.style) ? req.body.style : 'Современный';
   const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 500);
   const photoKey = await saveUpload(req.file, 'uploads');
   await q.createRoom(id, style, budget, photoKey, req.user.id);
@@ -313,8 +350,9 @@ app.post('/api/rooms', rateLimit, upload.single('photo'), h(async (req, res) => 
 }));
 
 app.get('/api/rooms/:id', h(async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Войдите, чтобы продолжить' });
   const room = await q.getRoom(req.params.id);
-  if (!room) return res.status(404).json({ error: 'Не найдено' });
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
   let render = null;
   if (req.query.render_id) {
     const picked = await q.getRender(String(req.query.render_id));
@@ -353,9 +391,15 @@ app.get('/api/rooms/:id', h(async (req, res) => {
   });
 }));
 
-// отдача файлов: с S3 — 302 на presigned URL, иначе с диска
-async function serveStored(req, res, dir, name) {
+// отдача файлов: с S3 — 302 на presigned URL, иначе с диска.
+// Фото комнат и рендеры доступны только владельцу комнаты; товары — публично.
+async function serveStored(req, res, dir, name, ownerQuery = null) {
   const key = `${dir}/${path.basename(name)}`;
+  if (ownerQuery) {
+    if (!req.user) return res.status(401).end();
+    const owner = await ownerQuery(key);
+    if (!owner || Number(owner.user_id) !== Number(req.user.id)) return res.status(404).end();
+  }
   try {
     const url = await redirectUrl(key);
     if (url) return res.redirect(url);
@@ -363,20 +407,21 @@ async function serveStored(req, res, dir, name) {
   const f = resolveDisk(key);
   fs.existsSync(f) ? res.sendFile(f) : res.status(404).end();
 }
-app.get('/files/:name', (req, res) => serveStored(req, res, 'uploads', req.params.name));
-app.get('/renders/:file', (req, res) => serveStored(req, res, 'renders', req.params.file));
-app.get('/products/:file', (req, res) => serveStored(req, res, 'products', req.params.file));
+app.get('/files/:name', h(async (req, res) => serveStored(req, res, 'uploads', req.params.name, q.roomByPhotoKey)));
+app.get('/renders/:file', h(async (req, res) => serveStored(req, res, 'renders', req.params.file, q.roomByRenderKey)));
+app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products', req.params.file)));
 
 // итерация: только для авторизованных, стоит 1 кредит
 app.post('/api/rooms/:id/iterate', rateLimit, h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
   const room = await q.getRoom(req.params.id);
-  if (!room) return res.status(404).json({ error: 'Не найдено' });
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
   const text = (req.body?.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Пустой запрос' });
+  if (text.length > 500) return res.status(400).json({ error: 'Слишком длинный запрос (макс. 500 символов)' });
   if (room.status !== 'done') return res.status(409).json({ error: 'Подождите завершения текущей задачи' });
   const parent = await q.latestRender(room.id);
   if (!parent) return res.status(409).json({ error: 'Нет рендера для правки' });
-  if (!requireAuth(req, res)) return;
   try {
     await enqueueRender({
       roomId: room.id,
@@ -393,6 +438,15 @@ app.post('/api/rooms/:id/iterate', rateLimit, h(async (req, res) => {
   }
   res.status(202).json({ id: room.id, status: 'queued' });
 }));
+
+app.use((err, _req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(status).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Файл больше 15 МБ' : err.message });
+  }
+  if (err?.message === 'Только JPG/PNG/WebP') return res.status(400).json({ error: err.message });
+  next(err);
+});
 
 // единый обработчик ошибок async-обработчиков — отдаём json, не HTML
 app.use((err, req, res, _next) => {
@@ -411,10 +465,13 @@ app.use((err, req, res, _next) => {
 // ---------- старт ----------
 async function main() {
   await migrate();          // накат миграций Postgres
+  if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
+    throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
+  }
   await assertConfig();     // проверка slug'ов моделей до приёма трафика
   if (!ADMIN_KEY) console.log('[warn] ADMIN_KEY не задан — админка каталога открыта не будет');
   app.listen(PORT, () => {
-    log({ event: 'listen', port: PORT, mock: MOCK_MODE });
+    log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
     startWorker();
   });
 }

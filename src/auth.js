@@ -34,6 +34,9 @@ if (!RESEND_API_KEY && process.env.SMTP_URL) {
 } else if (RESEND_API_KEY) {
   log({ event: 'mail_transport', mode: 'resend', from: MAIL_FROM, reply_to: MAIL_REPLY_TO });
 } else {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('В production нужен RESEND_API_KEY или SMTP_URL: dev-лог с OTP запрещён');
+  }
   log({ event: 'mail_transport', mode: 'dev_log', msg: 'RESEND_API_KEY/SMTP_URL не заданы — коды авторизации пишутся в лог' });
 }
 
@@ -140,13 +143,8 @@ export async function verifyCode(emailRaw, codeRaw) {
     throw e;
   };
   if (!/^\d{6}$/.test(code)) fail();
-  const row = await q.latestOtp(email);
-  if (!row || row.used_at || new Date(row.expires_at) < new Date() || row.attempts >= 5) fail();
-  if (row.code_hash !== sha256(code)) {
-    await q.otpMarkAttempt(row.id);
-    fail();
-  }
-  await q.otpMarkUsed(row.id);
+  const matched = await q.consumeOtp(email, sha256(code));
+  if (!matched) fail();
 
   let user = await q.findUserByEmail(email);
   let isNew = false;

@@ -2,8 +2,8 @@
   --bg:rgb(245,246,242);
   --card:#fff;
   --ink:#111;
-  --muted:#777;
-  --accent:#FF5F1F;
+  --muted:#666;
+  --accent:#D94A0B;
   --line:#e5e6e1;
 }
 *{box-sizing:border-box}
@@ -24,6 +24,8 @@ h3{font-size:15px;margin:18px 0 6px}
 p,li{color:rgba(17,17,17,.78)}
 ul,ol{padding-left:20px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0}
+.cta{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px;margin:8px 0 6px}
+.cta:hover{opacity:.92}
 .muted{color:var(--muted);font-size:13px}
 .price-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 0;border-bottom:1px dashed var(--line)}
 .price-row:last-child{border-bottom:none}

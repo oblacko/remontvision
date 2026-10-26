@@ -58,7 +58,8 @@ export async function curateProducts({ style, budget }) {
 // Внешние image_url кэшируем в data/refcache/<sha1>.
 export async function referenceImages(products) {
   const out = [];
-  for (const p of products.slice(0, MAX_REFERENCES)) {
+  for (const p of products) {
+    if (out.length >= MAX_REFERENCES) break;
     try {
       let buf, mime;
       if (p.image_path) {

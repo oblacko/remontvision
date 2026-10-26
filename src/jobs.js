@@ -6,12 +6,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, generateRender, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, generateRender, parseRender, matchCatalog, snapAspect, supportsInputRefs, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { curateProducts, referenceImages, hasImage } from './curate.js';
 import { putBuffer, getBuffer } from './storage.js';
-import { spendCreditForRender, restoreCreditForRender } from './payments.js';
+import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
@@ -49,7 +49,7 @@ async function processRender(renderId) {
     await q.setRenderPrompt(renderId, prompt);
 
     let imageB64, cost = null, model = null, targetRatio = null;
-    const refs = iteration ? [] : await referenceImages(curated.filter(hasImage));
+    const refs = iteration || !supportsInputRefs() ? [] : await referenceImages(curated.filter(hasImage));
 
     if (MOCK_MODE) {
       // демо без ключа: имитируем задержки и отдаём демо-картинку
@@ -94,8 +94,8 @@ async function processRender(renderId) {
       out_px: [outSize.width, outSize.height],
     });
 
-    // смета строится по тому, что реально видно на готовой визуализации.
-    // Если vision-разбор упал — откатываемся на товары, отобранные до генерации.
+    // Подборка строится по готовой визуализации. Пустой/упавший vision не должен
+    // стирать curated-подборку первого рендера или смету родителя у итерации.
     stage = 'matching';
     await q.setRoomStatus('matching', room.id);
     let visionCost = null;
@@ -103,7 +103,7 @@ async function processRender(renderId) {
     let matched = [];
     if (!MOCK_MODE) {
       try {
-        const parsed = await parseRender(bytes.toString('base64'));
+        const parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
         visionCost = parsed.cost;
         matched = matchCatalog(parsed.items, await q.allProducts());
         visionOk = true;
@@ -113,18 +113,21 @@ async function processRender(renderId) {
       }
     }
     await q.clearItems(render.id);
-    if (visionOk) {
-      // если похожих товаров нет — смета остаётся пустой, а не врёт curated-списком
+    if (visionOk && matched.length) {
       for (const m of matched) await q.saveItem(render.id, m.product.id, m.score);
-    } else if (iteration) {
-      const parent = await q.getRender(render.parent_render_id);
-      if (parent) await q.copyItems(parent.id, render.id);
-    } else if (curated.length) {
-      for (const p of curated) await q.saveItem(render.id, p.id, null);
     } else {
-      await sleep(1200);
-      const demo = (await q.allProducts()).filter(p => [1, 3, 5, 7].includes(Number(p.id)));
-      for (const p of demo) await q.saveItem(render.id, p.id, 0.9);
+      const fallback = visionOk ? 'no_matches' : 'vision_error';
+      log({ event: 'render_match_fallback', room_id: room.id, render_id: renderId, reason: fallback, iteration });
+      if (iteration) {
+        const parent = await q.getRender(render.parent_render_id);
+        if (parent) await q.copyItems(parent.id, render.id);
+      } else if (curated.length) {
+        for (const p of curated) await q.saveItem(render.id, p.id, null);
+      } else {
+        await sleep(1200);
+        const demo = (await q.allProducts()).filter(p => [1, 3, 5, 7].includes(Number(p.id)));
+        for (const p of demo) await q.saveItem(render.id, p.id, 0.9);
+      }
     }
 
     // полная себестоимость: генерация (включая фолбэк-попытки) + vision-разбор
@@ -136,13 +139,14 @@ async function processRender(renderId) {
     log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_image_usd: cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
   } catch (e) {
     const msg = String(e.message || e).slice(0, 500);
-    await q.setRenderError(msg, renderId, stage);
+    const errorCost = typeof e.cost === 'number' ? e.cost : null;
+    await q.setRenderError(msg, renderId, stage, errorCost);
     await q.setRoomError(msg, room.id);
     try {
       const restored = await restoreCreditForRender(renderId, `render_error:${stage}`);
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, credit_restored: restored, ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, credit_restored: restored, ms: Date.now() - t0 });
     } catch (restoreError) {
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
     }
   }
 }
@@ -161,7 +165,8 @@ export function startWorker() {
       const stale = await q.staleRenders(24 * 60);
       for (const r of stale) {
         const msg = 'Генерация не завершилась за 24 часа';
-        await q.setRenderError(msg, r.id, 'timeout');
+        const failed = await q.failStaleRender(r.id, msg, 'timeout');
+        if (!failed) continue; // задачу успели завершить — не трогаем и не возвращаем кредит
         await q.setRoomError(msg, r.room_id);
         const restored = await restoreCreditForRender(r.id, 'timeout');
         log({ event: 'render_timeout', room_id: r.room_id, render_id: r.id, credit_restored: restored });
@@ -187,26 +192,15 @@ export function startWorker() {
 
 export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null }) {
   const id = crypto.randomUUID();
-  await q.createRender(id, roomId, parentRenderId, requestText, null);
-  if (requestIp) await q.setRenderRequestIp(id, requestIp);
-
-  if (chargedUserId) {
-    const paid = await spendCreditForRender(chargedUserId, id, requestText ? 'iterate' : 'render');
-    if (!paid) {
-      await q.setRenderError('Нужен кредит', id, 'credit');
-      const e = new Error('Нужен кредит');
-      e.status = 402;
-      throw e;
-    }
-  }
-
-  try {
-    await q.setRoomStatus('queued', roomId);
-  } catch (e) {
-    if (chargedUserId) await restoreCreditForRender(id, 'enqueue_failed');
-    throw e;
-  }
-
-  log({ event: 'enqueue', room_id: roomId, render_id: id, parent_render_id: parentRenderId, charged_user_id: chargedUserId || null });
+  // В mock-режиме кредиты не списываются: картинка не зависит от исходника.
+  const chargeUser = MOCK_MODE ? null : chargedUserId;
+  await enqueueRenderWithCredit({
+    id,
+    roomId,
+    parentRenderId,
+    requestText,
+    chargedUserId: chargeUser,
+    requestIp,
+  });
   return id;
 }

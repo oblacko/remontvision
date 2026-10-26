@@ -16,8 +16,8 @@ export const LEGAL_URLS = {
 };
 
 export function clientIp(req) {
-  const xff = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  const ip = xff || req.socket?.remoteAddress || null;
+  // req.ip учитывает trust proxy (один nginx); первый XFF может быть подделан клиентом
+  const ip = req.ip || req.socket?.remoteAddress || null;
   return ip && net.isIP(ip) ? ip : null;
 }
 

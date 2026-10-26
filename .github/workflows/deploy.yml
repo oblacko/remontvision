@@ -22,3 +22,13 @@ jobs:
             docker compose up -d --build
             docker image prune -f
             docker compose ps
+
+      - name: Post-deploy smoke
+        run: |
+          for i in 1 2 3 4 5; do
+            body=$(curl -fsS https://www.remontvision.ru/api/health) || true
+            echo "$body"
+            echo "$body" | grep -q '"ok":true' && echo "$body" | grep -q '"payments_enabled":true' && echo "$body" | grep -q '"refunds_enabled":false' && exit 0
+            sleep 5
+          done
+          exit 1
