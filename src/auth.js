@@ -37,6 +37,7 @@ async function sendCodeEmail(email, code) {
       ? {
           from: MAIL_FROM,
           to: [email],
+          subject: 'Код входа — ремонтвижн',
           template: {
             id: RESEND_TEMPLATE_ID,
             variables: {
