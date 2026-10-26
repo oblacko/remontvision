@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ремонтвижн — ремонт по фото</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: rgb(245,246,242);
+    --card: #fff;
+    --ink: #111;
+    --muted: #888;
+    --accent: #FF5F1F;
+    --line: #e5e6e1;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:'Montserrat',-apple-system,'Segoe UI',sans-serif;
+    background:var(--bg);color:var(--ink);letter-spacing:-0.01em;
+  }
+  .phone{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
+  .screen{display:none;flex-direction:column;flex:1;padding:20px 16px 40px;animation:fade .35s ease}
+  .screen.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;gap:10px}
+  .logo{font-weight:800;font-size:17px;letter-spacing:-0.6px}
+  .logo em{font-style:normal;color:var(--accent)}
+  .top-right{display:flex;align-items:center;gap:8px;min-height:30px}
+  .credits{font-size:11px;font-weight:700;color:var(--ink);border:1.5px dashed var(--muted);padding:5px 10px;border-radius:20px;cursor:pointer;background:var(--card)}
+  .credits b{color:var(--accent)}
+  .linkbtn{font-family:inherit;font-size:12px;font-weight:600;background:none;border:none;color:var(--ink);cursor:pointer;padding:6px 4px;text-decoration:underline;text-underline-offset:3px}
+  .mock-badge{font-size:10px;color:#fff;background:var(--accent);padding:4px 10px;border-radius:20px;display:none}
+
+  .h1{font-size:26px;font-weight:800;line-height:1.15;letter-spacing:-1px;margin-bottom:6px}
+  .sub{font-size:13px;color:rgba(17,17,17,.55);margin-bottom:24px;line-height:1.45}
+  .drop{
+    border:1.5px dashed #b9bab2;border-radius:7px;background:var(--card);
+    padding:44px 20px;text-align:center;cursor:pointer;transition:border-color .2s;
+  }
+  .drop:hover{border-color:var(--accent)}
+  .drop svg{width:38px;height:38px;stroke:var(--accent);margin-bottom:12px}
+  .drop b{display:block;font-size:14px;font-weight:600}
+  .drop span{display:block;font-size:11.5px;color:var(--muted);margin-top:5px}
+  .preview-wrap{display:none;margin-bottom:18px}
+  .preview-wrap img{width:100%;border-radius:7px;display:block}
+  .chips{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .chip{
+    flex:1;min-width:70px;text-align:center;padding:11px 6px;border-radius:7px;
+    background:var(--card);border:1.5px solid var(--line);
+    font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;
+  }
+  .chip.on{border-color:var(--accent);color:var(--accent)}
+  .slider-block{margin-bottom:22px}
+  .slider-block label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:block;margin-bottom:10px}
+  .slider-row{display:flex;align-items:center;gap:12px}
+  input[type=range]{flex:1;appearance:none;height:3px;background:#dcdcd4;border-radius:2px;outline:none}
+  input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;border:none}
+  .budget-val{font-size:13px;font-weight:700;min-width:70px;text-align:right}
+  .btn{
+    display:block;width:100%;padding:16px;border:none;border-radius:7px;
+    background:var(--ink);color:#fff;font-family:inherit;font-size:14px;font-weight:700;
+    cursor:pointer;letter-spacing:.2px;transition:transform .1s;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.orange{background:var(--accent)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+  .btn.small{padding:10px 14px;font-size:12px;width:auto;display:inline-block}
+  .btnrow{display:flex;gap:10px}
+  .btnrow .btn{flex:1}
+
+  .load-stage{flex:1;display:flex;flex-direction:column;justify-content:center}
+  .load-img{position:relative;border-radius:7px;overflow:hidden;margin-bottom:26px}
+  .load-img img{width:100%;display:block;filter:grayscale(.4) brightness(.92)}
+  .load-img .scan{position:absolute;left:0;right:0;height:3px;background:var(--accent);box-shadow:0 0 18px 4px rgba(255,95,31,.55);animation:scan 2.2s ease-in-out infinite}
+  @keyframes scan{0%,100%{top:8%}50%{top:90%}}
+  .steps{list-style:none}
+  .steps li{display:flex;align-items:center;gap:12px;padding:11px 0;font-size:13px;color:var(--muted);border-bottom:1px dashed var(--line)}
+  .steps li:last-child{border-bottom:none}
+  .dot{width:8px;height:8px;border-radius:50%;background:#d7d8d2;flex:none;transition:background .3s}
+  .steps li.doing .dot{background:var(--accent);animation:pulse 1s infinite}
+  .steps li.done{color:var(--ink)}
+  .steps li.done .dot{background:var(--ink)}
+  @keyframes pulse{50%{opacity:.35}}
+  .eta{font-size:11.5px;color:var(--muted);text-align:center;margin-top:18px}
+  .load-error{color:#c0392b;font-size:12.5px;margin-top:16px;text-align:center;display:none;line-height:1.5}
+
+  .compare{position:relative;border-radius:7px;overflow:hidden;user-select:none;touch-action:none;cursor:ew-resize;margin-bottom:16px;background:#ddd}
+  .compare img{width:100%;display:block;pointer-events:none}
+  .compare .after{position:absolute;inset:0;clip-path:inset(0 0 0 50%)}
+  .handle{position:absolute;top:0;bottom:0;left:50%;width:2px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.4)}
+  .handle::after{
+    content:'⇄';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:36px;height:36px;border-radius:50%;background:#fff;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 10px rgba(0,0,0,.25);
+  }
+  .tag{position:absolute;top:10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 10px;border-radius:20px;background:rgba(255,255,255,.85);backdrop-filter:blur(6px)}
+  .tag.b{left:10px}.tag.a{right:10px;color:var(--accent)}
+  .sec-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:18px 0 10px}
+
+  .chat{display:flex;flex-direction:column;gap:10px;margin-bottom:6px}
+  .msg{max-width:82%;padding:11px 14px;border-radius:7px;font-size:13px;line-height:1.45}
+  .msg.user{align-self:flex-end;background:var(--ink);color:#fff}
+  .msg.ai{align-self:flex-start;background:var(--card);border:1px solid var(--line)}
+  .msg.ai .note{display:block;font-size:10.5px;color:var(--muted);margin-top:5px}
+  .msg.ai .act{display:inline-block;margin-top:8px;font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;text-decoration:underline}
+  .chat-input{display:flex;gap:8px;margin-top:12px}
+  .chat-input input{flex:1;border:1.5px solid var(--line);border-radius:7px;padding:13px 14px;font-family:inherit;font-size:13px;background:var(--card);outline:none}
+  .chat-input input:focus{border-color:var(--accent)}
+  .chat-input button{width:48px;border:none;border-radius:7px;background:var(--accent);color:#fff;font-size:17px;cursor:pointer;flex:none}
+  .chat-input button:disabled{opacity:.4}
+
+  .shop{background:var(--card);border-radius:7px;padding:4px 16px}
+  .shop .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px dashed var(--line);cursor:pointer}
+  .shop .row:last-of-type{border-bottom:none}
+  .shop .name{font-size:13px;font-weight:600;line-height:1.3}
+  .shop .meta{font-size:11px;color:var(--muted);margin-top:3px}
+  .shop .price{font-size:13px;font-weight:700;white-space:nowrap}
+  .shop .row .detail{display:none;font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .shop .row.open .detail{display:block}
+  .total{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px;margin-top:10px;background:var(--card);border-radius:7px}
+  .total span{font-size:12px;color:var(--muted)}
+  .total b{font-size:17px;font-weight:800;letter-spacing:-.5px}
+  .actions{margin-top:16px}
+  .empty{font-size:12.5px;color:var(--muted);text-align:center;padding:14px 0}
+  .footer-links{text-align:center;margin-top:22px;font-size:11px;color:var(--muted)}
+  .footer-links a{color:var(--muted)}
+
+  /* ---- модальные окна ---- */
+  .modal{position:fixed;inset:0;background:rgba(17,17,17,.45);display:none;align-items:flex-end;justify-content:center;z-index:50}
+  .modal.open{display:flex}
+  .sheet{width:100%;max-width:430px;background:var(--bg);border-radius:14px 14px 0 0;padding:22px 18px 30px;animation:up .25s ease;max-height:88vh;overflow-y:auto}
+  @keyframes up{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
+  .sheet h3{font-size:17px;font-weight:800;margin-bottom:4px}
+  .sheet .hint{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}
+  .field input,.field select,.field textarea{
+    width:100%;border:1.5px solid var(--line);border-radius:7px;padding:12px 13px;
+    font-family:inherit;font-size:13.5px;background:#fff;outline:none;
+  }
+  .field input:focus,.field select:focus{border-color:var(--accent)}
+  .sheet .close-x{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1}
+
+  .pack{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1.5px solid var(--line);border-radius:7px;padding:14px;margin-bottom:10px}
+  .pack .t{font-size:14px;font-weight:700}
+  .pack .d{font-size:11px;color:var(--muted);margin-top:3px}
+  .pack .p{font-size:15px;font-weight:800;white-space:nowrap}
+
+  /* ---- админка ---- */
+  .adminpage{display:none;position:fixed;inset:0;background:var(--bg);z-index:40;overflow-y:auto}
+  .adminpage.open{display:block}
+  .adminpage .inner{max-width:860px;margin:0 auto;padding:20px 16px 60px}
+  .adminpage h2{font-size:20px;font-weight:800;margin-bottom:4px}
+  .adminpage .sub2{font-size:12px;color:var(--muted);margin-bottom:18px}
+  .atable{width:100%;border-collapse:collapse;background:#fff;border-radius:7px;overflow:hidden;font-size:12px}
+  .atable th,.atable td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .atable th{background:#fafaf7;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .atable img{width:44px;height:44px;object-fit:cover;border-radius:5px;display:block}
+  .atable .mini{font-size:11px;padding:5px 8px;border-radius:5px;border:1px solid var(--line);background:#fff;cursor:pointer;margin-right:4px}
+  .pform{background:#fff;border-radius:7px;padding:16px;margin-bottom:18px}
+  .pform .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pform .full{grid-column:1/-1}
+  .pform h4{font-size:14px;font-weight:700;margin-bottom:12px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;font-size:12.5px;font-weight:600;padding:12px 18px;border-radius:8px;opacity:0;transition:all .3s;z-index:99;max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ЭКРАН 1: фото -->
+  <section class="screen active" id="s1">
+    <div class="top">
+      <div class="logo">ремонт<em>вижн</em></div>
+      <div class="top-right" id="userBlock"></div>
+      <div class="mock-badge" id="mockBadge">демо-режим</div>
+    </div>
+    <h1 class="h1">Кухня после ремонта — за 30 секунд</h1>
+    <p class="sub">Загрузите фото комнаты. Получите дизайн и список реальных материалов с ценами.</p>
+
+    <div class="drop" id="drop">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+      <b>Загрузить фото</b>
+      <span>или перетащите сюда · JPG, PNG, до 15 МБ</span>
+    </div>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+
+    <div class="preview-wrap" id="previewWrap"><img id="previewImg" alt="Ваша комната"></div>
+
+    <div id="options" style="display:none">
+      <div class="chips" id="chips">
+        <div class="chip on">Современный</div>
+        <div class="chip">Светлый</div>
+        <div class="chip">Тёмный</div>
+        <div class="chip">Классика</div>
+      </div>
+      <div class="slider-block">
+        <label>Бюджет на материалы</label>
+        <div class="slider-row">
+          <input type="range" id="budget" min="50" max="500" value="150" step="10">
+          <div class="budget-val" id="budgetVal">150 тыс. ₽</div>
+        </div>
+      </div>
+      <button class="btn orange" id="go">Сделать дизайн →</button>
+    </div>
+    <div class="footer-links"><a href="#admin">админка каталога</a></div>
+  </section>
+
+  <!-- ЭКРАН 2: ожидание -->
+  <section class="screen" id="s2">
+    <div class="top"><div class="logo">ремонт<em>вижн</em></div></div>
+    <div class="load-stage">
+      <div class="load-img">
+        <img id="loadImg" src="" alt="">
+        <div class="scan"></div>
+      </div>
+      <ul class="steps" id="steps">
+        <li data-s="analyzing"><span class="dot"></span>Подбираем материалы из каталога</li>
+        <li data-s="rendering"><span class="dot"></span>Рисуем дизайн с выбранными товарами</li>
+        <li data-s="matching"><span class="dot"></span>Считаем смету</li>
+      </ul>
+      <div class="eta">Обычно занимает 30–60 секунд — не закрывайте экран</div>
+      <div class="load-error" id="loadError"></div>
+    </div>
+  </section>
+
+  <!-- ЭКРАН 3: результат -->
+  <section class="screen" id="s3">
+    <div class="top"><div class="logo">ремонт<em>вижн</em></div><div class="top-right" id="userBlock2"></div></div>
+
+    <div class="compare" id="compare">
+      <img id="imgBefore" src="" alt="Было">
+      <img class="after" id="imgAfter" src="" alt="Стало">
+      <div class="handle"></div>
+      <div class="tag b">Было</div>
+      <div class="tag a">Стало</div>
+    </div>
+
+    <div class="sec-label">Хочу изменить <span style="text-transform:none;color:var(--muted)">· 1 кредит за правку</span></div>
+    <div class="chat" id="chat">
+      <div class="msg ai">Дизайн готов.<span class="note">Правки — по 1 кредиту (≈30–60 сек). Войдите, чтобы править.</span></div>
+    </div>
+    <div class="chat-input">
+      <input id="chatIn" type="text" placeholder="Например: пол → дерево, люстру проще">
+      <button id="chatSend" aria-label="Отправить">↑</button>
+    </div>
+
+    <div class="sec-label">Что на фото — реальные товары</div>
+    <div class="shop" id="shop"></div>
+    <div class="total">
+      <span>Итого материалы (оценка)</span>
+      <b id="total">—</b>
+    </div>
+
+    <div class="actions btnrow">
+      <a class="btn" id="dlBtn" href="#" download="remont.jpg" style="text-align:center;text-decoration:none">Скачать фото</a>
+      <button class="btn ghost" onclick="location.reload()">Новая комната</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- ВХОД -->
+<div class="modal" id="authModal">
+  <div class="sheet">
+    <button class="close-x" data-close="authModal">×</button>
+    <div id="authStep1">
+      <h3>Вход по e-mail</h3>
+      <p class="hint">Пришлём код на почту. Без паролей — удобно с телефона и компьютера.</p>
+      <div class="field"><label>E-mail</label><input id="authEmail" type="email" placeholder="you@yandex.ru" autocomplete="email"></div>
+      <button class="btn orange" id="authSend">Получить код</button>
+    </div>
+    <div id="authStep2" style="display:none">
+      <h3>Введите код</h3>
+      <p class="hint">Отправили на <b id="authEmailShown"></b>. Код живёт 10 минут.</p>
+      <div class="field"><label>Код из письма</label><input id="authCode" type="text" inputmode="numeric" maxlength="6" placeholder="123456"></div>
+      <button class="btn orange" id="authVerify">Войти</button>
+    </div>
+  </div>
+</div>
+
+<!-- ПОКУПКА КРЕДИТОВ -->
+<div class="modal" id="buyModal">
+  <div class="sheet">
+    <button class="close-x" data-close="buyModal">×</button>
+    <h3>Кредиты на правки</h3>
+    <p class="hint">1 кредит = 1 правка дизайна. Оплата картой, СБП или кошельком ЮMoney.</p>
+    <div id="packs"></div>
+  </div>
+</div>
+
+<!-- АДМИНКА КАТАЛОГА -->
+<div class="adminpage" id="adminPage">
+  <div class="inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h2>Каталог товаров</h2>
+      <a href="#" id="adminClose" style="font-size:12px;color:var(--muted)">← на главную</a>
+    </div>
+    <p class="sub2">Товары с фото попадают в референсы генерации: дизайн рисуется из каталога. <code>style_tags</code>: современный, светлый, темный, классика.</p>
+
+    <div class="field" id="keyGate" style="display:none">
+      <label>Ключ администратора (X-Admin-Key)</label>
+      <input id="adminKey" type="password" placeholder="ключ из .env (ADMIN_KEY)">
+      <button class="btn small" id="adminKeySave" style="margin-top:8px">Сохранить</button>
+    </div>
+
+    <div id="adminBody" style="display:none">
+      <div class="pform">
+        <h4 id="pformTitle">Новый товар</h4>
+        <input type="hidden" id="p_id">
+        <div class="grid">
+          <div class="field"><label>Категория</label>
+            <select id="p_category">
+              <option value="tile">tile — пол/фартук</option>
+              <option value="paint">paint — стены</option>
+              <option value="countertop">countertop — столешница</option>
+              <option value="faucet">faucet — смеситель</option>
+              <option value="light">light — свет</option>
+              <option value="outlets">outlets — розетки</option>
+              <option value="cabinet">cabinet — фасады</option>
+            </select>
+          </div>
+          <div class="field"><label>Цена, ₽</label><input id="p_price" type="number" min="1"></div>
+          <div class="field full"><label>Название</label><input id="p_name" type="text" placeholder="Керамогранит Atlas Concorde Brave"></div>
+          <div class="field"><label>Бренд</label><input id="p_brand" type="text"></div>
+          <div class="field"><label>Единица</label>
+            <select id="p_unit"><option>шт</option><option>м²</option><option>м.п.</option><option>м</option><option>упак</option></select>
+          </div>
+          <div class="field"><label>Кол-во в смете (qty)</label><input id="p_qty" type="number" step="0.5" value="1"></div>
+          <div class="field"><label>Теги стиля</label><input id="p_style_tags" type="text" placeholder="современный,темный"></div>
+          <div class="field"><label>Ключевые слова</label><input id="p_keywords" type="text" placeholder="керамогранит,пол,грейдж"></div>
+          <div class="field"><label>URL товара</label><input id="p_url" type="text" placeholder="https://..."></div>
+          <div class="field"><label>Фото файлом</label><input id="p_image" type="file" accept="image/jpeg,image/png,image/webp"></div>
+          <div class="field"><label>или фото URL</label><input id="p_image_url" type="text" placeholder="https://...jpg"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <button class="btn orange small" id="pSave">Сохранить товар</button>
+          <button class="btn ghost small" id="pReset">Сброс</button>
+        </div>
+      </div>
+      <table class="atable">
+        <thead><tr><th></th><th>Название</th><th>Кат.</th><th>Цена</th><th>Стиль</th><th></th></tr></thead>
+        <tbody id="pRows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+  let roomId=null, polling=null, me=null;
+
+  fetch('/api/health').then(r=>r.json()).then(h=>{
+    if(h.mock) $('#mockBadge').style.display='block';
+  });
+
+  function go(id){ $$('.screen').forEach(s=>s.classList.remove('active')); $('#'+id).classList.add('active'); window.scrollTo(0,0); }
+  const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(n))+' ₽';
+  function toast(msg,ms=3200){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),ms); }
+
+  // ---------- сессия ----------
+  async function loadMe(){
+    try{ const r=await fetch('/api/me'); me = r.ok ? await r.json() : null; }
+    catch{ me=null; }
+    paintUser();
+  }
+  function paintUser(){
+    const html = me
+      ? `<div class="credits" id="creditsPill"><b>${me.balance}</b>&nbsp;кр.</div><button class="linkbtn" id="logoutBtn" title="выйти">${me.email} ✕</button>`
+      : `<button class="linkbtn" id="loginBtn">Войти</button>`;
+    ['userBlock','userBlock2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+    if(me){
+      const pill=$('#creditsPill'); if(pill) pill.onclick=openBuy;
+      const lo=$('#logoutBtn'); if(lo) lo.onclick=async()=>{ await fetch('/api/auth/logout',{method:'POST'}); me=null; paintUser(); };
+    } else {
+      const li=$('#loginBtn'); if(li) li.onclick=openAuth;
+    }
+  }
+
+  // ---------- модалки ----------
+  function openModal(id){ $('#'+id).classList.add('open'); }
+  function closeModal(id){ $('#'+id).classList.remove('open'); }
+  $$('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+  $$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+  function openAuth(){
+    if(me){ openBuy(); return; }
+    $('#authStep1').style.display='block'; $('#authStep2').style.display='none';
+    $('#authEmail').value=''; $('#authCode').value='';
+    openModal('authModal');
+  }
+  $('#authSend').onclick=async()=>{
+    const email=$('#authEmail').value.trim();
+    if(!email) return toast('Введите e-mail');
+    $('#authSend').disabled=true;
+    try{
+      const r=await fetch('/api/auth/request-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error||r.status);
+      $('#authEmailShown').textContent=email;
+      $('#authStep1').style.display='none'; $('#authStep2').style.display='block';
+    }catch(e){ toast(e.message); }
+    finally{ $('#authSend').disabled=false; }
+  };
+  $('#authVerify').onclick=async()=>{
+    const code=$('#authCode').value.trim();
+    if(code.length!==6) return toast('Код — 6 цифр');
+    $('#authVerify').disabled=true;
+    try{
+      const r=await fetch('/api/auth/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#authEmail').value.trim(),code})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error||r.status);
+      closeModal('authModal');
+      await loadMe();
+      toast(d.is_new ? 'Готово! Начислен 1 кредит за регистрацию' : 'Вошли как '+d.email);
+    }catch(e){ toast(e.message); }
+    finally{ $('#authVerify').disabled=false; }
+  };
+  $('#authCode').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#authVerify').click(); });
+
+  async function openBuy(){
+    if(!me){ openAuth(); toast('Сначала войдите'); return; }
+    try{
+      const packs=await (await fetch('/api/packs')).json();
+      $('#packs').innerHTML=packs.map(p=>`
+        <div class="pack">
+          <div><div class="t">${p.title}</div><div class="d">${p.credits} правк${p.credits===1?'а':(p.credits<5?'и':'')} дизайна</div></div>
+          <div style="text-align:right"><div class="p">${fmt(p.price_kopecks/100)}</div>
+          <button class="btn orange small" data-pack="${p.id}" style="margin-top:6px">Купить</button></div>
+        </div>`).join('');
+      $('#packs').querySelectorAll('[data-pack]').forEach(b=>b.onclick=()=>buyPack(b.dataset.pack));
+      openModal('buyModal');
+    }catch(e){ toast('Не удалось загрузить пакеты'); }
+  }
+  async function buyPack(pack_id){
+    try{
+      const r=await fetch('/api/payments/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pack_id})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error||r.status);
+      location.href=d.confirmation_url;
+    }catch(e){ toast(e.message); }
+  }
+  // возврат с ЮKassa: ?paid=pack2 — подождём webhook и обновим баланс
+  (function(){
+    const m=location.search.match(/[?&]paid=(\w+)/);
+    if(!m) return;
+    history.replaceState(null,'',location.pathname);
+    let tries=0;
+    toast('Проверяем оплату…',2000);
+    const t=setInterval(async()=>{
+      tries++;
+      await loadMe();
+      if(me && me.balance>0){ clearInterval(t); toast('Оплачено! Баланс: '+me.balance+' кр.'); }
+      if(tries>15){ clearInterval(t); toast('Если кредиты не появились — обновите страницу через минуту'); }
+    },2000);
+  })();
+
+  // ---------- экран 1 (загрузка) — без изменений ----------
+  const drop=$('#drop'), fileInput=$('#fileInput');
+  let photoFile=null;
+  drop.addEventListener('click',()=>fileInput.click());
+  fileInput.addEventListener('change',()=>{
+    if(!fileInput.files[0])return;
+    photoFile=fileInput.files[0];
+    $('#previewImg').src=URL.createObjectURL(photoFile);
+    drop.style.display='none';
+    $('#previewWrap').style.display='block';
+    $('#options').style.display='block';
+  });
+  ['dragover','dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{
+    e.preventDefault();
+    if(ev==='drop'&&e.dataTransfer.files[0]){
+      photoFile=e.dataTransfer.files[0]; fileInput.files=e.dataTransfer.files;
+      $('#previewImg').src=URL.createObjectURL(photoFile);
+      drop.style.display='none'; $('#previewWrap').style.display='block'; $('#options').style.display='block';
+    }
+  }));
+  $$('.chip').forEach(c=>c.addEventListener('click',()=>{
+    $$('.chip').forEach(x=>x.classList.remove('on')); c.classList.add('on');
+  }));
+  $('#budget').addEventListener('input',e=>{$('#budgetVal').textContent=e.target.value+' тыс. ₽';});
+
+  $('#go').addEventListener('click',async()=>{
+    if(!photoFile)return;
+    $('#go').disabled=true; $('#go').textContent='Отправляем…';
+    const fd=new FormData();
+    fd.append('photo',photoFile);
+    fd.append('style',$('.chip.on').textContent.trim());
+    fd.append('budget',$('#budget').value);
+    try{
+      const r=await fetch('/api/rooms',{method:'POST',body:fd});
+      const data=await r.json();
+      if(!r.ok)throw new Error(data.error||r.status);
+      roomId=data.id;
+      $('#loadImg').src=URL.createObjectURL(photoFile);
+      go('s2'); poll();
+    }catch(e){
+      alert('Ошибка: '+e.message);
+      $('#go').disabled=false; $('#go').textContent='Сделать дизайн →';
+    }
+  });
+
+  // ---------- экран 2: поллинг ----------
+  function poll(){
+    clearTimeout(polling);
+    polling=setTimeout(async()=>{
+      try{
+        const r=await fetch('/api/rooms/'+roomId);
+        const d=await r.json();
+        if(!r.ok)throw new Error(d.error||r.status);
+        paintSteps(d.status);
+        if(d.status==='done'){ renderResult(d); go('s3'); return; }
+        if(d.status==='error'){
+          $('#loadError').textContent='Не получилось: '+(d.error||'ошибка');
+          $('#loadError').style.display='block';
+          return;
+        }
+        poll();
+      }catch(e){ poll(); }
+    },1500);
+  }
+  function paintSteps(status){
+    const order=['analyzing','rendering','matching'];
+    const idx=order.indexOf(status);
+    $$('#steps li').forEach(li=>{
+      const i=order.indexOf(li.dataset.s);
+      li.classList.toggle('done', i<idx || status==='done');
+      li.classList.toggle('doing', i===idx);
+    });
+  }
+
+  // ---------- экран 3: результат ----------
+  function renderResult(d){
+    $('#imgBefore').src=d.photo_url;
+    $('#imgAfter').src=d.render.image+'?t='+Date.now();
+    $('#dlBtn').href=d.render.image;
+    const shop=$('#shop'); shop.innerHTML='';
+    if(!d.items.length) shop.innerHTML='<div class="empty">Материалы не подобраны — каталог пуст</div>';
+    d.items.forEach(p=>{
+      const attrs=Object.values(p.attrs||{}).join(' · ');
+      const sum=p.price*p.qty;
+      const row=document.createElement('div'); row.className='row';
+      const imgTag=p.image_url?`<img src="${p.image_url}" style="width:44px;height:44px;object-fit:cover;border-radius:5px;margin-right:10px;flex:none" alt="">`:'';
+      row.innerHTML=`<div style="display:flex;gap:0;align-items:center">${imgTag}<div>
+          <div class="name">${p.name}</div>
+          <div class="meta">${[attrs, p.source].filter(Boolean).join(' · ')} · ${p.qty} ${p.unit}</div>
+          <div class="detail">${p.url?`Ссылка: <a href="${p.url}" target="_blank">${p.url}</a><br>`:''}Источник цены: ${p.source||'—'}${p.match_score!=null?` · совпадение ${(p.match_score*100).toFixed(0)}%`:''}</div>
+        </div></div>
+        <div class="price">${fmt(sum)}</div>`;
+      row.addEventListener('click',()=>row.classList.toggle('open'));
+      shop.appendChild(row);
+    });
+    $('#total').textContent='≈ '+fmt(d.total);
+  }
+
+  // слайдер до/после
+  const cmp=$('#compare'), aft=$('#imgAfter'), hdl=cmp.querySelector('.handle');
+  let dragging=false;
+  function setX(x){
+    const r=cmp.getBoundingClientRect();
+    const p=Math.min(Math.max((x-r.left)/r.width,0),1)*100;
+    aft.style.clipPath=`inset(0 0 0 ${p}%)`;
+    hdl.style.left=p+'%';
+  }
+  cmp.addEventListener('pointerdown',e=>{dragging=true;setX(e.clientX);cmp.setPointerCapture(e.pointerId)});
+  cmp.addEventListener('pointermove',e=>{if(dragging)setX(e.clientX)});
+  cmp.addEventListener('pointerup',()=>dragging=false);
+
+  // ---------- чат-правки ----------
+  function addMsg(cls,html){const m=document.createElement('div');m.className='msg '+cls;m.innerHTML=html;$('#chat').appendChild(m);m.scrollIntoView({behavior:'smooth',block:'nearest'});return m;}
+  async function send(){
+    const v=$('#chatIn').value.trim(); if(!v)return;
+    $('#chatSend').disabled=true;
+    addMsg('user',v); $('#chatIn').value='';
+    const ai=addMsg('ai','Рисуем…<span class="note">≈ 30–60 секунд</span>');
+    try{
+      const r=await fetch('/api/rooms/'+roomId+'/iterate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:v})});
+      const d=await r.json().catch(()=>({}));
+      if(r.status===401){
+        ai.innerHTML='Чтобы править дизайн, нужно войти.<span class="act">Войти</span>';
+        ai.querySelector('.act').onclick=openAuth;
+        return;
+      }
+      if(r.status===402){
+        ai.innerHTML='Правки стоят 1 кредит.<span class="act">Купить кредиты</span>';
+        ai.querySelector('.act').onclick=openBuy;
+        return;
+      }
+      if(!r.ok)throw new Error(d.error||r.status);
+      await waitDone();
+      const room=await (await fetch('/api/rooms/'+roomId)).json();
+      $('#imgAfter').src=room.render.image+'?t='+Date.now();
+      renderResult(room);
+      await loadMe();
+      ai.innerHTML='Готово, применил: «'+v+'».<span class="note">Смета обновлена</span>';
+    }catch(e){
+      ai.innerHTML='Не получилось: '+e.message;
+    }finally{
+      $('#chatSend').disabled=false;
+    }
+  }
+  function waitDone(){
+    return new Promise((res,rej)=>{
+      (async function tick(){
+        try{
+          const d=await (await fetch('/api/rooms/'+roomId)).json();
+          if(d.status==='done')return res();
+          if(d.status==='error')return rej(new Error(d.error||'ошибка'));
+          setTimeout(tick,1500);
+        }catch(e){setTimeout(tick,1500);}
+      })();
+    });
+  }
+  $('#chatSend').addEventListener('click',send);
+  $('#chatIn').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
+
+  // ---------- админка ----------
+  const adminPage=$('#adminPage');
+  let adminKey=localStorage.getItem('rv_admin_key')||'';
+  function adminHash(){ return location.hash==='#admin'; }
+  async function openAdmin(){
+    adminPage.classList.add('open');
+    if(!adminKey){ $('#keyGate').style.display='block'; $('#adminBody').style.display='none'; return; }
+    $('#keyGate').style.display='none';
+    await loadProducts();
+  }
+  $('#adminKeySave').onclick=()=>{
+    adminKey=$('#adminKey').value.trim();
+    localStorage.setItem('rv_admin_key',adminKey);
+    openAdmin();
+  };
+  $('#adminClose').onclick=e=>{ e.preventDefault(); location.hash=''; };
+
+  async function adminFetch(url,opts={}){
+    opts.headers=Object.assign({'X-Admin-Key':adminKey},opts.headers||{});
+    const r=await fetch(url,opts);
+    if(r.status===403){ localStorage.removeItem('rv_admin_key'); adminKey=''; $('#keyGate').style.display='block'; $('#adminBody').style.display='none'; throw new Error('Неверный ключ'); }
+    return r;
+  }
+  async function loadProducts(){
+    const r=await adminFetch('/api/admin/products');
+    const list=await r.json();
+    $('#adminBody').style.display='block';
+    $('#pRows').innerHTML=list.map(p=>`<tr>
+      <td>${p.image_path?`<img src="/products/${p.image_path.split('/').pop()}">`:(p.image_url?`<img src="${p.image_url}">`:'—')}</td>
+      <td><b>${p.name}</b><br><span style="color:var(--muted)">${p.brand||''}</span></td>
+      <td>${p.category}</td>
+      <td>${fmt(p.price)} ×${p.qty} ${p.unit}</td>
+      <td>${p.style_tags||'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="mini" data-edit='${JSON.stringify(p).replace(/'/g,"&#39;")}'>изм</button>
+        <button class="mini" data-del="${p.id}">удл</button>
+      </td></tr>`).join('');
+    $$('#pRows [data-edit]').forEach(b=>b.onclick=()=>fillForm(JSON.parse(b.dataset.edit)));
+    $$('#pRows [data-del]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Удалить товар?'))return;
+      await adminFetch('/api/admin/products/'+b.dataset.del,{method:'DELETE'});
+      loadProducts();
+    });
+  }
+  function fillForm(p){
+    $('#pformTitle').textContent='Товар #'+p.id;
+    $('#p_id').value=p.id; $('#p_category').value=p.category; $('#p_name').value=p.name;
+    $('#p_brand').value=p.brand||''; $('#p_price').value=p.price; $('#p_unit').value=p.unit;
+    $('#p_qty').value=p.qty; $('#p_style_tags').value=p.style_tags||'';
+    $('#p_keywords').value=p.keywords||''; $('#p_url').value=p.url||'';
+    $('#p_image_url').value=p.image_url||''; $('#p_image').value='';
+    window.scrollTo(0,0);
+  }
+  $('#pReset').onclick=()=>{
+    $('#pformTitle').textContent='Новый товар';
+    ['p_id','p_name','p_brand','p_price','p_style_tags','p_keywords','p_url','p_image_url','p_image'].forEach(id=>$('#'+id).value='');
+    $('#p_qty').value=1;
+  };
+  $('#pSave').onclick=async()=>{
+    const fd=new FormData();
+    fd.append('category',$('#p_category').value); fd.append('name',$('#p_name').value);
+    fd.append('price',$('#p_price').value); fd.append('unit',$('#p_unit').value);
+    fd.append('qty',$('#p_qty').value);
+    if($('#p_brand').value) fd.append('brand',$('#p_brand').value);
+    if($('#p_style_tags').value) fd.append('style_tags',$('#p_style_tags').value);
+    if($('#p_keywords').value) fd.append('keywords',$('#p_keywords').value);
+    if($('#p_url').value) fd.append('url',$('#p_url').value);
+    if($('#p_image_url').value) fd.append('image_url',$('#p_image_url').value);
+    if($('#p_image').files[0]) fd.append('image',$('#p_image').files[0]);
+    const id=$('#p_id').value;
+    try{
+      const r=await adminFetch(id?('/api/admin/products/'+id):'/api/admin/products',{method:id?'PUT':'POST',body:fd});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error||r.status);
+      toast('Сохранено: '+d.name);
+      $('#pReset').click();
+      loadProducts();
+    }catch(e){ toast(e.message); }
+  };
+
+  window.addEventListener('hashchange',()=>{ adminPage.classList.toggle('open',adminHash()); if(adminHash()) openAdmin(); });
+
+  // init
+  loadMe();
+  if(adminHash()) openAdmin();
+</script>
+</body>
+</html>

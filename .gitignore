@@ -1,0 +1,14 @@
+# зависимости
+node_modules/
+
+# данные и секреты
+data/
+.env
+
+# логи и мусор
+*.log
+.DS_Store
+npm-debug.log*
+
+# локальные проверки
+check-pg.mjs

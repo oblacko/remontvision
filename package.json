@@ -1,0 +1,25 @@
+{
+  "name": "remontvision",
+  "version": "1.0.0",
+  "description": "Ремонт по фото: AI-рендер + список реальных материалов с ценами",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --env-file=.env src/server.js",
+    "dev": "node --watch --env-file=.env src/server.js"
+  },
+  "engines": {
+    "node": ">=20.6"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1156.0",
+    "@aws-sdk/s3-request-presigner": "^3.1156.0",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.2",
+    "nodemailer": "^10.2.1",
+    "pg": "^8.23.1"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true
+  }
+}

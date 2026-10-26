@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: remont
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-remont}
+      POSTGRES_DB: remontvision
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U remont -d remontvision"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # на VPS внешний порт закройте/уберите — доступ только из сети compose.
+    # 5434 на хосте: 5432/5433 заняты другими postgres на этой машине
+    ports:
+      - "127.0.0.1:5434:5432"
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      RV_DATABASE_URL: postgres://remont:${DB_PASSWORD:-remont}@db:5432/remontvision
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - appdata:/app/data
+    restart: unless-stopped
+
+volumes:
+  appdata:
+  pgdata:
