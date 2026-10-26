@@ -142,7 +142,7 @@ export async function verifyCode(emailRaw, codeRaw) {
     user = await q.createUser(email);
     isNew = true;
     log({ event: 'user_created', user_id: user.id, email });
-    await grantCredits(user.id, 1, 'signup_bonus'); // 1 бесплатный рендер-итерация за регистрацию
+    await grantCredits(user.id, 2, 'signup_bonus'); // 2 бесплатные генерации за регистрацию
   }
   await q.addIdentity(user.id, 'email', null, email);
 

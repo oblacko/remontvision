@@ -9,7 +9,7 @@ import { listImageModels, MOCK_MODE, assertConfig, log } from './openrouter.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
 import { PACKS, packById, createPayment, syncPayment, createRefund, refundQuote, yukassaConfigured } from './payments.js';
-import { putBuffer, redirectUrl, resolveDisk } from './storage.js';
+import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 
@@ -229,13 +229,27 @@ app.post('/api/admin/refunds', h(async (req, res) => {
 
 // ---------- комнаты ----------
 app.post('/api/rooms', rateLimit, upload.single('photo'), h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
   if (!req.file) return res.status(400).json({ error: 'Нет фото' });
+  const bal = await q.creditBalance(req.user.id);
+  if (bal < 1) {
+    return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: bal });
+  }
   const id = crypto.randomUUID();
   const style = req.body.style || 'Современный';
   const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 500);
   const photoKey = await saveUpload(req.file, 'uploads');
-  await q.createRoom(id, style, budget, photoKey, req.user?.id || null);
-  await enqueueRender({ roomId: id });
+  await q.createRoom(id, style, budget, photoKey, req.user.id);
+  try {
+    await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
+  } catch (e) {
+    if (e.status === 402) {
+      await q.deleteRoom(id);
+      await remove(photoKey);
+      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: await q.creditBalance(req.user.id) });
+    }
+    throw e;
+  }
   res.status(201).json({ id, status: 'queued' });
 }));
 

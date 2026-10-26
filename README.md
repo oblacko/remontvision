@@ -56,7 +56,7 @@ docker compose up -d --build
      на vision-разбор + словесный матчинг (старая схема).
    - полная себестоимость (`cost_image_usd` + `cost_vision_usd`) пишется в json-лог и в `renders`.
 3. Фронт поллит `GET /api/rooms/:id` каждые 1,5 с, пока `status=done`.
-4. Итерации `POST /api/rooms/:id/iterate` — только для авторизованных, стоят 1 кредит (402 без кредитов).
+4. Создание комнаты `POST /api/rooms` и итерации `POST /api/rooms/:id/iterate` — только для авторизованных и стоят 1 кредит каждая (402 без кредитов).
 
 ## Каталог (админ)
 
@@ -86,7 +86,7 @@ docker compose up -d --build
 | POST | `/api/payments/webhook` | webhook ЮKassa (payment.succeeded → начисление) |
 
 Без `YUKASSA_SHOP_ID`/`YUKASSA_SECRET_KEY` — 503. Для боевых ссылок нужен `APP_URL` (return/webhook).
-Регистрация даёт 1 кредит (`signup_bonus`).
+Регистрация даёт 2 кредита (`signup_bonus`), этого хватает на 2 генерации.
 
 ## Настройка (`.env`)
 
@@ -105,7 +105,7 @@ curl https://openrouter.ai/api/v1/images/models -H "Authorization: Bearer $OPENR
 - `RENDER_MODEL_FALLBACK` — модель для одного ретрая при падении основной (пусто = без ретрая);
 - `OPENROUTER_TIMEOUT_MS` — таймаут вызовов (по умолчанию 120000);
 - `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS` — лимит задач на IP (по умолчанию 5 в час);
-- `SMTP_URL`, `MAIL_FROM` — отправка кодов авторизации (пусто — dev-режим с кодом в логе).
+- `RESEND_API_KEY`, `RESEND_TEMPLATE_ID`, `MAIL_FROM` — отправка кодов (фолбэк: `SMTP_URL` или dev-лог).
 
 ## API
 

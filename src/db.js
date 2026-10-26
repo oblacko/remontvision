@@ -62,6 +62,11 @@ export const q = {
     pool.query(`UPDATE rooms SET status = $1, error = NULL, updated_at = now() WHERE id = $2`, [status, id]),
   setRoomError: (error, id) =>
     pool.query(`UPDATE rooms SET status = 'error', error = $1, updated_at = now() WHERE id = $2`, [error, id]),
+  deleteRoom: id => withTransaction(async client => {
+    await client.query(`DELETE FROM render_items WHERE render_id IN (SELECT id FROM renders WHERE room_id = $1)`, [id]);
+    await client.query(`DELETE FROM renders WHERE room_id = $1`, [id]);
+    await client.query(`DELETE FROM rooms WHERE id = $1`, [id]);
+  }),
 
   // renders
   createRender: (id, roomId, parentRenderId, requestText, prompt) =>
