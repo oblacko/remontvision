@@ -116,8 +116,12 @@ export function buildPrompt({ style, budget, requestText, iteration, products })
   }
   // новое ядро: рисуем ИЗ товаров каталога — их фото уходят референсами (input_references)
   if (products?.length) {
-    const list = products.map((p, i) => `${i + 1}) ${p.name} — use for ${p.category}`).join('; ');
-    return `${keep} Redesign this room in ${styleDesc} style. Use EXACTLY these specific products in the interior (reference photos attached): ${list}. Keep the listed products visually recognizable in the result. Materials budget context ~${budget} thousand RUB.`;
+    const hasRefs = products.some(p => p.image_path || p.image_url);
+    const list = products.map((p, i) => {
+      const attrs = Object.entries(p.attrs || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+      return `${i + 1}) ${p.name}${p.brand ? ` (${p.brand})` : ''} — ${p.category}${attrs ? ` [${attrs}]` : ''}`;
+    }).join('; ');
+    return `${keep} Redesign this room in ${styleDesc} style. Use EXACTLY these specific products in the interior${hasRefs ? ' (reference photos attached)' : ''}: ${list}. Match the specified colors and materials; do not substitute unrelated products. Keep the listed products visually recognizable in the result. Materials budget context ~${budget} thousand RUB.`;
   }
   return `${keep} Redesign this room in ${styleDesc} style. Materials and furniture for a total materials budget around ${budget} thousand RUB. Realistic materials, believable lighting.`;
 }
@@ -221,17 +225,40 @@ export async function parseRender(renderB64) {
   return { items: Array.isArray(parsed) ? parsed : (parsed.items || []), cost: data.usage?.cost ?? null };
 }
 
-// Простой матчинг: пересечение ключевых слов с каталогом. v2 — эмбеддинги.
+// Простой матчинг: ключевые слова + штраф за несовпадение цвета. v2 — эмбеддинги.
+const COLOR_HINTS = {
+  'белый': ['бел', 'светл'],
+  'бежевый': ['беж', 'светл'],
+  'серый': ['сер', 'камен'],
+  'грейдж': ['грейдж', 'сер', 'камен'],
+  'графит': ['графит', 'темн', 'черн'],
+  'черный': ['черн', 'темн'],
+  'темный': ['темн', 'графит', 'черн'],
+  'светлый': ['светл', 'бел', 'беж'],
+  'антрацит': ['антрацит', 'темн', 'черн'],
+  'латунь': ['латун', 'золот', 'brass'],
+  'золотой': ['золот', 'латун'],
+  'хром': ['хром', 'серебр'],
+  'сталь': ['стал', 'серебр'],
+  'дерево': ['дерев', 'древес'],
+  'коричневый': ['корич', 'дерев', 'орех'],
+  'орех': ['орех', 'корич', 'дерев'],
+};
+
 export function matchCatalog(items, products) {
   const norm = s => (s || '').toLowerCase().replace(/ё/g, 'е');
   const results = [];
   for (const it of items.slice(0, 12)) {
     const words = [...(it.keywords || []), it.description || '', it.category || ''].map(norm);
+    const text = words.join(' ');
     let best = null, bestScore = 0;
     for (const p of products) {
       if (p.category !== it.category) continue;
       const pwords = norm(p.keywords).split(',').map(w => w.trim());
-      const score = pwords.filter(w => w && words.some(x => x.includes(w) || w.includes(x))).length / Math.max(pwords.length, 1);
+      let score = pwords.filter(w => w && words.some(x => x.includes(w) || w.includes(x))).length / Math.max(pwords.length, 1);
+      const color = norm((p.attrs || {})['цвет'] || '').split(/[ ,/]+/)[0];
+      const hints = COLOR_HINTS[color] || (color ? [color] : []);
+      if (hints.length && !hints.some(h => text.includes(h))) score *= 0.5;
       if (score > bestScore) { bestScore = score; best = p; }
     }
     if (best && bestScore >= 0.34) results.push({ product: best, score: bestScore });

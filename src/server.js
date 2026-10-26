@@ -70,6 +70,15 @@ function requireAdmin(req, res) {
   return true;
 }
 
+// В каталоге может не быть прямой ссылки: не отдаём битый href, а ведём на поиск.
+function productLink(p) {
+  const raw = String(p.url || '').trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#].*)?$/i.test(raw)) return `https://${raw}`;
+  const query = [p.name, p.brand, p.source].filter(Boolean).join(' ');
+  return `https://yandex.ru/search/?text=${encodeURIComponent(query)}`;
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true, mock: MOCK_MODE }));
 app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
@@ -272,7 +281,9 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       name: p.name, brand: p.brand, attrs: p.attrs || {},
       price: p.price, unit: p.unit, qty: p.qty, source: p.source, match_score: p.match_score,
       price_date: p.price_date, price_updated_at: p.price_updated_at,
-      url: p.url, image_url: p.image_path ? `/products/${path.basename(p.image_path)}` : p.image_url,
+      url: productLink(p), link_label: p.url ? 'Открыть товар' : 'Найти похожие',
+      image_search_url: `https://yandex.ru/images/search?text=${encodeURIComponent([p.name, p.brand, p.source].filter(Boolean).join(' '))}`,
+      image_url: p.image_path ? `/products/${path.basename(p.image_path)}` : p.image_url,
     })),
     total,
     prices_as_of: pricesAsOf,

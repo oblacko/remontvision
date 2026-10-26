@@ -80,21 +80,33 @@ async function processRender(renderId) {
     const renderKey = `renders/${render.id}.${ext}`;
     await putBuffer(renderKey, bytes, MIME_BY_EXT[ext] || 'image/png');
 
-    // смета: отобранные товары; итерации наследуют смету родителя; фолбэк — vision-матчинг
+    // смета строится по тому, что реально видно на готовой визуализации.
+    // Если vision-разбор упал — откатываемся на товары, отобранные до генерации.
     stage = 'matching';
     await q.setRoomStatus('matching', room.id);
     let visionCost = null;
-    if (iteration) {
+    let visionOk = false;
+    let matched = [];
+    if (!MOCK_MODE) {
+      try {
+        const parsed = await parseRender(imageB64);
+        visionCost = parsed.cost;
+        matched = matchCatalog(parsed.items, await q.allProducts());
+        visionOk = true;
+        log({ event: 'render_matched', room_id: room.id, render_id: renderId, parsed_items: parsed.items.length, matched: matched.length });
+      } catch (e) {
+        log({ event: 'render_match_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+      }
+    }
+    await q.clearItems(render.id);
+    if (visionOk) {
+      // если похожих товаров нет — смета остаётся пустой, а не врёт curated-списком
+      for (const m of matched) await q.saveItem(render.id, m.product.id, m.score);
+    } else if (iteration) {
       const parent = await q.getRender(render.parent_render_id);
       if (parent) await q.copyItems(parent.id, render.id);
     } else if (curated.length) {
       for (const p of curated) await q.saveItem(render.id, p.id, null);
-    } else if (!MOCK_MODE) {
-      const parsed = await parseRender(imageB64);
-      visionCost = parsed.cost;
-      const matched = matchCatalog(parsed.items, await q.allProducts());
-      for (const m of matched) await q.saveItem(render.id, m.product.id, m.score);
-      log({ event: 'render_matched', room_id: room.id, render_id: renderId, parsed_items: parsed.items.length, matched: matched.length, fallback: true });
     } else {
       await sleep(1200);
       const demo = (await q.allProducts()).filter(p => [1, 3, 5, 7].includes(Number(p.id)));
