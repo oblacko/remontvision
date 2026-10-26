@@ -7,6 +7,11 @@ services:
       POSTGRES_DB: remontvision
     volumes:
       - pgdata:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U remont -d remontvision"]
       interval: 5s
@@ -29,6 +34,11 @@ services:
         condition: service_healthy
     volumes:
       - appdata:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
 
 volumes:

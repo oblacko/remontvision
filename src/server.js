@@ -8,8 +8,10 @@ import { startWorker, enqueueRender } from './jobs.js';
 import { listImageModels, MOCK_MODE, assertConfig, log } from './openrouter.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
-import { PACKS, packById, createPayment, syncPayment, spendCredit } from './payments.js';
+import { PACKS, packById, createPayment, syncPayment, createRefund, refundQuote, yukassaConfigured } from './payments.js';
 import { putBuffer, redirectUrl, resolveDisk } from './storage.js';
+import { sanitizeImage } from './media.js';
+import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -47,7 +49,8 @@ const productUpload = memUpload();
 async function saveUpload(file, dir) {
   const ext = IMG_EXT[file.mimetype] || '.jpg';
   const key = `${dir}/${crypto.randomUUID()}${ext}`;
-  await putBuffer(key, file.buffer, file.mimetype);
+  const clean = await sanitizeImage(file.buffer);
+  await putBuffer(key, clean, file.mimetype);
   return key;
 }
 
@@ -69,6 +72,7 @@ function requireAdmin(req, res) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, mock: MOCK_MODE }));
 app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
+app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
 
 // ---------- авторизация (e-mail код; заделка под OAuth yandex/vk/mailru) ----------
 app.post('/api/auth/request-code', rateLimit, h(async (req, res) => {
@@ -77,7 +81,14 @@ app.post('/api/auth/request-code', rateLimit, h(async (req, res) => {
 }));
 
 app.post('/api/auth/verify', rateLimit, h(async (req, res) => {
+  requireConsents(req.body?.consents);
   const { token, user, isNew } = await verifyCode(req.body?.email, req.body?.code);
+  await recordAcceptances({
+    userId: user.id,
+    context: isNew ? 'signup' : 'login',
+    req,
+    documents: ['offer', 'privacy', 'cross_border'],
+  });
   setSessionCookie(res, token, req);
   res.json({ ok: true, email: user.email, is_new: Boolean(isNew) });
 }));
@@ -101,6 +112,11 @@ app.get('/api/my/rooms', h(async (req, res) => {
   res.json(await q.myRooms(req.user.id));
 }));
 
+app.get('/api/credits', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  res.json({ balance: await q.creditBalance(req.user.id), history: await q.creditHistory(req.user.id) });
+}));
+
 // ---------- оплата ----------
 app.get('/api/packs', (_req, res) => {
   res.json(PACKS.map(p => ({ id: p.id, credits: p.credits, price_kopecks: p.price_kopecks, title: p.title })));
@@ -108,18 +124,34 @@ app.get('/api/packs', (_req, res) => {
 
 app.post('/api/payments/create', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
+  if (req.body?.accept_offer !== true) {
+    return res.status(400).json({ error: 'Нужен отдельный акцепт оферты', legal_version: LEGAL_VERSIONS.offer });
+  }
   const pack = packById(req.body?.pack_id);
   if (!pack) return res.status(400).json({ error: 'Неизвестный пакет' });
   const base = (process.env.APP_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
   const payment = await createPayment({ userId: req.user.id, pack, returnUrl: `${base}/?paid=${pack.id}` });
+  await recordAcceptances({
+    userId: req.user.id,
+    context: 'payment',
+    req,
+    paymentId: payment.local_payment_id,
+    documents: ['offer'],
+  });
   res.json({ confirmation_url: payment.confirmation?.confirmation_url, payment_id: payment.id });
 }));
 
 // webhook ЮKassa: типы payment.succeeded / payment.canceled / refund.succeeded
 app.post('/api/payments/webhook', h(async (req, res) => {
+  const event = String(req.body?.event || '');
   const obj = req.body?.object;
   const id = obj?.id;
   if (!id) return res.status(400).json({ error: 'no object id' });
+  if (event.startsWith('refund.')) {
+    // возвраты инициирует админ через /api/admin/refunds; событие только фиксируем
+    log({ event: 'webhook_refund', provider_refund_id: id, status: event });
+    return res.json({ ok: true });
+  }
   try {
     const out = await syncPayment(id);
     log({ event: 'webhook', provider_payment_id: id, result: out });
@@ -167,6 +199,34 @@ app.delete('/api/admin/products/:id', h(async (req, res) => {
   res.status(ok ? 204 : 404).end();
 }));
 
+// ---------- возвраты: только админ ----------
+app.get('/api/admin/payments', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const userId = Number(req.query.user_id);
+  if (!userId) return res.status(400).json({ error: 'Нужен user_id' });
+  res.json(await q.paymentsByUser(userId));
+}));
+
+app.get('/api/admin/refunds/quote', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const paymentId = Number(req.query.payment_id);
+  if (!paymentId) return res.status(400).json({ error: 'Нужен payment_id' });
+  res.json({ ...(await refundQuote(paymentId)), yukassa_configured: yukassaConfigured() });
+}));
+
+app.post('/api/admin/refunds', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { payment_id, amount_kopecks, method, reason } = req.body || {};
+  if (!payment_id) return res.status(400).json({ error: 'Нужен payment_id' });
+  const out = await createRefund({
+    paymentId: Number(payment_id),
+    amountKopecks: Number(amount_kopecks),
+    method: method || 'yukassa',
+    reason: reason || '',
+  });
+  res.status(201).json(out);
+}));
+
 // ---------- комнаты ----------
 app.post('/api/rooms', rateLimit, upload.single('photo'), h(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Нет фото' });
@@ -185,6 +245,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
   const render = await q.latestRender(room.id);
   const items = render ? await q.itemsForRender(render.id) : [];
   const total = render ? await q.totalForRender(render.id) : 0;
+  const pricesAsOf = render ? await q.pricesAsOfForRender(render.id) : null;
   res.json({
     id: room.id,
     style: room.style,
@@ -196,9 +257,11 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     items: items.map(p => ({
       name: p.name, brand: p.brand, attrs: p.attrs || {},
       price: p.price, unit: p.unit, qty: p.qty, source: p.source, match_score: p.match_score,
+      price_date: p.price_date, price_updated_at: p.price_updated_at,
       url: p.url, image_url: p.image_path ? `/products/${path.basename(p.image_path)}` : p.image_url,
     })),
     total,
+    prices_as_of: pricesAsOf,
   });
 }));
 
@@ -226,11 +289,20 @@ app.post('/api/rooms/:id/iterate', rateLimit, h(async (req, res) => {
   const parent = await q.latestRender(room.id);
   if (!parent) return res.status(409).json({ error: 'Нет рендера для правки' });
   if (!requireAuth(req, res)) return;
-  const paid = await spendCredit(req.user.id, 'iterate');
-  if (!paid) {
-    return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: await q.creditBalance(req.user.id) });
+  try {
+    await enqueueRender({
+      roomId: room.id,
+      parentRenderId: parent.id,
+      requestText: text,
+      chargedUserId: req.user.id,
+      requestIp: clientIp(req),
+    });
+  } catch (e) {
+    if (e.status === 402) {
+      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: await q.creditBalance(req.user.id) });
+    }
+    throw e;
   }
-  await enqueueRender({ roomId: room.id, parentRenderId: parent.id, requestText: text });
   res.status(202).json({ id: room.id, status: 'queued' });
 }));
 

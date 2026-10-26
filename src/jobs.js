@@ -10,6 +10,7 @@ import { MOCK_MODE, buildPrompt, generateRender, parseRender, matchCatalog, snap
 import { imageSize, detectImageExt } from './imagesize.js';
 import { curateProducts, referenceImages, hasImage } from './curate.js';
 import { putBuffer, getBuffer } from './storage.js';
+import { spendCreditForRender, restoreCreditForRender } from './payments.js';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
@@ -28,8 +29,10 @@ async function processRender(renderId) {
   if (!render || render.status !== 'processing') return; // уже забран другим слотом
   const room = await q.getRoom(render.room_id);
   const iteration = Boolean(render.request_text);
+  let stage = 'start';
 
   try {
+    stage = 'analyzing';
     await q.setRoomStatus('analyzing', room.id);
     log({ event: 'render_start', room_id: room.id, render_id: renderId, iteration });
 
@@ -54,6 +57,7 @@ async function processRender(renderId) {
       await sleep(2500);
       imageB64 = fs.readFileSync(MOCK_AFTER).toString('base64');
     } else {
+      stage = 'rendering';
       await q.setRoomStatus('rendering', room.id);
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
       const srcStored = parent ? parent.image_path : room.photo_path;
@@ -77,6 +81,7 @@ async function processRender(renderId) {
     await putBuffer(renderKey, bytes, MIME_BY_EXT[ext] || 'image/png');
 
     // смета: отобранные товары; итерации наследуют смету родителя; фолбэк — vision-матчинг
+    stage = 'matching';
     await q.setRoomStatus('matching', room.id);
     let visionCost = null;
     if (iteration) {
@@ -105,9 +110,14 @@ async function processRender(renderId) {
     log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_image_usd: cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
   } catch (e) {
     const msg = String(e.message || e).slice(0, 500);
-    await q.setRenderError(msg, renderId);
+    await q.setRenderError(msg, renderId, stage);
     await q.setRoomError(msg, room.id);
-    log({ event: 'render_error', room_id: room.id, render_id: renderId, error: msg, ms: Date.now() - t0 });
+    try {
+      const restored = await restoreCreditForRender(renderId, `render_error:${stage}`);
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, credit_restored: restored, ms: Date.now() - t0 });
+    } catch (restoreError) {
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
+    }
   }
 }
 
@@ -118,6 +128,23 @@ let running = 0;
 export function startWorker() {
   // рендеры, оставшиеся в processing после краха, возвращаем в очередь
   q.requeueProcessing().then(n => { if (n) console.log(`[worker] вернул в очередь ${n} прерванных рендеров`); });
+
+  // страховка: задача без результата дольше 24 часов → ошибка + восстановление кредита
+  setInterval(async () => {
+    try {
+      const stale = await q.staleRenders(24 * 60);
+      for (const r of stale) {
+        const msg = 'Генерация не завершилась за 24 часа';
+        await q.setRenderError(msg, r.id, 'timeout');
+        await q.setRoomError(msg, r.room_id);
+        const restored = await restoreCreditForRender(r.id, 'timeout');
+        log({ event: 'render_timeout', room_id: r.room_id, render_id: r.id, credit_restored: restored });
+      }
+    } catch (e) {
+      log({ event: 'stale_sweep_error', error: String(e.message || e).slice(0, 300) });
+    }
+  }, 5 * 60 * 1000);
+
   setInterval(async () => {
     if (running >= 2) return;
     try {
@@ -132,10 +159,28 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null }) {
   const id = crypto.randomUUID();
   await q.createRender(id, roomId, parentRenderId, requestText, null);
-  await q.setRoomStatus('queued', roomId);
-  log({ event: 'enqueue', room_id: roomId, render_id: id, parent_render_id: parentRenderId });
+  if (requestIp) await q.setRenderRequestIp(id, requestIp);
+
+  if (chargedUserId) {
+    const paid = await spendCreditForRender(chargedUserId, id, 'iterate');
+    if (!paid) {
+      await q.setRenderError('Нужен кредит', id, 'credit');
+      const e = new Error('Нужен кредит');
+      e.status = 402;
+      throw e;
+    }
+  }
+
+  try {
+    await q.setRoomStatus('queued', roomId);
+  } catch (e) {
+    if (chargedUserId) await restoreCreditForRender(id, 'enqueue_failed');
+    throw e;
+  }
+
+  log({ event: 'enqueue', room_id: roomId, render_id: id, parent_render_id: parentRenderId, charged_user_id: chargedUserId || null });
   return id;
 }

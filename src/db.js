@@ -69,11 +69,23 @@ export const q = {
       [id, roomId, parentRenderId, requestText, prompt]),
   getRender: id => pool.query(`SELECT * FROM renders WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   setRenderDone: (imagePath, costUsd, model, id) =>
-    pool.query(`UPDATE renders SET status='done', image_path = $1, cost_usd = $2, model = $3 WHERE id = $4`, [imagePath, costUsd, model, id]),
-  setRenderError: (error, id) =>
-    pool.query(`UPDATE renders SET status='error', error = $1 WHERE id = $2`, [error, id]),
+    pool.query(`UPDATE renders SET status='done', image_path = $1, cost_usd = $2, model = $3,
+                finished_at = now(),
+                duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
+                WHERE id = $4`, [imagePath, costUsd, model, id]),
+  setRenderError: (error, id, stage = null) =>
+    pool.query(`UPDATE renders SET status='error', error = $1, error_stage = COALESCE($3, error_stage),
+                finished_at = now(),
+                duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
+                WHERE id = $2`, [error, id, stage]),
+  staleRenders: minutes =>
+    pool.query(`SELECT id, room_id FROM renders
+                WHERE status IN ('queued','processing')
+                  AND created_at < now() - ($1 || ' minutes')::interval`, [String(minutes)]).then(r => r.rows),
   setRenderPrompt: (id, prompt) =>
     pool.query(`UPDATE renders SET prompt = $2 WHERE id = $1`, [id, prompt]),
+  setRenderRequestIp: (id, ip) =>
+    pool.query(`UPDATE renders SET request_ip = $2 WHERE id = $1`, [id, ip || null]),
   copyItems: (fromRenderId, toRenderId) =>
     pool.query(`INSERT INTO render_items (render_id, product_id, match_score)
                 SELECT $2, product_id, match_score FROM render_items WHERE render_id = $1`, [fromRenderId, toRenderId]),
@@ -82,7 +94,7 @@ export const q = {
       .then(r => r.rows[0] || null),
   // атомарный claim следующей queued-задачи
   claimNextRender: () =>
-    pool.query(`UPDATE renders SET status = 'processing'
+    pool.query(`UPDATE renders SET status = 'processing', started_at = now()
                 WHERE id = (SELECT id FROM renders WHERE status = 'queued' ORDER BY created_at LIMIT 1)
                 RETURNING id`).then(r => r.rows[0] || null),
   requeueProcessing: () =>
@@ -98,6 +110,10 @@ export const q = {
     pool.query(`SELECT COALESCE(SUM(p.price * p.qty), 0)::int AS total FROM render_items ri
                 JOIN products p ON p.id = ri.product_id WHERE ri.render_id = $1`, [renderId])
       .then(r => r.rows[0].total),
+  pricesAsOfForRender: renderId =>
+    pool.query(`SELECT MAX(p.price_updated_at) AS as_of FROM render_items ri
+                JOIN products p ON p.id = ri.product_id WHERE ri.render_id = $1`, [renderId])
+      .then(r => r.rows[0]?.as_of || null),
   allProducts: () => pool.query(`SELECT * FROM products`).then(r => r.rows),
 
   // users / auth
@@ -129,8 +145,15 @@ export const q = {
   creditBalance: userId =>
     pool.query(`SELECT COALESCE(SUM(delta),0)::int AS balance FROM credit_txn WHERE user_id = $1`, [userId])
       .then(r => r.rows[0].balance),
-  addCreditTxn: (userId, delta, reason, paymentId = null) =>
-    pool.query(`INSERT INTO credit_txn (user_id, delta, reason, payment_id) VALUES ($1,$2,$3,$4)`, [userId, delta, reason, paymentId]),
+  addCreditTxn: (userId, delta, reason, paymentId = null, renderId = null, note = null) =>
+    pool.query(`INSERT INTO credit_txn (user_id, delta, reason, payment_id, render_id, note)
+                VALUES ($1,$2,$3,$4,$5,$6)`, [userId, delta, reason, paymentId, renderId, note]),
+  creditHistory: userId =>
+    pool.query(`SELECT ct.id, ct.delta, ct.reason, ct.payment_id, ct.render_id, ct.note, ct.created_at,
+                       r.room_id
+                FROM credit_txn ct LEFT JOIN renders r ON r.id = ct.render_id
+                WHERE ct.user_id = $1 ORDER BY ct.created_at DESC, ct.id DESC LIMIT 100`, [userId])
+      .then(r => r.rows),
 
   // комнаты юзера (история в UI)
   myRooms: userId =>
@@ -140,8 +163,40 @@ export const q = {
   // платежи
   createPaymentRow: (userId, provider, providerPaymentId, amountKopecks, payload) =>
     pool.query(`INSERT INTO payments (user_id, provider, provider_payment_id, amount_kopecks, payload) VALUES ($1,$2,$3,$4,$5)
-                ON CONFLICT (provider_payment_id) DO NOTHING`,
-      [userId, provider, providerPaymentId, amountKopecks, JSON.stringify(payload)]),
+                ON CONFLICT (provider_payment_id) DO NOTHING RETURNING *`,
+      [userId, provider, providerPaymentId, amountKopecks, JSON.stringify(payload)])
+      .then(r => r.rows[0] || null),
+  paymentById: id => pool.query(`SELECT * FROM payments WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  paymentsByUser: userId =>
+    pool.query(`SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId]).then(r => r.rows),
+
+  // юридические документы и акцепты
+  legalDocs: () => pool.query(`SELECT * FROM legal_docs ORDER BY published_at DESC`).then(r => r.rows),
+  acceptLegal: (userId, document, version, context, ip, userAgent, paymentId = null) =>
+    pool.query(`INSERT INTO legal_acceptances (user_id, document, version, context, ip, user_agent, payment_id)
+                VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [userId, document, version, context, ip || null, userAgent || null, paymentId]),
+
+  // возвраты
+  refundsByPayment: paymentId =>
+    pool.query(`SELECT * FROM refunds WHERE payment_id = $1 ORDER BY created_at DESC`, [paymentId]).then(r => r.rows),
+  createRefundRow: (paymentId, providerRefundId, amountKopecks, credits, method, status, reason, payload) =>
+    pool.query(`INSERT INTO refunds (payment_id, provider_refund_id, amount_kopecks, credits, method, status, reason, payload)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [paymentId, providerRefundId, amountKopecks, credits, method, status, reason, JSON.stringify(payload || {})])
+      .then(r => r.rows[0]),
+  markPaymentRefunded: (paymentId, amountKopecks) =>
+    pool.query(`UPDATE payments SET refunded_kopecks = refunded_kopecks + $2 WHERE id = $1 RETURNING *`,
+      [paymentId, amountKopecks]).then(r => r.rows[0]),
+
+  // чеки
+  createReceiptRow: (paymentId, provider, payload) =>
+    pool.query(`INSERT INTO receipts (payment_id, provider, payload) VALUES ($1,$2,$3) RETURNING *`,
+      [paymentId, provider, JSON.stringify(payload || {})]).then(r => r.rows[0]),
+  markReceipt: (id, status, providerReceiptId = null, error = null) =>
+    pool.query(`UPDATE receipts SET status=$2, provider_receipt_id=$3, error=$4,
+                sent_at = CASE WHEN $2 = 'sent' THEN now() ELSE sent_at END
+                WHERE id=$1 RETURNING *`, [id, status, providerReceiptId, error]).then(r => r.rows[0]),
 
   // каталог (админ)
   insertProduct: f =>
@@ -153,9 +208,10 @@ export const q = {
   updateProduct: (id, fields) => {
     const keys = Object.keys(fields).filter(k => ['category','name','brand','attrs','price','unit','qty','source','keywords','style_tags','url','image_url','image_path','price_date'].includes(k));
     if (!keys.length) return Promise.resolve(null);
-    const set = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+    const set = keys.map((k, i) => `${k} = $${i + 2}`);
+    if (keys.includes('price')) set.push('price_updated_at = now()');
     const vals = keys.map(k => k === 'attrs' ? JSON.stringify(fields[k]) : fields[k]);
-    return pool.query(`UPDATE products SET ${set} WHERE id = $1 RETURNING *`, [id, ...vals]).then(r => r.rows[0] || null);
+    return pool.query(`UPDATE products SET ${set.join(', ')} WHERE id = $1 RETURNING *`, [id, ...vals]).then(r => r.rows[0] || null);
   },
   deleteProduct: id => pool.query(`DELETE FROM products WHERE id = $1`, [id]).then(r => r.rowCount > 0),
 };

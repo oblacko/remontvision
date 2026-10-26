@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ремонт по фото — AI-дизайн интерьера и смета материалов | Ремонтвижн</title>
-<meta name="description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из реальных материалов с ценами. Первый рендер бесплатно.">
+<meta name="description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из товаров каталога с ценами и ссылками. Первый рендер бесплатно.">
 <meta name="keywords" content="ремонт по фото, дизайн интерьера по фото, AI дизайн, нейросеть ремонт, визуализация ремонта, смета материалов, дизайн кухни онлайн">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="author" content="Ремонтвижн">
@@ -15,7 +15,7 @@
 <meta property="og:site_name" content="Ремонтвижн">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:title" content="Ремонт по фото — AI-дизайн интерьера и смета материалов">
-<meta property="og:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из реальных материалов с ценами. Первый рендер бесплатно.">
+<meta property="og:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из товаров каталога с ценами и ссылками. Первый рендер бесплатно.">
 <meta property="og:url" content="https://www.remontvision.ru/">
 <meta property="og:image" content="https://www.remontvision.ru/assets/kitchen_after.png">
 <meta property="og:image:width" content="1536">
@@ -23,7 +23,7 @@
 <meta property="og:image:alt" content="Визуализация кухни после ремонта, созданная нейросетью">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Ремонт по фото — AI-дизайн интерьера и смета материалов">
-<meta name="twitter:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из реальных материалов с ценами.">
+<meta name="twitter:description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и составит смету из товаров каталога с ценами и ссылками.">
 <meta name="twitter:image" content="https://www.remontvision.ru/assets/kitchen_after.png">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,7 +39,7 @@
       "url": "https://www.remontvision.ru/",
       "name": "Ремонтвижн",
       "inLanguage": "ru-RU",
-      "description": "AI-сервис визуализации ремонта по фото с подбором реальных материалов и сметой."
+      "description": "AI-сервис визуализации ремонта по фото с подбором товаров каталога и сметой."
     },
     {
       "@type": "Organization",
@@ -57,7 +57,7 @@
       "operatingSystem": "Web",
       "browserRequirements": "Requires JavaScript",
       "inLanguage": "ru-RU",
-      "description": "Загрузите фото комнаты и получите AI-визуализацию ремонта и смету реальных материалов с ценами.",
+      "description": "Загрузите фото комнаты и получите AI-визуализацию ремонта и смету товаров каталога с ценами и ссылками.",
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -67,7 +67,7 @@
       "featureList": [
         "AI-визуализация ремонта по фото",
         "Выбор стиля и бюджета",
-        "Смета из реальных товаров с ценами",
+        "Товары из каталога со ссылками и ценами",
         "Правки дизайна текстовыми запросами"
       ]
     },
@@ -149,7 +149,13 @@
   .mock-badge{font-size:10px;color:#fff;background:var(--accent);padding:4px 10px;border-radius:20px;display:none}
 
   .h1{font-size:26px;font-weight:800;line-height:1.15;letter-spacing:-1px;margin-bottom:6px}
-  .sub{font-size:13px;color:rgba(17,17,17,.55);margin-bottom:24px;line-height:1.45}
+  .sub{font-size:13px;color:rgba(17,17,17,.55);margin-bottom:16px;line-height:1.45}
+  .ai-note{font-size:11px;color:#8a3b16;background:#fff3ec;border:1px solid #ffd6c2;border-radius:7px;padding:9px 11px;margin:0 0 18px;line-height:1.45}
+  .consents{margin:12px 0 4px;display:flex;flex-direction:column;gap:8px}
+  .consents label{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;line-height:1.4;color:rgba(17,17,17,.75);cursor:pointer}
+  .consents input{width:16px;height:16px;margin-top:1px;accent-color:var(--accent);flex:none}
+  .consents a{color:var(--accent)}
+  .price-asof{font-size:10.5px;color:var(--muted);margin:6px 2px 0;text-align:right}
   .drop{
     border:1.5px dashed #b9bab2;border-radius:7px;background:var(--card);
     padding:44px 20px;text-align:center;cursor:pointer;transition:border-color .2s;
@@ -247,6 +253,9 @@
   /* ---- модальные окна ---- */
   .modal{position:fixed;inset:0;background:rgba(17,17,17,.45);display:none;align-items:flex-end;justify-content:center;z-index:50}
   .modal.open{display:flex}
+  .modal.top{align-items:flex-start;padding-top:max(16px,env(safe-area-inset-top))}
+  .modal.top .sheet{border-radius:14px;max-height:calc(100vh - 32px);animation:drop .25s ease}
+  @keyframes drop{from{transform:translateY(-12px);opacity:.5}to{transform:none;opacity:1}}
   .sheet{width:100%;max-width:430px;background:var(--bg);border-radius:14px 14px 0 0;padding:22px 18px 30px;animation:up .25s ease;max-height:88vh;overflow-y:auto}
   @keyframes up{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
   .sheet h3{font-size:17px;font-weight:800;margin-bottom:4px}
@@ -312,8 +321,9 @@
       <div class="top-right" id="userBlock"></div>
       <div class="mock-badge" id="mockBadge">демо-режим</div>
     </div>
-    <h1 class="h1">Дизайн ремонта по фото — за 30 секунд</h1>
-    <p class="sub">Загрузите фото комнаты. Получите дизайн и список реальных материалов с ценами.</p>
+    <h1 class="h1">Дизайн ремонта по фото — обычно 30–60 секунд</h1>
+    <p class="sub">Загрузите фото комнаты. Получите визуализацию и товары из каталога со ссылками на магазины и ценами.</p>
+    <p class="ai-note">Сервис использует искусственный интеллект. Результат может содержать ошибки: размеры, цвета, количество материалов и цены могут не соответствовать реальности. Проверяйте перед покупкой и началом работ.</p>
 
     <div class="drop" id="drop">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
@@ -382,12 +392,13 @@
       <button id="chatSend" aria-label="Отправить">↑</button>
     </div>
 
-    <div class="sec-label">Что на фото — реальные товары</div>
+    <div class="sec-label">Товары из каталога со ссылками на магазины</div>
     <div class="shop" id="shop"></div>
     <div class="total">
       <span>Итого материалы (оценка)</span>
       <b id="total">—</b>
     </div>
+    <p class="price-asof" id="priceAsOf"></p>
     <p class="fineprint">Визуализация и смета созданы ИИ и носят информационный характер. Размеры, цвета, количество материалов и цены могут не соответствовать реальности — проверяйте перед покупкой и началом работ. <a href="/offer" target="_blank" rel="noopener">Подробнее в оферте</a>.</p>
 
     <div class="actions btnrow">
@@ -413,7 +424,7 @@
   <h3>Почему это удобно</h3>
   <ul>
     <li>Реалистичная визуализация ремонта по вашему фото.</li>
-    <li>Смета из реальных материалов с ценами и ссылками.</li>
+    <li>Товары из каталога со ссылками на магазины и ценами.</li>
     <li>Правки дизайна текстовыми запросами.</li>
     <li>Работает в браузере без установки приложения.</li>
   </ul>
@@ -445,15 +456,19 @@
 </footer>
 
 <!-- ВХОД -->
-<div class="modal" id="authModal">
+<div class="modal top" id="authModal">
   <div class="sheet">
     <button class="close-x" data-close="authModal">×</button>
     <div id="authStep1">
       <h3>Вход по e-mail</h3>
       <p class="hint">Пришлём код на почту. Без паролей — удобно с телефона и компьютера.</p>
       <div class="field"><label>E-mail</label><input id="authEmail" type="email" placeholder="you@yandex.ru" autocomplete="email"></div>
+      <div class="consents">
+        <label><input type="checkbox" id="consentOffer"><span>Принимаю <a href="/offer" target="_blank" rel="noopener">публичную оферту</a> (ред. <span class="legal-offer-version">2026-10-26.3</span>)</span></label>
+        <label><input type="checkbox" id="consentPrivacy"><span>Согласен на <a href="/privacy" target="_blank" rel="noopener">обработку персональных данных</a></span></label>
+        <label><input type="checkbox" id="consentCross"><span>Согласен на <a href="/privacy#cross-border" target="_blank" rel="noopener">трансграничную передачу</a> фото и запросов провайдерам генерации</span></label>
+      </div>
       <button class="btn orange" id="authSend">Получить код</button>
-      <p class="hint" style="margin-top:12px">Входя, вы принимаете <a href="/offer" target="_blank" rel="noopener" style="color:var(--accent)">оферту</a> и <a href="/privacy" target="_blank" rel="noopener" style="color:var(--accent)">политику конфиденциальности</a>.</p>
     </div>
     <div id="authStep2" style="display:none">
       <h3>Введите код</h3>
@@ -471,7 +486,9 @@
     <h3>Кредиты на правки</h3>
     <p class="hint">1 кредит = 1 правка дизайна. Оплата картой, СБП или кошельком ЮMoney.</p>
     <div id="packs"></div>
-    <p class="hint" style="margin-top:12px">Оплачивая, вы принимаете <a href="/offer" target="_blank" rel="noopener" style="color:var(--accent)">оферту</a>, <a href="/prices" target="_blank" rel="noopener" style="color:var(--accent)">условия и цены</a> и <a href="/privacy" target="_blank" rel="noopener" style="color:var(--accent)">политику конфиденциальности</a>.</p>
+    <div class="consents">
+      <label><input type="checkbox" id="buyOfferConsent"><span>Принимаю <a href="/offer" target="_blank" rel="noopener">оферту</a> (ред. <span class="legal-offer-version">2026-10-26.3</span>) и <a href="/prices" target="_blank" rel="noopener">условия и цены</a></span></label>
+    </div>
   </div>
 </div>
 
@@ -575,11 +592,28 @@
     if(me){ openBuy(); return; }
     $('#authStep1').style.display='block'; $('#authStep2').style.display='none';
     $('#authEmail').value=''; $('#authCode').value='';
+    ['consentOffer','consentPrivacy','consentCross'].forEach(id=>$('#'+id).checked=false);
     openModal('authModal');
+  }
+  function authConsents(){
+    return {
+      offer: $('#consentOffer').checked,
+      privacy: $('#consentPrivacy').checked,
+      cross_border: $('#consentCross').checked,
+    };
+  }
+  function consentsOk(){
+    const c=authConsents();
+    if(!c.offer || !c.privacy || !c.cross_border){
+      toast('Отметьте акцепт оферты, согласие на ПДн и трансграничную передачу');
+      return false;
+    }
+    return true;
   }
   $('#authSend').onclick=async()=>{
     const email=$('#authEmail').value.trim();
     if(!email) return toast('Введите e-mail');
+    if(!consentsOk()) return;
     $('#authSend').disabled=true;
     try{
       const r=await fetch('/api/auth/request-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
@@ -593,9 +627,10 @@
   $('#authVerify').onclick=async()=>{
     const code=$('#authCode').value.trim();
     if(code.length!==6) return toast('Код — 6 цифр');
+    if(!consentsOk()) return;
     $('#authVerify').disabled=true;
     try{
-      const r=await fetch('/api/auth/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#authEmail').value.trim(),code})});
+      const r=await fetch('/api/auth/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#authEmail').value.trim(),code,consents:authConsents()})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error||r.status);
       closeModal('authModal');
@@ -608,21 +643,22 @@
 
   async function openBuy(){
     if(!me){ openAuth(); toast('Сначала войдите'); return; }
+    $('#buyOfferConsent').checked=false;
     try{
       const packs=await (await fetch('/api/packs')).json();
       $('#packs').innerHTML=packs.map(p=>`
         <div class="pack">
           <div><div class="t">${p.title}</div><div class="d">${p.credits} правк${p.credits===1?'а':(p.credits<5?'и':'')} дизайна</div></div>
-          <div style="text-align:right"><div class="p">${fmt(p.price_kopecks/100)}</div>
-          <button class="btn orange small" data-pack="${p.id}" style="margin-top:6px">Купить</button></div>
+          <div style="text-align:right"><button class="btn orange small" data-pack="${p.id}">Оплатить ${fmt(p.price_kopecks/100)}</button></div>
         </div>`).join('');
       $('#packs').querySelectorAll('[data-pack]').forEach(b=>b.onclick=()=>buyPack(b.dataset.pack));
       openModal('buyModal');
     }catch(e){ toast('Не удалось загрузить пакеты'); }
   }
   async function buyPack(pack_id){
+    if(!$('#buyOfferConsent').checked) return toast('Отметьте акцепт оферты перед оплатой');
     try{
-      const r=await fetch('/api/payments/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pack_id})});
+      const r=await fetch('/api/payments/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pack_id,accept_offer:true})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error(d.error||r.status);
       location.href=d.confirmation_url;
@@ -739,6 +775,11 @@
       shop.appendChild(row);
     });
     $('#total').textContent='≈ '+fmt(d.total);
+    const dates=(d.items||[]).map(p=>p.price_updated_at||p.price_date).filter(Boolean).map(x=>new Date(x)).filter(x=>!isNaN(x));
+    const asOf=d.prices_as_of?new Date(d.prices_as_of):(dates.length?new Date(Math.max(...dates.map(x=>x.getTime()))):null);
+    $('#priceAsOf').textContent=asOf
+      ? 'Цены актуальны на '+asOf.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+      : 'Дата актуальности цен не указана';
   }
 
   // слайдер до/после
@@ -885,6 +926,11 @@
   window.addEventListener('hashchange',()=>{ adminPage.classList.toggle('open',adminHash()); if(adminHash()) openAdmin(); });
 
   // init
+  fetch('/api/legal').then(r=>r.ok?r.json():null).then(d=>{
+    if(!d?.versions) return;
+    $$('.legal-offer-version').forEach(el=>el.textContent=d.versions.offer||'');
+    $$('.legal-privacy-version').forEach(el=>el.textContent=d.versions.privacy||'');
+  }).catch(()=>{});
   loadMe();
   if(adminHash()) openAdmin();
 </script>

@@ -1,7 +1,7 @@
 // E-mail авторизация по одноразовому коду (passwordless).
 // Архитектура с заделкой под OAuth: юзер в users, входы — строки в auth_identities
 // (provider: email|yandex|vk|mailru), склейка аккаунтов по email.
-// Без SMTP_URL код пишется в json-лог (dev-режим) — удобно для локальной разработки.
+// Отправка: Resend API (RESEND_API_KEY) → SMTP (SMTP_URL) → dev-лог.
 import crypto from 'node:crypto';
 import nodemailer from 'nodemailer';
 import { q } from './db.js';
@@ -16,24 +16,73 @@ const COOKIE = 'rv_sid';
 
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const RESEND_TEMPLATE_ID = process.env.RESEND_TEMPLATE_ID || '';
+const MAIL_FROM = process.env.MAIL_FROM || 'ремонтвижн <noreply@remontvision.ru>';
+
 let mailer = null;
-if (process.env.SMTP_URL) {
+if (!RESEND_API_KEY && process.env.SMTP_URL) {
   mailer = nodemailer.createTransport(process.env.SMTP_URL);
   log({ event: 'mail_transport', mode: 'smtp' });
+} else if (RESEND_API_KEY) {
+  log({ event: 'mail_transport', mode: 'resend', from: MAIL_FROM });
 } else {
-  log({ event: 'mail_transport', mode: 'dev_log', msg: 'SMTP_URL не задан — коды авторизации пишутся в лог' });
+  log({ event: 'mail_transport', mode: 'dev_log', msg: 'RESEND_API_KEY/SMTP_URL не заданы — коды авторизации пишутся в лог' });
 }
 
 async function sendCodeEmail(email, code) {
+  const text = `Ваш код входа: ${code}\nДействует ${OTP_TTL_MIN} минут. Если вы не запрашивали код — просто игнорируйте письмо.`;
+  if (RESEND_API_KEY) {
+    const payload = RESEND_TEMPLATE_ID
+      ? {
+          from: MAIL_FROM,
+          to: [email],
+          template: {
+            id: RESEND_TEMPLATE_ID,
+            variables: {
+              code,
+              CODE: code,
+              otp: code,
+              OTP: code,
+              code_otp: code,
+              CODE_OTP: code,
+              ttl: String(OTP_TTL_MIN),
+              TTL: String(OTP_TTL_MIN),
+              ttl_min: String(OTP_TTL_MIN),
+              TTL_MIN: String(OTP_TTL_MIN),
+              minutes: String(OTP_TTL_MIN),
+              email,
+            },
+          },
+        }
+      : {
+          from: MAIL_FROM,
+          to: [email],
+          subject: 'Код входа — ремонтвижн',
+          text,
+          html: `<p>Ваш код входа: <b style="font-size:22px;letter-spacing:2px">${code}</b></p>
+                 <p>Действует ${OTP_TTL_MIN} минут. Если вы не запрашивали код — просто игнорируйте письмо.</p>`,
+        };
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error(`resend ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    return;
+  }
   if (!mailer) {
     log({ event: 'otp_dev_code', email, code, ttl_min: OTP_TTL_MIN });
     return;
   }
   await mailer.sendMail({
-    from: process.env.MAIL_FROM || 'remontvision <no-reply@localhost>',
+    from: MAIL_FROM,
     to: email,
     subject: 'Код входа — ремонтвижн',
-    text: `Ваш код входа: ${code}\nДействует ${OTP_TTL_MIN} минут. Если вы не запрашивали код — просто игнорируйте письмо.`,
+    text,
   });
 }
 
