@@ -13,7 +13,9 @@ import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES } from './roomtypes.js';
-import { SLOT_LABELS, normalizeTier } from './pricing.js';
+import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
+import { curateProducts } from './curate.js';
+import { roomTypeByName } from './roomtypes.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedCatalog } from './catalogseed.js';
 import { seedStyleReferences } from './stylerefseed.js';
@@ -572,6 +574,57 @@ app.post('/api/admin/styles/:id/products', h(async (req, res) => {
   res.status(201).json(row);
 }));
 
+app.post('/api/admin/styles/:id/products/bulk', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const styleId = Number(req.params.id);
+  const roomType = ROOM_TYPE_NAMES.includes(String(req.body?.room_type || '')) ? String(req.body.room_type) : null;
+  const ids = [...new Set((Array.isArray(req.body?.product_ids) ? req.body.product_ids : []).map(Number).filter(Boolean))];
+  const existing = new Set((await q.styleProducts(styleId, roomType)).map(p => Number(p.id)));
+  let added = 0;
+  for (const id of ids) {
+    if (existing.has(id)) continue;
+    await q.addStyleProduct(styleId, id, added, roomType);
+    added++;
+  }
+  res.json({ added });
+}));
+
+app.post('/api/admin/styles/:id/kit', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const style = await q.styleById(Number(req.params.id));
+  if (!style) return res.status(404).json({ error: 'Стиль не найден' });
+  const roomType = ROOM_TYPE_NAMES.includes(String(req.body?.room_type || '')) ? String(req.body.room_type) : 'Спальня';
+  const priceTier = normalizeTier(String(req.body?.price_tier || ''), 'comfort');
+  const room = roomTypeByName(roomType);
+  if (!room) return res.status(400).json({ error: 'Неизвестная комната' });
+  const pinned = await q.styleProducts(style.id, roomType);
+  const curated = await curateProducts({
+    style: style.name,
+    priceTier,
+    roomType,
+    preferredIds: pinned.filter(p => p.active !== false).map(p => p.id),
+    seed: `kit:${style.id}:${roomType}`,
+    requireUrl: true,
+  });
+  const slots = room.slots.map(slot => {
+    const p = curated.find(x => x.slot === slot.key);
+    return {
+      key: slot.key,
+      label: SLOT_LABELS_RU[slot.key] || slot.key,
+      product: p ? {
+        id: p.id, name: p.name, price: p.price, unit: p.unit, price_tier: p.price_tier,
+        url: p.url || null, image_url: p.image_path ? `/products/${path.basename(p.image_path)}` : p.image_url,
+        dimensions: p.dimensions || null,
+      } : null,
+    };
+  });
+  res.json({
+    style_id: style.id, style: style.name, room_type: roomType, price_tier: priceTier,
+    slots, missing: slots.filter(s => !s.product).map(s => s.key),
+    product_ids: slots.filter(s => s.product).map(s => s.product.id),
+  });
+}));
+
 app.delete('/api/admin/styles/:id/products/:productId', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const ok = await q.deleteStyleProduct(Number(req.params.id), Number(req.params.productId));
@@ -787,11 +840,14 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       analysis: render.analysis || null,
     } : null,
     items: items.map(p => ({
+      id: p.id,
       name: p.name, brand: p.brand, attrs: p.attrs || {},
       price: p.price, unit: p.unit, qty: p.qty, source: p.source, match_score: p.match_score,
       price_tier: p.price_tier || 'comfort',
       price_date: p.price_date, price_updated_at: p.price_updated_at,
-      url: productLink(p), link_label: p.url ? 'Открыть товар' : 'Найти похожие',
+      url: `/go/${p.id}${render ? `?r=${encodeURIComponent(render.id)}` : ''}`,
+      direct_url: Boolean(p.url),
+      link_label: p.url ? 'Заказать' : 'Найти похожие',
       image_search_url: `https://yandex.ru/images/search?text=${encodeURIComponent([p.name, p.brand, p.source].filter(Boolean).join(' '))}`,
       image_url: p.image_path ? `/products/${path.basename(p.image_path)}` : p.image_url,
     })),
@@ -820,6 +876,25 @@ app.get('/files/:name', h(async (req, res) => serveStored(req, res, 'uploads', r
 app.get('/renders/:file', h(async (req, res) => serveStored(req, res, 'renders', req.params.file, q.roomByRenderKey)));
 app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products', req.params.file)));
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
+
+// Переход из сметы к товару: логируем клик и уводим на реальную страницу/поиск.
+app.get('/go/:id', h(async (req, res) => {
+  const product = await q.getProduct(Number(req.params.id));
+  if (!product) return res.status(404).end();
+  let renderId = String(req.query.r || '').trim() || null;
+  if (renderId) {
+    const r = await q.getRender(renderId);
+    if (!r) renderId = null;
+  }
+  const ipHash = crypto.createHash('sha256').update(clientIp(req)).digest('hex').slice(0, 32);
+  try {
+    await q.logProductClick({ productId: product.id, userId: req.user?.id || null, renderId, ipHash });
+  } catch (e) {
+    log({ event: 'product_click_error', product_id: product.id, error: String(e.message || e).slice(0, 200) });
+  }
+  res.set('Cache-Control', 'no-store');
+  return res.redirect(302, productLink(product));
+}));
 
 // итерация: только для авторизованных, стоит 1 кредит
 app.delete('/api/rooms/:id', h(async (req, res) => {

@@ -122,6 +122,9 @@ export const q = {
   setRenderAnalysis: (id, analysis) =>
     pool.query(`UPDATE renders SET analysis = $2 WHERE id = $1`, [id, JSON.stringify(analysis || {})]),
   getProduct: id => pool.query(`SELECT * FROM products WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  logProductClick: ({ productId, userId = null, renderId = null, ipHash = null }) =>
+    pool.query(`INSERT INTO product_clicks (product_id, user_id, render_id, ip_hash) VALUES ($1,$2,$3,$4)`,
+      [productId, userId || null, renderId || null, ipHash || null]),
   copyItems: (fromRenderId, toRenderId) =>
     pool.query(`INSERT INTO render_items (render_id, product_id, match_score)
                 SELECT $2, product_id, match_score FROM render_items WHERE render_id = $1`, [fromRenderId, toRenderId]),
@@ -173,7 +176,7 @@ export const q = {
                 JOIN products p ON p.id = ri.product_id WHERE ri.render_id = $1`, [renderId])
       .then(r => r.rows[0]?.as_of || null),
   allProducts: () => pool.query(`SELECT * FROM products WHERE active IS NOT FALSE`).then(r => r.rows),
-  adminProducts: () => pool.query(`SELECT * FROM products ORDER BY active DESC, id`).then(r => r.rows),
+  adminProducts: () => pool.query(`SELECT p.*, (SELECT COUNT(*) FROM product_clicks pc WHERE pc.product_id = p.id)::int AS clicks FROM products p ORDER BY p.active DESC, p.id`).then(r => r.rows),
 
   // users / auth
   findUserByEmail: email =>

@@ -45,6 +45,8 @@ type Product = {
   seed_key?: string | null;
   dimensions?: { text?: string; width_cm?: number | null; depth_cm?: number | null; height_cm?: number | null; diameter_cm?: number | null } | null;
 }
+type KitSlot = { key: string; label: string; product: { id: number; name: string; price: number; unit: string; price_tier: string; url: string | null; image_url: string | null; dimensions?: { text?: string } | null } | null };
+type KitResult = { style_id: number; style: string; room_type: string; price_tier: string; slots: KitSlot[]; missing: string[]; product_ids: number[] };
 type ImportPreview = {
   url: string; domain: string; allowed_domain: boolean;
   name: string; brand: string; description: string; price: number; currency: string;
@@ -151,6 +153,14 @@ export default function Admin() {
   const [importBusy, setImportBusy] = useState(false)
   const [importNotice, setImportNotice] = useState('')
   const [importAllowAny, setImportAllowAny] = useState(false)
+  const [bulkUrls, setBulkUrls] = useState('')
+  const [bulkResults, setBulkResults] = useState<Array<{ url: string; preview?: ImportPreview; error?: string; added?: boolean }>>([])
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [kitRoom, setKitRoom] = useState('Спальня')
+  const [kitTier, setKitTier] = useState('comfort')
+  const [kit, setKit] = useState<KitResult | null>(null)
+  const [kitBusy, setKitBusy] = useState(false)
+  const [kitNotice, setKitNotice] = useState('')
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -228,26 +238,49 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка импорта') }
     finally { setImportBusy(false) }
   }
-  const addImported = async () => {
-    if (!importPreview) return
-    if (!importPreview.category || !importPreview.name || !importPreview.price) { setAdminError('Нужны название, цена и категория'); return }
-    if (!importPreview.allowed_domain && !importAllowAny) { setAdminError('Домен не в allowlist. Подтвердите импорт вручную'); return }
+  const addImported = async (preview: ImportPreview | null = importPreview, clear = true) => {
+    if (!preview) return false
+    if (!preview.category || !preview.name || !preview.price) { setAdminError('Нужны название, цена и категория'); return false }
+    if (!preview.allowed_domain && !importAllowAny) { setAdminError('Домен не в allowlist. Подтвердите импорт вручную'); return false }
     setCatalogBusy(true); setAdminError(''); setImportNotice('')
     try {
       await readJson(await api('/api/admin/products', { method: 'POST', body: JSON.stringify({
-        name: importPreview.name, brand: importPreview.brand, attrs: importPreview.attrs,
-        price: importPreview.price, unit: importPreview.unit, qty: importPreview.qty,
-        source: importPreview.domain, keywords: [importPreview.name, importPreview.category, importPreview.brand].filter(Boolean).join(','),
-        style_tags: importPreview.style_tags, url: importPreview.url_source || importPreview.url,
-        image_path: importPreview.image_path, image_url: importPreview.image_url,
-        price_tier: importPreview.price_tier, room_types: importPreview.room_types,
-        surface: importPreview.surface, dimensions: importPreview.dimensions, active: false,
+        name: preview.name, brand: preview.brand, attrs: preview.attrs,
+        price: preview.price, unit: preview.unit, qty: preview.qty,
+        source: preview.domain, keywords: [preview.name, preview.category, preview.brand].filter(Boolean).join(','),
+        style_tags: preview.style_tags, url: preview.url_source || preview.url,
+        image_path: preview.image_path, image_url: preview.image_url,
+        price_tier: preview.price_tier, room_types: preview.room_types,
+        surface: preview.surface, dimensions: preview.dimensions, active: false,
       }) }))
       setImportNotice('Товар добавлен черновиком. Включите его в таблице ниже.')
-      setImportPreview(null); setImportUrl(''); setImportAllowAny(false)
+      if (clear) { setImportPreview(null); setImportUrl(''); setImportAllowAny(false) }
       await loadCatalog()
-    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+      return true
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка'); return false }
     finally { setCatalogBusy(false) }
+  }
+  const parseBulk = async () => {
+    const urls = [...new Set(bulkUrls.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//i.test(s)))].slice(0, 20)
+    if (!urls.length) return
+    setBulkBusy(true); setAdminError(''); setImportNotice('')
+    const out: Array<{ url: string; preview?: ImportPreview; error?: string; added?: boolean }> = urls.map(url => ({ url }))
+    setBulkResults([...out])
+    for (let i = 0; i < out.length; i++) {
+      try {
+        out[i].preview = await readJson(await api('/api/admin/products/import', { method: 'POST', body: JSON.stringify({ url: out[i].url }) }))
+      } catch (e) {
+        out[i].error = e instanceof Error ? e.message : 'Ошибка импорта'
+      }
+      setBulkResults([...out])
+    }
+    setBulkBusy(false)
+  }
+  const addBulkResult = async (index: number) => {
+    const result = bulkResults[index]
+    if (!result?.preview) return
+    const ok = await addImported(result.preview, false)
+    if (ok) setBulkResults(prev => prev.map((x, i) => i === index ? { ...x, added: true } : x))
   }
   const updateCatalog = async (p: Product, fields: Record<string, unknown>) => {
     setCatalogBusy(true); setAdminError('')
@@ -304,7 +337,7 @@ export default function Admin() {
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
   const loadStyle = async (id: number) => {
-    setSelectedStyleId(id)
+    setSelectedStyleId(id); setKit(null); setKitNotice('')
     try {
       const d = await readJson(await api('/api/admin/styles/' + id))
       setStyleDetail(d)
@@ -438,6 +471,26 @@ export default function Admin() {
     if (!selectedStyleId) return
     try { await readJson(await api('/api/admin/styles/' + selectedStyleId + '/products', { method: 'POST', body: JSON.stringify({ product_id: productId, room_type: styleRoomType === 'Все' ? null : styleRoomType }) })); await loadStyle(selectedStyleId); await loadStyles() }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const buildKit = async () => {
+    if (!selectedStyleId) return
+    setKitBusy(true); setKitNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/styles/' + selectedStyleId + '/kit', { method: 'POST', body: JSON.stringify({ room_type: kitRoom, price_tier: kitTier }) }))
+      setKit(d)
+      setKitNotice(d.missing.length ? `Не хватает слотов: ${d.missing.length}. Добавьте реальные товары с URL.` : 'Комплект собран полностью')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setKitBusy(false) }
+  }
+  const addKitToStyle = async () => {
+    if (!selectedStyleId || !kit?.product_ids.length) return
+    setKitBusy(true); setKitNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/styles/' + selectedStyleId + '/products/bulk', { method: 'POST', body: JSON.stringify({ product_ids: kit.product_ids, room_type: kit.room_type }) }))
+      await loadStyle(selectedStyleId); await loadStyles()
+      setKitNotice(`Добавлено в стиль: ${d.added}`)
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setKitBusy(false) }
   }
   const deleteStyleProduct = async (productId: number) => {
     if (!selectedStyleId) return
@@ -611,6 +664,24 @@ export default function Admin() {
                     </section>
 
                     <section>
+                      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Генератор комплекта</p><p className="mt-1 max-w-xl text-xs leading-5 text-muted-foreground">Собирает 6–8 товаров по слотам комнаты. В комплект попадают только товары с реальным URL — по ним можно заказать.</p></div></div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <select value={kitRoom} onChange={e => { setKitRoom(e.target.value); setKit(null) }} className="h-10 border bg-background px-2 text-sm outline-none focus:border-primary">{roomTypeNames.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                        <select value={kitTier} onChange={e => { setKitTier(e.target.value); setKit(null) }} className="h-10 border bg-background px-2 text-sm outline-none focus:border-primary">{['start','comfort','premium','atelier'].map(t => <option key={t} value={t}>{t}</option>)}</select>
+                        <button type="button" disabled={kitBusy} onClick={() => void buildKit()} className="action-primary">{kitBusy ? 'Собираем…' : 'Собрать комплект'}</button>
+                      </div>
+                      {kitNotice && <p className="mt-3 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{kitNotice}</p>}
+                      {kit && (
+                        <>
+                          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {kit.slots.map(slot => <div key={slot.key} className={`border p-2 ${slot.product ? '' : 'border-dashed bg-muted/30'}`}><p className="text-[10px] uppercase tracking-wider text-muted-foreground">{slot.label}</p>{slot.product ? <><img src={slot.product.image_url || ''} alt="" className="mt-1 h-16 w-full border object-cover" /><p className="mt-1 line-clamp-2 text-xs font-medium">{slot.product.name}</p><p className="text-[11px] text-muted-foreground">{money(slot.product.price)} · {slot.product.price_tier}{slot.product.dimensions?.text ? ` · ${slot.product.dimensions.text}` : ''}</p></> : <p className="mt-2 text-xs text-muted-foreground">нет товара с URL</p>}</div>)}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={kitBusy || !kit.product_ids.length} onClick={() => void addKitToStyle()} className="action-secondary">Добавить всё в стиль ({kit.product_ids.length})</button></div>
+                        </>
+                      )}
+                    </section>
+
+                    <section>
                       <p className="eyebrow">Товары стиля (избранное)</p>
                       <div className="mt-3 divide-y border-y">
                         {styleDetail.products.map(p => <div key={p.id} className="flex items-center gap-3 py-2 text-sm"><img src={productImage(p)} alt="" className="h-10 w-10 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category} · {p.price_tier || 'comfort'}{p.room_type ? ` · ${p.room_type}` : ' · все комнаты'}</span></span><button type="button" onClick={() => deleteStyleProduct(p.id)} className="text-xs text-destructive underline">убрать</button></div>)}
@@ -742,6 +813,21 @@ export default function Admin() {
                     </div>
                   </div>
                 )}
+              </section>
+
+              <section className="border p-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div><p className="eyebrow">Массовый импорт</p><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">По одной ссылке на строку, максимум 20. Каждый товар разбирается отдельно, в каталог попадает только после кнопки «Добавить».</p></div>
+                  <button type="button" disabled={bulkBusy || !bulkUrls.trim()} onClick={() => void parseBulk()} className="action-secondary">{bulkBusy ? 'Разбираем…' : 'Разобрать список'}</button>
+                </div>
+                <textarea value={bulkUrls} onChange={e => setBulkUrls(e.target.value)} rows={4} placeholder="https://...&#10;https://..." className="mt-3 w-full border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-primary" />
+                {bulkResults.length > 0 && <div className="mt-3 divide-y border-y">
+                  {bulkResults.map((r, i) => <div key={`${r.url}-${i}`} className="flex flex-wrap items-center gap-3 py-3">
+                    {r.preview?.image_url ? <img src={r.preview.image_url} alt="" className="h-12 w-12 border object-cover" /> : <div className="flex h-12 w-12 items-center justify-center border bg-muted text-[10px] text-muted-foreground">нет</div>}
+                    <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{r.preview?.name || r.url}</p><p className="truncate text-xs text-muted-foreground">{r.error ? r.error : `${r.preview?.category || '—'} · ${r.preview?.price ? money(r.preview.price) : 'цена не найдена'} · score ${r.preview?.quality?.score ?? '—'}${r.preview?.allowed_domain ? '' : ' · не allowlist'}`}</p></div>
+                    {r.added ? <span className="text-xs text-primary-text">добавлен</span> : r.preview ? <button type="button" disabled={catalogBusy || (!r.preview.allowed_domain && !importAllowAny) || !r.preview.category || !r.preview.price} onClick={() => void addBulkResult(i)} className="min-h-9 border border-foreground px-3 text-xs hover:bg-foreground hover:text-background disabled:opacity-40">Добавить</button> : null}
+                  </div>)}
+                </div>}
               </section>
 
               <section>

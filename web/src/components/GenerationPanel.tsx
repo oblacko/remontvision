@@ -22,7 +22,7 @@ import { ShareDialog } from '@/components/ShareDialog'
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
   name: string; price: number; qty: number; unit: string;
-  url: string; link_label?: string; source?: string; match_score?: number; price_tier?: string;
+  url: string; link_label?: string; direct_url?: boolean; source?: string; match_score?: number; price_tier?: string;
 }
 type Surface = {
   surface: string; label: string; description?: string; hex: string;
@@ -829,7 +829,7 @@ export function GenerationPanel({
                           {rub(item.price)} × {item.qty} {item.unit}
                           {item.source ? ` · ${item.source}` : ''}
                           {item.price_tier ? ` · ${tierName(item.price_tier)}` : ''}
-                          {item.url ? <> · <a className="underline underline-offset-2" href={item.url} target="_blank" rel="noopener nofollow">{item.link_label || 'в магазин'}</a></> : null}
+                          {item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}
                         </span>
                       </div>
                     )) : <p className="py-4 text-sm text-muted-foreground">Подборка не сформирована — попробуйте изменить запрос.</p>}

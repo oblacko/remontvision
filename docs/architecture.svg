@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="2520" viewBox="0 0 1680 2520">
+<defs>
+<pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M 32 0 L 0 0 0 32" fill="none" stroke="#000000" stroke-opacity="0.035" stroke-width="1"/></pattern>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#1f2421" flood-opacity="0.10"/></filter>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#232826"/></marker>
+<marker id="arrowT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#BE6A4A"/></marker>
+<marker id="arrowO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#5E6F4F"/></marker>
+</defs>
+<rect width="1680" height="2520" fill="#F4EFE6"/><rect width="1680" height="2520" fill="url(#grid)"/>
+<text x="80" y="92" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#BE6A4A" text-anchor="start" letter-spacing="3.6" opacity="1">РЕМОНТВИЖН</text>
+<text x="80" y="142" font-family="DejaVu Sans, Arial, sans-serif" font-size="42" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Карта системы и путь генерации</text>
+<text x="80" y="178" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Что где живёт, откуда берутся товары, стиль, смета и как устроена правка</text>
+<rect x="1240" y="78" width="360" height="112" rx="14" fill="#FFFDF8" stroke="#CFC4B4" stroke-width="1" opacity="0.92" filter="url(#shadow)"/>
+<text x="1264" y="108" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">ЦВЕТА</text>
+<circle cx="1270" cy="131" r="6" fill="#5E6F4F"/>
+<text x="1284" y="136" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">данные</text>
+<circle cx="1438" cy="131" r="6" fill="#BE6A4A"/>
+<text x="1452" y="136" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">внешние вызовы</text>
+<circle cx="1270" cy="157" r="6" fill="#4F6B7D"/>
+<text x="1284" y="162" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">клиент</text>
+<circle cx="1438" cy="157" r="6" fill="#303533"/>
+<text x="1452" y="162" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">инфраструктура</text>
+<rect x="60" y="220" width="1560" height="1140" rx="18" fill="#F9F5EE" stroke="#CFC4B4" stroke-width="1" opacity="0.9"/>
+<text x="90" y="262" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#BE6A4A" text-anchor="start" letter-spacing="2" opacity="1">01</text>
+<text x="126" y="262" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="2.4" opacity="1">КАРТА СИСТЕМЫ</text>
+<text x="90" y="296" font-family="DejaVu Sans, Arial, sans-serif" font-size="26" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Кто с кем разговаривает</text>
+<rect x="92" y="330" width="360" height="980" rx="16" fill="#E9E1D4" stroke="none" stroke-width="1" opacity="0.55"/>
+<text x="112" y="362" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="2" opacity="1">КЛИЕНТ</text>
+<rect x="112" y="384" width="320" height="180" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="112" y="384" width="6" height="180" rx="3" fill="#4F6B7D"/>
+<text x="134" y="418" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">UI</text>
+<text x="134" y="442" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Лендинг + генератор</text>
+<text x="134" y="468" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">React / Vite, /?panel=1</text>
+<text x="134" y="489" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">фото, тип комнаты, стиль, класс</text>
+<text x="134" y="510" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">быстрые правки, шаринг</text>
+<rect x="112" y="588" width="320" height="170" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="112" y="588" width="6" height="170" rx="3" fill="#4F6B7D"/>
+<text x="134" y="622" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">/CABINET</text>
+<text x="134" y="646" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Кабинет</text>
+<text x="134" y="672" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">история комнат и версий</text>
+<text x="134" y="693" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">смета, RAL, электрика</text>
+<text x="134" y="714" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">кредиты и покупка пакетов</text>
+<rect x="112" y="782" width="320" height="230" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="112" y="782" width="6" height="230" rx="3" fill="#4F6B7D"/>
+<text x="134" y="816" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">/ADMIN</text>
+<text x="134" y="840" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Админка</text>
+<text x="134" y="866" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">каталог + импорт по URL</text>
+<text x="134" y="887" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">стили, hero-референсы, approve</text>
+<text x="134" y="908" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">промты, модели, прокси</text>
+<rect x="112" y="1036" width="320" height="180" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="112" y="1036" width="6" height="180" rx="3" fill="#4F6B7D"/>
+<text x="134" y="1070" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">SHARE</text>
+<text x="134" y="1094" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Публичная ссылка</text>
+<text x="134" y="1120" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">/s/:token — только дизайн</text>
+<text x="134" y="1141" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">лайки и комментарии</text>
+<text x="134" y="1162" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">noindex, без сметы</text>
+<rect x="492" y="330" width="600" height="980" rx="16" fill="#E9E1D4" stroke="none" stroke-width="1" opacity="0.55"/>
+<text x="512" y="362" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="2" opacity="1">СЕРВЕР</text>
+<rect x="512" y="384" width="560" height="118" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="512" y="384" width="6" height="118" rx="3" fill="#303533"/>
+<text x="534" y="418" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">EDGE</text>
+<text x="534" y="442" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Nginx + TLS</text>
+<text x="534" y="468" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">apex remontvision.ru → 301 → www</text>
+<text x="534" y="489" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">сертификат на оба домена</text>
+<text x="534" y="510" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">proxy → Express :3000</text>
+<rect x="512" y="526" width="560" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="512" y="526" width="6" height="190" rx="3" fill="#5E6F4F"/>
+<text x="534" y="560" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">API</text>
+<text x="534" y="584" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Express API</text>
+<text x="534" y="610" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">auth, rooms, renders, share, payments</text>
+<text x="534" y="631" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">/api/admin/*: каталог, стили, модели, прокси</text>
+<text x="534" y="652" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">импорт URL: JSON-LD / OpenGraph → черновик</text>
+<rect x="512" y="740" width="560" height="150" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="512" y="740" width="6" height="150" rx="3" fill="#5E6F4F"/>
+<text x="534" y="774" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">JOBS</text>
+<text x="534" y="798" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Worker (очередь)</text>
+<text x="534" y="824" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">claim queued renders</text>
+<text x="534" y="845" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">curate → prompt → render → vision</text>
+<text x="534" y="866" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">credit refund on error</text>
+<rect x="512" y="914" width="560" height="170" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="512" y="914" width="6" height="170" rx="3" fill="#5E6F4F"/>
+<text x="534" y="948" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">DATA</text>
+<text x="534" y="972" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Postgres</text>
+<text x="534" y="998" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">users, sessions, rooms, renders</text>
+<text x="534" y="1019" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">products, render_items</text>
+<text x="534" y="1040" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">styles, style_references, app_settings</text>
+<text x="534" y="1061" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">credits, payments, likes, comments</text>
+<rect x="512" y="1108" width="560" height="170" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="512" y="1108" width="6" height="170" rx="3" fill="#5E6F4F"/>
+<text x="534" y="1142" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">FILES</text>
+<text x="534" y="1166" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Storage</text>
+<text x="534" y="1192" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">фото комнат и рендеры</text>
+<text x="534" y="1213" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">картинки товаров и референсов</text>
+<text x="534" y="1234" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">S3 или диск + presigned URL</text>
+<rect x="1124" y="330" width="464" height="980" rx="16" fill="#E9E1D4" stroke="none" stroke-width="1" opacity="0.55"/>
+<text x="1144" y="362" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="2" opacity="1">ВНЕШНИЕ СЕРВИСЫ</text>
+<rect x="1144" y="384" width="424" height="250" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="1144" y="384" width="6" height="250" rx="3" fill="#BE6A4A"/>
+<text x="1166" y="418" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">AI</text>
+<text x="1166" y="442" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">OpenRouter</text>
+<text x="1166" y="468" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Seedream 5.0 Flash — картинка</text>
+<text x="1166" y="489" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Gemini 3 Flash — vision-разбор</text>
+<text x="1166" y="510" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">промт + source + refs → image</text>
+<rect x="1164" y="544" width="384" height="34" rx="8" fill="#FFF4EE" stroke="none" stroke-width="1" opacity="1"/>
+<text x="1180" y="566" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#BE6A4A" text-anchor="start" letter-spacing="0" opacity="1">Seedream: рендер интерьера</text>
+<rect x="1164" y="586" width="384" height="34" rx="8" fill="#FFF4EE" stroke="none" stroke-width="1" opacity="1"/>
+<text x="1180" y="608" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#BE6A4A" text-anchor="start" letter-spacing="0" opacity="1">Gemini: items + surfaces + electrical</text>
+<rect x="1144" y="658" width="424" height="110" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="1144" y="658" width="6" height="110" rx="3" fill="#BE6A4A"/>
+<text x="1166" y="692" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">MAIL</text>
+<text x="1166" y="716" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Resend</text>
+<text x="1166" y="742" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">OTP-коды, письма входа</text>
+<rect x="1144" y="792" width="424" height="110" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="1144" y="792" width="6" height="110" rx="3" fill="#BE6A4A"/>
+<text x="1166" y="826" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">PAY</text>
+<text x="1166" y="850" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">ЮKassa</text>
+<text x="1166" y="876" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">платежи, вебхуки, возвраты*</text>
+<rect x="1144" y="926" width="424" height="110" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="1144" y="926" width="6" height="110" rx="3" fill="#BE6A4A"/>
+<text x="1166" y="960" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">NET</text>
+<text x="1166" y="984" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Прокси</text>
+<text x="1166" y="1010" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">опционально для OpenRouter</text>
+<text x="1166" y="1031" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">health-check в админке</text>
+<rect x="1144" y="1060" width="424" height="150" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<rect x="1144" y="1060" width="6" height="150" rx="3" fill="#BE6A4A"/>
+<text x="1166" y="1094" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">CATALOG</text>
+<text x="1166" y="1118" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">Сайты магазинов / URL</text>
+<text x="1166" y="1144" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">источник импорта товаров</text>
+<text x="1166" y="1165" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">allowlist 10 доменов</text>
+<text x="1166" y="1186" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">JSON-LD / OpenGraph / картинка</text>
+<path d="M 432 560 L 512 560" fill="none" stroke="#4F6B7D" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="472" y="545" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#6E736D" text-anchor="middle" letter-spacing="0" opacity="1">HTTPS / JSON</text>
+<path d="M 432 640 L 512 640" fill="none" stroke="#4F6B7D" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="6 6"/>
+<path d="M 792 716 L 792 914" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<text x="812" y="820" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#6E736D" text-anchor="middle" letter-spacing="0" opacity="1">SQL</text>
+<path d="M 792 1084 L 792 1108" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 742 1084 L 742 1108" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 700 890 L 700 914" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 700 1084 L 700 1108" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 1072 790 L 1098 790 L 1098 520 L 1144 520" fill="none" stroke="#BE6A4A" stroke-width="2" marker-end="url(#arrowT)"/>
+<path d="M 1144 560 L 1108 560 L 1108 820 L 1072 820" fill="none" stroke="#BE6A4A" stroke-width="2" marker-end="url(#arrowT)"/>
+<path d="M 1072 600 L 1084 600 L 1084 713 L 1144 713" fill="none" stroke="#BE6A4A" stroke-width="2" marker-end="url(#arrowT)" stroke-dasharray="6 6"/>
+<path d="M 1072 660 L 1084 660 L 1084 847 L 1144 847" fill="none" stroke="#BE6A4A" stroke-width="2" marker-end="url(#arrowT)" stroke-dasharray="6 6"/>
+<path d="M 1072 700 L 1098 700 L 1098 1135 L 1144 1135" fill="none" stroke="#BE6A4A" stroke-width="2" marker-end="url(#arrowT)"/>
+<text x="92" y="1334" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="500" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Источник истины: товары — products, стиль — styles + approved style_references, смета — render_items, промт — renders.prompt/meta.</text>
+<rect x="60" y="1380" width="1560" height="1000" rx="18" fill="#F9F5EE" stroke="#CFC4B4" stroke-width="1" opacity="0.9"/>
+<text x="90" y="1422" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#BE6A4A" text-anchor="start" letter-spacing="2" opacity="1">02</text>
+<text x="126" y="1422" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="2.4" opacity="1">ПУТЬ ГЕНЕРАЦИИ</text>
+<text x="90" y="1456" font-family="DejaVu Sans, Arial, sans-serif" font-size="26" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">От фото до сметы — и как работает правка</text>
+<rect x="112" y="1490" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="146" cy="1524" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="146" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">01</text>
+<text x="178" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">ФОТО + ВВОД</text>
+<text x="134" y="1568" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">фото комнаты</text>
+<text x="134" y="1588" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">тип комнаты, стиль</text>
+<text x="134" y="1608" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">класс материала</text>
+<text x="134" y="1628" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">свой ref: файл / URL</text>
+<rect x="480" y="1490" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="514" cy="1524" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="514" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">02</text>
+<text x="546" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">API + КРЕДИТ</text>
+<text x="502" y="1568" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">auth + баланс</text>
+<text x="502" y="1588" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">создаёт room + render</text>
+<text x="502" y="1608" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">render: queued</text>
+<text x="502" y="1628" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">списывает 1 кредит</text>
+<rect x="848" y="1490" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="882" cy="1524" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="882" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">03</text>
+<text x="914" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">КОНТЕКСТ</text>
+<text x="870" y="1568" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">room_type + style</text>
+<text x="870" y="1588" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">класс + бюджет-совместимость</text>
+<text x="870" y="1608" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">approved hero-референс</text>
+<text x="870" y="1628" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">style_products (избранные)</text>
+<rect x="1216" y="1490" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="1250" cy="1524" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="1250" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">04</text>
+<text x="1282" y="1530" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">CURATE</text>
+<text x="1238" y="1568" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">products по комнате</text>
+<text x="1238" y="1588" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">слот × класс × стиль</text>
+<text x="1238" y="1608" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">мебель + отделка + свет</text>
+<text x="1238" y="1628" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">габариты в палитру</text>
+<rect x="112" y="1734" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="146" cy="1768" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="146" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">05</text>
+<text x="178" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">PROMPT</text>
+<text x="134" y="1812" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">карта изображений</text>
+<text x="134" y="1832" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">KEEP / CHANGE</text>
+<text x="134" y="1852" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">палитра товаров</text>
+<text x="134" y="1872" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">масштаб и размеры</text>
+<rect x="480" y="1734" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="514" cy="1768" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="514" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">06</text>
+<text x="546" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">RENDER</text>
+<text x="502" y="1812" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Seedream 5.0 Flash</text>
+<text x="502" y="1832" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">source + 1 hero + 3 товара</text>
+<text x="502" y="1852" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">глубокое преображение</text>
+<text x="502" y="1872" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">без изменения архитектуры</text>
+<rect x="848" y="1734" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="882" cy="1768" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="882" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">07</text>
+<text x="914" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">VISION</text>
+<text x="870" y="1812" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Gemini 3 Flash</text>
+<text x="870" y="1832" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">items + surfaces(hex)</text>
+<text x="870" y="1852" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">RAL для окрашиваемых</text>
+<text x="870" y="1872" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">электрика + visible</text>
+<rect x="1216" y="1734" width="316" height="190" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
+<circle cx="1250" cy="1768" r="18" fill="#5E6F4F" opacity="0.14"/>
+<text x="1250" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">08</text>
+<text x="1282" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">РЕЗУЛЬТАТ</text>
+<text x="1238" y="1812" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">render_items + смета</text>
+<text x="1238" y="1832" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">RAL + рекомендации</text>
+<text x="1238" y="1852" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">4 быстрые правки</text>
+<text x="1238" y="1872" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">share / кабинет</text>
+<path d="M 428 1585 L 480 1585" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 796 1585 L 848 1585" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 1164 1585 L 1216 1585" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 1374 1680 L 1374 1706 L 280 1706 L 280 1734" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 428 1829 L 480 1829" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 796 1829 L 848 1829" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<path d="M 1164 1829 L 1216 1829" fill="none" stroke="#5E6F4F" stroke-width="2" marker-end="url(#arrowO)"/>
+<rect x="112" y="1956" width="316" height="150" rx="14" fill="#FFFDF8" stroke="#CFC4B4" stroke-width="1" opacity="0.95"/>
+<text x="130" y="1982" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.2" opacity="1">ОТКУДА ТОВАРЫ</text>
+<text x="130" y="2008" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">catalog/seed.json + images</text>
+<text x="130" y="2026" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">импорт URL → черновик → active</text>
+<text x="130" y="2044" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">admin: цена, класс, комнаты</text>
+<text x="130" y="2062" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">products.dimensions</text>
+<rect x="480" y="1956" width="316" height="150" rx="14" fill="#FFFDF8" stroke="#CFC4B4" stroke-width="1" opacity="0.95"/>
+<text x="498" y="1982" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.2" opacity="1">ОТКУДА СТИЛЬ</text>
+<text x="498" y="2008" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">styles.prompt_description</text>
+<text x="498" y="2026" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">approved hero style_references</text>
+<text x="498" y="2044" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">fallback: статическая обложка</text>
+<text x="498" y="2062" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">style_products = избранные</text>
+<rect x="848" y="1956" width="316" height="150" rx="14" fill="#FFFDF8" stroke="#CFC4B4" stroke-width="1" opacity="0.95"/>
+<text x="866" y="1982" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.2" opacity="1">ОТКУДА СМЕТА</text>
+<text x="866" y="2008" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">curated — источник истины</text>
+<text x="866" y="2026" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">vision только дополняет</text>
+<text x="866" y="2044" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">правка копирует родителя</text>
+<text x="866" y="2062" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">target заменяется один</text>
+<rect x="1216" y="1956" width="316" height="150" rx="14" fill="#FFFDF8" stroke="#CFC4B4" stroke-width="1" opacity="0.95"/>
+<text x="1234" y="1982" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.2" opacity="1">ОТКУДА RAL / ЭЛЕКТРИКА</text>
+<text x="1234" y="2008" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Gemini surfaces → hex</text>
+<text x="1234" y="2026" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">RAL только стены/потолок/фасады</text>
+<text x="1234" y="2044" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">электрика: vision + шаблон</text>
+<text x="1234" y="2062" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">без фейковой разметки</text>
+<rect x="112" y="2132" width="1420" height="76" rx="14" fill="#FFF4EE" stroke="#BE6A4A" stroke-width="1" opacity="0.9"/>
+<text x="134" y="2162" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#BE6A4A" text-anchor="start" letter-spacing="1.6" opacity="1">ПРАВКА</text>
+<text x="134" y="2186" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="500" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">parent render + текст + target + ref (товар / файл / URL) → короткий edit prompt → только target меняется, остальное сохраняется</text>
+<rect x="112" y="2232" width="1420" height="112" rx="14" fill="#EEF1E9" stroke="#5E6F4F" stroke-width="1" opacity="0.85"/>
+<text x="134" y="2262" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="700" fill="#5E6F4F" text-anchor="start" letter-spacing="1.6" opacity="1">ЧТО ДЕЛАТЬ ДАЛЬШЕ</text>
+<text x="134" y="2288" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="500" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">1. Добить approved hero-референсы на все стили/комнаты.   2. Габариты комнаты → фильтр мебели по fit.</text>
+<text x="134" y="2312" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="500" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">3. Наполнять каталог: URL-импорт → фиды/CPA.   4. Мониторинг, бэкапы, аналитика воронки.</text>
+<text x="80" y="2440" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#6E736D" text-anchor="start" letter-spacing="1.2" opacity="1">Ремонтвижн · карта системы</text>
+<text x="1600" y="2440" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="500" fill="#6E736D" text-anchor="end" letter-spacing="0" opacity="1">обновлено 27.10.2026</text>
+</svg>

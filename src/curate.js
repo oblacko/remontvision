@@ -61,13 +61,13 @@ function hashPick(list, seed, key) {
   return list[h[0] % list.length];
 }
 
-export async function curateProducts({ style, budget, priceTier = 'comfort', roomType = 'Другое', preferredIds = [], allowedCategories = null, seed = '' }) {
+export async function curateProducts({ style, budget, priceTier = 'comfort', roomType = 'Другое', preferredIds = [], allowedCategories = null, seed = '', requireUrl = false }) {
   const tier = PRICE_TIERS.includes(priceTier) ? priceTier : 'comfort';
   const room = roomTypeByName(roomType);
   const slots = room?.slots?.length
     ? room.slots
     : (Array.isArray(allowedCategories) && allowedCategories.length ? allowedCategories.map(c => ({ key: c, categories: [c] })) : CATEGORIES.map(c => ({ key: c, categories: [c] })));
-  const all = await q.allProducts();
+  const all = (await q.allProducts()).filter(p => !requireUrl || /^https?:\/\//i.test(String(p.url || '')));
   const preferred = all.filter(p => preferredIds.map(Number).includes(Number(p.id)));
   const chosen = [];
 
