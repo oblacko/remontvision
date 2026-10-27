@@ -1,105 +1,190 @@
 // Воркер: забирает рендеры со статусом queued и доводит до done.
-// Новое ядро: первый рендер рисуем ИЗ товаров каталога — отбор по бюджету/стилю,
-// фото товаров уходят в генерацию как input_references, смета = отобранные товары.
-// Vision-парсинг оставлен только как фолбэк, когда каталог пуст.
+// Два режима:
+//   base — глубокое преображение по стилю + палитра товаров под класс материалов;
+//   edit — короткая правка одного объекта с референсом, без полного стилевого промта.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, generateRender, parseRender, matchCatalog, snapAspect, supportsInputRefs, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, parseRender, matchCatalog, snapAspect, supportsInputRefs, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
-import { curateProducts, referenceImages, hasImage } from './curate.js';
+import { curateProducts, referenceImagesDetailed, hasImage } from './curate.js';
 import { roomTypeByName } from './roomtypes.js';
+import { buildAnalysis } from './analysis.js';
+import { normalizeTier } from './pricing.js';
+import { getModelConfig } from './modelconfig.js';
+import { modelFamily, MODEL_CAPS } from './modelcaps.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
 const MIME_BY_EXT = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
-// исходник (фото комнаты или родительский рендер) → data URL из storage
-async function photoB64(stored) {
-  const buf = await getBuffer(stored);
+async function bufferToDataUrl(buf) {
   const ext = detectImageExt(buf);
   return `data:${MIME_BY_EXT[ext] || 'image/jpeg'};base64,${buf.toString('base64')}`;
+}
+
+async function editReference(render) {
+  if (render.ref_path) {
+    try {
+      const buf = await getBuffer(render.ref_path);
+      return { b64: await bufferToDataUrl(buf), label: 'user reference' };
+    } catch (e) {
+      log({ event: 'edit_ref_error', render_id: render.id, error: String(e.message || e).slice(0, 200) });
+    }
+  }
+  if (render.ref_product_id) {
+    try {
+      const product = await q.getProduct(render.ref_product_id);
+      if (product) {
+        const refs = await referenceImagesDetailed([product], 1);
+        if (refs[0]) return { b64: refs[0].b64, label: product.name };
+      }
+    } catch (e) {
+      log({ event: 'edit_ref_product_error', render_id: render.id, product_id: render.ref_product_id, error: String(e.message || e).slice(0, 200) });
+    }
+  }
+  return null;
+}
+
+async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
+  const buffers = [];
+  const add = async (stored) => {
+    if (!stored || buffers.length >= 2) return;
+    try { buffers.push(await getBuffer(stored)); } catch { /* пропускаем битый референс */ }
+  };
+  if (room.style_ref_path) {
+    // Пользовательский референс главнее: не подмешиваем админские/обложку.
+    await add(room.style_ref_path);
+    return { buffers, user: true };
+  }
+  for (const ref of adminStyleRefs) await add(ref.image_path);
+  if (!buffers.length && styleInfo) {
+    if (styleInfo.preset_image_path) await add(styleInfo.preset_image_path);
+    else {
+      const staticStylePath = path.join(process.cwd(), 'web', 'dist', 'images', `style-${styleInfo.key}.webp`);
+      if (fs.existsSync(staticStylePath)) buffers.push(fs.readFileSync(staticStylePath));
+    }
+  }
+  return { buffers, user: false };
 }
 
 async function processRender(renderId) {
   const t0 = Date.now();
   const render = await q.getRender(renderId);
-  if (!render || render.status !== 'processing') return; // уже забран другим слотом
+  if (!render || render.status !== 'processing') return;
   const room = await q.getRoom(render.room_id);
   const iteration = Boolean(render.request_text);
+  const roomType = room.room_type || 'Другое';
+  const roomTypeInfo = roomTypeByName(roomType);
+  const priceTier = normalizeTier(room.price_tier || 'comfort');
   let stage = 'start';
 
   try {
     stage = 'analyzing';
     await q.setRoomStatus('analyzing', room.id);
-    log({ event: 'render_start', room_id: room.id, render_id: renderId, iteration });
+    log({ event: 'render_start', room_id: room.id, render_id: renderId, iteration, target: render.edit_target || null, price_tier: priceTier });
 
-    // отбор товаров и промпт собираем здесь, где есть доступ к каталогу
-    let curated = [];
     let prompt;
+    let curated = [];
     let styleInfo = null;
-    let adminStyleRefs = [];
-    let hasStyleRef = false;
-    const roomType = room.room_type || 'Другое';
-    const roomTypeInfo = roomTypeByName(roomType);
+    let imageMap = [];
+    let meta = {
+      mode: iteration ? 'edit' : 'base',
+      room_type: roomType,
+      price_tier: priceTier,
+      style: room.style,
+      target: render.edit_target || null,
+      product_ids: [],
+      refs: [],
+      model_config: getModelConfig(),
+    };
+    let parentItems = [];
+    let sourceStored = room.photo_path;
+    let referenceImagesB64 = [];
+
     if (iteration) {
-      prompt = buildPrompt({ style: room.style, budget: room.budget, requestText: render.request_text, iteration: true, roomType });
+      const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
+      if (parent?.image_path) sourceStored = parent.image_path;
+      if (parent) parentItems = await q.itemsForRender(parent.id);
+      const ref = await editReference(render);
+      if (ref) referenceImagesB64.push(ref.b64);
+      imageMap = [
+        { role: 'current interior render', label: 'edit only the target object' },
+        ...(ref ? [{ role: 'reference image', label: ref.label }] : []),
+      ];
+      prompt = buildEditPrompt({
+        roomType,
+        target: render.edit_target,
+        instruction: render.request_text,
+        hasRef: Boolean(ref),
+        refLabel: ref?.label || '',
+      });
+      meta.refs = imageMap.map((m, i) => ({ index: i + 1, ...m }));
+      meta.parent_render_id = render.parent_render_id || null;
     } else {
       styleInfo = await q.styleByName(room.style);
-      adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id) : [];
-      const preferred = styleInfo ? await q.styleProducts(styleInfo.id) : [];
-      const staticStylePath = styleInfo ? path.join(process.cwd(), 'web', 'dist', 'images', `style-${styleInfo.key}.webp`) : null;
-      const hasStaticStyleRef = Boolean(styleInfo && (styleInfo.preset_image_path || (staticStylePath && fs.existsSync(staticStylePath))));
-      hasStyleRef = Boolean(room.style_ref_path) || adminStyleRefs.length > 0 || hasStaticStyleRef;
+      const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
+      const stylePreferred = styleInfo ? await q.styleProducts(styleInfo.id, roomType) : [];
+      const allowed = new Set(roomTypeInfo?.categories || []);
+      const preferred = stylePreferred.filter(p => p.active !== false && (
+        p.style_room_type === roomType ||
+        (!p.style_room_type && (!allowed.size || allowed.has(p.category)))
+      ));
+
       curated = await curateProducts({
         style: room.style,
         budget: room.budget,
+        priceTier,
+        roomType,
         preferredIds: preferred.map(p => p.id),
         allowedCategories: roomTypeInfo?.categories || null,
+        seed: room.id,
       });
+
+      const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
+      const styleRefUrls = [];
+      for (const buf of styleRefs.buffers.slice(0, 2)) styleRefUrls.push(await bufferToDataUrl(buf));
+
+      const productLimit = Math.max(0, 4 - styleRefUrls.length);
+      const productRefs = supportsInputRefs() ? await referenceImagesDetailed(curated.filter(hasImage), productLimit) : [];
+      const refIds = new Set(productRefs.map(r => Number(r.product.id)));
+
+      imageMap = [
+        { role: 'source room', label: 'preserve architecture, camera and room proportions' },
+        ...styleRefUrls.map(() => ({ role: styleRefs.user ? 'user style reference' : 'style reference', label: 'mood, materials and palette only' })),
+        ...productRefs.map(r => ({ role: 'product reference', label: `${r.product.name} — ${r.product.category}` })),
+      ];
+
+      const productsForPrompt = curated.map(p => ({ ...p, has_ref: refIds.has(Number(p.id)) }));
       prompt = buildPrompt({
         style: room.style,
+        priceTier,
         budget: room.budget,
-        products: curated,
+        products: productsForPrompt,
         palette: room.palette || 'none',
         accent: room.accent || 'none',
-        hasStyleRef,
+        hasStyleRef: styleRefUrls.length > 0,
+        userStyleRef: styleRefs.user,
         styleDescription: styleInfo?.prompt_description || '',
         roomType,
+        imageMap,
       });
+
+      referenceImagesB64 = [...styleRefUrls, ...productRefs.map(r => r.b64)];
+      meta.product_ids = curated.map(p => Number(p.id));
+      meta.style_id = styleInfo?.id || null;
+      meta.budget = room.budget;
+      meta.refs = imageMap.map((m, i) => ({ index: i + 1, ...m }));
     }
+
     await q.setRenderPrompt(renderId, prompt);
+    await q.setRenderMeta(renderId, meta);
 
     let imageB64, cost = null, model = null, targetRatio = null;
-    const styleRefs = [];
-    if (!iteration && supportsInputRefs()) {
-      const buffers = [];
-      const addStored = async (storedPath) => {
-        if (!storedPath || buffers.length >= 2) return;
-        try { buffers.push(await getBuffer(storedPath)); } catch { /* пропускаем битый референс */ }
-      };
-      if (room.style_ref_path) await addStored(room.style_ref_path);
-      for (const ref of adminStyleRefs) await addStored(ref.image_path);
-      if (!buffers.length && styleInfo) {
-        if (styleInfo.preset_image_path) await addStored(styleInfo.preset_image_path);
-        else {
-          const staticStylePath = path.join(process.cwd(), 'web', 'dist', 'images', `style-${styleInfo.key}.webp`);
-          if (fs.existsSync(staticStylePath)) buffers.push(fs.readFileSync(staticStylePath));
-        }
-      }
-      for (const refBuf of buffers.slice(0, 2)) {
-        styleRefs.push(`data:${MIME_BY_EXT[detectImageExt(refBuf)] || 'image/jpeg'};base64,${refBuf.toString('base64')}`);
-      }
-    }
-    const productRefs = iteration || !supportsInputRefs() ? [] : await referenceImages(curated.filter(hasImage));
-    const refs = [...styleRefs, ...productRefs.slice(0, Math.max(0, 4 - styleRefs.length))];
-
     if (MOCK_MODE) {
-      // демо без ключа: имитируем задержки и отдаём демо-картинку
       await sleep(1500);
       await q.setRoomStatus('rendering', room.id);
       await sleep(2500);
@@ -107,26 +192,26 @@ async function processRender(renderId) {
     } else {
       stage = 'rendering';
       await q.setRoomStatus('rendering', room.id);
-      const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
-      const srcStored = parent ? parent.image_path : room.photo_path;
-      const srcBuf = await getBuffer(srcStored);
+      const srcBuf = await getBuffer(sourceStored);
       const { width, height } = imageSize(srcBuf);
       targetRatio = width / height;
-      const aspectRatio = snapAspect(width, height); // реальные пропорции, не хардкод 3:2
-      const srcB64 = `data:${MIME_BY_EXT[detectImageExt(srcBuf)] || 'image/jpeg'};base64,${srcBuf.toString('base64')}`;
+      const family = modelFamily(getModelConfig().render);
+      const allowedAspects = MODEL_CAPS[family]?.aspects || null;
+      const aspectRatio = snapAspect(width, height, allowedAspects);
+      const srcB64 = await bufferToDataUrl(srcBuf);
       const out = await generateRender({
         prompt,
         sourceImageB64: srcB64,
-        referenceImagesB64: refs,
+        referenceImagesB64,
         aspectRatio,
       });
       imageB64 = out.b64; cost = out.cost; model = out.model || null;
-      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, style_refs: styleRefs.length, refs: refs.length, curated: curated.length, cost_usd: cost, ms: Date.now() - t0 });
+      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cost_usd: cost, ms: Date.now() - t0 });
     }
 
     const rawBytes = Buffer.from(imageB64, 'base64');
     const bytes = targetRatio ? await fitAspect(rawBytes, targetRatio) : rawBytes;
-    const ext = detectImageExt(bytes); // модель может вернуть JPEG — не называем его .png
+    const ext = detectImageExt(bytes);
     const renderKey = `renders/${render.id}.${ext}`;
     await putBuffer(renderKey, bytes, MIME_BY_EXT[ext] || 'image/png');
     const rawSize = imageSize(rawBytes);
@@ -141,47 +226,71 @@ async function processRender(renderId) {
       out_px: [outSize.width, outSize.height],
     });
 
-    // Подборка строится по готовой визуализации. Пустой/упавший vision не должен
-    // стирать curated-подборку первого рендера или смету родителя у итерации.
+    // Разбор готовой визуализации: материалы, поверхности → RAL, электрика, быстрые правки.
     stage = 'matching';
     await q.setRoomStatus('matching', room.id);
+    let parsed = { items: [], surfaces: [], visible: [], electrical: [] };
     let visionCost = null;
-    let visionOk = false;
-    let matched = [];
     if (!MOCK_MODE) {
       try {
-        const parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
+        parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
         visionCost = parsed.cost;
-        matched = matchCatalog(parsed.items, await q.allProducts());
-        visionOk = true;
-        log({ event: 'render_matched', room_id: room.id, render_id: renderId, parsed_items: parsed.items.length, matched: matched.length });
+        log({ event: 'render_analysis', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length });
       } catch (e) {
-        log({ event: 'render_match_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-      }
-    }
-    await q.clearItems(render.id);
-    if (visionOk && matched.length) {
-      for (const m of matched) await q.saveItem(render.id, m.product.id, m.score);
-    } else {
-      const fallback = visionOk ? 'no_matches' : 'vision_error';
-      log({ event: 'render_match_fallback', room_id: room.id, render_id: renderId, reason: fallback, iteration });
-      if (iteration) {
-        const parent = await q.getRender(render.parent_render_id);
-        if (parent) await q.copyItems(parent.id, render.id);
-      } else if (curated.length) {
-        for (const p of curated) await q.saveItem(render.id, p.id, null);
-      } else {
-        await sleep(1200);
-        const demo = (await q.allProducts()).filter(p => [1, 3, 5, 7].includes(Number(p.id)));
-        for (const p of demo) await q.saveItem(render.id, p.id, 0.9);
+        log({ event: 'render_analysis_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
       }
     }
 
-    // полная себестоимость: генерация (включая фолбэк-попытки) + vision-разбор
+    const allProducts = await q.allProducts();
+
+    let matched = [];
+    try { matched = matchCatalog(parsed.items, allProducts); }
+    catch (e) { log({ event: 'render_match_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) }); }
+
+    await q.clearItems(render.id);
+    if (iteration) {
+      const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
+      if (parent) await q.copyItems(parent.id, render.id);
+    } else {
+      for (const p of curated) await q.saveItem(render.id, p.id, null);
+    }
+    const categoryGroup = category => (category === 'paint' || category === 'wallpaper')
+      ? ['paint', 'wallpaper']
+      : [category];
+    for (const m of matched) {
+      await q.replaceItemByCategories(render.id, categoryGroup(m.product.category), m.product.id, m.score);
+    }
+    if (!iteration && !curated.length && !matched.length && MOCK_MODE) {
+      for (const p of allProducts.filter(p => ['light', 'floor', 'paint', 'outlets'].includes(p.category)).slice(0, 4)) {
+        await q.saveItem(render.id, p.id, 0.9);
+      }
+    }
+
+    // Подсказки строим уже по финальной смете, чтобы не предлагать заменить то,
+    // что только что поставили (например, новую люстру после правки).
+    const finalItems = await q.itemsForRender(render.id);
+    const analysis = buildAnalysis({
+      roomType,
+      parsed,
+      products: allProducts,
+      currentProducts: finalItems,
+      priceTier,
+      style: room.style,
+    });
+    await q.setRenderAnalysis(renderId, analysis);
+    log({ event: 'render_matched', room_id: room.id, render_id: renderId, parsed_items: parsed.items.length, matched: matched.length, curated: curated.length, suggestions: analysis.suggestions.length });
+
+    await q.setRenderMeta(renderId, {
+      ...meta,
+      model,
+      cost_usd: cost ?? null,
+      vision_cost_usd: visionCost ?? null,
+      suggestion_targets: analysis.suggestions.map(s => s.target),
+    });
+
     const parts = [cost, visionCost].filter(c => typeof c === 'number');
     const totalCost = parts.length ? parts.reduce((a, b) => a + b, 0) : null;
     await q.setRenderDone(renderKey, totalCost, model, render.id);
-
     await q.setRoomStatus('done', room.id);
     log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_image_usd: cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
   } catch (e) {
@@ -200,20 +309,17 @@ async function processRender(renderId) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// поллер: раз в 2 секунды, максимум 2 параллельных задания
 let running = 0;
 export function startWorker() {
-  // рендеры, оставшиеся в processing после краха, возвращаем в очередь
   q.requeueProcessing().then(n => { if (n) console.log(`[worker] вернул в очередь ${n} прерванных рендеров`); });
 
-  // страховка: задача без результата дольше 24 часов → ошибка + восстановление кредита
   setInterval(async () => {
     try {
       const stale = await q.staleRenders(24 * 60);
       for (const r of stale) {
         const msg = 'Генерация не завершилась за 24 часа';
         const failed = await q.failStaleRender(r.id, msg, 'timeout');
-        if (!failed) continue; // задачу успели завершить — не трогаем и не возвращаем кредит
+        if (!failed) continue;
         await q.setRoomError(msg, r.room_id);
         const restored = await restoreCreditForRender(r.id, 'timeout');
         log({ event: 'render_timeout', room_id: r.room_id, render_id: r.id, credit_restored: restored });
@@ -237,9 +343,8 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null }) {
   const id = crypto.randomUUID();
-  // В mock-режиме кредиты не списываются: картинка не зависит от исходника.
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
     id,
@@ -248,6 +353,9 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     requestText,
     chargedUserId: chargeUser,
     requestIp,
+    editTarget,
+    refPath,
+    refProductId,
   });
   return id;
 }

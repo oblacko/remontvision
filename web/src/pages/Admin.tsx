@@ -17,10 +17,12 @@ type GenRow = {
 }
 type PromptRow = {
   id: string; room_id: string; email: string; style: string; room_type: string | null; budget: number;
+  price_tier?: string | null;
   status: string; error: string | null; created_at: string; finished_at: string | null;
   request_text: string | null; prompt: string | null; model: string | null;
   cost_usd: number | null; duration_ms: number | null; credits_spent: number | null;
   image_url: string | null; photo_url: string | null;
+  meta?: { mode?: string; target?: string | null; refs?: Array<{ index: number; role: string; label?: string }> } | null;
 }
 type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
@@ -29,11 +31,12 @@ type Style = {
   image_url: string; active: boolean; sort: number;
   references_count?: number; products_count?: number;
 }
-type StyleRef = { id: number; title: string; image_url: string; sort: number }
+type StyleRef = { id: number; title: string; image_url: string; sort: number; room_type?: string | null }
 type Product = {
   id: number; category: string; name: string; brand?: string | null; price: number;
   unit: string; qty: number; image_path?: string | null; image_url?: string | null;
-  source?: string | null; url?: string | null;
+  source?: string | null; url?: string | null; room_type?: string | null;
+  price_tier?: string | null; room_types?: string | null; surface?: string | null; active?: boolean;
 }
 type ModelSettings = {
   render_model: string; vision_model: string; resolution: string; aspect_ratio: string;
@@ -46,6 +49,7 @@ const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(
 const money = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const productImage = (p: Product) => p.image_path ? `/products/${p.image_path.split('/').pop()}` : (p.image_url || '')
+const roomTypeNames = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое'] as const
 const accents = ['sand', 'dust', 'graphite', 'forest', 'terra'] as const
 const accentNames: Record<string, string> = { sand: 'Песочный', dust: 'Синева', graphite: 'Графит', forest: 'Оливковый', terra: 'Терракота' }
 const modelFamily = (id: string) =>
@@ -125,6 +129,7 @@ export default function Admin() {
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [productQuery, setProductQuery] = useState('')
   const [refTitle, setRefTitle] = useState('')
+  const [styleRoomType, setStyleRoomType] = useState('Все')
   const [styleBusy, setStyleBusy] = useState(false)
   const styleImageRef = useRef<HTMLInputElement>(null)
   const styleRefsRef = useRef<HTMLInputElement>(null)
@@ -300,6 +305,7 @@ export default function Admin() {
       for (let i = 0; i < files.length; i += 8) {
         const fd = new FormData()
         fd.append('title', refTitle)
+        if (styleRoomType !== 'Все') fd.append('room_type', styleRoomType)
         for (const file of Array.from(files).slice(i, i + 8)) fd.append('images', file)
         await readJson(await api('/api/admin/styles/' + selectedStyleId + '/references', { method: 'POST', body: fd }))
       }
@@ -317,7 +323,7 @@ export default function Admin() {
   }
   const addStyleProduct = async (productId: number) => {
     if (!selectedStyleId) return
-    try { await readJson(await api('/api/admin/styles/' + selectedStyleId + '/products', { method: 'POST', body: JSON.stringify({ product_id: productId }) })); await loadStyle(selectedStyleId); await loadStyles() }
+    try { await readJson(await api('/api/admin/styles/' + selectedStyleId + '/products', { method: 'POST', body: JSON.stringify({ product_id: productId, room_type: styleRoomType === 'Все' ? null : styleRoomType }) })); await loadStyle(selectedStyleId); await loadStyles() }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
   const deleteStyleProduct = async (productId: number) => {
@@ -465,12 +471,13 @@ export default function Admin() {
                   <div className="mt-6 space-y-6">
                     <section>
                       <div className="flex flex-wrap items-center justify-between gap-3"><p className="eyebrow">Референсы общего дизайна</p><span className="text-xs text-muted-foreground">{styleDetail.references.length} шт.</span></div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2"><label htmlFor="style-room-type" className="text-xs text-muted-foreground">Добавлять для комнаты:</label><select id="style-room-type" value={styleRoomType} onChange={e => setStyleRoomType(e.target.value)} className="h-10 border bg-background px-2 text-sm outline-none focus:border-primary"><option value="Все">Все комнаты</option>{roomTypeNames.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <input value={refTitle} onChange={e => setRefTitle(e.target.value)} placeholder="Подпись (необязательно)" className="h-10 min-w-40 flex-1 border bg-background px-3 text-sm outline-none focus:border-primary" />
                         <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border px-3 text-sm hover:bg-muted"><Upload className="size-4 text-primary-text" />Добавить фото<input ref={styleRefsRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={uploadStyleRefs} /></label>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {styleDetail.references.map(ref => <div key={ref.id} className="group relative border"><img src={ref.image_url} alt={ref.title} className="aspect-[4/3] w-full object-cover" /><button type="button" onClick={() => deleteStyleRef(ref.id)} className="absolute right-1 top-1 flex size-8 items-center justify-center bg-background/90 text-destructive hover:bg-background" aria-label="Удалить референс"><X className="size-4" /></button></div>)}
+                        {styleDetail.references.map(ref => <div key={ref.id} className="group relative border"><img src={ref.image_url} alt={ref.title} className="aspect-[4/3] w-full object-cover" />{ref.room_type && <span className="absolute left-1 top-1 bg-background/90 px-1.5 py-0.5 text-[10px]">{ref.room_type}</span>}<button type="button" onClick={() => deleteStyleRef(ref.id)} className="absolute right-1 top-1 flex size-8 items-center justify-center bg-background/90 text-destructive hover:bg-background" aria-label="Удалить референс"><X className="size-4" /></button></div>)}
                         {!styleDetail.references.length && <p className="col-span-full py-4 text-sm text-muted-foreground">Пока нет референсов. Добавьте 1–2 изображения общего настроения стиля.</p>}
                       </div>
                     </section>
@@ -478,13 +485,13 @@ export default function Admin() {
                     <section>
                       <p className="eyebrow">Товары стиля (избранное)</p>
                       <div className="mt-3 divide-y border-y">
-                        {styleDetail.products.map(p => <div key={p.id} className="flex items-center gap-3 py-2 text-sm"><img src={productImage(p)} alt="" className="h-10 w-10 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category}</span></span><button type="button" onClick={() => deleteStyleProduct(p.id)} className="text-xs text-destructive underline">убрать</button></div>)}
-                        {!styleDetail.products.length && <p className="py-3 text-sm text-muted-foreground">Товары не выбраны — генерация возьмёт каталог по бюджету.</p>}
+                        {styleDetail.products.map(p => <div key={p.id} className="flex items-center gap-3 py-2 text-sm"><img src={productImage(p)} alt="" className="h-10 w-10 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category} · {p.price_tier || 'comfort'}{p.room_type ? ` · ${p.room_type}` : ' · все комнаты'}</span></span><button type="button" onClick={() => deleteStyleProduct(p.id)} className="text-xs text-destructive underline">убрать</button></div>)}
+                        {!styleDetail.products.length && <p className="py-3 text-sm text-muted-foreground">Товары не выбраны — генерация возьмёт каталог по классу материалов.</p>}
                       </div>
                       <div className="mt-4">
                         <input value={productQuery} onChange={e => setProductQuery(e.target.value)} placeholder="Найти товар по названию или бренду" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
                         <div className="mt-2 max-h-64 overflow-y-auto border">
-                          {filteredProducts.slice(0, 20).map(p => <button key={p.id} type="button" onClick={() => addStyleProduct(p.id)} className="flex w-full items-center gap-3 border-b p-2 text-left text-sm last:border-b-0 hover:bg-muted"><img src={productImage(p)} alt="" className="h-9 w-9 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category} · {money(p.price)}</span></span><Plus className="size-4 shrink-0 text-primary-text" /></button>)}
+                          {filteredProducts.slice(0, 20).map(p => <button key={p.id} type="button" onClick={() => addStyleProduct(p.id)} className="flex w-full items-center gap-3 border-b p-2 text-left text-sm last:border-b-0 hover:bg-muted"><img src={productImage(p)} alt="" className="h-9 w-9 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category} · {p.price_tier || 'comfort'} · {money(p.price)}</span></span><Plus className="size-4 shrink-0 text-primary-text" /></button>)}
                           {!filteredProducts.length && <p className="p-3 text-sm text-muted-foreground">Ничего не найдено</p>}
                         </div>
                       </div>
@@ -498,7 +505,7 @@ export default function Admin() {
           {tab === 'prompts' && (
             <div className="mt-8">
               <div className="flex flex-wrap items-end justify-between gap-4">
-                <div><p className="eyebrow">Промты</p><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Что уходит модели: тип комнаты, стиль, бюджет, товары, ограничения и ссылка на референсы стиля. Здесь видно, почему появилась та или иная люстра или предмет.</p></div>
+                <div><p className="eyebrow">Промты</p><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Что уходит модели: тип комнаты, стиль, класс материалов, товары, ограничения и карта референсов. Здесь видно, почему появилась та или иная люстра или предмет.</p></div>
                 <div className="relative w-full sm:w-80"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={promptQuery} onChange={e => setPromptQuery(e.target.value)} placeholder="E-mail, стиль, тип или текст промта" className="h-10 w-full border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary" /></div>
               </div>
               <div className="mt-4 space-y-4">
@@ -508,7 +515,9 @@ export default function Admin() {
                       <AdminImage src={p.image_url || p.photo_url} kind={p.image_url ? 'renders' : 'files'} alt="" />
                       <div className="min-w-0 flex-1 text-xs">
                         <div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-sm">{p.email}</b><span className="font-mono uppercase tracking-wider text-muted-foreground">{p.status} · {dateTime(p.created_at)}</span></div>
-                        <p className="mt-1 text-muted-foreground">{p.style}{p.room_type ? ` · ${p.room_type}` : ''} · бюджет {p.budget} 000 ₽ · {p.credits_spent ?? '—'} кр.</p>
+                        <p className="mt-1 text-muted-foreground">{p.style}{p.room_type ? ` · ${p.room_type}` : ''} · класс {p.price_tier || 'comfort'} · {p.credits_spent ?? '—'} кр.</p>
+                        {p.meta?.refs?.length ? <p className="mt-1 text-muted-foreground">Референсы: {p.meta.refs.map(r => `${r.index}. ${r.role}${r.label ? ` (${r.label})` : ''}`).join(' · ')}</p> : null}
+                        {p.meta?.mode === 'edit' && p.meta.target ? <p className="mt-1 text-muted-foreground">Правка: {p.meta.target}</p> : null}
                         <p className="mt-1 text-muted-foreground">{p.model || '—'} · {p.cost_usd != null ? `$${p.cost_usd}` : '—'}{p.duration_ms ? ` · ${(p.duration_ms / 1000).toFixed(1)} с` : ''}</p>
                         <p className="mt-1">{p.request_text || 'Базовый дизайн'}</p>
                       </div>

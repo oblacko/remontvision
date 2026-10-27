@@ -62,10 +62,10 @@ export async function migrate() {
 // ---------- запросы ----------
 export const q = {
   // rooms
-  createRoom: (id, style, budget, photoPath, userId, roomType = null, palette = null, accent = null, styleRefPath = null) =>
-    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, room_type, palette, accent, style_ref_path)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [id, style, budget, photoPath, userId, roomType, palette, accent, styleRefPath]),
+  createRoom: (id, style, budget, photoPath, userId, roomType = null, palette = null, accent = null, styleRefPath = null, priceTier = 'comfort') =>
+    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, room_type, palette, accent, style_ref_path, price_tier)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [id, style, budget, photoPath, userId, roomType, palette, accent, styleRefPath, priceTier]),
   getRoom: id => pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   roomByPhotoKey: key =>
     pool.query(`SELECT user_id FROM rooms WHERE photo_path = $1 OR photo_path LIKE '%/' || $1 LIMIT 1`, [key])
@@ -117,9 +117,25 @@ export const q = {
     pool.query(`UPDATE renders SET prompt = $2 WHERE id = $1`, [id, prompt]),
   setRenderRequestIp: (id, ip) =>
     pool.query(`UPDATE renders SET request_ip = $2 WHERE id = $1`, [id, ip || null]),
+  setRenderMeta: (id, meta) =>
+    pool.query(`UPDATE renders SET meta = $2 WHERE id = $1`, [id, JSON.stringify(meta || {})]),
+  setRenderAnalysis: (id, analysis) =>
+    pool.query(`UPDATE renders SET analysis = $2 WHERE id = $1`, [id, JSON.stringify(analysis || {})]),
+  getProduct: id => pool.query(`SELECT * FROM products WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   copyItems: (fromRenderId, toRenderId) =>
     pool.query(`INSERT INTO render_items (render_id, product_id, match_score)
                 SELECT $2, product_id, match_score FROM render_items WHERE render_id = $1`, [fromRenderId, toRenderId]),
+  // заменяем позицию той же категории: vision уточнил материал, но остальные позиции сохраняем
+  replaceItemByCategories: async (renderId, categories, productId, score) => {
+    await pool.query(`DELETE FROM render_items WHERE render_id = $1
+                      AND product_id IN (SELECT id FROM products WHERE category = ANY($2))`, [renderId, categories]);
+    return pool.query(`INSERT INTO render_items (render_id, product_id, match_score) VALUES ($1,$2,$3)`, [renderId, productId, score]);
+  },
+  replaceItemByCategory: async (renderId, category, productId, score) => {
+    await pool.query(`DELETE FROM render_items WHERE render_id = $1
+                      AND product_id IN (SELECT id FROM products WHERE category = $2)`, [renderId, category]);
+    return pool.query(`INSERT INTO render_items (render_id, product_id, match_score) VALUES ($1,$2,$3)`, [renderId, productId, score]);
+  },
   latestRender: roomId =>
     pool.query(`SELECT * FROM renders WHERE room_id = $1 AND status = 'done' ORDER BY created_at DESC LIMIT 1`, [roomId])
       .then(r => r.rows[0] || null),
@@ -145,7 +161,8 @@ export const q = {
     pool.query(`SELECT MAX(p.price_updated_at) AS as_of FROM render_items ri
                 JOIN products p ON p.id = ri.product_id WHERE ri.render_id = $1`, [renderId])
       .then(r => r.rows[0]?.as_of || null),
-  allProducts: () => pool.query(`SELECT * FROM products`).then(r => r.rows),
+  allProducts: () => pool.query(`SELECT * FROM products WHERE active IS NOT FALSE`).then(r => r.rows),
+  adminProducts: () => pool.query(`SELECT * FROM products ORDER BY active DESC, id`).then(r => r.rows),
 
   // users / auth
   findUserByEmail: email =>
@@ -198,12 +215,12 @@ export const q = {
 
   // комнаты юзера (история в UI)
   myRooms: userId =>
-    pool.query(`SELECT id, style, budget, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
+    pool.query(`SELECT id, style, budget, price_tier, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
       .then(r => r.rows),
   userGenerations: userId =>
     pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at, r.request_text,
                        r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms,
-                       rm.style, rm.budget, rm.photo_path, rm.room_type,
+                       rm.style, rm.budget, rm.price_tier, rm.photo_path, rm.room_type,
                        GREATEST(0,
                          COALESCE((SELECT SUM(-ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.delta < 0), 0)
                          - COALESCE((SELECT SUM(ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.reason = 'iterate_refund'), 0)
@@ -215,8 +232,8 @@ export const q = {
   // админка: аккаунты
   adminRenders: (limit = 100) =>
     pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at,
-                       r.request_text, r.prompt, r.model, r.cost_usd, r.duration_ms, r.image_path,
-                       rm.style, rm.room_type, rm.budget, rm.photo_path, u.email,
+                       r.request_text, r.prompt, r.model, r.cost_usd, r.duration_ms, r.image_path, r.analysis, r.meta,
+                       rm.style, rm.room_type, rm.budget, rm.price_tier, rm.photo_path, u.email,
                        GREATEST(0,
                          COALESCE((SELECT SUM(-ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.delta < 0), 0)
                          - COALESCE((SELECT SUM(ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.reason = 'iterate_refund'), 0)
@@ -287,13 +304,14 @@ export const q = {
 
   // каталог (админ)
   insertProduct: f =>
-    pool.query(`INSERT INTO products (category, name, brand, attrs, price, unit, qty, source, keywords, style_tags, url, image_url, image_path, price_date)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, COALESCE($14, CURRENT_DATE)) RETURNING *`,
+    pool.query(`INSERT INTO products (category, name, brand, attrs, price, unit, qty, source, keywords, style_tags, url, image_url, image_path, price_date, price_tier, room_types, surface, active)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, COALESCE($14, CURRENT_DATE), $15,$16,$17,$18) RETURNING *`,
       [f.category, f.name, f.brand || null, JSON.stringify(f.attrs || {}), f.price, f.unit || 'шт', f.qty || 1,
-       f.source || null, f.keywords || null, f.style_tags || null, f.url || null, f.image_url || null, f.image_path || null, f.price_date || null])
+       f.source || null, f.keywords || null, f.style_tags || null, f.url || null, f.image_url || null, f.image_path || null, f.price_date || null,
+       f.price_tier || 'comfort', f.room_types || null, f.surface || null, f.active !== false])
       .then(r => r.rows[0]),
   updateProduct: (id, fields) => {
-    const keys = Object.keys(fields).filter(k => ['category','name','brand','attrs','price','unit','qty','source','keywords','style_tags','url','image_url','image_path','price_date'].includes(k));
+    const keys = Object.keys(fields).filter(k => ['category','name','brand','attrs','price','unit','qty','source','keywords','style_tags','url','image_url','image_path','price_date','price_tier','room_types','surface','active'].includes(k));
     if (!keys.length) return Promise.resolve(null);
     const set = keys.map((k, i) => `${k} = $${i + 2}`);
     if (keys.includes('price')) set.push('price_updated_at = now()');
@@ -301,6 +319,14 @@ export const q = {
     return pool.query(`UPDATE products SET ${set.join(', ')} WHERE id = $1 RETURNING *`, [id, ...vals]).then(r => r.rows[0] || null);
   },
   deleteProduct: id => pool.query(`DELETE FROM products WHERE id = $1`, [id]).then(r => r.rowCount > 0),
+  upsertSeedProduct: f =>
+    pool.query(`INSERT INTO products (seed_key, category, name, brand, attrs, price, unit, qty, source, keywords, style_tags, url, image_url, price_tier, room_types, surface, active, price_date)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,CURRENT_DATE)
+                ON CONFLICT (seed_key) DO NOTHING RETURNING id`,
+      [f.seed_key, f.category, f.name, f.brand || null, JSON.stringify(f.attrs || {}), f.price, f.unit || 'шт', f.qty || 1,
+       'remontvision catalog', f.keywords || null, f.style_tags || null, f.url || null, f.image_url || null,
+       f.price_tier || 'comfort', f.room_types || null, f.surface || null])
+      .then(r => r.rows[0] || null),
 
   // настройки приложения
   settingsByKeys: keys =>
@@ -357,21 +383,26 @@ export const q = {
       [id, ...keys.map(k => fields[k])]).then(r => r.rows[0] || null);
   },
   deleteStyle: id => pool.query(`DELETE FROM styles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
-  styleReferences: styleId =>
-    pool.query(`SELECT * FROM style_references WHERE style_id = $1 ORDER BY sort, id`, [styleId]).then(r => r.rows),
-  addStyleReference: (styleId, imagePath, title = '', sort = 0) =>
-    pool.query(`INSERT INTO style_references (style_id, image_path, title, sort) VALUES ($1,$2,$3,$4) RETURNING *`,
-      [styleId, imagePath, title, sort]).then(r => r.rows[0]),
+  styleReferences: (styleId, roomType = null) =>
+    pool.query(`SELECT * FROM style_references WHERE style_id = $1
+                ${roomType ? 'AND (room_type IS NULL OR room_type = $2)' : ''}
+                ORDER BY ${roomType ? 'CASE WHEN room_type = $2 THEN 0 ELSE 1 END,' : ''} sort, id`,
+      roomType ? [styleId, roomType] : [styleId]).then(r => r.rows),
+  addStyleReference: (styleId, imagePath, title = '', sort = 0, roomType = null) =>
+    pool.query(`INSERT INTO style_references (style_id, image_path, title, sort, room_type) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [styleId, imagePath, title, sort, roomType]).then(r => r.rows[0]),
   deleteStyleReference: (styleId, refId) =>
     pool.query(`DELETE FROM style_references WHERE id = $1 AND style_id = $2`, [refId, styleId]).then(r => r.rowCount > 0),
-  styleProducts: styleId =>
-    pool.query(`SELECT p.*, sp.sort AS style_sort FROM style_products sp
+  styleProducts: (styleId, roomType = null) =>
+    pool.query(`SELECT p.*, sp.sort AS style_sort, sp.room_type AS style_room_type FROM style_products sp
                 JOIN products p ON p.id = sp.product_id WHERE sp.style_id = $1
-                ORDER BY sp.sort, p.id`, [styleId]).then(r => r.rows),
-  addStyleProduct: (styleId, productId, sort = 0) =>
-    pool.query(`INSERT INTO style_products (style_id, product_id, sort) VALUES ($1,$2,$3)
-                ON CONFLICT (style_id, product_id) DO UPDATE SET sort = EXCLUDED.sort RETURNING *`,
-      [styleId, productId, sort]).then(r => r.rows[0]),
+                ${roomType ? 'AND (sp.room_type IS NULL OR sp.room_type = $2)' : ''}
+                ORDER BY ${roomType ? 'CASE WHEN sp.room_type = $2 THEN 0 ELSE 1 END,' : ''} sp.sort, p.id`,
+      roomType ? [styleId, roomType] : [styleId]).then(r => r.rows),
+  addStyleProduct: (styleId, productId, sort = 0, roomType = null) =>
+    pool.query(`INSERT INTO style_products (style_id, product_id, sort, room_type) VALUES ($1,$2,$3,$4)
+                ON CONFLICT (style_id, product_id) DO UPDATE SET sort = EXCLUDED.sort, room_type = EXCLUDED.room_type RETURNING *`,
+      [styleId, productId, sort, roomType]).then(r => r.rows[0]),
   deleteStyleProduct: (styleId, productId) =>
     pool.query(`DELETE FROM style_products WHERE style_id = $1 AND product_id = $2`, [styleId, productId]).then(r => r.rowCount > 0),
 };

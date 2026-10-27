@@ -5,6 +5,7 @@
 import { roomTypeByName } from './roomtypes.js';
 import { getModelConfig } from './modelconfig.js';
 import { supportsAdvancedOptions } from './modelcaps.js';
+import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -19,7 +20,7 @@ export const MOCK_MODE = !process.env.OPENROUTER_API_KEY;
 
 const HTTP_REFERER = process.env.APP_URL || 'http://localhost:3000';
 const TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 120_000);
-export const MAX_REFERENCES = 4; // сколько референсов товаров передаём в генерацию (проверяй supported_parameters модели)
+export const MAX_REFERENCES = 4; // сколько референсов уходит в генерацию (проверяй supported_parameters модели)
 
 // --- логирование: json-строки для юнит-экономики и отладки ---
 export function log(obj) {
@@ -55,7 +56,7 @@ async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = TIME
     } finally {
       clearTimeout(timer);
     }
-    if (attempt < retries) await sleep(1000 * 2 ** attempt); // 1 с, 2 с
+    if (attempt < retries) await sleep(1000 * 2 ** attempt);
     attempt++;
   }
   throw lastErr;
@@ -69,7 +70,6 @@ export async function listImageModels() {
   const r = await fetch(`${BASE}/images/models`, { headers: headers() });
   if (!r.ok) throw new Error(`models: ${r.status} ${await r.text()}`);
   const data = await r.json();
-  // возвращаем компактный список: slug + поддержка референсов
   return (data.data || data.models || []).map(m => ({
     id: m.id,
     input_refs: Boolean(m.supported_parameters?.input_references),
@@ -77,7 +77,6 @@ export async function listImageModels() {
 }
 
 // Проверка конфига при старте: неверный slug рендер-модели = каждый рендер жжёт 502.
-// Падаем с понятной ошибкой ДО приёма трафика. Vision-модель сверяем мягко (предупреждение).
 export async function assertConfig() {
   if (MOCK_MODE) return;
   const { render: renderModel, vision: visionModel } = getModelConfig();
@@ -108,19 +107,19 @@ export async function assertConfig() {
 }
 
 const STYLES = {
-  'Современный': 'modern minimalist interior, handleless matte cabinets, warm LED lighting, large-format porcelain tile',
-  'Светлый':     'bright airy interior, white and light wood palette, lots of natural light, scandinavian',
-  'Тёмный':      'moody dark interior, deep graphite and walnut, accent warm lighting, premium hotel feel',
-  'Классика':    'classic interior, elegant moldings, warm wood, brass details, timeless',
+  'Современный': 'modern minimalist interior, clean architectural lines, handleless matte cabinetry, warm layered lighting, refined materials, calm neutral palette',
+  'Светлый': 'bright airy interior, white and light wood palette, lots of natural light, scandinavian, warm and calm',
+  'Тёмный': 'moody dark interior, deep graphite and walnut, layered warm lighting, premium hotel feel',
+  'Классика': 'classic interior, elegant moldings, warm wood, brass details, timeless proportions',
   'Скандинавский': 'scandinavian interior, light oak, white walls, linen, soft natural light, functional minimalism',
-  'Лофт': 'industrial loft, exposed concrete or brick, black metal, warm wood, large windows',
+  'Лофт': 'industrial loft, exposed concrete or brick, black metal, warm wood, large windows, raw textures',
   'Джапанди': 'japandi interior, warm minimalism, natural oak, linen, wabi-sabi, calm earthy palette',
   'Неоклассика': 'neoclassical interior, elegant wall moldings, warm neutrals, subtle brass, timeless',
-  'Минимализм': 'minimalist interior, clean lines, neutral palette, hidden storage, soft lighting',
-  'Тёмный модерн': 'dark modern interior, graphite and walnut, moody lighting, premium materials',
-  'Бохо': 'bohemian interior, layered textiles, rattan, plants, warm earthy colors',
+  'Минимализм': 'minimalist interior, clean lines, neutral palette, hidden storage, soft indirect lighting',
+  'Тёмный модерн': 'dark modern interior, graphite and walnut, moody lighting, premium materials, dramatic contrast',
+  'Бохо': 'bohemian interior, layered textiles, rattan, plants, warm earthy colors, relaxed artisanal styling',
   'Ар-деко': 'art deco interior, brass, velvet, geometric patterns, rich jewel tones',
-  'Кантри': 'country interior, natural wood, cozy textiles, warm rustic details',
+  'Кантри': 'country interior, natural wood, cozy textiles, warm rustic details, handmade character',
   'Референс пользователя': 'the uploaded style reference',
 };
 
@@ -138,66 +137,151 @@ const ACCENTS = {
   graphite: 'graphite',
 };
 
-export function buildPrompt({ style, budget, requestText, iteration, products, palette = 'none', accent = 'none', hasStyleRef = false, styleDescription = '', roomType = 'Другое' }) {
+function imageRolesText(imageMap = []) {
+  if (!imageMap.length) return 'Image 1 is the source room. Preserve its geometry, camera angle and architecture.';
+  return ['IMAGE ROLES:']
+    .concat(imageMap.map((m, i) => `${i + 1}. ${m.role}${m.label ? ` — ${m.label}` : ''}`))
+    .join('\n');
+}
+
+function productsText(products = []) {
+  if (!products.length) return 'No specific product references. Use materials and fixtures appropriate for the room, style and material class.';
+  return products.map((p, i) => {
+    const attrs = Object.entries(p.attrs || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+    const slot = p.slot ? `${SLOT_LABELS[p.slot] || p.slot}: ` : '';
+    const ref = p.has_ref ? 'reference image attached' : 'no reference image — use the described color/finish only';
+    return `${i + 1}. ${slot}${p.name}${p.brand ? ` (${p.brand})` : ''} — ${p.category}${attrs ? ` [${attrs}]` : ''} (${ref})`;
+  }).join('\n');
+}
+
+export function buildPrompt({
+  style,
+  priceTier = 'comfort',
+  budget,
+  requestText,
+  iteration,
+  products = [],
+  palette = 'none',
+  accent = 'none',
+  hasStyleRef = false,
+  userStyleRef = false,
+  styleDescription = '',
+  roomType = 'Другое',
+  imageMap = [],
+}) {
+  const tierKey = normalizeTier(priceTier);
+  const tier = PRICE_TIER_META[tierKey];
   const styleDesc = styleDescription || STYLES[style] || STYLES['Современный'];
   const room = roomTypeByName(roomType);
-  const roomRule = room ? `This room is a ${room.prompt}. ${room.forbid}` : '';
-  const keep = `CRITICAL: keep the exact same camera angle, walls positions, window and door openings. Do not change the room geometry or layout. Photorealistic professional interior photography. ${roomRule}`.trim();
+  const roomName = room?.prompt || 'room shown in the source photo';
+  const keep = String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '');
+  const change = String(room?.change || 'finishes, lighting, textiles, decor and styling that match the chosen style').replace(/\.+$/, '');
+  const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
+  const roles = imageRolesText(imageMap);
+
   if (iteration) {
-    return `${keep} Apply ONLY this change to the interior: "${requestText}". Keep everything else exactly as in the source image.`;
+    return `${roles}
+This is a ${roomName}. Apply ONLY this change to the interior: "${requestText}".
+Keep everything else exactly as in the source image: camera, geometry, architecture, large furniture, floor, walls, lighting and decor.
+Do not restyle the room. Do not move objects. Photorealistic result.`;
   }
-  const budgetTier = budget <= 80 ? 'budget-conscious' : budget <= 300 ? 'mid-range' : 'premium';
-  const budgetNote = `Target total materials budget: about ${budget} thousand RUB (${budgetTier}). Prefer materials and furniture whose combined cost fits this target; if the selected products require more, keep the remaining items modest.`;
-  const extras = [
+
+  const styleRefText = hasStyleRef
+    ? (userStyleRef
+      ? 'The user style reference is the primary target. Follow its mood, materials, palette, furniture character and level of detail. Do not copy its layout, architecture or camera angle.'
+      : 'The style reference defines the target mood, materials, palette, furniture character and level of detail. Do not copy its layout, architecture or camera angle.')
+    : 'There is no separate style reference. Build the style from the description and the selected materials.';
+  const colors = [
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
     ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
-    hasStyleRef ? 'Use the attached style references for mood, materials and palette; do not copy their room layout.' : '',
   ].filter(Boolean).join(' ');
-  // новое ядро: рисуем ИЗ товаров каталога — их фото уходят референсами (input_references)
-  if (products?.length) {
-    const hasRefs = products.some(p => p.image_path || p.image_url);
-    const list = products.map((p, i) => {
-      const attrs = Object.entries(p.attrs || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
-      return `${i + 1}) ${p.name}${p.brand ? ` (${p.brand})` : ''} — ${p.category}${attrs ? ` [${attrs}]` : ''}`;
-    }).join('; ');
-    return `${keep} ${budgetNote} Redesign this room in ${styleDesc} style. ${extras} Use EXACTLY these specific products in the interior${hasRefs ? ' (reference photos attached)' : ''}: ${list}. Match the specified colors and materials; do not substitute unrelated products. Keep the listed products visually recognizable in the result.`;
-  }
-  return `${keep} ${budgetNote} Redesign this room in ${styleDesc} style. ${extras} Realistic materials, believable lighting.`;
+
+  return `${roles}
+
+TASK
+Create a photorealistic, editorial-quality photograph of this ${roomName} after a deep renovation in ${styleDesc} style.
+The result must feel like a completed designer renovation, not a moodboard or a furniture showroom. Deeply transform the finishes, lighting, textiles, decor and styling while keeping the architecture believable and buildable.
+
+KEEP EXACTLY
+${keep}.
+Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.
+
+CHANGE / DEEP TRANSFORMATION
+${change}.
+If a floor product is listed below, replace the floor finish with it. If no floor product is listed, preserve the existing floor. The same applies to walls: change only when a wall finish is listed.
+You may restyle upholstery, headboards and cabinet fronts, but keep the size and realistic position of large furniture.
+
+ROOM RULES
+${roomRules}
+
+MATERIAL PALETTE — use these products where they fit
+${productsText(products)}
+Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures. Small decor, plants and textiles may be added to complete the styling.
+
+STYLE
+${styleRefText}
+${colors}
+
+MATERIAL CLASS
+${tier.promptName || tier.name} — ${tier.prompt}
+The selected products already match this class; keep the rest of the room consistent with it.
+
+OUTPUT
+Photorealistic interior photograph, natural realistic lighting, believable materials, correct proportions, high detail, livable styling. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look.`;
+}
+
+// Короткий промт для правки: один target + один референс, без полного стилевого промта.
+export function buildEditPrompt({ roomType = 'Другое', target = null, instruction = '', hasRef = false, refLabel = '' }) {
+  const room = roomTypeByName(roomType);
+  const roomName = room?.prompt || 'room';
+  const targetLabel = SLOT_LABELS[target] || 'the requested element';
+  const roles = hasRef
+    ? `IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.\nImage 2 — reference for the new ${targetLabel}${refLabel ? ` — ${refLabel}` : ''}.`
+    : 'IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.';
+  return `${roles}
+
+This is a ${roomName}.
+Change only the ${targetLabel}. ${instruction}
+Match the reference's shape, color, material and finish${hasRef ? '' : ' from the described material'}. Keep the size and realistic position appropriate for the room.
+Keep everything else exactly as in Image 1: camera, geometry, walls, floor, furniture, decor and lighting. Do not restyle the room. Do not move objects. Do not add extra furniture or fixtures.
+Photorealistic result, no text, no watermarks, no people.`;
 }
 
 // OpenRouter принимает только фиксированные пропорции — подбираем ближайшую к реальному фото.
-// Только значения, которые принимает провайдер (иначе 400 invalid_value).
 const ASPECTS = [
   [1, 1], [2, 3], [3, 2], [3, 4], [4, 3],
   [4, 5], [5, 4], [9, 16], [16, 9],
 ];
-export function snapAspect(width, height) {
+export function snapAspect(width, height, allowed = null) {
   if (!width || !height) return '3:2';
+  const list = Array.isArray(allowed) && allowed.length
+    ? allowed.filter(a => a && a !== 'auto').map(a => String(a).split(':').map(Number)).filter(([w, h]) => w > 0 && h > 0)
+    : ASPECTS;
+  if (!list.length) return '3:2';
   const r = Math.log(width / height);
   let best = '3:2', bestD = Infinity;
-  for (const [w, h] of ASPECTS) {
+  for (const [w, h] of list) {
     const d = Math.abs(r - Math.log(w / h));
     if (d < bestD) { bestD = d; best = `${w}:${h}`; }
   }
   return best;
 }
 
-// Один рендер = максимум два внешних вызова: Image API, затем chat-фолбэк.
-// Без retry-каскада и без второй модели: неизвестный timeout не повторяем автоматически.
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio }) {
   return generateWithModel(getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 }
 
 async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio }) {
   const productRefs = INPUT_REFS_OK ? referenceImagesB64 : [];
-  // Исходное фото комнаты — первый обязательный reference в основном Image API.
   const refs = [
     { type: 'image_url', image_url: { url: sourceImageB64 } },
     ...productRefs.map(b => ({ type: 'image_url', image_url: { url: b } })),
   ];
   const cfg = getModelConfig();
   const advanced = supportsAdvancedOptions(model);
-  const aspect = advanced ? (cfg.aspectRatio || 'auto') : (aspectRatio || '3:2');
+  // auto из настроек — это «подстройся под источник»; конкретную пропорцию всё равно
+  // считаем по исходнику, чтобы не потерять края при финальном fitAspect.
+  const aspect = advanced ? (cfg.aspectRatio === 'auto' ? (aspectRatio || 'auto') : cfg.aspectRatio) : (aspectRatio || '3:2');
   const resolution = advanced ? (cfg.resolution || '1K') : null;
   const body = {
     model,
@@ -266,10 +350,21 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   throw lastErr || new Error('generation failed');
 }
 
-// Vision: читаем готовый рендер и достаём список материалов/предметов для матчинга.
-// Возвращает { items, cost } — cost нужен для полной себестоимости рендера.
+// Vision: читаем готовый рендер и достаём материалы, поверхности, электрику и подсказки.
 export async function parseRender(renderB64, mime = 'image/png') {
-  const sys = `Ты — анализатор интерьерных рендеров. Посмотри на картинку и верни JSON-массив материалов и предметов отделки, которые видны: пол, стены, фартук, столешница, смеситель, свет, розетки/выключатели, фасады. Для каждого: {"category": одно из tile|paint|countertop|faucet|light|outlets|cabinet, "description": краткое описание на русском, "keywords": [3-5 ключевых слов]}. Только реальные отделочные материалы и сантехника/свет/электрика, без мебели-декора и растений. Только JSON, без текста вокруг.`;
+  const sys = `Ты — анализатор интерьерных рендеров. Верни строго JSON-объект без текста вокруг:
+{
+  "items": [{"category": "floor|paint|wallpaper|tile|skirting|countertop|cabinet|faucet|sink|toilet|shower|bathtub|light|outlets|appliance|textile", "description": "кратко по-русски", "keywords": ["3-5 ключевых слов"]}],
+  "surfaces": [{"surface": "walls|floor|ceiling|cabinets|countertop|backsplash|textile|trim", "description": "кратко по-русски", "hex": "#RRGGBB"}],
+  "visible": ["bed","sofa","pendant light","floor","walls","kitchen cabinets","toilet","shower","..."],
+  "electrical": [{"title": "кратко по-русски", "text": "рекомендация по розеткам/свету для этой комнаты"}]
+}
+Правила:
+- items — только реальные отделочные материалы, сантехника, свет, электрика и текстиль. Без декора и растений.
+- surfaces — 3-6 главных поверхностей; hex — приблизительный цвет на картинке, без RAL-кодов.
+- visible — крупные объекты, которые реально видно.
+- electrical — 3-5 практичных рекомендаций с учётом планировки на картинке.
+Только JSON.`;
   const r = await fetchWithRetry(`${BASE}/chat/completions`, {
     method: 'POST',
     headers: headers(),
@@ -278,7 +373,7 @@ export async function parseRender(renderB64, mime = 'image/png') {
       messages: [
         { role: 'system', content: sys },
         { role: 'user', content: [
-          { type: 'text', text: 'Список материалов с картинки:' },
+          { type: 'text', text: 'Разбери этот интерьер:' },
           { type: 'image_url', image_url: { url: `data:${mime};base64,${renderB64}` } },
         ]},
       ],
@@ -286,9 +381,21 @@ export async function parseRender(renderB64, mime = 'image/png') {
     }),
   });
   const data = await r.json();
-  const txt = data.choices?.[0]?.message?.content || '[]';
-  const parsed = JSON.parse(txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/)?.[0] || '[]');
-  return { items: Array.isArray(parsed) ? parsed : (parsed.items || []), cost: data.usage?.cost ?? null };
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try {
+    parsed = JSON.parse(txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/)?.[0] || '{}');
+  } catch {
+    parsed = {};
+  }
+  const items = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.items) ? parsed.items : []);
+  return {
+    items,
+    surfaces: Array.isArray(parsed.surfaces) ? parsed.surfaces : [],
+    visible: Array.isArray(parsed.visible) ? parsed.visible : [],
+    electrical: Array.isArray(parsed.electrical) ? parsed.electrical : [],
+    cost: data.usage?.cost ?? null,
+  };
 }
 
 // Простой матчинг: ключевые слова + штраф за несовпадение цвета. v2 — эмбеддинги.
@@ -299,6 +406,7 @@ const COLOR_HINTS = {
   'грейдж': ['грейдж', 'сер', 'камен'],
   'графит': ['графит', 'темн', 'черн'],
   'черный': ['черн', 'темн'],
+  'тёмный': ['темн', 'графит', 'черн'],
   'темный': ['темн', 'графит', 'черн'],
   'светлый': ['светл', 'бел', 'беж'],
   'антрацит': ['антрацит', 'темн', 'черн'],
@@ -309,6 +417,10 @@ const COLOR_HINTS = {
   'дерево': ['дерев', 'древес'],
   'коричневый': ['корич', 'дерев', 'орех'],
   'орех': ['орех', 'корич', 'дерев'],
+  'оливковый': ['олив', 'зелен', 'шалфей'],
+  'терракота': ['террак', 'оранж', 'красн'],
+  'меловой': ['мелов', 'бел', 'светл'],
+  'песочный': ['песоч', 'беж', 'светл'],
 };
 
 export function matchCatalog(items, products) {
@@ -329,7 +441,6 @@ export function matchCatalog(items, products) {
     }
     if (best && bestScore >= 0.34) results.push({ product: best, score: bestScore });
   }
-  // дедуп по товару, максимальный скор
   const seen = new Map();
   for (const r of results) if (!seen.has(r.product.id) || seen.get(r.product.id).score < r.score) seen.set(r.product.id, r);
   return [...seen.values()];

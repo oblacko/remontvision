@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node --env-file=.env src/server.js",
     "dev": "node --watch --env-file=.env src/server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "catalog:images": "node --env-file=.env scripts/generate-catalog-images.mjs",
+    "catalog:seed": "node --env-file=.env -e \"import('./src/catalogseed.js').then(({seedCatalog})=>seedCatalog())\""
   },
   "engines": {
     "node": ">=20.6"

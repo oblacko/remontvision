@@ -5,7 +5,7 @@ import '../App.css'
 type Me = { email: string; balance: number }
 type Consents = { offer: boolean; personal: boolean; transfer: boolean }
 type GenRow = {
-  id: string; room_id: string; style: string; room_type?: string | null; budget: number; status: string; error: string | null;
+  id: string; room_id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
   created_at: string; finished_at: string | null; request_text: string | null;
   credits_spent: number; image_url: string | null; photo_url: string | null;
 }
@@ -13,7 +13,7 @@ type CreditRow = { id: number; delta: number; reason: string; payment_id: number
 type Pack = { id: string; title: string; credits: number; price_kopecks: number }
 type GenItem = { name: string; price: number; qty: number; unit: string; url: string; link_label?: string; source?: string; match_score?: number }
 type RoomData = {
-  id: string; style: string; room_type?: string | null; budget: number; status: string; error: string | null;
+  id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
   photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null } | null;
   items: GenItem[]; total: number; prices_as_of: string | null;
 }
@@ -25,6 +25,8 @@ const reasonNames: Record<string, string> = {
   refund: 'возврат', admin_adjust: 'корректировка администратором', admin_test: 'корректировка',
 }
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
+const tierNames: Record<string, string> = { start: 'Старт', comfort: 'Комфорт', premium: 'Премиум', atelier: 'Ателье' }
+const tierName = (key?: string | null) => tierNames[key || 'comfort'] || 'Комфорт'
 const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const plural = (n: number, one: string, few: string, many: string) => {
   const m = n % 100, d = n % 10
@@ -358,7 +360,7 @@ export default function Cabinet() {
                   <a href={`/app?room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
                 </div>
-                <div className="mt-6 grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Бюджет</p><p className="mt-2 text-xl font-light">{roomData.budget} 000 ₽</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p>{roomData.total > roomData.budget * 1000 ? <p className="mt-1 text-[11px] text-destructive">Выше бюджета на {rub(roomData.total - roomData.budget * 1000)}</p> : <p className="mt-1 text-[11px] text-primary-text">В бюджете · остаток {rub(roomData.budget * 1000 - roomData.total)}</p>}{roomData.prices_as_of && <p className="mt-1 text-[11px] text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
+                <div className="mt-6 grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-[11px] text-muted-foreground">Подбор по уровню, а не по сумме</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p><p className="mt-1 text-[11px] text-muted-foreground">Смета ориентировочная</p>{roomData.prices_as_of && <p className="mt-1 text-[11px] text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
                 <div className="mt-6"><p className="eyebrow">Версии</p><div className="mt-3 flex flex-wrap gap-2">{selectedRoom.versions.map((v, index) => <button key={v.id} type="button" onClick={() => selectVersion(v.id)} className={`min-h-10 border px-3 text-xs ${selectedRenderId === v.id ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>Версия {selectedRoom.versions.length - index} · {v.request_text ? 'правка' : 'базовая'} · {statusLabel(v.status)}</button>)}</div></div>
                 {roomData.items.length > 0 && <div className="mt-6"><p className="eyebrow">Товары и смета</p><div className="mt-3 divide-y border-y">{roomData.items.map((item, i) => <div key={`${item.name}-${i}`} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 py-3 text-sm"><span>{item.name}</span><span className="font-medium">{rub(item.price * item.qty)}</span><span className="col-span-2 text-xs text-muted-foreground">{rub(item.price)} × {item.qty} {item.unit}{item.source ? ` · ${item.source}` : ''}{item.url ? <> · <a className="underline underline-offset-2" href={item.url} target="_blank" rel="noopener nofollow">{item.link_label || 'в магазин'}</a></> : null}</span></div>)}</div></div>}
                 {roomData.error && <p className="mt-4 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{roomData.error}</p>}

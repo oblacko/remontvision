@@ -10,38 +10,39 @@ import {
   Expand,
   Info,
   LoaderCircle,
-  Plug,
   RotateCcw,
   Search,
   Upload,
   X,
   Zap,
 } from 'lucide-react'
-import { Slider } from '@/components/ui/slider'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
   name: string; price: number; qty: number; unit: string;
-  url: string; link_label?: string; source?: string; match_score?: number;
+  url: string; link_label?: string; source?: string; match_score?: number; price_tier?: string;
 }
+type Surface = {
+  surface: string; label: string; description?: string; hex: string;
+  ral?: { code: string; name: string; hex: string } | null;
+}
+type ElectricalItem = { title: string; text: string }
+type Suggestion = { target: string; label: string; product_id: number; image_url?: string | null }
+type Analysis = { surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[] }
 type RoomResult = {
-  id: string; status: string; error?: string | null; style: string; budget: number;
-  render?: { id: string; image: string | null; status: string } | null;
+  id: string; status: string; error?: string | null; style: string; budget: number; price_tier?: string;
+  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
 type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
-  budget: number; pricesAsOf?: string | null;
+  budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
-const budgetInfo = (total: number, budgetThousands: number) => {
-  const diff = total - budgetThousands * 1000
-  return diff > 0 ? `Выше бюджета на ${rub(diff)}` : `В бюджете · остаток ${rub(-diff)}`
-}
 const fmtDateTime = (iso?: string | null) => iso
   ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   : null
@@ -84,28 +85,13 @@ const refinePresets = [
   'Добавить больше растений',
 ] as const
 
-const ralColors = [
-  ['RAL 7047', 'Телегрей 4', '--pl-dust-3'],
-  ['RAL 1019', 'Серо-бежевый', '--pl-sand-3'],
-  ['RAL 8022', 'Чёрно-коричневый', '--pl-graphite-2'],
-  ['RAL 1036', 'Жемчужно-бежевый', '--pl-sand-2'],
-  ['RAL 6003', 'Оливково-зелёный', '--pl-forest-2'],
-  ['RAL 3012', 'Бежево-красный', '--pl-terra-2'],
+const priceTiers = [
+  { key: 'start', name: 'Старт', short: 'Практично и аккуратно', description: 'Ламинат, керамика, painted MDF и базовые fixtures. Чисто и надёжно.' },
+  { key: 'comfort', name: 'Комфорт', short: 'Лучший баланс', description: 'Инженерная доска, кварц, качественные фасады, латунь/сталь и layered lighting.' },
+  { key: 'premium', name: 'Премиум', short: 'Статусные материалы', description: 'Натуральный камень, массив, дизайнерский свет и брендовая сантехника.' },
+  { key: 'atelier', name: 'Ателье', short: 'Дизайнерские решения', description: 'Редкие фактуры, кастомные решения и коллекционные предметы.' },
 ] as const
-
-const electricalPlan = [
-  ['Розетки у дивана', '2 шт + USB, высота 300 мм от пола'],
-  ['ТВ-зона', '4 розетки за панелью, скрытый кабель-канал'],
-  ['Рабочее место у окна', '2 розетки + выключатель, высота 900 мм'],
-  ['Проходной выключатель', 'у входа и у изножия кровати'],
-] as const
-
-const socketMarks = [
-  { x: 20, y: 74, kind: 'socket', label: 'Розетка ×2' },
-  { x: 46, y: 52, kind: 'socket', label: 'ТВ-розетки' },
-  { x: 72, y: 68, kind: 'switch', label: 'Выключатель' },
-  { x: 86, y: 34, kind: 'socket', label: 'Рабочее место' },
-] as const
+const tierName = (key?: string | null) => priceTiers.find(item => item.key === key)?.name || 'Комфорт'
 
 const stepLabels = ['Фото', 'Стиль', 'Результат', 'Смета'] as const
 const roomTypes = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое'] as const
@@ -126,21 +112,6 @@ function AccentDot({ token }: { token: string | null }) {
     >
       {!token && <span className="absolute left-1/2 top-1/2 h-px w-8 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-foreground/60" />}
     </span>
-  )
-}
-
-function ElectricalOverlay() {
-  return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-      {socketMarks.map((mark) => (
-        <span key={mark.label} className="socket-mark" style={{ left: `${mark.x}%`, top: `${mark.y}%` }}>
-          <span className={`socket-dot ${mark.kind === 'switch' ? 'socket-dot-switch' : ''}`}>
-            {mark.kind === 'switch' ? <Zap className="size-3" /> : <Plug className="size-3" />}
-          </span>
-          <span className="socket-label">{mark.label}</span>
-        </span>
-      ))}
-    </div>
   )
 }
 
@@ -166,13 +137,16 @@ export function GenerationPanel({
   const [style, setStyle] = useState<string | null>(null)
   const [accent, setAccent] = useState('none')
   const [scheme, setScheme] = useState('none')
-  const [budget, setBudget] = useState(150)
+  const [priceTier, setPriceTier] = useState('comfort')
   const [customOpen, setCustomOpen] = useState(false)
   const [schemeOpen, setSchemeOpen] = useState(false)
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
   const [refFile, setRefFile] = useState<File | null>(null)
   const [refName, setRefName] = useState('')
   const [usedRef, setUsedRef] = useState<File | null>(null)
+  const [editRefPhoto, setEditRefPhoto] = useState<string | null>(null)
+  const [editRefFile, setEditRefFile] = useState<File | null>(null)
+  const [editRefName, setEditRefName] = useState('')
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
@@ -186,6 +160,7 @@ export function GenerationPanel({
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const refInput = useRef<HTMLInputElement>(null)
+  const editRefInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
@@ -262,6 +237,25 @@ export function GenerationPanel({
     setUsedRef(null)
   }
 
+  const clearEditRef = () => {
+    releaseUrl(editRefPhoto)
+    setEditRefPhoto(null)
+    setEditRefFile(null)
+    setEditRefName('')
+    if (editRefInput.current) editRefInput.current.value = ''
+  }
+
+  const acceptEditRef = (nextFile?: File) => {
+    if (!nextFile || !nextFile.type.startsWith('image/')) return
+    if (nextFile.size > 15 * 1024 * 1024) { setGenError('Референс больше 15 МБ'); return }
+    releaseUrl(editRefPhoto)
+    const url = URL.createObjectURL(nextFile)
+    rememberUrl(url)
+    setEditRefPhoto(url)
+    setEditRefFile(nextFile)
+    setEditRefName(nextFile.name)
+  }
+
   async function pollRoom(id: string): Promise<RoomResult | null> {
     const started = Date.now()
     while (true) {
@@ -288,7 +282,7 @@ export function GenerationPanel({
     }
   }
 
-  async function startGeneration(request: string, styleName: string) {
+  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; parentId?: string }) {
     if (!file) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
@@ -301,7 +295,7 @@ export function GenerationPanel({
         fd.append('photo', file)
         fd.append('style', styleName)
         fd.append('room_type', roomType)
-        fd.append('budget', String(budget))
+        fd.append('price_tier', priceTier)
         fd.append('palette', scheme)
         fd.append('accent', accent)
         if (refFile) fd.append('style_ref', refFile)
@@ -314,9 +308,13 @@ export function GenerationPanel({
         setRoomId(id)
         setUsedRef(refFile)
       } else {
-        const r = await fetch(`/api/rooms/${id}/iterate`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: request }),
-        })
+        const fd = new FormData()
+        fd.append('text', request)
+        if (edit?.target) fd.append('target', edit.target)
+        if (edit?.productId) fd.append('product_id', String(edit.productId))
+        if (edit?.parentId) fd.append('parent_id', edit.parentId)
+        if (edit?.refFile) fd.append('ref', edit.refFile)
+        const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { onRequireLogin(); return }
         if (r.status === 402) { setGenError(''); setStep(iterations.length ? 'result' : 'style'); setCreditOpen(true); return }
@@ -335,15 +333,18 @@ export function GenerationPanel({
         items: room.items,
         total: room.total,
         budget: room.budget,
+        priceTier: room.price_tier || priceTier,
         roomId: id,
         ratio: photoRatio,
         pricesAsOf: room.prices_as_of,
+        analysis: render.analysis || null,
       }
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
       setOpenHistory(next.id)
       setProgress(100)
       setStep('result')
+      clearEditRef()
       await onRefreshUser()
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось выполнить генерацию')
@@ -356,9 +357,10 @@ export function GenerationPanel({
     releaseUrl(refPhoto)
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
-    setStyle(null); setAccent('none'); setScheme('none'); setBudget(150)
+    setStyle(null); setAccent('none'); setScheme('none'); setPriceTier('comfort')
     setCustomOpen(false); setSchemeOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setUsedRef(null)
+    clearEditRef()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
     setRefineText(''); setGenError(''); setProgress(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     if (photoInput.current) photoInput.current.value = ''
@@ -511,12 +513,18 @@ export function GenerationPanel({
 
             <div className="mt-8 border p-4">
               <div className="flex items-end justify-between gap-4">
-                <div><p className="eyebrow">Бюджет на материалы</p><p className="mt-1 text-xs text-muted-foreground">Учтём при подборе товаров</p></div>
-                <output className="text-lg font-light">{budget} тыс. ₽</output>
+                <div><p className="eyebrow">Класс материалов</p><p className="mt-1 text-xs text-muted-foreground">Заменяет бюджет-сумму: подбираем товары уровня, а не «впихиваем в цифру»</p></div>
+                <output className="text-lg font-light">{tierName(priceTier)}</output>
               </div>
-              <Slider min={50} max={1000} step={25} value={[budget]} onValueChange={(value) => setBudget(value[0])} aria-label="Бюджет на материалы в тысячах рублей" className="mt-5 rounded-none" />
-              <div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>50 тыс.</span><span>1 млн ₽</span></div>
-              <p className="mt-3 text-xs leading-5 text-muted-foreground">Бюджет влияет на подбор товаров и уровень материалов. Итоговая смета может отличаться — она ориентировочная.</p>
+              <div className="mt-4 grid grid-cols-2 gap-px border bg-border">
+                {priceTiers.map(item => (
+                  <button key={item.key} type="button" aria-pressed={priceTier === item.key} onClick={() => setPriceTier(item.key)} className={`min-h-16 bg-background px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${priceTier === item.key ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>
+                    <span className="block text-sm font-medium">{item.name}</span>
+                    <span className="mt-1 block text-[11px] leading-4 opacity-70">{item.short}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description} Итоговая смета может отличаться — она ориентировочная.</p>
             </div>
 
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
@@ -589,10 +597,23 @@ export function GenerationPanel({
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm">
-                  <span className="text-muted-foreground">Бюджет {current.budget} 000 ₽ · подборка {rub(current.total)}</span>
-                  <span className={current.total > current.budget * 1000 ? 'text-destructive' : 'text-primary-text'}>{budgetInfo(current.total, current.budget)}</span>
+                  <span className="text-muted-foreground">Класс «{tierName(current.priceTier)}» · подборка {rub(current.total)}</span>
+                  <span className="text-muted-foreground">Итог ориентировочный</span>
                 </div>
-
+                {current.analysis?.suggestions?.length ? (
+                  <div className="mt-6 border p-4">
+                    <p className="eyebrow">Что улучшить</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Кнопки прикрепляют референс товара и меняют только выбранный объект.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {current.analysis.suggestions.map(s => (
+                        <button key={`${s.target}-${s.product_id}`} type="button" onClick={() => startGeneration(s.label, current.styleName, { target: s.target, productId: s.product_id, parentId: current.id })} className="inline-flex min-h-10 items-center gap-2 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          {s.image_url ? <img src={s.image_url} alt="" className="size-7 border object-cover" /> : null}
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <aside className="border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
@@ -615,14 +636,21 @@ export function GenerationPanel({
                             <p className="eyebrow mt-5">Быстрые правки</p>
                             <div className="mt-3 flex flex-wrap gap-2">
                               {refinePresets.map((preset) => (
-                                <button key={preset} type="button" onClick={() => startGeneration(preset, item.styleName)} className="min-h-10 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <button key={preset} type="button" onClick={() => startGeneration(preset, item.styleName, { parentId: item.id })} className="min-h-10 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                   {preset}
                                 </button>
                               ))}
                             </div>
                             <div className="mt-3 flex flex-col gap-2">
                               <input value={refineText} onChange={(event) => setRefineText(event.target.value)} placeholder="Или опишите правку словами…" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                              <button type="button" disabled={!refineText.trim()} onClick={() => startGeneration(refineText.trim(), item.styleName)} className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground">
+                                  <Upload className="size-3.5 text-primary-text" />Прикрепить референс
+                                  <input ref={editRefInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptEditRef(event.target.files?.[0])} />
+                                </label>
+                                {editRefPhoto ? <span className="inline-flex min-h-10 items-center gap-2 border border-foreground/30 px-2 text-xs"><img src={editRefPhoto} alt="" className="size-8 object-cover" /><span className="max-w-28 truncate">{editRefName}</span><button type="button" onClick={clearEditRef} className="p-1 text-destructive" aria-label="Убрать референс"><X className="size-3.5" /></button></span> : null}
+                              </div>
+                              <button type="button" disabled={!refineText.trim()} onClick={() => startGeneration(refineText.trim(), item.styleName, { parentId: item.id, refFile: editRefFile || undefined })} className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                                 Перегенерировать <RotateCcw className="size-4" />
                               </button>
                             </div>
@@ -639,7 +667,7 @@ export function GenerationPanel({
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={() => setStep('style')} className="action-secondary"><ArrowLeft className="size-4" />Изменить стиль</button>
+              <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="action-secondary"><ArrowLeft className="size-4" />Изменить стиль</button>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
                 <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
@@ -655,11 +683,10 @@ export function GenerationPanel({
             <div className="mt-6 grid gap-10 xl:grid-cols-2">
               <div>
                 <div className="relative mx-auto w-full bg-foreground" style={{ aspectRatio: String(current.ratio), width: `min(100%, calc(58svh * ${current.ratio}))` }}>
-                  <img src={current.image} alt="Дизайн интерьера с рекомендуемой разметкой розеток и выключателей" className="absolute inset-0 h-full w-full object-cover" />
-                  <ElectricalOverlay />
+                  <img src={current.image} alt="Сгенерированный дизайн интерьера" className="absolute inset-0 h-full w-full object-cover" />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  <p className="flex items-center gap-2 text-xs text-muted-foreground"><Plug className="size-4 text-primary-text" />Условная разметка — рекомендация, не проект</p>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground"><Zap className="size-4 text-primary-text" />Электрика — рекомендация, не проект</p>
                   <button type="button" onClick={() => setLightbox(true)} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Во весь экран <Expand className="size-4" /></button>
                 </div>
               </div>
@@ -675,36 +702,44 @@ export function GenerationPanel({
                         <span className="text-xs text-muted-foreground">
                           {rub(item.price)} × {item.qty} {item.unit}
                           {item.source ? ` · ${item.source}` : ''}
+                          {item.price_tier ? ` · ${tierName(item.price_tier)}` : ''}
                           {item.url ? <> · <a className="underline underline-offset-2" href={item.url} target="_blank" rel="noopener nofollow">{item.link_label || 'в магазин'}</a></> : null}
                         </span>
                       </div>
                     )) : <p className="py-4 text-sm text-muted-foreground">Подборка не сформирована — попробуйте изменить запрос.</p>}
                   </div>
-                  <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
-                  <p className={current.total > current.budget * 1000 ? 'mt-1 text-right text-xs text-destructive' : 'mt-1 text-right text-xs text-primary-text'}>{budgetInfo(current.total, current.budget)}</p>
+                  <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка · класс «{tierName(current.priceTier)}»</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
+                  <p className="mt-1 text-right text-xs text-muted-foreground">Смета ориентировочная</p>
                   {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
                 </section>
 
                 <section aria-labelledby="gen-ral">
-                  <h4 id="gen-ral" className="eyebrow mb-4">Цвета в RAL · ориентировочно</h4>
-                  <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                    {ralColors.map(([code, name, token]) => (
-                      <div key={code} className="bg-background p-3">
-                        <span className="block h-10 w-full border border-foreground/20" style={{ background: `oklch(var(${token}))` }} />
-                        <p className="mt-2 font-mono text-xs">{code}</p>
-                        <p className="text-xs text-muted-foreground">{name}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <h4 id="gen-ral" className="eyebrow mb-4">Палитра по рендеру · RAL ориентировочно</h4>
+                  {current.analysis?.surfaces?.length ? (
+                    <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
+                      {current.analysis.surfaces.map((surface, index) => (
+                        <div key={`${surface.surface}-${index}`} className="bg-background p-3">
+                          <span className="block h-10 w-full border border-foreground/20" style={{ background: surface.hex }} />
+                          <p className="mt-2 text-xs font-medium">{surface.label || surface.surface}</p>
+                          <p className="font-mono text-[11px] text-muted-foreground">{surface.ral?.code || surface.hex}</p>
+                          {surface.ral ? <p className="text-[11px] text-muted-foreground">{surface.ral.name}</p> : null}
+                          {surface.description ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{surface.description}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="border-y py-4 text-sm text-muted-foreground">Палитра появится после анализа рендера — сейчас vision не вернул поверхности.</p>}
+                  <p className="mt-2 text-[11px] leading-4 text-muted-foreground">RAL подобран по оттенкам на картинке, точный код сверяйте по вееру.</p>
                 </section>
 
                 <section aria-labelledby="gen-electrical">
                   <h4 id="gen-electrical" className="eyebrow mb-4">Розетки и выключатели · рекомендация</h4>
-                  <ul className="divide-y border-y">
-                    {electricalPlan.map(([title, text]) => (
-                      <li key={title} className="flex gap-3 py-3 text-sm"><Zap className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{text}</p></div></li>
-                    ))}
-                  </ul>
+                  {current.analysis?.electrical?.length ? (
+                    <ul className="divide-y border-y">
+                      {current.analysis.electrical.map((item, index) => (
+                        <li key={`${item.title}-${index}`} className="flex gap-3 py-3 text-sm"><Zap className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div></li>
+                      ))}
+                    </ul>
+                  ) : <p className="border-y py-4 text-sm text-muted-foreground">Рекомендации по электрике появятся после анализа рендера.</p>}
                 </section>
               </div>
             </div>
@@ -728,7 +763,6 @@ export function GenerationPanel({
           </button>
           <div className="relative mx-auto my-auto overflow-hidden bg-foreground" style={{ aspectRatio: String(current.ratio), width: `min(100vw, calc(100svh * ${current.ratio}))` }}>
             <img src={current.image} alt="Сгенерированный дизайн интерьера в полном размере" className="absolute inset-0 h-full w-full object-cover" />
-            {step === 'estimates' && <ElectricalOverlay />}
           </div>
         </div>
       )}

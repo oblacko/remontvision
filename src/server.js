@@ -13,6 +13,9 @@ import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES } from './roomtypes.js';
+import { SLOT_LABELS, normalizeTier } from './pricing.js';
+import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
+import { seedCatalog } from './catalogseed.js';
 import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
 import { validateModelOptions } from './modelcaps.js';
 
@@ -146,6 +149,7 @@ function styleReferenceDto(ref) {
     id: ref.id,
     title: ref.title,
     sort: ref.sort,
+    room_type: ref.room_type || null,
     image_url: `/style-images/${path.basename(ref.image_path)}`,
   };
 }
@@ -162,6 +166,11 @@ function styleProductDto(product) {
     qty: product.qty,
     source: product.source,
     url: productLink(product),
+    price_tier: product.price_tier || 'comfort',
+    room_types: product.room_types || null,
+    surface: product.surface || null,
+    active: product.active !== false,
+    room_type: product.style_room_type || null,
     image_url: product.image_path ? `/products/${path.basename(product.image_path)}` : product.image_url,
   };
 }
@@ -173,6 +182,7 @@ function generationDto(g) {
     style: g.style,
     room_type: g.room_type,
     budget: g.budget,
+    price_tier: g.price_tier || 'comfort',
     status: g.status,
     error: g.error,
     created_at: g.created_at,
@@ -312,7 +322,7 @@ app.post('/api/payments/webhook', h(async (req, res) => {
 // ---------- каталог: админ ----------
 app.get('/api/admin/products', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  res.json(await q.allProducts());
+  res.json(await q.adminProducts());
 }));
 
 app.post('/api/admin/products', productUpload.single('image'), h(async (req, res) => {
@@ -502,7 +512,8 @@ app.post('/api/admin/styles/:id/references', upload.array('images', 8), h(async 
   const out = [];
   for (const file of files) {
     const imagePath = await saveUpload(file, 'style-images');
-    const ref = await q.addStyleReference(styleId, imagePath, String(req.body.title || file.originalname || '').slice(0, 200), Number(req.body.sort) || 0);
+    const roomType = ROOM_TYPE_NAMES.includes(String(req.body.room_type || '')) ? String(req.body.room_type) : null;
+    const ref = await q.addStyleReference(styleId, imagePath, String(req.body.title || file.originalname || '').slice(0, 200), Number(req.body.sort) || 0, roomType);
     out.push(styleReferenceDto(ref));
   }
   res.status(201).json(out);
@@ -519,7 +530,8 @@ app.post('/api/admin/styles/:id/products', h(async (req, res) => {
   const styleId = Number(req.params.id);
   const productId = Number(req.body?.product_id);
   if (!styleId || !productId) return res.status(400).json({ error: 'Нужны style id и product_id' });
-  const row = await q.addStyleProduct(styleId, productId, Number(req.body?.sort) || 0);
+  const roomType = ROOM_TYPE_NAMES.includes(String(req.body?.room_type || '')) ? String(req.body.room_type) : null;
+  const row = await q.addStyleProduct(styleId, productId, Number(req.body?.sort) || 0, roomType);
   res.status(201).json(row);
 }));
 
@@ -642,9 +654,10 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const palette = allowedPalettes.has(req.body.palette) ? req.body.palette : 'none';
   const accent = allowedAccents.has(req.body.accent) ? req.body.accent : 'none';
   const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 1000);
+  const priceTier = normalizeTier(String(req.body.price_tier || req.body.tier || '').trim(), 'comfort');
   const photoKey = await saveUpload(photo, 'uploads');
   const styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
@@ -677,6 +690,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     style: room.style,
     room_type: room.room_type,
     budget: room.budget,
+    price_tier: room.price_tier || 'comfort',
     status: room.status,
     error: room.error,
     photo_url: `/files/${path.basename(room.photo_path)}`,
@@ -688,10 +702,13 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       request_text: render.request_text,
       cost_usd: render.cost_usd,
       model: render.model,
+      edit_target: render.edit_target || null,
+      analysis: render.analysis || null,
     } : null,
     items: items.map(p => ({
       name: p.name, brand: p.brand, attrs: p.attrs || {},
       price: p.price, unit: p.unit, qty: p.qty, source: p.source, match_score: p.match_score,
+      price_tier: p.price_tier || 'comfort',
       price_date: p.price_date, price_updated_at: p.price_updated_at,
       url: productLink(p), link_label: p.url ? 'Открыть товар' : 'Найти похожие',
       image_search_url: `https://yandex.ru/images/search?text=${encodeURIComponent([p.name, p.brand, p.source].filter(Boolean).join(' '))}`,
@@ -738,23 +755,72 @@ app.delete('/api/rooms/:id', h(async (req, res) => {
   res.status(204).end();
 }));
 
-app.post('/api/rooms/:id/iterate', rateLimit, h(async (req, res) => {
+app.post('/api/rooms/:id/iterate', rateLimit, upload.single('ref'), h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const room = await q.getRoom(req.params.id);
   if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
-  const text = (req.body?.text || '').trim();
+  const text = String(req.body?.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Пустой запрос' });
   if (text.length > 500) return res.status(400).json({ error: 'Слишком длинный запрос (макс. 500 символов)' });
   if (room.status !== 'done') return res.status(409).json({ error: 'Подождите завершения текущей задачи' });
-  const parent = await q.latestRender(room.id);
+  const requestedParentId = String(req.body?.parent_id || '').trim();
+  let parent;
+  if (requestedParentId) {
+    const picked = await q.getRender(requestedParentId);
+    if (!picked || picked.room_id !== room.id || picked.status !== 'done' || !picked.image_path) {
+      return res.status(400).json({ error: 'Версия для правки не найдена' });
+    }
+    parent = picked;
+  } else {
+    parent = await q.latestRender(room.id);
+  }
   if (!parent) return res.status(409).json({ error: 'Нет рендера для правки' });
+
+  let target = String(req.body?.target || '').trim();
+  if (target && !SLOT_LABELS[target]) return res.status(400).json({ error: 'Неизвестный объект правки' });
+
+  const refProductId = req.body?.product_id ? Number(req.body.product_id) : null;
+  let refProduct = null;
+  if (refProductId) {
+    refProduct = await q.getProduct(refProductId);
+    if (!refProduct || refProduct.active === false) return res.status(400).json({ error: 'Товар для референса не найден' });
+    if (!target) target = refProduct.category;
+    if (target === 'paint' || target === 'wallpaper') target = 'wall';
+    if (!SLOT_LABELS[target]) target = null;
+  }
+
+  let refPath = null;
+  let instruction = text;
+  if (req.file) {
+    refPath = await saveUpload(req.file, 'uploads');
+    const pastedUrl = firstImageUrl(text);
+    if (pastedUrl) instruction = text.replace(pastedUrl, '').replace(/\s+/g, ' ').trim() || 'Применить правку по референсу';
+  } else {
+    const explicitUrl = String(req.body?.ref_url || '').trim();
+    const url = explicitUrl || firstImageUrl(text);
+    if (url) {
+      try {
+        const img = await fetchRemoteImage(url);
+        refPath = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
+        // URL в тексте модели не нужен: картинка уже прикреплена.
+        instruction = text.replace(url, '').replace(/\s+/g, ' ').trim() || 'Применить правку по референсу';
+      } catch (e) {
+        log({ event: 'iterate_ref_url_error', url, error: String(e.message || e).slice(0, 200) });
+        return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}. Прикрепите файл.` });
+      }
+    }
+  }
+
   try {
     await enqueueRender({
       roomId: room.id,
       parentRenderId: parent.id,
-      requestText: text,
+      requestText: instruction,
       chargedUserId: req.user.id,
       requestIp: clientIp(req),
+      editTarget: target || null,
+      refPath,
+      refProductId: refProduct ? refProduct.id : null,
     });
   } catch (e) {
     if (e.status === 402) {
@@ -791,6 +857,7 @@ app.use((err, req, res, _next) => {
 // ---------- старт ----------
 async function main() {
   await migrate();          // накат миграций Postgres
+  await seedCatalog();      // идемпотентный сид каталога (catalog/seed.json)
   await loadModelConfig();  // модели из app_settings / env
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
