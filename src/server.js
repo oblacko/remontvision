@@ -19,10 +19,12 @@ import { seedCatalog } from './catalogseed.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
 import { validateModelOptions } from './modelcaps.js';
+import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const PAYMENTS_ENABLED = String(process.env.PAYMENTS_ENABLED || 'false') === 'true';
+const APP_URL = (process.env.APP_URL || 'https://www.remontvision.ru').replace(/\/$/, '');
 const REFUNDS_ENABLED = String(process.env.REFUNDS_ENABLED || 'false') === 'true';
 const app = express();
 app.set('trust proxy', 1); // ровно один nginx перед приложением
@@ -63,6 +65,7 @@ app.get(['/app', '/app/'], (_req, res) => res.sendFile(path.join(process.cwd(), 
 const webIndexPath = path.join(WEB_DIST, 'index.html');
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get(['/cabinet', '/cabinet/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
+app.get('/s/:token', (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
   res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
 });
@@ -115,6 +118,10 @@ function requireAdmin(req, res) {
   }
   return true;
 }
+
+const visitorKey = req => crypto.createHash('sha256')
+  .update(`${clientIp(req)}|${req.headers['user-agent'] || ''}`)
+  .digest('hex').slice(0, 40);
 
 // В каталоге может не быть прямой ссылки: не отдаём битый href, а ведём на поиск.
 function productLink(p) {
@@ -567,6 +574,32 @@ app.get('/api/admin/settings/models', h(async (req, res) => {
   res.json({ render_model: config.render, vision_model: config.vision, resolution: config.resolution, aspect_ratio: config.aspectRatio, image_models: imageModels });
 }));
 
+app.get('/api/admin/settings/proxy', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(getProxyState());
+}));
+
+app.put('/api/admin/settings/proxy', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    await applyProxy(String(req.body?.url || ''));
+    await q.setSetting('proxy.url', getProxyState().url);
+    res.json(getProxyState());
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/settings/proxy/test', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const result = await testProxy(String(req.body?.url ?? getProxyState().url ?? ''));
+    res.json({ ...getProxyState(), status: result });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
 app.put('/api/admin/settings/models', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const renderModel = String(req.body?.render_model || '').trim();
@@ -673,7 +706,19 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 1000);
   const priceTier = normalizeTier(String(req.body.price_tier || req.body.tier || '').trim(), 'comfort');
   const photoKey = await saveUpload(photo, 'uploads');
-  const styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
+  let styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
+  if (!styleRefKey) {
+    const styleRefUrl = String(req.body?.style_ref_url || '').trim();
+    if (styleRefUrl) {
+      try {
+        const img = await fetchRemoteImage(styleRefUrl);
+        styleRefKey = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
+      } catch (e) {
+        await remove(photoKey);
+        return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}` });
+      }
+    }
+  }
   await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
@@ -770,6 +815,65 @@ app.delete('/api/rooms/:id', h(async (req, res) => {
   if (room.photo_path) { try { await remove(room.photo_path); } catch { /* ignore */ } }
   if (room.style_ref_path) { try { await remove(room.style_ref_path); } catch { /* ignore */ } }
   res.status(204).end();
+}));
+
+app.post('/api/renders/:id/share', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.getRender(req.params.id);
+  if (!render || render.status !== 'done' || !render.image_path) return res.status(404).json({ error: 'Дизайн не найден' });
+  const room = await q.getRoom(render.room_id);
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Дизайн не найден' });
+  const token = render.share_token || crypto.randomBytes(18).toString('base64url');
+  if (!render.share_token) await q.setRenderShareToken(render.id, token);
+  res.json({ token, url: `${APP_URL}/s/${token}` });
+}));
+
+app.get('/api/share/:token', h(async (req, res) => {
+  const render = await q.renderByShareToken(req.params.token);
+  if (!render) return res.status(404).json({ error: 'Ссылка не найдена' });
+  const visitor = visitorKey(req);
+  const [likes, comments, liked] = await Promise.all([
+    q.countLikes(render.id),
+    q.listComments(render.id),
+    q.hasLike(render.id, visitor),
+  ]);
+  res.json({
+    id: render.id,
+    image: `/s/${req.params.token}/image`,
+    style: render.style,
+    room_type: render.room_type,
+    created_at: render.created_at,
+    likes,
+    liked,
+    comments: comments.map(c => ({ id: c.id, name: c.name, text: c.text, created_at: c.created_at })),
+  });
+}));
+
+app.post('/api/share/:token/like', rateLimit, h(async (req, res) => {
+  const render = await q.renderByShareToken(req.params.token);
+  if (!render) return res.status(404).json({ error: 'Ссылка не найдена' });
+  const visitor = visitorKey(req);
+  const liked = await q.hasLike(render.id, visitor);
+  if (liked) await q.removeLike(render.id, visitor);
+  else await q.addLike(render.id, visitor);
+  res.json({ liked: !liked, likes: await q.countLikes(render.id) });
+}));
+
+app.post('/api/share/:token/comments', rateLimit, h(async (req, res) => {
+  const render = await q.renderByShareToken(req.params.token);
+  if (!render) return res.status(404).json({ error: 'Ссылка не найдена' });
+  const text = String(req.body?.text || '').trim();
+  const name = String(req.body?.name || '').trim().slice(0, 60);
+  if (!text) return res.status(400).json({ error: 'Введите комментарий' });
+  if (text.length > 500) return res.status(400).json({ error: 'Комментарий длиннее 500 символов' });
+  const comment = await q.addComment(render.id, name, text, visitorKey(req));
+  res.status(201).json({ id: comment.id, name: comment.name, text: comment.text, created_at: comment.created_at });
+}));
+
+app.get('/s/:token/image', h(async (req, res) => {
+  const render = await q.renderByShareToken(req.params.token);
+  if (!render || !render.image_path) return res.status(404).end();
+  await serveStored(req, res, 'renders', path.basename(render.image_path));
 }));
 
 app.post('/api/rooms/:id/iterate', rateLimit, upload.single('ref'), h(async (req, res) => {
@@ -877,6 +981,7 @@ async function main() {
   await seedCatalog();      // идемпотентный сид каталога (catalog/seed.json)
   await seedStyleReferences(); // сгенерированные референсы стилей (style-refs/seed.json)
   await loadModelConfig();  // модели из app_settings / env
+  await loadProxyConfig();  // прокси из app_settings / env
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }

@@ -136,6 +136,17 @@ export const q = {
                       AND product_id IN (SELECT id FROM products WHERE category = $2)`, [renderId, category]);
     return pool.query(`INSERT INTO render_items (render_id, product_id, match_score) VALUES ($1,$2,$3)`, [renderId, productId, score]);
   },
+  setRenderShareToken: (id, token) =>
+    pool.query(`UPDATE renders SET share_token = $2 WHERE id = $1 RETURNING share_token`, [id, token]).then(r => r.rows[0]?.share_token || null),
+  renderByShareToken: token =>
+    pool.query(`SELECT r.*, rm.style, rm.room_type, rm.user_id FROM renders r
+                JOIN rooms rm ON rm.id = r.room_id WHERE r.share_token = $1 AND r.status = 'done'`, [token]).then(r => r.rows[0] || null),
+  countLikes: renderId => pool.query(`SELECT COUNT(*)::int AS n FROM render_likes WHERE render_id = $1`, [renderId]).then(r => r.rows[0]?.n || 0),
+  hasLike: (renderId, visitor) => pool.query(`SELECT 1 FROM render_likes WHERE render_id = $1 AND visitor = $2`, [renderId, visitor]).then(r => r.rowCount > 0),
+  addLike: (renderId, visitor) => pool.query(`INSERT INTO render_likes (render_id, visitor) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [renderId, visitor]),
+  removeLike: (renderId, visitor) => pool.query(`DELETE FROM render_likes WHERE render_id = $1 AND visitor = $2`, [renderId, visitor]),
+  listComments: renderId => pool.query(`SELECT id, name, text, created_at FROM render_comments WHERE render_id = $1 ORDER BY created_at DESC LIMIT 100`, [renderId]).then(r => r.rows),
+  addComment: (renderId, name, text, visitor) => pool.query(`INSERT INTO render_comments (render_id, name, text, visitor) VALUES ($1,$2,$3,$4) RETURNING id, name, text, created_at`, [renderId, name || null, text, visitor || null]).then(r => r.rows[0]),
   latestRender: roomId =>
     pool.query(`SELECT * FROM renders WHERE room_id = $1 AND status = 'done' ORDER BY created_at DESC LIMIT 1`, [roomId])
       .then(r => r.rows[0] || null),

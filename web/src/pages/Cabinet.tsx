@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Download, LoaderCircle, LogOut, Search, Trash2, X } from 'lucide-react'
+import { ArrowUpRight, Download, LoaderCircle, LogOut, Search, Share2, Trash2, X } from 'lucide-react'
+import { ShareDialog } from '@/components/ShareDialog'
 import '../App.css'
 
 type Me = { email: string; balance: number }
@@ -51,6 +52,7 @@ export default function Cabinet() {
   const [roomData, setRoomData] = useState<RoomData | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [notice, setNotice] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
   const [error, setError] = useState('')
   const [buyConsent, setBuyConsent] = useState(false)
   const [buying, setBuying] = useState('')
@@ -357,7 +359,8 @@ export default function Cabinet() {
                 <div className="mt-5 bg-foreground">{roomData.render?.image ? <img src={roomData.render.image} alt="Дизайн комнаты" className="max-h-[52svh] w-full object-contain" /> : <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">{roomData.error || 'Изображение недоступно'}</div>}</div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {roomData.render?.image && <a href={roomData.render.image} download="remontvision-design.jpg" className="action-secondary"><Download className="size-4" />Скачать</a>}
-                  <a href={`/app?room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
+                  {roomData.render?.image && <button type="button" onClick={() => setShareOpen(true)} className="action-secondary"><Share2 className="size-4" />Поделиться</button>}
+                  <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
                 </div>
                 <div className="mt-6 grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-[11px] text-muted-foreground">Подбор по уровню, а не по сумме</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p><p className="mt-1 text-[11px] text-muted-foreground">Смета ориентировочная</p>{roomData.prices_as_of && <p className="mt-1 text-[11px] text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
@@ -369,6 +372,7 @@ export default function Cabinet() {
           </div>
         </div>
       )}
+      <ShareDialog renderId={roomData?.render?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
     </div>
   )
 }

@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles' | 'prompts' | 'models'
+type Tab = 'users' | 'packs' | 'styles' | 'prompts' | 'models' | 'proxy'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -124,6 +124,11 @@ export default function Admin() {
   const [aspectDraft, setAspectDraft] = useState('auto')
   const [modelNotice, setModelNotice] = useState('')
   const [modelSaving, setModelSaving] = useState(false)
+  const [proxyUrl, setProxyUrl] = useState('')
+  const [proxyEnv, setProxyEnv] = useState('')
+  const [proxyStatus, setProxyStatus] = useState<{ ok: boolean; status: number; ms: number; at: string; error?: string } | null>(null)
+  const [proxyNotice, setProxyNotice] = useState('')
+  const [proxyBusy, setProxyBusy] = useState(false)
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -188,6 +193,30 @@ export default function Admin() {
       setModelSettings(d); setRenderDraft(d.render_model); setVisionDraft(d.vision_model); setResolutionDraft(d.resolution || '1K'); setAspectDraft(d.aspect_ratio || 'auto'); setModelNotice('')
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
+  const loadProxy = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/proxy'))
+      setProxyUrl(d.url || ''); setProxyEnv(d.env_url || ''); setProxyStatus(d.status || null); setProxyNotice('')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const saveProxy = async () => {
+    setProxyBusy(true); setProxyNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/proxy', { method: 'PUT', body: JSON.stringify({ url: proxyUrl }) }))
+      setProxyUrl(d.url || ''); setProxyEnv(d.env_url || ''); setProxyStatus(d.status || null)
+      setProxyNotice(d.url ? 'Прокси сохранён и применён' : 'Прокси отключён')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setProxyBusy(false) }
+  }
+  const testProxy = async () => {
+    setProxyBusy(true); setProxyNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/proxy/test', { method: 'POST', body: JSON.stringify({ url: proxyUrl }) }))
+      setProxyStatus(d.status || null)
+      setProxyNotice(d.status?.ok ? 'Прокси работает' : 'Прокси не ответил')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setProxyBusy(false) }
+  }
   const saveModels = async () => {
     setModelSaving(true); setModelNotice(''); setAdminError('')
     try {
@@ -217,7 +246,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -386,7 +415,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты'], ['models', 'Модели']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты'], ['models', 'Модели'], ['proxy', 'Прокси']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -587,6 +616,32 @@ export default function Admin() {
                 </form>
               )}
               {!modelSettings && <p className="mt-4 text-sm text-muted-foreground">Загружаем список моделей…</p>}
+            </div>
+          )}
+
+          {tab === 'proxy' && (
+            <div className="mt-8 max-w-3xl">
+              <p className="eyebrow">Прокси для OpenRouter</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Нужен, если OpenRouter блокирует IP сервера. Сохраняется в app_settings и применяется без рестарта. Пустое поле выключает прокси, даже если HTTPS_PROXY задан в env.</p>
+              <form onSubmit={e => { e.preventDefault(); void saveProxy() }} className="mt-6 space-y-4 border p-4">
+                <div>
+                  <label htmlFor="proxy-url" className="eyebrow mb-2 block">URL прокси</label>
+                  <input id="proxy-url" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="http://user:pass@host:port" className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
+                  <p className="mt-2 text-xs text-muted-foreground">Env-фолбэк: {proxyEnv ? <span className="font-mono">{proxyEnv.replace(/\/\/.*@/, '//***@')}</span> : 'не задан'}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="submit" disabled={proxyBusy} className="action-primary">{proxyBusy ? 'Проверяем…' : 'Сохранить'}</button>
+                  <button type="button" disabled={proxyBusy} onClick={() => void testProxy()} className="action-secondary">Проверить</button>
+                  {proxyEnv && <button type="button" disabled={proxyBusy} onClick={() => setProxyUrl(proxyEnv)} className="action-secondary">Подставить env</button>}
+                </div>
+                {proxyNotice && <p className="border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{proxyNotice}</p>}
+                {proxyStatus && (
+                  <div className={`border px-3 py-2 text-sm ${proxyStatus.ok ? 'border-primary/40 bg-primary/5' : 'border-destructive/40 bg-destructive/5 text-destructive'}`}>
+                    <p className="font-medium">{proxyStatus.ok ? 'Прокси работает' : 'Прокси не работает'}{proxyStatus.status ? ` · HTTP ${proxyStatus.status}` : ''} · {proxyStatus.ms} мс</p>
+                    <p className="mt-1 text-xs opacity-80">Проверено: {dateTime(proxyStatus.at)}{proxyStatus.error ? ` · ${proxyStatus.error}` : ''}</p>
+                  </div>
+                )}
+              </form>
             </div>
           )}
         </main>

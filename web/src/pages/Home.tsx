@@ -57,6 +57,7 @@ export default function Home() {
   const [me, setMe] = useState<Me | null>(null)
   const [pendingPanel, setPendingPanel] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [panelRoomId, setPanelRoomId] = useState('')
   const [packs, setPacks] = useState<PublicPack[]>(defaultPacks)
 
   async function loadMe() {
@@ -71,8 +72,10 @@ export default function Home() {
     if (!me) return
     const params = new URLSearchParams(location.search)
     if (params.get('panel') !== '1') return
+    const room = params.get('room') || ''
     params.delete('panel')
     history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : '') + location.hash)
+    setPanelRoomId(room)
     setPanelOpen(true)
   }, [me])
   useEffect(() => {
@@ -463,7 +466,8 @@ export default function Home() {
 
       <GenerationPanel
         open={panelOpen}
-        onClose={() => setPanelOpen(false)}
+        initialRoomId={panelRoomId}
+        onClose={() => { setPanelOpen(false); setPanelRoomId('') }}
         onRequireLogin={() => { setPanelOpen(false); openLogin() }}
         onRefreshUser={loadMe}
       />

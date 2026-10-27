@@ -11,11 +11,13 @@ import {
   Info,
   LoaderCircle,
   RotateCcw,
+  Share2,
   Search,
   Upload,
   X,
   Zap,
 } from 'lucide-react'
+import { ShareDialog } from '@/components/ShareDialog'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -117,11 +119,13 @@ function AccentDot({ token }: { token: string | null }) {
 
 export function GenerationPanel({
   open,
+  initialRoomId = '',
   onClose,
   onRequireLogin,
   onRefreshUser,
 }: {
   open: boolean
+  initialRoomId?: string
   onClose: () => void
   onRequireLogin: () => void
   onRefreshUser: () => void | Promise<void>
@@ -143,10 +147,14 @@ export function GenerationPanel({
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
   const [refFile, setRefFile] = useState<File | null>(null)
   const [refName, setRefName] = useState('')
+  const [refUrl, setRefUrl] = useState('')
+  const [refUrlDraft, setRefUrlDraft] = useState('')
   const [usedRef, setUsedRef] = useState<File | null>(null)
   const [editRefPhoto, setEditRefPhoto] = useState<string | null>(null)
   const [editRefFile, setEditRefFile] = useState<File | null>(null)
   const [editRefName, setEditRefName] = useState('')
+  const [editRefUrl, setEditRefUrl] = useState('')
+  const [editRefUrlDraft, setEditRefUrlDraft] = useState('')
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
@@ -157,11 +165,13 @@ export function GenerationPanel({
   const [genError, setGenError] = useState('')
   const [busy, setBusy] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const refInput = useRef<HTMLInputElement>(null)
   const editRefInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
+  const loadedRoomRef = useRef('')
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
 
@@ -185,7 +195,7 @@ export function GenerationPanel({
   }, [])
 
   useEffect(() => {
-    if (!open) { setCreditOpen(false); return }
+    if (!open) { loadedRoomRef.current = ''; setCreditOpen(false); return }
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     window.setTimeout(() => closeRef.current?.focus(), 380)
@@ -196,6 +206,61 @@ export function GenerationPanel({
       window.removeEventListener('keydown', close)
     }
   }, [open, onClose])
+
+  useEffect(() => {
+    if (!open || !initialRoomId || loadedRoomRef.current === initialRoomId) return
+    loadedRoomRef.current = initialRoomId
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch(`/api/rooms/${initialRoomId}`)
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(d.error || String(r.status))
+        if (cancelled) return
+        setRoomId(initialRoomId)
+        setStyle(d.style || null)
+        setRoomType(d.room_type || null)
+        setPriceTier(d.price_tier || 'comfort')
+        setPhoto(d.photo_url || null)
+        setPhotoName('Фото комнаты')
+        setPhotoError(''); setGenError('')
+        if (d.photo_url) {
+          try {
+            const pr = await fetch(d.photo_url)
+            if (pr.ok) {
+              const blob = await pr.blob()
+              setFile(new File([blob], 'room.jpg', { type: blob.type || 'image/jpeg' }))
+            }
+          } catch { /* правки работают и без локального файла */ }
+        }
+        const render = d.render
+        if (render?.image) {
+          const next: Iteration = {
+            id: render.id,
+            request: render.request_text || 'Базовая версия',
+            image: render.image,
+            styleName: d.style || '',
+            items: d.items || [],
+            total: d.total || 0,
+            budget: d.budget || 150,
+            priceTier: d.price_tier || 'comfort',
+            roomId: initialRoomId,
+            ratio: 4 / 3,
+            pricesAsOf: d.prices_as_of,
+            analysis: render.analysis || null,
+          }
+          setIterations([next])
+          setCurrentId(next.id)
+          setStep('result')
+        } else {
+          setStep('photo')
+        }
+      } catch (e) {
+        if (!cancelled) setGenError(e instanceof Error ? e.message : 'Не удалось открыть комнату')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [open, initialRoomId])
 
   useEffect(() => {
     if (step !== 'generating') return
@@ -233,8 +298,29 @@ export function GenerationPanel({
     setRefPhoto(url)
     setRefFile(nextFile)
     setRefName(nextFile.name)
+    setRefUrl(''); setRefUrlDraft('')
     setStyle(null)
     setUsedRef(null)
+  }
+
+  const acceptRefUrl = (url: string) => {
+    const clean = url.trim()
+    if (!/^https?:\/\//i.test(clean)) return
+    releaseUrl(refPhoto)
+    setRefPhoto(null)
+    setRefFile(null)
+    setRefUrl(clean)
+    setRefUrlDraft('')
+    setRefName('Референс по ссылке')
+    setStyle(null)
+    setUsedRef(null)
+    if (refInput.current) refInput.current.value = ''
+  }
+
+  const clearRef = () => {
+    releaseUrl(refPhoto)
+    setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
+    if (refInput.current) refInput.current.value = ''
   }
 
   const clearEditRef = () => {
@@ -242,6 +328,7 @@ export function GenerationPanel({
     setEditRefPhoto(null)
     setEditRefFile(null)
     setEditRefName('')
+    setEditRefUrl(''); setEditRefUrlDraft('')
     if (editRefInput.current) editRefInput.current.value = ''
   }
 
@@ -254,6 +341,19 @@ export function GenerationPanel({
     setEditRefPhoto(url)
     setEditRefFile(nextFile)
     setEditRefName(nextFile.name)
+    setEditRefUrl(''); setEditRefUrlDraft('')
+  }
+
+  const acceptEditRefUrl = (url: string) => {
+    const clean = url.trim()
+    if (!/^https?:\/\//i.test(clean)) return
+    releaseUrl(editRefPhoto)
+    setEditRefPhoto(null)
+    setEditRefFile(null)
+    setEditRefName('Референс по ссылке')
+    setEditRefUrl(clean)
+    setEditRefUrlDraft('')
+    if (editRefInput.current) editRefInput.current.value = ''
   }
 
   async function pollRoom(id: string): Promise<RoomResult | null> {
@@ -282,8 +382,8 @@ export function GenerationPanel({
     }
   }
 
-  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; parentId?: string }) {
-    if (!file) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
+  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string }) {
+    if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
     setBusy(true); setGenError(''); setRefineText(''); setProgress(3); setStep('generating')
@@ -291,6 +391,7 @@ export function GenerationPanel({
       const isBase = !roomId || Boolean(refFile && refFile !== usedRef)
       let id = roomId
       if (isBase) {
+        if (!file) throw new Error('Для новой генерации нужно фото комнаты')
         const fd = new FormData()
         fd.append('photo', file)
         fd.append('style', styleName)
@@ -299,6 +400,7 @@ export function GenerationPanel({
         fd.append('palette', scheme)
         fd.append('accent', accent)
         if (refFile) fd.append('style_ref', refFile)
+        if (!refFile && refUrl) fd.append('style_ref_url', refUrl)
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { onRequireLogin(); return }
@@ -314,6 +416,7 @@ export function GenerationPanel({
         if (edit?.productId) fd.append('product_id', String(edit.productId))
         if (edit?.parentId) fd.append('parent_id', edit.parentId)
         if (edit?.refFile) fd.append('ref', edit.refFile)
+        if (!edit?.refFile && edit?.refUrl) fd.append('ref_url', edit.refUrl)
         const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { onRequireLogin(); return }
@@ -359,7 +462,8 @@ export function GenerationPanel({
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setStyle(null); setAccent('none'); setScheme('none'); setPriceTier('comfort')
     setCustomOpen(false); setSchemeOpen(false)
-    setRefPhoto(null); setRefFile(null); setRefName(''); setUsedRef(null)
+    setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
+    loadedRoomRef.current = ''
     clearEditRef()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
     setRefineText(''); setGenError(''); setProgress(0); setRoomId(''); setBusy(false); setCreditOpen(false)
@@ -466,19 +570,36 @@ export function GenerationPanel({
                 <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${customOpen ? 'rotate-180' : ''}`} />
               </button>
               {customOpen && (
-                <div className="border-t border-foreground/25 p-4">
+                <div className="border-t border-foreground/25 p-4" onPaste={(event) => {
+                  if ((event.target as HTMLElement).tagName === 'INPUT') return
+                  const pastedFile = event.clipboardData.files?.[0]
+                  if (pastedFile) { event.preventDefault(); acceptRef(pastedFile); return }
+                  const pastedText = event.clipboardData.getData('text')
+                  if (pastedText && /^https?:\/\//i.test(pastedText.trim())) { event.preventDefault(); acceptRefUrl(pastedText) }
+                }}>
                   <input ref={refInput} id="gen-ref" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptRef(event.target.files?.[0])} />
                   {refPhoto ? (
                     <div className="flex items-center justify-between gap-4 border bg-muted px-4 py-3">
                       <span className="truncate text-sm">{refName}</span>
-                      <button type="button" onClick={() => { releaseUrl(refPhoto); setRefPhoto(null); setRefFile(null); setRefName(''); setUsedRef(null); if (refInput.current) refInput.current.value = '' }} className="flex size-11 items-center justify-center hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить референс"><X className="size-4" /></button>
+                      <button type="button" onClick={clearRef} className="flex size-11 items-center justify-center hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить референс"><X className="size-4" /></button>
+                    </div>
+                  ) : refUrl ? (
+                    <div className="flex items-center justify-between gap-4 border bg-muted px-4 py-3">
+                      <a href={refUrl} target="_blank" rel="noopener noreferrer" className="truncate text-sm underline underline-offset-2">{refUrl}</a>
+                      <button type="button" onClick={clearRef} className="flex size-11 items-center justify-center hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить референс"><X className="size-4" /></button>
                     </div>
                   ) : (
-                    <label htmlFor="gen-ref" className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-foreground/40 px-4 text-center text-sm transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
-                      <Upload className="size-5 text-primary-text" />
-                      <span>Загрузить фото примера стиля</span>
-                      <span className="text-xs text-muted-foreground">JPG, PNG, WebP — нейросеть перенесёт настроение референса</span>
-                    </label>
+                    <>
+                      <label htmlFor="gen-ref" className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-foreground/40 px-4 text-center text-sm transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
+                        <Upload className="size-5 text-primary-text" />
+                        <span>Загрузить фото или вставить из буфера</span>
+                        <span className="text-xs text-muted-foreground">JPG, PNG, WebP — нейросеть перенесёт настроение референса</span>
+                      </label>
+                      <div className="mt-3 flex gap-2">
+                        <input value={refUrlDraft} onChange={(event) => setRefUrlDraft(event.target.value)} onBlur={() => { if (refUrlDraft) acceptRefUrl(refUrlDraft) }} onKeyDown={(event) => { if (event.key === 'Enter' && refUrlDraft) { event.preventDefault(); acceptRefUrl(refUrlDraft) } }} placeholder="или вставьте ссылку на референс" className="h-11 min-w-0 flex-1 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                        <button type="button" disabled={!refUrlDraft.trim()} onClick={() => acceptRefUrl(refUrlDraft)} className="min-h-11 border border-foreground px-3 text-xs hover:bg-foreground hover:text-background disabled:opacity-40">Добавить</button>
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -533,7 +654,7 @@ export function GenerationPanel({
               <button type="button" onClick={() => setStep('photo')} className="action-secondary"><ArrowLeft className="size-4" />Назад</button>
               <button
                 type="button"
-                disabled={busy || (!style && !refFile)}
+                disabled={busy || (!style && !refFile && !refUrl)}
                 onClick={() => {
                   const schemeName = schemes.find(item => item.key === scheme)?.name
                   const accentName = accents.find(item => item.key === accent)?.name
@@ -594,6 +715,9 @@ export function GenerationPanel({
                     <a href={current.image} download="remontvision-design.webp" className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Скачать результат">
                       <Download className="size-5" />
                     </a>
+                    <button type="button" onClick={() => setShareOpen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Поделиться результатом">
+                      <Share2 className="size-5" />
+                    </button>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm">
@@ -648,9 +772,11 @@ export function GenerationPanel({
                                   <Upload className="size-3.5 text-primary-text" />Прикрепить референс
                                   <input ref={editRefInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptEditRef(event.target.files?.[0])} />
                                 </label>
+                                <input value={editRefUrlDraft} onChange={(event) => setEditRefUrlDraft(event.target.value)} onBlur={() => { if (editRefUrlDraft) acceptEditRefUrl(editRefUrlDraft) }} onKeyDown={(event) => { if (event.key === 'Enter' && editRefUrlDraft) { event.preventDefault(); acceptEditRefUrl(editRefUrlDraft) } }} placeholder="или ссылка на референс" className="h-10 min-w-36 flex-1 border bg-background px-2 text-xs outline-none focus:border-primary" />
                                 {editRefPhoto ? <span className="inline-flex min-h-10 items-center gap-2 border border-foreground/30 px-2 text-xs"><img src={editRefPhoto} alt="" className="size-8 object-cover" /><span className="max-w-28 truncate">{editRefName}</span><button type="button" onClick={clearEditRef} className="p-1 text-destructive" aria-label="Убрать референс"><X className="size-3.5" /></button></span> : null}
+                                {!editRefPhoto && editRefUrl ? <span className="inline-flex min-h-10 max-w-48 items-center gap-2 border border-foreground/30 px-2 text-xs"><a href={editRefUrl} target="_blank" rel="noopener noreferrer" className="truncate underline underline-offset-2">{editRefUrl}</a><button type="button" onClick={clearEditRef} className="p-1 text-destructive" aria-label="Убрать референс"><X className="size-3.5" /></button></span> : null}
                               </div>
-                              <button type="button" disabled={!refineText.trim()} onClick={() => startGeneration(refineText.trim(), item.styleName, { parentId: item.id, refFile: editRefFile || undefined })} className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+                              <button type="button" disabled={!refineText.trim()} onClick={() => startGeneration(refineText.trim(), item.styleName, { parentId: item.id, refFile: editRefFile || undefined, refUrl: editRefUrl || undefined })} className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                                 Перегенерировать <RotateCcw className="size-4" />
                               </button>
                             </div>
@@ -767,6 +893,7 @@ export function GenerationPanel({
         </div>
       )}
 
+      <ShareDialog renderId={current?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
       {creditOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/80 p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
           <div className="w-full max-w-md border border-foreground bg-background p-6 shadow-[8px_8px_0_oklch(var(--foreground))]">
