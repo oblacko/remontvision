@@ -13,6 +13,7 @@ import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES } from './roomtypes.js';
+import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -527,6 +528,32 @@ app.delete('/api/admin/styles/:id/products/:productId', h(async (req, res) => {
   res.status(ok ? 204 : 404).end();
 }));
 
+// ---------- модели генерации: только админ ----------
+app.get('/api/admin/settings/models', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const config = getModelConfig();
+  const listed = await listImageModels();
+  const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
+  res.json({ render_model: config.render, vision_model: config.vision, image_models: imageModels });
+}));
+
+app.put('/api/admin/settings/models', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const renderModel = String(req.body?.render_model || '').trim();
+  const visionModel = String(req.body?.vision_model || '').trim();
+  if (!renderModel || !visionModel) return res.status(400).json({ error: 'Нужны render_model и vision_model' });
+  const listed = await listImageModels();
+  const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
+  const picked = imageModels.find(m => m.id === renderModel);
+  if (!picked) return res.status(400).json({ error: 'Модель не найдена среди image-моделей OpenRouter' });
+  const saved = await saveModelConfig({ render: renderModel, vision: visionModel });
+  let warning = '';
+  try { await assertConfig(); }
+  catch (e) { warning = String(e.message || e).slice(0, 300); log({ event: 'model_config_warning', error: warning }); }
+  log({ event: 'model_config_saved', render_model: saved.render, vision_model: saved.vision, input_refs: picked.input_refs });
+  res.json({ ...saved, input_refs: Boolean(picked.input_refs), warning });
+}));
+
 // ---------- промты генераций: только админ ----------
 app.get('/api/admin/renders', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -759,6 +786,7 @@ app.use((err, req, res, _next) => {
 // ---------- старт ----------
 async function main() {
   await migrate();          // накат миграций Postgres
+  await loadModelConfig();  // модели из app_settings / env
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }

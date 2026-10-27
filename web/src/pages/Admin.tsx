@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles' | 'prompts'
+type Tab = 'users' | 'packs' | 'styles' | 'prompts' | 'models'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -34,6 +34,10 @@ type Product = {
   id: number; category: string; name: string; brand?: string | null; price: number;
   unit: string; qty: number; image_path?: string | null; image_url?: string | null;
   source?: string | null; url?: string | null;
+}
+type ModelSettings = {
+  render_model: string; vision_model: string;
+  image_models: Array<{ id: string; input_refs: boolean }>;
 }
 type StyleDetail = { style: Style; prompt_description: string; references: StyleRef[]; products: Product[] }
 
@@ -92,6 +96,11 @@ export default function Admin() {
   const [editPackId, setEditPackId] = useState<string | null>(null)
   const [packForm, setPackForm] = useState({ id: '', title: '', credits: '2', price: '99', active: true, sort: '10' })
 
+  const [modelSettings, setModelSettings] = useState<ModelSettings | null>(null)
+  const [renderDraft, setRenderDraft] = useState('')
+  const [visionDraft, setVisionDraft] = useState('')
+  const [modelNotice, setModelNotice] = useState('')
+  const [modelSaving, setModelSaving] = useState(false)
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -148,6 +157,23 @@ export default function Admin() {
     try { setStyles(await readJson(await api('/api/admin/styles'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
+  const loadModels = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/models'))
+      setModelSettings(d); setRenderDraft(d.render_model); setVisionDraft(d.vision_model); setModelNotice('')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const saveModels = async () => {
+    setModelSaving(true); setModelNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/models', {
+        method: 'PUT', body: JSON.stringify({ render_model: renderDraft, vision_model: visionDraft }),
+      }))
+      setModelNotice(d.warning ? `Сохранено, но проверка предупредила: ${d.warning}` : 'Модели сохранены — новые генерации будут использовать их')
+      await loadModels()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setModelSaving(false) }
+  }
   const loadPrompts = async () => {
     try { setPromptRows(await readJson(await api('/api/admin/renders?limit=150'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
@@ -166,7 +192,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -327,7 +353,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты'], ['models', 'Модели']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -478,6 +504,33 @@ export default function Admin() {
                 ))}
                 {!filteredPrompts.length && <p className="border border-dashed p-8 text-center text-sm text-muted-foreground">Промтов пока нет.</p>}
               </div>
+            </div>
+          )}
+
+          {tab === 'models' && (
+            <div className="mt-8 max-w-3xl">
+              <p className="eyebrow">Модели генерации</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Генерация и vision-разбор. Изменения применяются к новым рендерам; уже готовые не меняются. Seedream 5.0 Flash в OpenRouter: <code className="border bg-muted px-1.5 py-0.5 text-[11px]">bytedance-seed/seedream-5-0-flash</code>.</p>
+              {modelSettings && (
+                <form onSubmit={e => { e.preventDefault(); saveModels() }} className="mt-6 space-y-5 border p-4">
+                  <div>
+                    <label htmlFor="render-model" className="eyebrow mb-2 block">Модель генерации</label>
+                    <select id="render-model" value={renderDraft} onChange={e => setRenderDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">
+                      {modelSettings.image_models.some(m => m.id === renderDraft) ? null : <option value={renderDraft}>{renderDraft}</option>}
+                      {[...modelSettings.image_models].sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}
+                    </select>
+                    <p className="mt-2 text-xs text-muted-foreground">{modelSettings.image_models.find(m => m.id === renderDraft)?.input_refs ? 'Поддерживает input_references — фото комнаты, референсы стиля и товаров уйдут в модель.' : 'Не заявлены input_references — фото и референсы могут не уйти. Проверьте перед включением.'}</p>
+                  </div>
+                  <div>
+                    <label htmlFor="vision-model" className="eyebrow mb-2 block">Модель разбора (vision)</label>
+                    <input id="vision-model" value={visionDraft} onChange={e => setVisionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
+                    <p className="mt-2 text-xs text-muted-foreground">Обычно оставляем Gemini для разбора изображения и сметы.</p>
+                  </div>
+                  {modelNotice && <p className="border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{modelNotice}</p>}
+                  <button type="submit" disabled={modelSaving} className="action-primary">{modelSaving ? 'Сохраняем…' : 'Сохранить модели'}</button>
+                </form>
+              )}
+              {!modelSettings && <p className="mt-4 text-sm text-muted-foreground">Загружаем список моделей…</p>}
             </div>
           )}
         </main>

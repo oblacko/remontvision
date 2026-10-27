@@ -302,6 +302,14 @@ export const q = {
   },
   deleteProduct: id => pool.query(`DELETE FROM products WHERE id = $1`, [id]).then(r => r.rowCount > 0),
 
+  // настройки приложения
+  settingsByKeys: keys =>
+    pool.query(`SELECT key, value FROM app_settings WHERE key = ANY($1)`, [keys]).then(r => r.rows),
+  setSetting: (key, value) =>
+    pool.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ($1,$2,now())
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now() RETURNING *`,
+      [key, value]).then(r => r.rows[0]),
+
   // пакеты кредитов
   creditPacks: activeOnly =>
     pool.query(`SELECT * FROM credit_packs ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)

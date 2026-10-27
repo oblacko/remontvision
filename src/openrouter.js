@@ -3,6 +3,7 @@
 // Если задан HTTPS_PROXY/S3-прокси — гоним через него (нативный fetch env-прокси не читает).
 
 import { roomTypeByName } from './roomtypes.js';
+import { getModelConfig } from './modelconfig.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -15,9 +16,6 @@ if (proxyUrl) {
 
 export const MOCK_MODE = !process.env.OPENROUTER_API_KEY;
 
-const RENDER_MODEL = process.env.RENDER_MODEL || 'google/gemini-3.1-flash-image-preview';
-const RENDER_MODEL_FALLBACK = process.env.RENDER_MODEL_FALLBACK || ''; // один ретрай на ней при падении основной
-const VISION_MODEL = process.env.VISION_MODEL || 'google/gemini-3-flash-preview';
 const HTTP_REFERER = process.env.APP_URL || 'http://localhost:3000';
 const TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 120_000);
 export const MAX_REFERENCES = 4; // сколько референсов товаров передаём в генерацию (проверяй supported_parameters модели)
@@ -81,30 +79,31 @@ export async function listImageModels() {
 // Падаем с понятной ошибкой ДО приёма трафика. Vision-модель сверяем мягко (предупреждение).
 export async function assertConfig() {
   if (MOCK_MODE) return;
+  const { render: renderModel, vision: visionModel } = getModelConfig();
   const models = await listImageModels();
-  const render = models.find(m => m.id === RENDER_MODEL);
+  const render = models.find(m => m.id === renderModel);
   if (!render) {
     throw new Error(
-      `RENDER_MODEL="${RENDER_MODEL}" нет в списке image-моделей OpenRouter (получено ${models.length} шт.). ` +
+      `RENDER_MODEL="${renderModel}" нет в списке image-моделей OpenRouter (получено ${models.length} шт.). ` +
       `Проверьте slug: curl https://openrouter.ai/api/v1/images/models -H "Authorization: Bearer $OPENROUTER_API_KEY" ` +
       `либо откройте GET /api/models у приложения.`
     );
   }
   INPUT_REFS_OK = Boolean(render.input_refs);
   if (!INPUT_REFS_OK) {
-    log({ event: 'config_warning', msg: `модель ${RENDER_MODEL} не поддерживает input_references — референсы товаров в генерацию не уйдут` });
+    log({ event: 'config_warning', msg: `модель ${renderModel} не поддерживает input_references — референсы товаров в генерацию не уйдут` });
   }
   try {
     const r = await fetchWithRetry(`${BASE}/models`, { headers: headers() }, { retries: 1, timeoutMs: 15_000 });
     const data = await r.json();
     const ids = (data.data || []).map(m => m.id);
-    if (!ids.includes(VISION_MODEL)) {
-      log({ event: 'config_warning', msg: `VISION_MODEL="${VISION_MODEL}" не найдена среди chat-моделей — этап разбора рендера будет падать` });
+    if (!ids.includes(visionModel)) {
+      log({ event: 'config_warning', msg: `VISION_MODEL="${visionModel}" не найдена среди chat-моделей — этап разбора рендера будет падать` });
     }
   } catch (e) {
     log({ event: 'config_warning', msg: `не удалось сверить VISION_MODEL: ${String(e.message || e).slice(0, 200)}` });
   }
-  log({ event: 'config_ok', render_model: RENDER_MODEL, render_fallback: RENDER_MODEL_FALLBACK || null, vision_model: VISION_MODEL });
+  log({ event: 'config_ok', render_model: renderModel, vision_model: visionModel });
 }
 
 const STYLES = {
@@ -168,8 +167,8 @@ export function buildPrompt({ style, budget, requestText, iteration, products, p
 // OpenRouter принимает только фиксированные пропорции — подбираем ближайшую к реальному фото.
 // Только значения, которые принимает провайдер (иначе 400 invalid_value).
 const ASPECTS = [
-  [1, 1], [1, 4], [1, 8], [2, 3], [3, 2], [3, 4], [4, 1], [4, 3],
-  [4, 5], [5, 4], [8, 1], [9, 16], [16, 9],
+  [1, 1], [2, 3], [3, 2], [3, 4], [4, 3],
+  [4, 5], [5, 4], [9, 16], [16, 9],
 ];
 export function snapAspect(width, height) {
   if (!width || !height) return '3:2';
@@ -185,7 +184,7 @@ export function snapAspect(width, height) {
 // Один рендер = максимум два внешних вызова: Image API, затем chat-фолбэк.
 // Без retry-каскада и без второй модели: неизвестный timeout не повторяем автоматически.
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio }) {
-  return generateWithModel(RENDER_MODEL, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
+  return generateWithModel(getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 }
 
 async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio }) {
@@ -268,7 +267,7 @@ export async function parseRender(renderB64, mime = 'image/png') {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
-      model: VISION_MODEL,
+      model: getModelConfig().vision,
       messages: [
         { role: 'system', content: sys },
         { role: 'user', content: [
