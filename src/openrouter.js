@@ -237,7 +237,7 @@ LIGHTING DESIGN — THE MAIN WOW TOOL
 Use warm layered lighting (2700–3000K): a statement fixture that matches the chosen style/reference, plus hidden LED cove or wall wash, bedside/floor/table lamps, and under-cabinet or backlit-mirror light where relevant. Create pools of warm light, soft shadows and depth. Do not rely on a single flat ceiling light. No boob lights, cold white light, visible bulbs or dangling wires. If the reference shows a specific fixture, match it; do not substitute a generic chandelier. If the catalog includes a light product, use that fixture as the visible statement piece.
 
 CLEANUP / REALISM
-Remove visual noise from the existing room: old TVs, cable boxes, exposed wires, dangling cables, bare radiators, window air conditioners, cheap plastic blinds, old roller blinds, torn or yellowed curtains, clutter and visible meters. If a radiator or window unit must remain, integrate it behind a slim cover/grille or a neat panel. If a TV remains, mount it flush with hidden cables or use a frame TV; otherwise remove it. No visible cables anywhere.
+Remove visual noise from the existing room: old TVs, cable boxes, exposed wires, dangling cables, bare radiators, window air conditioners, cheap plastic blinds, old roller blinds, torn or yellowed curtains, clutter and visible meters. Remove the radiator from view completely. If it must remain, hide it behind a flush wall-colored grille or built-in panel so it disappears into the wall; never leave a white radiator panel under the window. If a TV remains, mount it flush with hidden cables or use a frame TV; otherwise remove it. No visible cables anywhere.
 
 WINDOW STYLING
 Windows are a key part of the styling. Replace old blinds and curtains with new window treatments that match the style: floor-length curtains, linen sheers, or a clean Roman/roller blind. Hide the cornice and mechanism. Never keep cheap plastic horizontal or vertical blinds, torn curtains or a bare window unless the style explicitly calls for it.
@@ -254,8 +254,8 @@ Make it look like a saved Pinterest reference: curated, layered and personal, wi
 - Textiles: floor-length curtains, throws, cushions, rugs, table runners.
 - Walls: framed art, posters, a small gallery wall, textile panel or wall hanging.
 - Shelves: open shelving with books, ceramics, vases, candles, small sculptures, records and plants.
-- Personal objects: a modern laptop (MacBook-style), headphones, a speaker, a camera, magazines. Place them naturally on a desk, bed, coffee table or shelf; hide all cables.
-- Plush toys: only in a children's room or a bedroom, one or two, styled on a chair, bed or shelf. Never in bathrooms, kitchens or adult living rooms.
+- Personal objects: a modern laptop (MacBook-style), headphones, a speaker, a camera, magazines. Place them on a desk, nightstand, console, shelf, coffee table or bed — never on the floor or rug. A laptop may be open on a desk or closed on a nightstand/console. Hide chargers, cables, camera straps and loose wires.
+- Plush toys: only in a children's room or a bedroom, one or two, styled on a chair, bed or shelf — never on the floor. Never in bathrooms, kitchens or adult living rooms.
 Keep it tasteful and uncluttered: every object should look intentional, not scattered.
 
 CATALOG / MATERIALS
@@ -274,7 +274,7 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected products already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no random clutter, no old electronics, no visible cables, no plush toys in bathrooms or kitchens, no old plastic blinds, no torn curtains.`;
+Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no visible radiator panel, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no random clutter, no old electronics, no electronics on the floor or rug, no loose cables, chargers or camera straps, no plush toys in bathrooms or kitchens, no old plastic blinds, no torn curtains.`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.
