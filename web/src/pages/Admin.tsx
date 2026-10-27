@@ -283,7 +283,7 @@ export default function Admin() {
           <div className="flex items-center gap-3"><a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span></a><span className="eyebrow">/ админка</span></div>
           <nav className="flex items-center gap-3 text-sm">
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
-            <a href="/app" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">Кабинет</a>
+            <a href="/cabinet" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">Кабинет</a>
             {authed && <button type="button" onClick={logout} className="inline-flex min-h-11 items-center gap-2 px-2 hover:opacity-50"><LogOut className="size-4" />Выйти</button>}
           </nav>
         </div>

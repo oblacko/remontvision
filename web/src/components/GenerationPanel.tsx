@@ -616,7 +616,7 @@ export function GenerationPanel({
               <button type="button" onClick={() => setStep('style')} className="action-secondary"><ArrowLeft className="size-4" />Изменить стиль</button>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
-                <a href={`/app?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
+                <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
                 <button type="button" onClick={() => setStep('estimates')} className="action-primary min-h-14 px-8 text-base">Готово — собрать смету <ArrowUpRight className="size-5" /></button>
               </div>
             </div>
@@ -685,7 +685,7 @@ export function GenerationPanel({
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => setStep('result')} className="action-secondary"><ArrowLeft className="size-4" />Вернуться к результату</button>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <a href={`/app?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
+                <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
                 <button type="button" onClick={resetAll} className="action-secondary"><RotateCcw className="size-4" />Новая комната</button>
                 <button type="button" onClick={onClose} className="action-primary min-h-14 px-8 text-base">Завершить <Check className="size-5" /></button>
               </div>
@@ -713,7 +713,7 @@ export function GenerationPanel({
             <h3 className="display-title mt-3 text-3xl">Кредиты закончились</h3>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">Каждая генерация или правка стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <a href="/app?buy=1" target="_blank" rel="noopener" onClick={() => setCreditOpen(false)} className="action-primary">Пополнить <ArrowUpRight className="size-4" /></a>
+              <a href="/cabinet#credits" target="_blank" rel="noopener" onClick={() => setCreditOpen(false)} className="action-primary">Пополнить <ArrowUpRight className="size-4" /></a>
               <button type="button" onClick={() => setCreditOpen(false)} className="action-secondary">Позже</button>
             </div>
           </div>

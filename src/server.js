@@ -55,6 +55,7 @@ app.use('/web-assets', express.static(path.join(WEB_DIST, 'web-assets')));
 app.get(['/app', '/app/'], (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'app.html')));
 const webIndexPath = path.join(WEB_DIST, 'index.html');
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
+app.get(['/cabinet', '/cabinet/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
   res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
 });
@@ -254,7 +255,9 @@ app.post('/api/payments/create', h(async (req, res) => {
   const pack = await q.packById(String(req.body?.pack_id || ''));
   if (!pack || !pack.active) return res.status(400).json({ error: 'Неизвестный пакет' });
   const base = (process.env.APP_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
-  const payment = await createPayment({ userId: req.user.id, pack, returnUrl: `${base}/?paid=${pack.id}` });
+  const returnPath = req.body?.return_path === '/cabinet' ? '/cabinet' : '/';
+  const returnUrl = `${base}${returnPath}${returnPath.includes('?') ? '&' : '?'}paid=${pack.id}`;
+  const payment = await createPayment({ userId: req.user.id, pack, returnUrl });
   await recordAcceptances({
     userId: req.user.id,
     context: 'payment',
@@ -668,6 +671,20 @@ app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
 
 // итерация: только для авторизованных, стоит 1 кредит
+app.delete('/api/rooms/:id', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const room = await q.getRoom(req.params.id);
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
+  const renderPaths = await q.renderPathsForRoom(room.id);
+  await q.deleteRoom(room.id);
+  for (const imagePath of renderPaths) {
+    try { await remove(imagePath); } catch { /* файл мог быть уже удалён */ }
+  }
+  if (room.photo_path) { try { await remove(room.photo_path); } catch { /* ignore */ } }
+  if (room.style_ref_path) { try { await remove(room.style_ref_path); } catch { /* ignore */ } }
+  res.status(204).end();
+}));
+
 app.post('/api/rooms/:id/iterate', rateLimit, h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const room = await q.getRoom(req.params.id);

@@ -74,6 +74,9 @@ export const q = {
     pool.query(`SELECT rm.user_id FROM renders r JOIN rooms rm ON rm.id = r.room_id
                 WHERE r.image_path = $1 OR r.image_path LIKE '%/' || $1 LIMIT 1`, [key])
       .then(r => r.rows[0] || null),
+  renderPathsForRoom: roomId =>
+    pool.query(`SELECT image_path FROM renders WHERE room_id = $1 AND image_path IS NOT NULL`, [roomId])
+      .then(r => r.rows.map(row => row.image_path)),
   setRoomStatus: (status, id) =>
     pool.query(`UPDATE rooms SET status = $1, error = NULL, updated_at = now() WHERE id = $2`, [status, id]),
   setRoomError: (error, id) =>

@@ -68,6 +68,14 @@ export default function Home() {
 
   useEffect(() => { void loadMe() }, [])
   useEffect(() => {
+    if (!me) return
+    const params = new URLSearchParams(location.search)
+    if (params.get('panel') !== '1') return
+    params.delete('panel')
+    history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : '') + location.hash)
+    setPanelOpen(true)
+  }, [me])
+  useEffect(() => {
     fetch('/api/packs').then(r => r.ok ? r.json() : null).then(list => {
       if (Array.isArray(list) && list.length) setPacks(list)
     }).catch(() => {})
@@ -163,7 +171,7 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-2">
             {me ? (
-              <a href="/app" className="hidden min-h-11 items-center gap-2 px-3 text-sm transition-opacity hover:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex">
+              <a href="/cabinet" className="hidden min-h-11 items-center gap-2 px-3 text-sm transition-opacity hover:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex">
                 Кабинет · {me.balance} кр. <ArrowUpRight className="size-4" />
               </a>
             ) : (
@@ -231,7 +239,7 @@ export default function Home() {
               <a key={label} href={href} onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between border-b text-sm last:border-0 hover:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{label}<ArrowUpRight className="size-4" /></a>
             ))}
             {me ? (
-              <a href="/app" className="flex min-h-12 items-center justify-between border-b text-sm hover:opacity-50">Кабинет · {me.balance} кр.<ArrowUpRight className="size-4" /></a>
+              <a href="/cabinet" className="flex min-h-12 items-center justify-between border-b text-sm hover:opacity-50">Кабинет · {me.balance} кр.<ArrowUpRight className="size-4" /></a>
             ) : (
               <button type="button" onClick={() => { setMenuOpen(false); openLogin() }} className="flex min-h-12 items-center justify-between border-b text-left text-sm hover:opacity-50">Войти<ArrowUpRight className="size-4" /></button>
             )}
@@ -410,7 +418,7 @@ export default function Home() {
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={openPanel} className="action-primary">Начать бесплатно <ArrowUpRight className="size-4" /></button>
-                <a href="/app?buy=1" className="action-secondary">Купить кредиты <ArrowUpRight className="size-4" /></a>
+                <a href="/cabinet#credits" className="action-secondary">Купить кредиты <ArrowUpRight className="size-4" /></a>
               </div>
               <a href={`${site}/prices`} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Все условия и цены <ArrowUpRight className="size-4" /></a>
             </div>
