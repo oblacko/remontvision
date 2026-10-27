@@ -5,7 +5,11 @@
     "surface": "floor",
     "name": "Ламинат «Дуб натуральный»",
     "brand": null,
-    "attrs": {"цвет": "светлый дуб", "материал": "ламинат", "класс": "33"},
+    "attrs": {
+      "цвет": "светлый дуб",
+      "материал": "ламинат",
+      "класс": "33"
+    },
     "price": 1490,
     "unit": "м²",
     "qty": 35,
@@ -22,7 +26,11 @@
     "surface": "floor",
     "name": "Ламинат «Серый камень»",
     "brand": null,
-    "attrs": {"цвет": "серый", "материал": "ламинат", "класс": "33"},
+    "attrs": {
+      "цвет": "серый",
+      "материал": "ламинат",
+      "класс": "33"
+    },
     "price": 1690,
     "unit": "м²",
     "qty": 35,
@@ -39,7 +47,11 @@
     "surface": "floor",
     "name": "Инженерная доска «Светлый дуб»",
     "brand": null,
-    "attrs": {"цвет": "светлый дуб", "материал": "инженерная доска", "покрытие": "матовая"},
+    "attrs": {
+      "цвет": "светлый дуб",
+      "материал": "инженерная доска",
+      "покрытие": "матовая"
+    },
     "price": 4900,
     "unit": "м²",
     "qty": 35,
@@ -56,7 +68,11 @@
     "surface": "floor",
     "name": "Инженерная доска «Американский орех»",
     "brand": null,
-    "attrs": {"цвет": "орех", "материал": "инженерная доска", "покрытие": "матовая"},
+    "attrs": {
+      "цвет": "орех",
+      "материал": "инженерная доска",
+      "покрытие": "матовая"
+    },
     "price": 5600,
     "unit": "м²",
     "qty": 35,
@@ -73,7 +89,11 @@
     "surface": "floor",
     "name": "Паркет «Французская ёлка, дуб»",
     "brand": null,
-    "attrs": {"цвет": "натуральный дуб", "материал": "массив", "укладка": "французская ёлка"},
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "массив",
+      "укладка": "французская ёлка"
+    },
     "price": 12500,
     "unit": "м²",
     "qty": 35,
@@ -90,7 +110,11 @@
     "surface": "floor",
     "name": "Керамогранит «Бетон»",
     "brand": null,
-    "attrs": {"цвет": "серый", "материал": "керамогранит", "размер": "60x60"},
+    "attrs": {
+      "цвет": "серый",
+      "материал": "керамогранит",
+      "размер": "60x60"
+    },
     "price": 3200,
     "unit": "м²",
     "qty": 35,
@@ -107,7 +131,11 @@
     "surface": "floor",
     "name": "Керамогранит «Мрамор Calacatta»",
     "brand": null,
-    "attrs": {"цвет": "белый мрамор", "материал": "керамогранит", "размер": "60x120"},
+    "attrs": {
+      "цвет": "белый мрамор",
+      "материал": "керамогранит",
+      "размер": "60x120"
+    },
     "price": 7800,
     "unit": "м²",
     "qty": 35,
@@ -124,7 +152,11 @@
     "surface": "floor",
     "name": "Виниловая плитка «Дуб»",
     "brand": null,
-    "attrs": {"цвет": "светлый дуб", "материал": "винил", "класс": "43"},
+    "attrs": {
+      "цвет": "светлый дуб",
+      "материал": "винил",
+      "класс": "43"
+    },
     "price": 2100,
     "unit": "м²",
     "qty": 35,
@@ -135,14 +167,17 @@
     "image": "floor-vinyl-oak-start.webp",
     "image_prompt": "Top-down seamless texture sample of light oak luxury vinyl plank flooring, narrow planks, matte finish, even studio lighting, no perspective, no shadows, no objects, no text, photorealistic, fills the frame"
   },
-
   {
     "seed_key": "paint-warm-white-start",
     "category": "paint",
     "surface": "walls",
     "name": "Краска «Тёплый белый»",
     "brand": null,
-    "attrs": {"цвет": "тёплый белый", "блеск": "матовая", "основа": "водоэмульсионная"},
+    "attrs": {
+      "цвет": "тёплый белый",
+      "блеск": "матовая",
+      "основа": "водоэмульсионная"
+    },
     "price": 890,
     "unit": "л",
     "qty": 10,
@@ -159,7 +194,11 @@
     "surface": "walls",
     "name": "Краска «Жемчужный беж»",
     "brand": null,
-    "attrs": {"цвет": "тёплый беж", "блеск": "матовая", "основа": "водоэмульсионная"},
+    "attrs": {
+      "цвет": "тёплый беж",
+      "блеск": "матовая",
+      "основа": "водоэмульсионная"
+    },
     "price": 2400,
     "unit": "л",
     "qty": 10,
@@ -176,7 +215,11 @@
     "surface": "walls",
     "name": "Краска «Оливковый шалфей»",
     "brand": null,
-    "attrs": {"цвет": "оливковый", "блеск": "матовая", "основа": "водоэмульсионная"},
+    "attrs": {
+      "цвет": "оливковый",
+      "блеск": "матовая",
+      "основа": "водоэмульсионная"
+    },
     "price": 2800,
     "unit": "л",
     "qty": 10,
@@ -193,7 +236,11 @@
     "surface": "walls",
     "name": "Краска «Графит»",
     "brand": null,
-    "attrs": {"цвет": "графит", "блеск": "матовая", "основа": "водоэмульсионная"},
+    "attrs": {
+      "цвет": "графит",
+      "блеск": "матовая",
+      "основа": "водоэмульсионная"
+    },
     "price": 6200,
     "unit": "л",
     "qty": 10,
@@ -210,7 +257,11 @@
     "surface": "walls",
     "name": "Декоративная краска «Известковая»",
     "brand": null,
-    "attrs": {"цвет": "тёплый камень", "блеск": "матовая", "эффект": "лёгкая патина"},
+    "attrs": {
+      "цвет": "тёплый камень",
+      "блеск": "матовая",
+      "эффект": "лёгкая патина"
+    },
     "price": 9800,
     "unit": "л",
     "qty": 10,
@@ -221,14 +272,17 @@
     "image": "paint-limewash-atelier.webp",
     "image_prompt": "Top-down close-up of limewash paint finish in warm stone beige, soft cloudy patina, matte, evenly lit, no perspective, no shadows, no objects, no text, fills the frame"
   },
-
   {
     "seed_key": "wallpaper-linen-start",
     "category": "wallpaper",
     "surface": "walls",
     "name": "Обои «Лён, меловой»",
     "brand": null,
-    "attrs": {"цвет": "меловой", "материал": "флизелин", "фактура": "лён"},
+    "attrs": {
+      "цвет": "меловой",
+      "материал": "флизелин",
+      "фактура": "лён"
+    },
     "price": 1200,
     "unit": "рулон",
     "qty": 8,
@@ -245,7 +299,11 @@
     "surface": "walls",
     "name": "Обои «Рогожка, песочный»",
     "brand": null,
-    "attrs": {"цвет": "песочный", "материал": "винил", "фактура": "рогожка"},
+    "attrs": {
+      "цвет": "песочный",
+      "материал": "винил",
+      "фактура": "рогожка"
+    },
     "price": 3900,
     "unit": "рулон",
     "qty": 8,
@@ -262,7 +320,11 @@
     "surface": "walls",
     "name": "Обои «Панно, ар-деко»",
     "brand": null,
-    "attrs": {"цвет": "графит и латунь", "материал": "текстиль", "узор": "геометрия"},
+    "attrs": {
+      "цвет": "графит и латунь",
+      "материал": "текстиль",
+      "узор": "геометрия"
+    },
     "price": 18000,
     "unit": "рулон",
     "qty": 6,
@@ -273,14 +335,17 @@
     "image": "wallpaper-artdeco-atelier.webp",
     "image_prompt": "Top-down seamless art deco wallpaper texture with elegant geometric brass lines on deep graphite, luxurious, softly lit, no perspective, no shadows, no objects, no text, fills the frame"
   },
-
   {
     "seed_key": "tile-subway-white-start",
     "category": "tile",
     "surface": "wall",
     "name": "Плитка «Белый кабанчик»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "керамика", "формат": "7.5x15"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "керамика",
+      "формат": "7.5x15"
+    },
     "price": 1600,
     "unit": "м²",
     "qty": 12,
@@ -297,7 +362,11 @@
     "surface": "wall",
     "name": "Плитка «Зеллиж, оливковый»",
     "brand": null,
-    "attrs": {"цвет": "оливковый", "материал": "керамика", "формат": "10x10"},
+    "attrs": {
+      "цвет": "оливковый",
+      "материал": "керамика",
+      "формат": "10x10"
+    },
     "price": 4200,
     "unit": "м²",
     "qty": 12,
@@ -314,7 +383,11 @@
     "surface": "wall",
     "name": "Плитка «Мрамор Calacatta»",
     "brand": null,
-    "attrs": {"цвет": "белый мрамор", "материал": "керамика", "формат": "60x120"},
+    "attrs": {
+      "цвет": "белый мрамор",
+      "материал": "керамика",
+      "формат": "60x120"
+    },
     "price": 9800,
     "unit": "м²",
     "qty": 12,
@@ -331,7 +404,11 @@
     "surface": "wall",
     "name": "Плитка «Терраццо»",
     "brand": null,
-    "attrs": {"цвет": "бежевый", "материал": "керамика", "формат": "60x60"},
+    "attrs": {
+      "цвет": "бежевый",
+      "материал": "керамика",
+      "формат": "60x60"
+    },
     "price": 3600,
     "unit": "м²",
     "qty": 12,
@@ -342,14 +419,17 @@
     "image": "tile-terrazzo-comfort.webp",
     "image_prompt": "Top-down seamless texture of warm beige terrazzo wall tiles with fine stone chips, matte, even studio lighting, no perspective, no shadows, no objects, no text, photorealistic, fills the frame"
   },
-
   {
     "seed_key": "skirting-white-start",
     "category": "skirting",
     "surface": "skirting",
     "name": "Плинтус «МДФ, белый»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "МДФ", "высота": "80 мм"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "МДФ",
+      "высота": "80 мм"
+    },
     "price": 320,
     "unit": "м.п.",
     "qty": 30,
@@ -366,7 +446,11 @@
     "surface": "skirting",
     "name": "Плинтус «Дуб, шпон»",
     "brand": null,
-    "attrs": {"цвет": "натуральный дуб", "материал": "шпон", "высота": "80 мм"},
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "шпон",
+      "высота": "80 мм"
+    },
     "price": 680,
     "unit": "м.п.",
     "qty": 30,
@@ -377,14 +461,17 @@
     "image": "skirting-oak-comfort.webp",
     "image_prompt": "Product photo of a natural oak veneer skirting board profile, clean straight sample, pure white background, soft studio light, no room, no text, no watermark, photorealistic, centered"
   },
-
   {
     "seed_key": "countertop-hpl-oak-start",
     "category": "countertop",
     "surface": "countertop",
     "name": "Столешница «HPL, дуб»",
     "brand": null,
-    "attrs": {"цвет": "дуб", "материал": "HPL", "толщина": "38 мм"},
+    "attrs": {
+      "цвет": "дуб",
+      "материал": "HPL",
+      "толщина": "38 мм"
+    },
     "price": 4200,
     "unit": "м.п.",
     "qty": 3,
@@ -401,7 +488,11 @@
     "surface": "countertop",
     "name": "Столешница «Кварц, белый»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "кварцевый агломерат", "толщина": "20 мм"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "кварцевый агломерат",
+      "толщина": "20 мм"
+    },
     "price": 14500,
     "unit": "м.п.",
     "qty": 3,
@@ -418,7 +509,11 @@
     "surface": "countertop",
     "name": "Столешница «Травертин»",
     "brand": null,
-    "attrs": {"цвет": "бежевый", "материал": "натуральный камень", "толщина": "30 мм"},
+    "attrs": {
+      "цвет": "бежевый",
+      "материал": "натуральный камень",
+      "толщина": "30 мм"
+    },
     "price": 32000,
     "unit": "м.п.",
     "qty": 3,
@@ -435,7 +530,11 @@
     "surface": "countertop",
     "name": "Столешница «Мрамор Viola»",
     "brand": null,
-    "attrs": {"цвет": "фиолетовый мрамор", "материал": "натуральный камень", "толщина": "30 мм"},
+    "attrs": {
+      "цвет": "фиолетовый мрамор",
+      "материал": "натуральный камень",
+      "толщина": "30 мм"
+    },
     "price": 58000,
     "unit": "м.п.",
     "qty": 3,
@@ -446,14 +545,17 @@
     "image": "countertop-marble-viola-atelier.webp",
     "image_prompt": "Top-down close-up texture of Calacatta Viola marble countertop, white base with dramatic purple and burgundy veining, polished, evenly lit, no perspective, no shadows, no objects, no text, photorealistic, fills the frame"
   },
-
   {
     "seed_key": "cabinet-white-matte-start",
     "category": "cabinet",
     "surface": "cabinet",
     "name": "Фасады «ЛДСП, белый матовый»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "ЛДСП", "стиль": "без ручек"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "ЛДСП",
+      "стиль": "без ручек"
+    },
     "price": 7800,
     "unit": "м²",
     "qty": 6,
@@ -470,7 +572,11 @@
     "surface": "cabinet",
     "name": "Фасады «МДФ эмаль, тёплый серый»",
     "brand": null,
-    "attrs": {"цвет": "тёплый серый", "материал": "МДФ", "стиль": "без ручек"},
+    "attrs": {
+      "цвет": "тёплый серый",
+      "материал": "МДФ",
+      "стиль": "без ручек"
+    },
     "price": 12500,
     "unit": "м²",
     "qty": 6,
@@ -487,7 +593,11 @@
     "surface": "cabinet",
     "name": "Фасады «Шпон дуба»",
     "brand": null,
-    "attrs": {"цвет": "натуральный дуб", "материал": "шпон", "стиль": "накладные ручки"},
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "шпон",
+      "стиль": "накладные ручки"
+    },
     "price": 15800,
     "unit": "м²",
     "qty": 6,
@@ -504,7 +614,11 @@
     "surface": "cabinet",
     "name": "Фасады «МДФ, графит, без ручек»",
     "brand": null,
-    "attrs": {"цвет": "графит", "материал": "МДФ", "стиль": "без ручек"},
+    "attrs": {
+      "цвет": "графит",
+      "материал": "МДФ",
+      "стиль": "без ручек"
+    },
     "price": 22000,
     "unit": "м²",
     "qty": 6,
@@ -515,14 +629,17 @@
     "image": "cabinet-graphite-premium.webp",
     "image_prompt": "Product photo of a single deep graphite matte handleless cabinet door sample, vertical panel, pure white background, soft studio light, no room, no text, no watermark, photorealistic, centered"
   },
-
   {
     "seed_key": "faucet-chrome-start",
     "category": "faucet",
     "surface": "faucet",
     "name": "Смеситель «Хром, классика»",
     "brand": null,
-    "attrs": {"цвет": "хром", "материал": "латунь", "тип": "однорычажный"},
+    "attrs": {
+      "цвет": "хром",
+      "материал": "латунь",
+      "тип": "однорычажный"
+    },
     "price": 4900,
     "unit": "шт",
     "qty": 1,
@@ -539,7 +656,11 @@
     "surface": "faucet",
     "name": "Смеситель «Чёрный матовый»",
     "brand": null,
-    "attrs": {"цвет": "чёрный матовый", "материал": "латунь", "тип": "однорычажный"},
+    "attrs": {
+      "цвет": "чёрный матовый",
+      "материал": "латунь",
+      "тип": "однорычажный"
+    },
     "price": 12400,
     "unit": "шт",
     "qty": 1,
@@ -556,7 +677,11 @@
     "surface": "faucet",
     "name": "Смеситель «Латунь, брашированная»",
     "brand": null,
-    "attrs": {"цвет": "латунь", "материал": "латунь", "тип": "однорычажный"},
+    "attrs": {
+      "цвет": "латунь",
+      "материал": "латунь",
+      "тип": "однорычажный"
+    },
     "price": 24800,
     "unit": "шт",
     "qty": 1,
@@ -567,14 +692,17 @@
     "image": "faucet-brass-premium.webp",
     "image_prompt": "Product photography of a single brushed brass kitchen faucet, elegant curved spout, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "sink-ceramic-start",
     "category": "sink",
     "surface": "sink",
     "name": "Раковина «Керамика, белая»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "керамика", "форма": "овальная"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "керамика",
+      "форма": "овальная"
+    },
     "price": 6900,
     "unit": "шт",
     "qty": 1,
@@ -591,7 +719,11 @@
     "surface": "sink",
     "name": "Раковина «Композит, графит»",
     "brand": null,
-    "attrs": {"цвет": "графит", "материал": "композит", "форма": "прямоугольная"},
+    "attrs": {
+      "цвет": "графит",
+      "материал": "композит",
+      "форма": "прямоугольная"
+    },
     "price": 14500,
     "unit": "шт",
     "qty": 1,
@@ -602,14 +734,17 @@
     "image": "sink-composite-comfort.webp",
     "image_prompt": "Product photography of a single dark graphite composite rectangular sink, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "toilet-white-start",
     "category": "toilet",
     "surface": "toilet",
     "name": "Унитаз «Компакт, белый»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "санфаянс", "тип": "компакт"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "санфаянс",
+      "тип": "компакт"
+    },
     "price": 12900,
     "unit": "шт",
     "qty": 1,
@@ -626,7 +761,11 @@
     "surface": "toilet",
     "name": "Унитаз «Подвесной, белый»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "санфаянс", "тип": "подвесной"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "санфаянс",
+      "тип": "подвесной"
+    },
     "price": 24500,
     "unit": "шт",
     "qty": 1,
@@ -637,14 +776,17 @@
     "image": "toilet-wall-hung-comfort.webp",
     "image_prompt": "Product photography of a single white wall-hung toilet, minimalist shape, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "shower-cabin-start",
     "category": "shower",
     "surface": "shower",
     "name": "Душевая кабина «Хром»",
     "brand": null,
-    "attrs": {"цвет": "хром", "материал": "стекло", "профиль": "хром"},
+    "attrs": {
+      "цвет": "хром",
+      "материал": "стекло",
+      "профиль": "хром"
+    },
     "price": 28000,
     "unit": "шт",
     "qty": 1,
@@ -661,7 +803,11 @@
     "surface": "shower",
     "name": "Душевая «Walk-in, чёрный профиль»",
     "brand": null,
-    "attrs": {"цвет": "прозрачный", "материал": "стекло", "профиль": "чёрный"},
+    "attrs": {
+      "цвет": "прозрачный",
+      "материал": "стекло",
+      "профиль": "чёрный"
+    },
     "price": 46000,
     "unit": "шт",
     "qty": 1,
@@ -672,14 +818,17 @@
     "image": "shower-walkin-black-comfort.webp",
     "image_prompt": "Product photography of a single frameless walk-in glass shower screen with black profile, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "bathtub-acrylic-comfort",
     "category": "bathtub",
     "surface": "bathtub",
     "name": "Ванна «Акриловая, белая»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "акрил", "форма": "овальная"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "акрил",
+      "форма": "овальная"
+    },
     "price": 34000,
     "unit": "шт",
     "qty": 1,
@@ -690,14 +839,17 @@
     "image": "bathtub-acrylic-comfort.webp",
     "image_prompt": "Product photography of a single white oval acrylic bathtub, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "light-ceiling-white-start",
     "category": "light",
     "surface": "ceiling",
     "name": "Светильник «Потолочный, белый»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "металл", "тип": "потолочный"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "металл",
+      "тип": "потолочный"
+    },
     "price": 3200,
     "unit": "шт",
     "qty": 1,
@@ -714,7 +866,11 @@
     "surface": "ceiling",
     "name": "Подвес «Латунь»",
     "brand": null,
-    "attrs": {"цвет": "латунь", "материал": "металл", "тип": "подвес"},
+    "attrs": {
+      "цвет": "латунь",
+      "материал": "металл",
+      "тип": "подвес"
+    },
     "price": 7300,
     "unit": "шт",
     "qty": 1,
@@ -731,7 +887,11 @@
     "surface": "ceiling",
     "name": "Подвес «Чёрный»",
     "brand": null,
-    "attrs": {"цвет": "чёрный", "материал": "металл", "тип": "подвес"},
+    "attrs": {
+      "цвет": "чёрный",
+      "материал": "металл",
+      "тип": "подвес"
+    },
     "price": 8900,
     "unit": "шт",
     "qty": 1,
@@ -748,7 +908,11 @@
     "surface": "ceiling",
     "name": "Подвес «Стекло, дымчатое»",
     "brand": null,
-    "attrs": {"цвет": "дымчатый", "материал": "стекло", "тип": "подвес"},
+    "attrs": {
+      "цвет": "дымчатый",
+      "материал": "стекло",
+      "тип": "подвес"
+    },
     "price": 24000,
     "unit": "шт",
     "qty": 1,
@@ -765,7 +929,11 @@
     "surface": "ceiling",
     "name": "Люстра «Каскад, латунь»",
     "brand": null,
-    "attrs": {"цвет": "латунь", "материал": "металл", "тип": "люстра"},
+    "attrs": {
+      "цвет": "латунь",
+      "материал": "металл",
+      "тип": "люстра"
+    },
     "price": 38000,
     "unit": "шт",
     "qty": 1,
@@ -776,14 +944,17 @@
     "image": "light-chandelier-brass-premium.webp",
     "image_prompt": "Product photography of a single elegant brass cascade chandelier, multiple slender arms, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "outlets-white-start",
     "category": "outlets",
     "surface": "outlets",
     "name": "Розетки «Белые, классика»",
     "brand": null,
-    "attrs": {"цвет": "белый", "материал": "пластик", "рамка": "скрытая"},
+    "attrs": {
+      "цвет": "белый",
+      "материал": "пластик",
+      "рамка": "скрытая"
+    },
     "price": 390,
     "unit": "шт",
     "qty": 10,
@@ -800,7 +971,11 @@
     "surface": "outlets",
     "name": "Розетки «Графит, скрытые»",
     "brand": null,
-    "attrs": {"цвет": "графит", "материал": "пластик", "рамка": "скрытая"},
+    "attrs": {
+      "цвет": "графит",
+      "материал": "пластик",
+      "рамка": "скрытая"
+    },
     "price": 890,
     "unit": "шт",
     "qty": 10,
@@ -817,7 +992,11 @@
     "surface": "outlets",
     "name": "Розетки «Латунь, ретро»",
     "brand": null,
-    "attrs": {"цвет": "латунь", "материал": "металл", "рамка": "латунь"},
+    "attrs": {
+      "цвет": "латунь",
+      "материал": "металл",
+      "рамка": "латунь"
+    },
     "price": 2400,
     "unit": "шт",
     "qty": 10,
@@ -828,14 +1007,17 @@
     "image": "outlets-brass-premium.webp",
     "image_prompt": "Product photography of an elegant brass retro wall socket and switch set, round metal frame, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "appliance-oven-comfort",
     "category": "appliance",
     "surface": "appliance",
     "name": "Духовой шкаф «Графит»",
     "brand": null,
-    "attrs": {"цвет": "графит", "тип": "встраиваемый", "управление": "сенсорное"},
+    "attrs": {
+      "цвет": "графит",
+      "тип": "встраиваемый",
+      "управление": "сенсорное"
+    },
     "price": 42000,
     "unit": "шт",
     "qty": 1,
@@ -852,7 +1034,11 @@
     "surface": "appliance",
     "name": "Варочная панель «Индукция, графит»",
     "brand": null,
-    "attrs": {"цвет": "графит", "тип": "индукционная", "зон": "4"},
+    "attrs": {
+      "цвет": "графит",
+      "тип": "индукционная",
+      "зон": "4"
+    },
     "price": 38000,
     "unit": "шт",
     "qty": 1,
@@ -869,7 +1055,11 @@
     "surface": "appliance",
     "name": "Вытяжка «Островная, сталь»",
     "brand": null,
-    "attrs": {"цвет": "нержавеющая сталь", "тип": "островная", "управление": "сенсорное"},
+    "attrs": {
+      "цвет": "нержавеющая сталь",
+      "тип": "островная",
+      "управление": "сенсорное"
+    },
     "price": 68000,
     "unit": "шт",
     "qty": 1,
@@ -880,14 +1070,17 @@
     "image": "appliance-hood-premium.webp",
     "image_prompt": "Product photography of a single stainless steel island range hood, sleek minimal shape, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
   },
-
   {
     "seed_key": "textile-linen-sand-start",
     "category": "textile",
     "surface": "textile",
     "name": "Ткань «Лён, песочный»",
     "brand": null,
-    "attrs": {"цвет": "песочный", "материал": "лён", "плотность": "средняя"},
+    "attrs": {
+      "цвет": "песочный",
+      "материал": "лён",
+      "плотность": "средняя"
+    },
     "price": 1900,
     "unit": "м",
     "qty": 6,
@@ -904,7 +1097,11 @@
     "surface": "textile",
     "name": "Ткань «Лён, оливковый»",
     "brand": null,
-    "attrs": {"цвет": "оливковый", "материал": "лён", "плотность": "средняя"},
+    "attrs": {
+      "цвет": "оливковый",
+      "материал": "лён",
+      "плотность": "средняя"
+    },
     "price": 3400,
     "unit": "м",
     "qty": 6,
@@ -921,7 +1118,11 @@
     "surface": "textile",
     "name": "Ткань «Бархат, терракота»",
     "brand": null,
-    "attrs": {"цвет": "терракота", "материал": "бархат", "плотность": "высокая"},
+    "attrs": {
+      "цвет": "терракота",
+      "материал": "бархат",
+      "плотность": "высокая"
+    },
     "price": 6800,
     "unit": "м",
     "qty": 6,
@@ -931,5 +1132,960 @@
     "keywords": "текстиль,ткань,бархат,терракота,шторы",
     "image": "textile-velvet-terra-premium.webp",
     "image_prompt": "Top-down close-up of terracotta velvet fabric, soft sheen and folds, warm even light, no perspective, no objects, no text, photorealistic, fills the frame"
+  },
+  {
+    "seed_key": "bed-upholstered-beige-comfort",
+    "category": "bed",
+    "surface": "bed",
+    "name": "Кровать «Мягкая, беж»",
+    "brand": null,
+    "attrs": {
+      "цвет": "беж",
+      "материал": "велюр",
+      "размер": "160×200"
+    },
+    "price": 72000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Спальня,Детская",
+    "style_tags": "скандинавский,джапанди,современный,неоклассика,бохо",
+    "keywords": "кровать,мягкая,беж,велюр,спальня",
+    "image": "bed-upholstered-beige-comfort.webp",
+    "image_prompt": "Product photography of a single upholstered bed with a soft beige velvet headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "bed-oak-platform-comfort",
+    "category": "bed",
+    "surface": "bed",
+    "name": "Кровать «Дуб, платформа»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "массив",
+      "размер": "160×200"
+    },
+    "price": 68000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Спальня,Детская",
+    "style_tags": "джапанди,скандинавский,минимализм,кантри",
+    "keywords": "кровать,дуб,платформа,дерево,спальня",
+    "image": "bed-oak-platform-comfort.webp",
+    "image_prompt": "Product photography of a single low solid oak platform bed, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "bed-boucle-premium",
+    "category": "bed",
+    "surface": "bed",
+    "name": "Кровать «Букле, слоновая кость»",
+    "brand": null,
+    "attrs": {
+      "цвет": "слоновая кость",
+      "материал": "букле",
+      "размер": "180×200"
+    },
+    "price": 128000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Спальня",
+    "style_tags": "современный,джапанди,неоклассика,бохо",
+    "keywords": "кровать,букле,крем,премиум,спальня",
+    "image": "bed-boucle-premium.webp",
+    "image_prompt": "Product photography of a single sculptural boucle bed in ivory, rounded headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "bed-velvet-terra-atelier",
+    "category": "bed",
+    "surface": "bed",
+    "name": "Кровать «Бархат, терракота»",
+    "brand": null,
+    "attrs": {
+      "цвет": "терракота",
+      "материал": "бархат",
+      "размер": "180×200"
+    },
+    "price": 185000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "atelier",
+    "room_types": "Спальня",
+    "style_tags": "ар-деко,неоклассика,бохо",
+    "keywords": "кровать,бархат,терракота,ар-деко,спальня",
+    "image": "bed-velvet-terra-atelier.webp",
+    "image_prompt": "Product photography of a single luxurious terracotta velvet bed with a tall channel-tufted headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "wardrobe-white-matte-start",
+    "category": "wardrobe",
+    "surface": "wardrobe",
+    "name": "Шкаф «Белый матовый»",
+    "brand": null,
+    "attrs": {
+      "цвет": "белый",
+      "материал": "ЛДСП",
+      "стиль": "без ручек"
+    },
+    "price": 52000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "start",
+    "room_types": "Спальня,Прихожая,Детская,Гардеробная",
+    "style_tags": "современный,скандинавский,минимализм",
+    "keywords": "шкаф,белый,матовый,хранение,спальня",
+    "image": "wardrobe-white-matte-start.webp",
+    "image_prompt": "Product photography of a single white matte handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "wardrobe-oak-veneer-comfort",
+    "category": "wardrobe",
+    "surface": "wardrobe",
+    "name": "Шкаф «Шпон дуба»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "шпон",
+      "стиль": "накладные ручки"
+    },
+    "price": 98000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Спальня,Прихожая,Детская,Гардеробная",
+    "style_tags": "джапанди,скандинавский,неоклассика,кантри",
+    "keywords": "шкаф,дуб,шпон,хранение,спальня",
+    "image": "wardrobe-oak-veneer-comfort.webp",
+    "image_prompt": "Product photography of a single natural oak veneer wardrobe with slim handles, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "wardrobe-graphite-premium",
+    "category": "wardrobe",
+    "surface": "wardrobe",
+    "name": "Шкаф «Графит, без ручек»",
+    "brand": null,
+    "attrs": {
+      "цвет": "графит",
+      "материал": "МДФ",
+      "стиль": "без ручек"
+    },
+    "price": 145000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Спальня,Прихожая,Гардеробная",
+    "style_tags": "современный,тёмный модерн,минимализм,лофт",
+    "keywords": "шкаф,графит,тёмный,хранение,спальня",
+    "image": "wardrobe-graphite-premium.webp",
+    "image_prompt": "Product photography of a single deep graphite matte handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sofa-linen-sand-comfort",
+    "category": "sofa",
+    "surface": "sofa",
+    "name": "Диван «Лён, песочный»",
+    "brand": null,
+    "attrs": {
+      "цвет": "песочный",
+      "материал": "лён",
+      "мест": "3"
+    },
+    "price": 98000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Гостиная (зал),Кабинет",
+    "style_tags": "скандинавский,джапанди,бохо,современный",
+    "keywords": "диван,лён,песочный,гостиная,мягкая мебель",
+    "image": "sofa-linen-sand-comfort.webp",
+    "image_prompt": "Product photography of a single three-seat linen sofa in warm sand, relaxed silhouette, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sofa-boucle-cream-premium",
+    "category": "sofa",
+    "surface": "sofa",
+    "name": "Диван «Букле, крем»",
+    "brand": null,
+    "attrs": {
+      "цвет": "кремовый",
+      "материал": "букле",
+      "мест": "3"
+    },
+    "price": 165000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Гостиная (зал)",
+    "style_tags": "современный,джапанди,неоклассика",
+    "keywords": "диван,букле,крем,гостиная,премиум",
+    "image": "sofa-boucle-cream-premium.webp",
+    "image_prompt": "Product photography of a single sculptural cream boucle sofa with rounded arms, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sofa-velvet-green-atelier",
+    "category": "sofa",
+    "surface": "sofa",
+    "name": "Диван «Бархат, оливковый»",
+    "brand": null,
+    "attrs": {
+      "цвет": "оливковый",
+      "материал": "бархат",
+      "мест": "3"
+    },
+    "price": 245000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "atelier",
+    "room_types": "Гостиная (зал)",
+    "style_tags": "ар-деко,неоклассика,бохо",
+    "keywords": "диван,бархат,оливковый,гостиная,ар-деко",
+    "image": "sofa-velvet-green-atelier.webp",
+    "image_prompt": "Product photography of a single deep olive velvet sofa with elegant curved arms, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sofa-leather-cognac-premium",
+    "category": "sofa",
+    "surface": "sofa",
+    "name": "Диван «Кожа, коньяк»",
+    "brand": null,
+    "attrs": {
+      "цвет": "коньячный",
+      "материал": "кожа",
+      "мест": "3"
+    },
+    "price": 210000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Гостиная (зал),Кабинет",
+    "style_tags": "лофт,тёмный модерн,неоклассика",
+    "keywords": "диван,кожа,коньяк,гостиная,лофт",
+    "image": "sofa-leather-cognac-premium.webp",
+    "image_prompt": "Product photography of a single cognac leather sofa with clean modern lines, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "armchair-boucle-comfort",
+    "category": "armchair",
+    "surface": "armchair",
+    "name": "Кресло «Букле, беж»",
+    "brand": null,
+    "attrs": {
+      "цвет": "беж",
+      "материал": "букле"
+    },
+    "price": 42000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Гостиная (зал),Спальня,Кабинет",
+    "style_tags": "современный,джапанди,бохо,скандинавский",
+    "keywords": "кресло,букле,беж,гостиная",
+    "image": "armchair-boucle-comfort.webp",
+    "image_prompt": "Product photography of a single beige boucle armchair with a rounded silhouette, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "armchair-leather-premium",
+    "category": "armchair",
+    "surface": "armchair",
+    "name": "Кресло «Кожа, коньяк»",
+    "brand": null,
+    "attrs": {
+      "цвет": "коньячный",
+      "материал": "кожа"
+    },
+    "price": 89000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Гостиная (зал),Кабинет",
+    "style_tags": "лофт,неоклассика,тёмный модерн",
+    "keywords": "кресло,кожа,коньяк,лофт",
+    "image": "armchair-leather-premium.webp",
+    "image_prompt": "Product photography of a single cognac leather lounge armchair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "armchair-cane-comfort",
+    "category": "armchair",
+    "surface": "armchair",
+    "name": "Кресло «Дуб и ротанг»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "дуб, ротанг"
+    },
+    "price": 36000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Гостиная (зал),Спальня,Кабинет",
+    "style_tags": "джапанди,бохо,кантри,скандинавский",
+    "keywords": "кресло,дуб,ротанг,плетёное,гостиная",
+    "image": "armchair-cane-comfort.webp",
+    "image_prompt": "Product photography of a single oak armchair with a woven cane back, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "coffee-table-oak-comfort",
+    "category": "coffee_table",
+    "surface": "coffee_table",
+    "name": "Журнальный стол «Дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "массив",
+      "форма": "овальная"
+    },
+    "price": 28000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Гостиная (зал)",
+    "style_tags": "джапанди,скандинавский,минимализм,кантри",
+    "keywords": "стол,журнальный,дуб,гостиная",
+    "image": "coffee-table-oak-comfort.webp",
+    "image_prompt": "Product photography of a single oval solid oak coffee table, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "coffee-table-travertine-premium",
+    "category": "coffee_table",
+    "surface": "coffee_table",
+    "name": "Журнальный стол «Травертин»",
+    "brand": null,
+    "attrs": {
+      "цвет": "бежевый",
+      "материал": "травертин",
+      "форма": "прямоугольная"
+    },
+    "price": 72000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Гостиная (зал)",
+    "style_tags": "неоклассика,современный,джапанди",
+    "keywords": "стол,журнальный,травертин,камень,гостиная",
+    "image": "coffee-table-travertine-premium.webp",
+    "image_prompt": "Product photography of a single travertine stone coffee table with a thick slab top, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "coffee-table-glass-brass-atelier",
+    "category": "coffee_table",
+    "surface": "coffee_table",
+    "name": "Журнальный стол «Стекло и латунь»",
+    "brand": null,
+    "attrs": {
+      "цвет": "прозрачный",
+      "материал": "стекло, латунь",
+      "форма": "круглая"
+    },
+    "price": 96000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "atelier",
+    "room_types": "Гостиная (зал)",
+    "style_tags": "ар-деко,неоклассика",
+    "keywords": "стол,журнальный,стекло,латунь,ар-деко",
+    "image": "coffee-table-glass-brass-atelier.webp",
+    "image_prompt": "Product photography of a single round glass coffee table with a sculptural brass base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "dining-table-oak-comfort",
+    "category": "dining_table",
+    "surface": "dining_table",
+    "name": "Обеденный стол «Дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "массив",
+      "размер": "180×90"
+    },
+    "price": 62000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Столовая,Кухня",
+    "style_tags": "джапанди,скандинавский,кантри,современный",
+    "keywords": "стол,обеденный,дуб,столовая",
+    "image": "dining-table-oak-comfort.webp",
+    "image_prompt": "Product photography of a single solid oak dining table, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "dining-table-marble-premium",
+    "category": "dining_table",
+    "surface": "dining_table",
+    "name": "Обеденный стол «Мрамор»",
+    "brand": null,
+    "attrs": {
+      "цвет": "белый мрамор",
+      "материал": "мрамор, металл",
+      "размер": "200×100"
+    },
+    "price": 145000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Столовая",
+    "style_tags": "неоклассика,ар-деко,современный",
+    "keywords": "стол,обеденный,мрамор,столовая,премиум",
+    "image": "dining-table-marble-premium.webp",
+    "image_prompt": "Product photography of a single white marble dining table with a sculptural base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "dining-table-black-atelier",
+    "category": "dining_table",
+    "surface": "dining_table",
+    "name": "Обеденный стол «Чёрный, камень»",
+    "brand": null,
+    "attrs": {
+      "цвет": "чёрный",
+      "материал": "камень",
+      "размер": "220×100"
+    },
+    "price": 190000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "atelier",
+    "room_types": "Столовая",
+    "style_tags": "ар-деко,тёмный модерн,лофт",
+    "keywords": "стол,обеденный,чёрный,камень,столовая",
+    "image": "dining-table-black-atelier.webp",
+    "image_prompt": "Product photography of a single black stone dining table with a bold architectural base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "dining-chair-oak-comfort",
+    "category": "dining_chair",
+    "surface": "dining_chair",
+    "name": "Стул «Дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "массив"
+    },
+    "price": 8900,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Столовая,Кухня",
+    "style_tags": "джапанди,скандинавский,кантри,минимализм",
+    "keywords": "стул,дуб,дерево,столовая",
+    "image": "dining-chair-oak-comfort.webp",
+    "image_prompt": "Product photography of a single solid oak dining chair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "dining-chair-upholstered-premium",
+    "category": "dining_chair",
+    "surface": "dining_chair",
+    "name": "Стул «Велюр, олива»",
+    "brand": null,
+    "attrs": {
+      "цвет": "оливковый",
+      "материал": "велюр, металл"
+    },
+    "price": 18500,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Столовая",
+    "style_tags": "неоклассика,ар-деко,современный",
+    "keywords": "стул,велюр,оливковый,столовая,премиум",
+    "image": "dining-chair-upholstered-premium.webp",
+    "image_prompt": "Product photography of a single olive velvet upholstered dining chair with a slim metal frame, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "dining-chair-cane-comfort",
+    "category": "dining_chair",
+    "surface": "dining_chair",
+    "name": "Стул «Дуб и ротанг»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "дуб, ротанг"
+    },
+    "price": 12500,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Столовая,Кухня",
+    "style_tags": "бохо,кантри,джапанди",
+    "keywords": "стул,дуб,ротанг,плетёный,столовая",
+    "image": "dining-chair-cane-comfort.webp",
+    "image_prompt": "Product photography of a single oak dining chair with a woven cane back, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sideboard-oak-comfort",
+    "category": "sideboard",
+    "surface": "sideboard",
+    "name": "Комод «Дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "шпон"
+    },
+    "price": 54000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Гостиная (зал),Столовая,Прихожая",
+    "style_tags": "джапанди,скандинавский,современный",
+    "keywords": "комод,консоль,дуб,гостиная",
+    "image": "sideboard-oak-comfort.webp",
+    "image_prompt": "Product photography of a single oak sideboard with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sideboard-graphite-premium",
+    "category": "sideboard",
+    "surface": "sideboard",
+    "name": "Комод «Графит»",
+    "brand": null,
+    "attrs": {
+      "цвет": "графит",
+      "материал": "МДФ"
+    },
+    "price": 92000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Гостиная (зал),Столовая",
+    "style_tags": "современный,тёмный модерн,минимализм",
+    "keywords": "комод,консоль,графит,гостиная",
+    "image": "sideboard-graphite-premium.webp",
+    "image_prompt": "Product photography of a single deep graphite sideboard with handleless doors, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sideboard-classic-atelier",
+    "category": "sideboard",
+    "surface": "sideboard",
+    "name": "Комод «Классика, латунь»",
+    "brand": null,
+    "attrs": {
+      "цвет": "тёмный орех",
+      "материал": "шпон, латунь"
+    },
+    "price": 135000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "atelier",
+    "room_types": "Гостиная (зал),Столовая",
+    "style_tags": "неоклассика,ар-деко",
+    "keywords": "комод,консоль,классика,латунь,гостиная",
+    "image": "sideboard-classic-atelier.webp",
+    "image_prompt": "Product photography of a single elegant dark walnut sideboard with brass details, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "desk-oak-comfort",
+    "category": "desk",
+    "surface": "desk",
+    "name": "Стол «Дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "массив",
+      "размер": "140×70"
+    },
+    "price": 42000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Кабинет,Детская,Спальня",
+    "style_tags": "джапанди,скандинавский,минимализм",
+    "keywords": "стол,рабочий,дуб,кабинет",
+    "image": "desk-oak-comfort.webp",
+    "image_prompt": "Product photography of a single solid oak desk with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "desk-black-premium",
+    "category": "desk",
+    "surface": "desk",
+    "name": "Стол «Графит»",
+    "brand": null,
+    "attrs": {
+      "цвет": "графит",
+      "материал": "шпон, металл",
+      "размер": "160×80"
+    },
+    "price": 78000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Кабинет",
+    "style_tags": "современный,тёмный модерн,лофт",
+    "keywords": "стол,рабочий,графит,кабинет,премиум",
+    "image": "desk-black-premium.webp",
+    "image_prompt": "Product photography of a single graphite executive desk with a slim metal frame, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "desk-white-start",
+    "category": "desk",
+    "surface": "desk",
+    "name": "Стол «Белый»",
+    "brand": null,
+    "attrs": {
+      "цвет": "белый",
+      "материал": "ЛДСП",
+      "размер": "120×60"
+    },
+    "price": 24000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "start",
+    "room_types": "Кабинет,Детская",
+    "style_tags": "современный,скандинавский,минимализм",
+    "keywords": "стол,рабочий,белый,кабинет",
+    "image": "desk-white-start.webp",
+    "image_prompt": "Product photography of a single white minimalist desk, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "office-chair-black-comfort",
+    "category": "office_chair",
+    "surface": "office_chair",
+    "name": "Кресло «Эргономичное, графит»",
+    "brand": null,
+    "attrs": {
+      "цвет": "графит",
+      "материал": "ткань, металл"
+    },
+    "price": 28000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Кабинет",
+    "style_tags": "современный,минимализм,тёмный модерн",
+    "keywords": "кресло,рабочее,эргономичное,графит,кабинет",
+    "image": "office-chair-black-comfort.webp",
+    "image_prompt": "Product photography of a single ergonomic graphite office chair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "office-chair-fabric-comfort",
+    "category": "office_chair",
+    "surface": "office_chair",
+    "name": "Кресло «Ткань, беж»",
+    "brand": null,
+    "attrs": {
+      "цвет": "беж",
+      "материал": "ткань, дерево"
+    },
+    "price": 32000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Кабинет",
+    "style_tags": "скандинавский,джапанди,современный",
+    "keywords": "кресло,рабочее,ткань,беж,кабинет",
+    "image": "office-chair-fabric-comfort.webp",
+    "image_prompt": "Product photography of a single beige fabric office chair with a wooden base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "storage-oak-comfort",
+    "category": "storage",
+    "surface": "storage",
+    "name": "Стеллаж «Дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "шпон",
+      "секций": "5"
+    },
+    "price": 48000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Кабинет,Гостиная (зал),Детская,Кладовка,Гардеробная",
+    "style_tags": "джапанди,скандинавский,минимализм",
+    "keywords": "стеллаж,хранение,дуб,кабинет",
+    "image": "storage-oak-comfort.webp",
+    "image_prompt": "Product photography of a single open oak shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "storage-white-start",
+    "category": "storage",
+    "surface": "storage",
+    "name": "Стеллаж «Белый»",
+    "brand": null,
+    "attrs": {
+      "цвет": "белый",
+      "материал": "ЛДСП",
+      "секций": "4"
+    },
+    "price": 22000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "start",
+    "room_types": "Кабинет,Детская,Кладовка,Гардеробная",
+    "style_tags": "современный,скандинавский,минимализм",
+    "keywords": "стеллаж,хранение,белый,кабинет",
+    "image": "storage-white-start.webp",
+    "image_prompt": "Product photography of a single white open shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "storage-metal-loft-comfort",
+    "category": "storage",
+    "surface": "storage",
+    "name": "Стеллаж «Металл и дерево»",
+    "brand": null,
+    "attrs": {
+      "цвет": "чёрный",
+      "материал": "металл, дуб",
+      "секций": "5"
+    },
+    "price": 36000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Кабинет,Гостиная (зал),Кладовка",
+    "style_tags": "лофт,современный",
+    "keywords": "стеллаж,металл,дерево,лофт,хранение",
+    "image": "storage-metal-loft-comfort.webp",
+    "image_prompt": "Product photography of a single black metal and oak shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "bench-oak-comfort",
+    "category": "bench",
+    "surface": "bench",
+    "name": "Банкетка «Дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "массив",
+      "размер": "120×40"
+    },
+    "price": 24000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Прихожая,Спальня,Столовая",
+    "style_tags": "джапанди,скандинавский,кантри",
+    "keywords": "банкетка,дуб,прихожая,спальня",
+    "image": "bench-oak-comfort.webp",
+    "image_prompt": "Product photography of a single solid oak bench, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "bench-upholstered-premium",
+    "category": "bench",
+    "surface": "bench",
+    "name": "Банкетка «Велюр, олива»",
+    "brand": null,
+    "attrs": {
+      "цвет": "оливковый",
+      "материал": "велюр, металл",
+      "размер": "120×40"
+    },
+    "price": 46000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Прихожая,Спальня,Столовая",
+    "style_tags": "неоклассика,ар-деко,современный",
+    "keywords": "банкетка,велюр,оливковый,прихожая",
+    "image": "bench-upholstered-premium.webp",
+    "image_prompt": "Product photography of a single olive velvet upholstered bench with slim metal legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "rug-wool-sand-comfort",
+    "category": "rug",
+    "surface": "floor",
+    "name": "Ковёр «Шерсть, песочный»",
+    "brand": null,
+    "attrs": {
+      "цвет": "песочный",
+      "материал": "шерсть",
+      "размер": "200×300"
+    },
+    "price": 36000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "comfort",
+    "room_types": "Гостиная (зал),Спальня,Столовая,Детская",
+    "style_tags": "скандинавский,джапанди,бохо,кантри",
+    "keywords": "ковёр,шерсть,песочный,гостиная",
+    "image": "rug-wool-sand-comfort.webp",
+    "image_prompt": "Top-down close-up of a textured sand wool rug, soft pile, subtle tonal variations, even studio light, no perspective, no objects, no text, photorealistic, fills the frame"
+  },
+  {
+    "seed_key": "rug-jute-start",
+    "category": "rug",
+    "surface": "floor",
+    "name": "Ковёр «Джут»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный",
+      "материал": "джут",
+      "размер": "160×230"
+    },
+    "price": 18000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "start",
+    "room_types": "Гостиная (зал),Спальня,Столовая",
+    "style_tags": "бохо,кантри,скандинавский",
+    "keywords": "ковёр,джут,натуральный,гостиная",
+    "image": "rug-jute-start.webp",
+    "image_prompt": "Top-down close-up of a natural jute rug with woven texture, warm neutral color, even studio light, no perspective, no objects, no text, photorealistic, fills the frame"
+  },
+  {
+    "seed_key": "rug-vintage-premium",
+    "category": "rug",
+    "surface": "floor",
+    "name": "Ковёр «Винтаж, терракота»",
+    "brand": null,
+    "attrs": {
+      "цвет": "терракота",
+      "материал": "шерсть",
+      "размер": "200×300"
+    },
+    "price": 68000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Гостиная (зал),Спальня,Столовая",
+    "style_tags": "ар-деко,неоклассика,бохо",
+    "keywords": "ковёр,винтаж,терракота,гостиная",
+    "image": "rug-vintage-premium.webp",
+    "image_prompt": "Top-down close-up of a vintage terracotta wool rug with a faded ornamental pattern, even studio light, no perspective, no objects, no text, photorealistic, fills the frame"
+  },
+  {
+    "seed_key": "floor-wide-oak-premium",
+    "category": "floor",
+    "surface": "floor",
+    "name": "Инженерная доска «Широкий дуб»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "инженерная доска",
+      "ширина": "220 мм"
+    },
+    "price": 9800,
+    "unit": "м²",
+    "qty": 35,
+    "price_tier": "premium",
+    "room_types": "Спальня,Гостиная (зал),Столовая,Кабинет,Прихожая",
+    "style_tags": "джапанди,скандинавский,современный,минимализм,неоклассика",
+    "keywords": "пол,инженерная доска,широкий дуб,натуральный,премиум",
+    "image": "floor-wide-oak-premium.webp",
+    "image_prompt": "Top-down seamless texture sample of wide-plank natural oak engineered flooring, long boards, warm grain, matte finish, even studio lighting, no perspective, no shadows, no objects, no text, photorealistic, fills the frame"
+  },
+  {
+    "seed_key": "paint-clay-premium",
+    "category": "paint",
+    "surface": "walls",
+    "name": "Краска «Тёплая глина»",
+    "brand": null,
+    "attrs": {
+      "цвет": "тёплая глина",
+      "блеск": "матовая",
+      "основа": "минеральная"
+    },
+    "price": 5400,
+    "unit": "л",
+    "qty": 10,
+    "price_tier": "premium",
+    "room_types": "Спальня,Гостиная (зал),Детская,Кухня,Столовая,Кабинет,Прихожая",
+    "style_tags": "джапанди,скандинавский,бохо,кантри,неоклассика",
+    "keywords": "краска,стены,глина,беж,тёплый,матовая",
+    "image": "paint-clay-premium.webp",
+    "image_prompt": "Flat top-down matte paint swatch in warm clay beige, subtle mineral plaster texture, evenly lit, no perspective, no shadows, no objects, no text, fills the frame"
+  },
+  {
+    "seed_key": "wallpaper-silk-premium",
+    "category": "wallpaper",
+    "surface": "walls",
+    "name": "Обои «Шёлк, овсяный»",
+    "brand": null,
+    "attrs": {
+      "цвет": "овсяный",
+      "материал": "текстиль",
+      "фактура": "шёлк"
+    },
+    "price": 9800,
+    "unit": "рулон",
+    "qty": 8,
+    "price_tier": "premium",
+    "room_types": "Спальня,Гостиная (зал),Столовая,Кабинет,Прихожая",
+    "style_tags": "джапанди,неоклассика,современный,минимализм",
+    "keywords": "обои,шёлк,овсяный,тёплый,премиум",
+    "image": "wallpaper-silk-premium.webp",
+    "image_prompt": "Top-down seamless wallpaper texture of natural silk in warm oat beige, subtle sheen and fine weave, softly lit, no perspective, no shadows, no objects, no text, fills the frame"
+  },
+  {
+    "seed_key": "wardrobe-oak-premium",
+    "category": "wardrobe",
+    "surface": "wardrobe",
+    "name": "Шкаф «Дуб, без ручек»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "шпон",
+      "стиль": "без ручек"
+    },
+    "price": 165000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Спальня,Прихожая,Гардеробная",
+    "style_tags": "джапанди,скандинавский,минимализм,неоклассика",
+    "keywords": "шкаф,дуб,без ручек,хранение,спальня,премиум",
+    "image": "wardrobe-oak-premium.webp",
+    "image_prompt": "Product photography of a single natural oak veneer handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "textile-linen-oat-premium",
+    "category": "textile",
+    "surface": "textile",
+    "name": "Ткань «Лён, овсяный»",
+    "brand": null,
+    "attrs": {
+      "цвет": "овсяный",
+      "материал": "лён",
+      "плотность": "высокая"
+    },
+    "price": 5200,
+    "unit": "м",
+    "qty": 6,
+    "price_tier": "premium",
+    "room_types": "Спальня,Гостиная (зал),Детская,Столовая,Кабинет,Прихожая",
+    "style_tags": "джапанди,скандинавский,бохо,кантри,минимализм",
+    "keywords": "текстиль,ткань,лён,овсяный,шторы,премиум",
+    "image": "textile-linen-oat-premium.webp",
+    "image_prompt": "Top-down close-up of natural oat linen fabric, soft natural wrinkles, warm even light, no perspective, no objects, no text, photorealistic, fills the frame"
+  },
+  {
+    "seed_key": "light-paper-premium",
+    "category": "light",
+    "surface": "ceiling",
+    "name": "Подвес «Рисовая бумага»",
+    "brand": null,
+    "attrs": {
+      "цвет": "тёплый белый",
+      "материал": "бумага, металл",
+      "тип": "подвес"
+    },
+    "price": 18000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "",
+    "style_tags": "джапанди,скандинавский,бохо,минимализм",
+    "keywords": "свет,подвес,люстра,рисовая бумага,тёплый",
+    "image": "light-paper-premium.webp",
+    "image_prompt": "Product photography of a single sculptural rice paper pendant lamp with a warm glow, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+  },
+  {
+    "seed_key": "sideboard-oak-premium",
+    "category": "sideboard",
+    "surface": "sideboard",
+    "name": "Комод «Дуб, рейка»",
+    "brand": null,
+    "attrs": {
+      "цвет": "натуральный дуб",
+      "материал": "шпон",
+      "фасады": "рейка"
+    },
+    "price": 98000,
+    "unit": "шт",
+    "qty": 1,
+    "price_tier": "premium",
+    "room_types": "Гостиная (зал),Столовая,Прихожая",
+    "style_tags": "джапанди,скандинавский,современный,минимализм",
+    "keywords": "комод,консоль,дуб,рейка,гостиная,премиум",
+    "image": "sideboard-oak-premium.webp",
+    "image_prompt": "Product photography of a single oak slatted sideboard with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
   }
 ]

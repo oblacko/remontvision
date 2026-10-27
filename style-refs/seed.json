@@ -1,0 +1,3169 @@
+[
+  {
+    "seed_key": "style-japandi-living-hero-1",
+    "style_key": "japandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Джапанди · Гостиная (зал) · hero 1",
+    "file": "hero-japandi-living-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Overly simplistic white plastic window frame contrasts slightly with the organic textures",
+        "Visible black power outlets on the right wall are somewhat distracting in a minimalist composition"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009595
+    },
+    "product_ids": "240,364,365,247,245,369,268,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-japandi-living-hero-2",
+    "style_key": "japandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Джапанди · Гостиная (зал) · hero 2",
+    "file": "hero-japandi-living-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Slightly visible wires and dark sockets on the left wall detract from the minimalist aesthetic",
+        "TV placement looks a bit small for the wall proportion"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009565
+    },
+    "product_ids": "240,364,365,247,245,369,268,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-japandi-living-hero-3",
+    "style_key": "japandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Джапанди · Гостиная (зал) · hero 3",
+    "file": "hero-japandi-living-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Overly warm white balance makes the scene look a bit yellowish",
+        "Empty wall space above the TV feels unbalanced",
+        "Visible black TV screen is too dominant for a minimalist aesthetic",
+        "Standard plastic window frame slightly downgrades the premium feel"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010195
+    },
+    "product_ids": "240,364,365,247,245,369,268,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-japandi-living-board",
+    "style_key": "japandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "material_board",
+    "title": "Джапанди · Гостиная (зал) · material board",
+    "file": "board-japandi-living.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "240,364,365,247,245,369,268,37,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-japandi-office-hero-1",
+    "style_key": "japandi",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Джапанди · Кабинет · hero 1",
+    "file": "hero-japandi-office-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Слегка заваленная вертикаль окна справа",
+        "Пустоватые полки стеллажа создают ощущение незавершенности стайлинга"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009615
+    },
+    "product_ids": "258,364,365,262,263,369,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-japandi-office-hero-2",
+    "style_key": "japandi",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Джапанди · Кабинет · hero 2",
+    "file": "hero-japandi-office-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 9,
+      "issues": [
+        "Розетки на стене слишком контрастные для мягкой палитры джапанди",
+        "Ковер выглядит мелковатым относительно зоны стола",
+        "Небольшой завал вертикали в левой части кадра"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010005
+    },
+    "product_ids": "258,364,365,262,263,369,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-japandi-office-hero-3",
+    "style_key": "japandi",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Джапанди · Кабинет · hero 3",
+    "file": "hero-japandi-office-3.webp",
+    "sort": 2,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Слишком маленькая площадь ковра под рабочим стулом (колеса съезжают на пол)",
+        "Неудачное кадрирование дверной ручки на переднем плане справа"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009825
+    },
+    "product_ids": "258,364,365,262,263,369,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-japandi-office-board",
+    "style_key": "japandi",
+    "room_type": "Кабинет",
+    "kind": "material_board",
+    "title": "Джапанди · Кабинет · material board",
+    "file": "board-japandi-office.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "258,364,365,262,263,369,37,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-japandi-kitchen-hero-1",
+    "style_key": "japandi",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Джапанди · Кухня · hero 1",
+    "file": "hero-japandi-kitchen-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "The green tile backsplash and black cabinetry lean slightly more towards contemporary minimalist than pure Japandi",
+        "Visible electrical sockets on the apron could have been better integrated or hidden"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009555
+    },
+    "product_ids": "21,33,40,45,365,48,50,369,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-japandi-kitchen-hero-2",
+    "style_key": "japandi",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Джапанди · Кухня · hero 2",
+    "file": "hero-japandi-kitchen-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 8.7,
+      "issues": [
+        "The dark grey cabinetry leans slightly more towards Modern/Minimalist than traditional light-toned Japandi palettes",
+        "Visible electrical sockets on the apron area are a bit distracting"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009645
+    },
+    "product_ids": "21,33,40,45,365,48,50,369,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-japandi-kitchen-hero-3",
+    "style_key": "japandi",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Джапанди · Кухня · hero 3",
+    "file": "hero-japandi-kitchen-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 7,
+      "total": 8,
+      "issues": [
+        "The industrial-style steel exhaust hood conflicts with the organic Japandi aesthetic",
+        "Visible black electrical sockets on the backsplash disrupt the visual Zen",
+        "The dark grey cabinetry is slightly too heavy and leans more toward modern industrial than warm Scandinavian-Japanese minimalism",
+        "Composition is a bit tight on the left side, cutting off the window frame"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010695
+    },
+    "product_ids": "21,33,40,45,365,48,50,369,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-japandi-kitchen-board",
+    "style_key": "japandi",
+    "room_type": "Кухня",
+    "kind": "material_board",
+    "title": "Джапанди · Кухня · material board",
+    "file": "board-japandi-kitchen.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "21,33,40,45,365,48,50,369,66,62",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bathroom-hero-1",
+    "style_key": "japandi",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Джапанди · Санузел · hero 1",
+    "file": "hero-japandi-bathroom-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 8.5,
+      "issues": [
+        "Плитка зелёного оттенка больше тяготеет к марокканскому стилю (зеллидж), чем к чистому джапанди",
+        "Несоответствие цветовой температуры: свет светильника слишком желтый на фоне холодного дневного света из окна"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010425
+    },
+    "product_ids": "21,33,45,40,48,50,52,369,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bathroom-hero-2",
+    "style_key": "japandi",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Джапанди · Санузел · hero 2",
+    "file": "hero-japandi-bathroom-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 8,
+      "issues": [
+        "Слишком активный цвет плитки для каноничного джапанди, стиль обычно тяготеет к более нейтральной палитре",
+        "Дизайн унитаза выглядит слишком бюджетно и не соответствует общему уровню интерьера",
+        "Неудачное кадрирование: дверная ручка слева мешает восприятию композиции"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010785
+    },
+    "product_ids": "21,33,45,40,48,50,52,369,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bathroom-hero-3",
+    "style_key": "japandi",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Джапанди · Санузел · hero 3",
+    "file": "hero-japandi-bathroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 7.5,
+      "issues": [
+        "The intense green zellige tile is too saturated and visually heavy for a classic Japandi palette, which typically favors neutrals and muted tones.",
+        "The black vanity and high-contrast accents lean more towards Modern Industrial than the softness required for Japandi.",
+        "Lighting is a bit warm/yellow, distorting the natural material feel."
+      ],
+      "verdict": "approve",
+      "cost": 0.0010635
+    },
+    "product_ids": "21,33,45,40,48,50,52,369,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bathroom-board",
+    "style_key": "japandi",
+    "room_type": "Санузел",
+    "kind": "material_board",
+    "title": "Джапанди · Санузел · material board",
+    "file": "board-japandi-bathroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "21,33,45,40,48,50,52,369,62",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bedroom-hero-1",
+    "style_key": "japandi",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Джапанди · Спальня · hero 1",
+    "file": "hero-japandi-bedroom-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 10,
+      "total": 9.7,
+      "issues": [
+        "Minor distortion on the right door frame",
+        "Overexposed view from the window"
+      ],
+      "verdict": "approve",
+      "cost": 0.000916
+    },
+    "product_ids": "234,364,365,369,367,268,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bedroom-hero-2",
+    "style_key": "japandi",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Джапанди · Спальня · hero 2",
+    "file": "hero-japandi-bedroom-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 9,
+      "issues": [
+        "Overexposed area around the central pendant lamp",
+        "Slightly generic AI-generated texture on the bouclé bed frame"
+      ],
+      "verdict": "approve",
+      "cost": 0.000937
+    },
+    "product_ids": "234,364,365,369,367,268,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bedroom-hero-3",
+    "style_key": "japandi",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Джапанди · Спальня · hero 3",
+    "file": "hero-japandi-bedroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Слабая контрастность освещения в дневное время при включенных лампах",
+        "Небольшое искажение перспективы из-за широкого угла съемки"
+      ],
+      "verdict": "approve",
+      "cost": 0.000973
+    },
+    "product_ids": "234,364,365,369,367,268,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-japandi-bedroom-board",
+    "style_key": "japandi",
+    "room_type": "Спальня",
+    "kind": "material_board",
+    "title": "Джапанди · Спальня · material board",
+    "file": "board-japandi-bedroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "234,364,365,369,367,268,37,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-japandi-dining-hero-1",
+    "style_key": "japandi",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Джапанди · Столовая · hero 1",
+    "file": "hero-japandi-dining-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Слегка завалена вертикаль дверного проема на переднем плане",
+        "Композиция кадра выглядит немного тесной из-за обрезанной двери слева"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009765
+    },
+    "product_ids": "249,364,366,254,370,268,369,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-japandi-dining-hero-2",
+    "style_key": "japandi",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Джапанди · Столовая · hero 2",
+    "file": "hero-japandi-dining-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Немного скудное естественное освещение из-за плотных штор",
+        "Дверное полотно на переднем плане создает лишний визуальный шум"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009705
+    },
+    "product_ids": "249,364,366,254,370,268,369,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-japandi-dining-hero-3",
+    "style_key": "japandi",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Джапанди · Столовая · hero 3",
+    "file": "hero-japandi-dining-3.webp",
+    "sort": 2,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Слегка завалена вертикаль дверного проема на переднем плане",
+        "Черные розетки на светлом фоне создают избыточный визуальный шум"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009735
+    },
+    "product_ids": "249,364,366,254,370,268,369,37,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-japandi-dining-board",
+    "style_key": "japandi",
+    "room_type": "Столовая",
+    "kind": "material_board",
+    "title": "Джапанди · Столовая · material board",
+    "file": "board-japandi-dining.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "249,364,366,254,370,268,369,37,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-loft-living-hero-1",
+    "style_key": "loft",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Лофт · Гостиная (зал) · hero 1",
+    "file": "hero-loft-living-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 4,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 6,
+      "total": 5,
+      "issues": [
+        "Стиль больше склоняется к современному минимализму с элементами мид-сенчури, чем к лофту.",
+        "Отсутствуют характерные для лофта индустриальные черты: открытые коммуникации, кирпичная кладка, бетон или грубые текстуры.",
+        "Напольное покрытие из светлого мрамора/керамогранита противоречит эстетике лофта.",
+        "Классический белый плинтус и пластиковое окно упрощают интерьер."
+      ],
+      "verdict": "reject",
+      "cost": 0.001173
+    },
+    "product_ids": "242,22,27,247,244,59,270,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-loft-living-hero-2",
+    "style_key": "loft",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Лофт · Гостиная (зал) · hero 2",
+    "file": "hero-loft-living-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 8.25,
+      "issues": [
+        "Style mismatch: The interior is closer to Modern or Mid-century Modern than Loft. Lack of industrial elements like brickwork, exposed pipes, or raw concrete.",
+        "The floor finish (white marble tile) contradicts the traditional Loft aesthetic."
+      ],
+      "verdict": "approve",
+      "cost": 0.001007
+    },
+    "product_ids": "242,22,27,247,244,59,270,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-loft-living-hero-3",
+    "style_key": "loft",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Лофт · Гостиная (зал) · hero 3",
+    "file": "hero-loft-living-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 7,
+      "issues": [
+        "Стиль ближе к современному мид-сенчури, чем к чистому лофту; не хватает характерных индустриальных элементов (кирпич, открытые коммуникации).",
+        "Белый мраморный пол конфликтует с бетонным потолком по визуальному весу.",
+        "Композиция мебели выглядит разрозненно из-за слишком маленького ковра, который не объединяет диванную и ТВ-зоны.",
+        "Неудачный масштаб журнального столика относительно ковра."
+      ],
+      "verdict": "approve",
+      "cost": 0.001193
+    },
+    "product_ids": "242,22,27,247,244,59,270,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-loft-living-board",
+    "style_key": "loft",
+    "room_type": "Гостиная (зал)",
+    "kind": "material_board",
+    "title": "Лофт · Гостиная (зал) · material board",
+    "file": "board-loft-living.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "242,22,27,247,244,59,270,36,62,68",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-loft-office-hero-1",
+    "style_key": "loft",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Лофт · Кабинет · hero 1",
+    "file": "hero-loft-office-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 8.5,
+      "issues": [
+        "Style leans more towards dark minimalism or industrial chic than classic loft (missing characteristic brickwork, high ceilings, or visible pipes)",
+        "Small rug under the chair creates a visual break that feels slightly cluttered"
+      ],
+      "verdict": "approve",
+      "cost": 0.000982
+    },
+    "product_ids": "259,364,27,262,265,59,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-loft-office-hero-2",
+    "style_key": "loft",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Лофт · Кабинет · hero 2",
+    "file": "hero-loft-office-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 7.5,
+      "issues": [
+        "Стиль скорее относится к современному минимализму с элементами индастриала, чем к тру-лофту (отсутствует открытая кладка, балки или индустриальные коммуникации)",
+        "Белый классический плинтус спорит с индустриальной эстетикой мебели",
+        "Несоответствие масштаба ковра рабочей зоне (колеса кресла выходят за край)"
+      ],
+      "verdict": "approve",
+      "cost": 0.001129
+    },
+    "product_ids": "259,364,27,262,265,59,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-loft-office-hero-3",
+    "style_key": "loft",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Лофт · Кабинет · hero 3",
+    "file": "hero-loft-office-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 8.25,
+      "issues": [
+        "Стиль ближе к современному минимализму с элементами индастриала, чем к классическому лофту",
+        "Отсутствуют характерные для лофта грубые фактуры: открытая кирпичная кладка, бетон или видимые коммуникации",
+        "Белый классический плинтус диссонирует с эстетикой лофта"
+      ],
+      "verdict": "approve",
+      "cost": 0.001093
+    },
+    "product_ids": "259,364,27,262,265,59,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-loft-office-board",
+    "style_key": "loft",
+    "room_type": "Кабинет",
+    "kind": "material_board",
+    "title": "Лофт · Кабинет · material board",
+    "file": "board-loft-office.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "259,364,27,262,265,59,36,62,68",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-loft-kitchen-hero-1",
+    "style_key": "loft",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Лофт · Кухня · hero 1",
+    "file": "hero-loft-kitchen-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 4,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 6,
+      "issues": [
+        "Стиль больше соответствует современному минимализму, чем лофту",
+        "Отсутствуют характерные для лофта элементы: открытые коммуникации, кирпичная кладка, грубые фактуры или индустриальный декор",
+        "Мраморный фартук и пол слишком стерильны и классичны для заявленного стиля"
+      ],
+      "verdict": "reject",
+      "cost": 0.001075
+    },
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-loft-kitchen-hero-2",
+    "style_key": "loft",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Лофт · Кухня · hero 2",
+    "file": "hero-loft-kitchen-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 4,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 6,
+      "issues": [
+        "Стиль больше соответствует современному минимализму, чем лофту",
+        "Отсутствуют характерные черты лофта: кирпичная кладка, открытые коммуникации, грубые фактуры или бетон",
+        "Мраморный фартук и пол создают слишком чистый и классический образ для индустриального стиля"
+      ],
+      "verdict": "reject",
+      "cost": 0.001072
+    },
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-loft-kitchen-hero-3",
+    "style_key": "loft",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Лофт · Кухня · hero 3",
+    "file": "hero-loft-kitchen-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 7,
+      "issues": [
+        "Interior leans more towards modern minimalism or dark contemporary than authentic industrial loft",
+        "Absence of signature loft elements like exposed brick, raw concrete, or open piping",
+        "Marble-effect backsplash and flooring are too polished/refined for a classic loft aesthetic"
+      ],
+      "verdict": "approve",
+      "cost": 0.001012
+    },
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-loft-kitchen-board",
+    "style_key": "loft",
+    "room_type": "Кухня",
+    "kind": "material_board",
+    "title": "Лофт · Кухня · material board",
+    "file": "board-loft-kitchen.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-loft-bathroom-hero-1",
+    "style_key": "loft",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Лофт · Санузел · hero 1",
+    "file": "hero-loft-bathroom-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 3,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 6,
+      "total": 5,
+      "issues": [
+        "Стиль не соответствует лофту: это современный минимализм с элементами неоклассики (мрамор)",
+        "Отсутствуют характерные атрибуты лофта: открытые коммуникации, кирпич, бетон или грубые текстуры",
+        "Цветовая гамма слишком светлая и стерильная для индустриального стиля"
+      ],
+      "verdict": "reject",
+      "cost": 0.001081
+    },
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-loft-bathroom-hero-2",
+    "style_key": "loft",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Лофт · Санузел · hero 2",
+    "file": "hero-loft-bathroom-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 4,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 8,
+      "total": 6,
+      "issues": [
+        "Стиль не соответствует заявленному: это современный минимализм с элементами контемпорари, а не лофт",
+        "Отсутствуют ключевые атрибуты лофта: кирпич, бетон, открытые коммуникации или индустриальные текстуры",
+        "Доминирование мрамора противоречит грубой эстетике лофта"
+      ],
+      "verdict": "reject",
+      "cost": 0.001072
+    },
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-loft-bathroom-hero-3",
+    "style_key": "loft",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Лофт · Санузел · hero 3",
+    "file": "hero-loft-bathroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 4,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 6,
+      "issues": [
+        "The style is modern/contemporary, not Loft. It lacks raw materials like brick, concrete, or exposed pipes.",
+        "Marble tiling is too polished and luxurious for a traditional industrial Loft aesthetic.",
+        "The white marble texture feels too bright and clean compared to the requested moody or industrial Loft vibe."
+      ],
+      "verdict": "reject",
+      "cost": 0.001036
+    },
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-loft-bathroom-board",
+    "style_key": "loft",
+    "room_type": "Санузел",
+    "kind": "material_board",
+    "title": "Лофт · Санузел · material board",
+    "file": "board-loft-bathroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-loft-bedroom-hero-1",
+    "style_key": "loft",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Лофт · Спальня · hero 1",
+    "file": "hero-loft-bedroom-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 3,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 5,
+      "issues": [
+        "Стиль не соответствует заявленному Лофту: отсутствуют индустриальные элементы, открытые коммуникации, кирпич или бетон.",
+        "Интерьер выполнен в стиле современный минимализм с элементами скандинавского дизайна.",
+        "Паркет 'ёлочка' и классические высокие плинтусы противоречат эстетике лофта."
+      ],
+      "verdict": "reject",
+      "cost": 0.0010865
+    },
+    "product_ids": "234,20,27,59,238,270,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-loft-bedroom-hero-2",
+    "style_key": "loft",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Лофт · Спальня · hero 2",
+    "file": "hero-loft-bedroom-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 4,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 6.5,
+      "issues": [
+        "Стиль больше соответствует современному минимализму с элементами сканди, а не лофту",
+        "Отсутствуют характерные для лофта индустриальные черты: открытые коммуникации, кирпичная кладка, бетон или высокие потолки",
+        "Мягкая кровать 'букле' и классический паркет 'ёлка' уводят интерьер в сторону уютного минимализма"
+      ],
+      "verdict": "reject",
+      "cost": 0.0011315
+    },
+    "product_ids": "234,20,27,59,238,270,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-loft-bedroom-hero-3",
+    "style_key": "loft",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Лофт · Спальня · hero 3",
+    "file": "hero-loft-bedroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 4,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 6,
+      "issues": [
+        "Стиль не соответствует заявленному Лофту: это современный минимализм с элементами мид-сенчури.",
+        "Отсутствуют характерные индустриальные признаки: кирпич, бетон, открытые коммуникации или грубые текстуры.",
+        "Паркет 'ёлочкой' и классический ковер уводят интерьер в сторону эклектики."
+      ],
+      "verdict": "reject",
+      "cost": 0.0011015
+    },
+    "product_ids": "234,20,27,59,238,270,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-loft-bedroom-board",
+    "style_key": "loft",
+    "room_type": "Спальня",
+    "kind": "material_board",
+    "title": "Лофт · Спальня · material board",
+    "file": "board-loft-bedroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "234,20,27,59,238,270,36,62,68",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-loft-dining-hero-1",
+    "style_key": "loft",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Лофт · Столовая · hero 1",
+    "file": "hero-loft-dining-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 2,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 4,
+      "issues": [
+        "Стиль не соответствует заявленному: это современная классика или контемпорари, а не лофт",
+        "Отсутствуют характерные элементы лофта: открытые коммуникации, кирпичная кладка, грубые текстуры, индустриальные детали",
+        "Интерьер слишком выглаженный и мягкий для индустриальной эстетики"
+      ],
+      "verdict": "reject",
+      "cost": 0.00109
+    },
+    "product_ids": "250,364,27,253,370,270,59,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-loft-dining-hero-2",
+    "style_key": "loft",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Лофт · Столовая · hero 2",
+    "file": "hero-loft-dining-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 3,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 5,
+      "issues": [
+        "Style mismatch: this is Dark Contemporary/Neo-classic, not Loft",
+        "Absence of industrial elements: no raw brick, exposed pipes, or concrete",
+        "Furniture and textiles (velvet, marble, classic rug) are too polished for the loft aesthetic",
+        "High white plinths and classic window framing conflict with industrial style"
+      ],
+      "verdict": "reject",
+      "cost": 0.001072
+    },
+    "product_ids": "250,364,27,253,370,270,59,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-loft-dining-hero-3",
+    "style_key": "loft",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Лофт · Столовая · hero 3",
+    "file": "hero-loft-dining-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 3,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 5,
+      "issues": [
+        "Стиль не соответствует заявленному Лофту: отсутствует индустриальная отделка, открытые коммуникации или кирпичная кладка.",
+        "Интерьер выполнен в стиле Современная Классика или Контемпорари с элементами Арт-деко.",
+        "Наличие белых классических плинтусов и ровных окрашенных стен противоречит эстетике Лофта."
+      ],
+      "verdict": "reject",
+      "cost": 0.001108
+    },
+    "product_ids": "250,364,27,253,370,270,59,36,62,68",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-loft-dining-board",
+    "style_key": "loft",
+    "room_type": "Столовая",
+    "kind": "material_board",
+    "title": "Лофт · Столовая · material board",
+    "file": "board-loft-dining.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "250,364,27,253,370,270,59,36,62,68",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-modern-living-hero-1",
+    "style_key": "modern",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Современный · Гостиная (зал) · hero 1",
+    "file": "hero-modern-living-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Compromised lighting: strong overexposure in the window area loses exterior detail",
+        "Compositional imbalance: heavy dark wall on the left vs bright window on the right",
+        "Area rug size: slightly too small for the seating group, creating a 'floating island' effect",
+        "Visual clutter from visible wall sockets and switches that aren't integrated into the design"
+      ],
+      "verdict": "approve",
+      "cost": 0.001094
+    },
+    "product_ids": "240,22,27,247,244,59,270,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-modern-living-hero-2",
+    "style_key": "modern",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Современный · Гостиная (зал) · hero 2",
+    "file": "hero-modern-living-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Overexposed window area (bleached out)",
+        "Visible electrical sockets at the bottom left distract from the composition",
+        "TV unit looks slightly undersized relative to the dark wall expanse"
+      ],
+      "verdict": "approve",
+      "cost": 0.000971
+    },
+    "product_ids": "240,22,27,247,244,59,270,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-modern-living-hero-3",
+    "style_key": "modern",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Современный · Гостиная (зал) · hero 3",
+    "file": "hero-modern-living-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Overexposed view through the window",
+        "TV unit placement feels slightly isolated against the large dark wall",
+        "Rug size is borderline small for the seating area scale",
+        "Visible electrical sockets at the bottom left are distracting"
+      ],
+      "verdict": "approve",
+      "cost": 0.001004
+    },
+    "product_ids": "240,22,27,247,244,59,270,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-modern-living-board",
+    "style_key": "modern",
+    "room_type": "Гостиная (зал)",
+    "kind": "material_board",
+    "title": "Современный · Гостиная (зал) · material board",
+    "file": "board-modern-living.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "240,22,27,247,244,59,270,36,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-modern-office-hero-1",
+    "style_key": "modern",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Современный · Кабинет · hero 1",
+    "file": "hero-modern-office-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 8.5,
+      "issues": [
+        "Слишком маленький ковер, застревающий под колесами кресла",
+        "Неудачное расположение розетки или полное отсутствие кабель-менеджмента для настольной лампы",
+        "Пустое наполнение стеллажа выглядит нежилым",
+        "Заниженная высота подвесного светильника относительно центра комнаты"
+      ],
+      "verdict": "approve",
+      "cost": 0.001072
+    },
+    "product_ids": "259,364,27,262,265,59,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-modern-office-hero-2",
+    "style_key": "modern",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Современный · Кабинет · hero 2",
+    "file": "hero-modern-office-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Розетки на стене выглядят слишком бюджетно для такого интерьера",
+        "Ковер слишком мал для рабочего места: колеса кресла будут постоянно съезжать с края"
+      ],
+      "verdict": "approve",
+      "cost": 0.000968
+    },
+    "product_ids": "259,364,27,262,265,59,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-modern-office-hero-3",
+    "style_key": "modern",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Современный · Кабинет · hero 3",
+    "file": "hero-modern-office-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 8.5,
+      "issues": [
+        "The decorative rug is too small for the desk area, creating a disproportionate visual scale",
+        "Central pendant light placement feels disconnected from the functional work zone",
+        "The small artwork on the back wall is undersized for the wall plane"
+      ],
+      "verdict": "approve",
+      "cost": 0.001009
+    },
+    "product_ids": "259,364,27,262,265,59,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-modern-office-board",
+    "style_key": "modern",
+    "room_type": "Кабинет",
+    "kind": "material_board",
+    "title": "Современный · Кабинет · material board",
+    "file": "board-modern-office.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "259,364,27,262,265,59,36,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-modern-kitchen-hero-1",
+    "style_key": "modern",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Современный · Кухня · hero 1",
+    "file": "hero-modern-kitchen-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 8,
+      "total": 8.75,
+      "issues": [
+        "Слишком простая и дешевая вытяжка для данного сегмента",
+        "Неудачное кадрирование слева с дверным косяком",
+        "Коврик на полу упрощает визуальную композицию"
+      ],
+      "verdict": "approve",
+      "cost": 0.001003
+    },
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-modern-kitchen-hero-2",
+    "style_key": "modern",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Современный · Кухня · hero 2",
+    "file": "hero-modern-kitchen-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Over-exposure in the window area loses detail",
+        "Visible electrical outlets on the backsplash disrupt the clean marble pattern",
+        "Generic lighting fixture choice"
+      ],
+      "verdict": "approve",
+      "cost": 0.000949
+    },
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-modern-kitchen-hero-3",
+    "style_key": "modern",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Современный · Кухня · hero 3",
+    "file": "hero-modern-kitchen-3.webp",
+    "sort": 2,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 10,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.5,
+      "issues": [
+        "Overexposed view outside the window",
+        "Visible electrical sockets on the apron are slightly distracting but realistic"
+      ],
+      "verdict": "approve",
+      "cost": 0.000925
+    },
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-modern-kitchen-board",
+    "style_key": "modern",
+    "room_type": "Кухня",
+    "kind": "material_board",
+    "title": "Современный · Кухня · material board",
+    "file": "board-modern-kitchen.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "22,34,39,45,27,47,50,59,66,62",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-modern-bathroom-hero-1",
+    "style_key": "modern",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Современный · Санузел · hero 1",
+    "file": "hero-modern-bathroom-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Distorted perspective on the left edge due to wide-angle lens",
+        "Visible window reflection in the mirror creates visual clutter",
+        "Uneven ceiling lighting causing a slightly flat appearance in the shower area"
+      ],
+      "verdict": "approve",
+      "cost": 0.000988
+    },
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-modern-bathroom-hero-2",
+    "style_key": "modern",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Современный · Санузел · hero 2",
+    "file": "hero-modern-bathroom-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Несоосность швов плитки на полу и стенах",
+        "Резкие тени от подвесного светильника",
+        "Заваленная вертикаль по левому краю кадра"
+      ],
+      "verdict": "approve",
+      "cost": 0.000982
+    },
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-modern-bathroom-hero-3",
+    "style_key": "modern",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Современный · Санузел · hero 3",
+    "file": "hero-modern-bathroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Distorted perspective on the left side of the frame",
+        "Visible reflections in the glass shower screen",
+        "Average editorial lighting; shadow under the vanity is a bit deep",
+        "Standard developer-grade finish level lacks high-end designer uniqueness"
+      ],
+      "verdict": "approve",
+      "cost": 0.001018
+    },
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-modern-bathroom-board",
+    "style_key": "modern",
+    "room_type": "Санузел",
+    "kind": "material_board",
+    "title": "Современный · Санузел · material board",
+    "file": "board-modern-bathroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "22,34,45,39,47,50,52,59,62",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-modern-bedroom-hero-1",
+    "style_key": "modern",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Современный · Спальня · hero 1",
+    "file": "hero-modern-bedroom-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Ковер выглядит излишне изношенным/винтажным для чистого современного стиля",
+        "Неравномерное освещение: на стене за изголовьем видны резкие световые пятна",
+        "Центральная люстра кажется слишком массивной для данной высоты потолка"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010475
+    },
+    "product_ids": "234,20,366,59,238,270,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-modern-bedroom-hero-2",
+    "style_key": "modern",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Современный · Спальня · hero 2",
+    "file": "hero-modern-bedroom-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.25,
+      "issues": [
+        "Стык штор с потолком выглядит незаконченным из-за отсутствия скрытого карниза",
+        "Ковер визуально выбивается из общей нейтральной палитры по стилистике, создавая излишний контраст с современными формами мебели"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010355
+    },
+    "product_ids": "234,20,366,59,238,270,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-modern-bedroom-hero-3",
+    "style_key": "modern",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Современный · Спальня · hero 3",
+    "file": "hero-modern-bedroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.25,
+      "issues": [
+        "Слишком активный этнический ковер выбивается из общей нейтральной палитры современного стиля",
+        "Небольшая асимметрия в расстановке декора на прикроватных тумбах относительно центральной люстры"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010115
+    },
+    "product_ids": "234,20,366,59,238,270,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-modern-bedroom-board",
+    "style_key": "modern",
+    "room_type": "Спальня",
+    "kind": "material_board",
+    "title": "Современный · Спальня · material board",
+    "file": "board-modern-bedroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "234,20,366,59,238,270,36,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-modern-dining-hero-1",
+    "style_key": "modern",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Современный · Столовая · hero 1",
+    "file": "hero-modern-dining-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Дверное полотно слева перекрывает часть кадра, создавая визуальный шум",
+        "Небольшой завал горизонта на комоде",
+        "Ковер выглядит слишком маленьким для обеденной группы"
+      ],
+      "verdict": "approve",
+      "cost": 0.000997
+    },
+    "product_ids": "250,20,27,253,370,270,59,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-modern-dining-hero-2",
+    "style_key": "modern",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Современный · Столовая · hero 2",
+    "file": "hero-modern-dining-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Дверное полотно на переднем плане создает визуальный шум и обрезает композицию",
+        "Неудачный ракурс съемки: камера расположена слишком высоко, из-за чего искажаются пропорции мебели",
+        "Ковер выглядит слишком мелким для данной обеденной группы"
+      ],
+      "verdict": "approve",
+      "cost": 0.001039
+    },
+    "product_ids": "250,20,27,253,370,270,59,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-modern-dining-hero-3",
+    "style_key": "modern",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Современный · Столовая · hero 3",
+    "file": "hero-modern-dining-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "The white door frame on the left creates excessive visual noise and cuts into the composition",
+        "The carpet feels slightly undersized for the dining group"
+      ],
+      "verdict": "approve",
+      "cost": 0.000943
+    },
+    "product_ids": "250,20,27,253,370,270,59,36,62,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-modern-dining-board",
+    "style_key": "modern",
+    "room_type": "Столовая",
+    "kind": "material_board",
+    "title": "Современный · Столовая · material board",
+    "file": "board-modern-dining.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "250,20,27,253,370,270,59,36,62,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-neo-living-hero-1",
+    "style_key": "neo",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Неоклассика · Гостиная (зал) · hero 1",
+    "file": "hero-neo-living-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 8,
+      "issues": [
+        "Смешение стилей: мебель под ТВ (скандинавский ретро-стиль) и кофейный столик (брутализм) конфликтуют с неоклассической отделкой стен и люстрой",
+        "Неудачное расположение розеток и выключателей, создающее визуальный шум на молдингах",
+        "Перебор с одним оттенком терракоты в текстиле, ковре и отделке стен"
+      ],
+      "verdict": "approve",
+      "cost": 0.0011435
+    },
+    "product_ids": "240,364,365,247,244,60,270,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-neo-living-hero-2",
+    "style_key": "neo",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Неоклассика · Гостиная (зал) · hero 2",
+    "file": "hero-neo-living-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 8,
+      "total": 8.2,
+      "issues": [
+        "Смешение стилей: база неоклассическая (молдинги, карнизы), но мебель и декор тяготеют к Mid-century modern и современному стилю",
+        "Неудачное расположение розеток над плинтусом слева, привлекающее лишнее внимание",
+        "Телевизионная тумба выглядит слишком бюджетно на фоне массивного каменного стола и кожаных кресел"
+      ],
+      "verdict": "approve",
+      "cost": 0.0011375
+    },
+    "product_ids": "240,364,365,247,244,60,270,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-neo-living-hero-3",
+    "style_key": "neo",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Неоклассика · Гостиная (зал) · hero 3",
+    "file": "hero-neo-living-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 6,
+      "total": 7,
+      "issues": [
+        "Мебель (ТВ-тумба и журнальный столик) по стилистике ближе к Mid-century modern, чем к чистой неоклассике",
+        "Неудачное расположение розеток на виду",
+        "Пластиковое окно удешевляет интерьер",
+        "Недостаточная проработка текстиля и аксессуаров для премиальной неоклассики"
+      ],
+      "verdict": "approve",
+      "cost": 0.0011105
+    },
+    "product_ids": "240,364,365,247,244,60,270,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-neo-living-board",
+    "style_key": "neo",
+    "room_type": "Гостиная (зал)",
+    "kind": "material_board",
+    "title": "Неоклассика · Гостиная (зал) · material board",
+    "file": "board-neo-living.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "240,364,365,247,244,60,270,37,63,69",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-neo-office-hero-1",
+    "style_key": "neo",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Неоклассика · Кабинет · hero 1",
+    "file": "hero-neo-office-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 7,
+      "total": 8.5,
+      "issues": [
+        "Modern ergonomic office chair conflicts slightly with the classical wall moldings",
+        "Shelf unit leans more towards industrial/contemporary than pure neoclassics",
+        "Rug is undersized for the desk area"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009805
+    },
+    "product_ids": "259,20,366,261,265,59,37,63,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-neo-office-hero-2",
+    "style_key": "neo",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Неоклассика · Кабинет · hero 2",
+    "file": "hero-neo-office-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 6,
+      "total": 7.7,
+      "issues": [
+        "Стилевой диссонанс: современное офисное кресло на колесиках и стеллаж в стиле лофт конфликтуют с неоклассической отделкой стен",
+        "Неудачное кадрирование: дверная коробка на переднем плане слева создает визуальный шум",
+        "Ковер слишком мал для данной зоны, кресло постоянно съезжает с края",
+        "Расположение розеток слишком акцентное и не совпадает по цвету с фурнитурой стола"
+      ],
+      "verdict": "approve",
+      "cost": 0.0011935
+    },
+    "product_ids": "259,20,366,261,265,59,37,63,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-neo-office-hero-3",
+    "style_key": "neo",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Неоклассика · Кабинет · hero 3",
+    "file": "hero-neo-office-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 9,
+      "beauty_score": 5,
+      "product_score": 4,
+      "total": 6,
+      "issues": [
+        "Стилистический диссонанс: офисное кресло и стеллаж в индустриальном стиле конфликтуют с классической отделкой стен",
+        "Неудачная фактура декоративной штукатурки внутри молдингов создает эффект 'мятой бумаги'",
+        "Композиционный провал: пустой угол и слишком мелкий ковер",
+        "Дешевая фурнитура розеток и выключателей выбивается из палитры"
+      ],
+      "verdict": "reject",
+      "cost": 0.0011515
+    },
+    "product_ids": "259,20,366,261,265,59,37,63,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-neo-office-board",
+    "style_key": "neo",
+    "room_type": "Кабинет",
+    "kind": "material_board",
+    "title": "Неоклассика · Кабинет · material board",
+    "file": "board-neo-office.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "259,20,366,261,265,59,37,63,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-neo-kitchen-hero-1",
+    "style_key": "neo",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Неоклассика · Кухня · hero 1",
+    "file": "hero-neo-kitchen-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 9,
+      "issues": [
+        "Черная рама окна немного выбивается из общей мягкой цветовой палитры неоклассики",
+        "Современная бытовая техника (духовка) визуально диссонирует с классическими фасадами"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009985
+    },
+    "product_ids": "22,34,40,44,365,48,49,59,66,63",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-neo-kitchen-hero-2",
+    "style_key": "neo",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Неоклассика · Кухня · hero 2",
+    "file": "hero-neo-kitchen-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 6,
+      "total": 7.7,
+      "issues": [
+        "Технократичная вытяжка из нержавеющей стали конфликтует с классическими фасадами",
+        "Несоответствие оттенков металла: латунный смеситель и розетки против стальной вытяжки",
+        "Слишком простая форма светильника для неоклассики",
+        "Ковер на кухне выглядит непрактичным и упрощает интерьер"
+      ],
+      "verdict": "approve",
+      "cost": 0.0011125
+    },
+    "product_ids": "22,34,40,44,365,48,49,59,66,63",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-neo-kitchen-hero-3",
+    "style_key": "neo",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Неоклассика · Кухня · hero 3",
+    "file": "hero-neo-kitchen-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.25,
+      "issues": [
+        "Артефакты ИИ на варочной панели (странное расположение конфорок)",
+        "Несоответствие отделки оконной рамы (черный металл) общему мягкому стилю",
+        "Нелогичное завершение верхнего ряда шкафов слева от окна"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010495
+    },
+    "product_ids": "22,34,40,44,365,48,49,59,66,63",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-neo-kitchen-board",
+    "style_key": "neo",
+    "room_type": "Кухня",
+    "kind": "material_board",
+    "title": "Неоклассика · Кухня · material board",
+    "file": "board-neo-kitchen.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "22,34,40,44,365,48,49,59,66,63",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-neo-bathroom-hero-1",
+    "style_key": "neo",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Неоклассика · Санузел · hero 1",
+    "file": "hero-neo-bathroom-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Стык мраморных плит на стене слева выглядит незавершенным",
+        "Окно обрезано по краю кадра, что нарушает симметрию",
+        "Тумба под раковину имеет слишком минималистичные фасады, контрастирующие с классическими молдингами"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010555
+    },
+    "product_ids": "22,34,43,40,48,49,52,59,63",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-neo-bathroom-hero-2",
+    "style_key": "neo",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Неоклассика · Санузел · hero 2",
+    "file": "hero-neo-bathroom-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 9,
+      "issues": [
+        "Смеситель и фурнитура имеют разный оттенок металла по сравнению с клавишей смыва",
+        "Минималистичный дизайн тумбы под раковину слегка выбивается из неоклассического декора стен"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010075
+    },
+    "product_ids": "22,34,43,40,48,49,52,59,63",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-neo-bathroom-hero-3",
+    "style_key": "neo",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Неоклассика · Санузел · hero 3",
+    "file": "hero-neo-bathroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 8,
+      "total": 8.75,
+      "issues": [
+        "Смеситель и фурнитура имеют разный оттенок металла",
+        "Неудачный завал вертикалей в левой части кадра",
+        "Пересвет в области окна"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009895
+    },
+    "product_ids": "22,34,43,40,48,49,52,59,63",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-neo-bathroom-board",
+    "style_key": "neo",
+    "room_type": "Санузел",
+    "kind": "material_board",
+    "title": "Неоклассика · Санузел · material board",
+    "file": "board-neo-bathroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "22,34,43,40,48,49,52,59,63",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-neo-bedroom-hero-1",
+    "style_key": "neo",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Неоклассика · Спальня · hero 1",
+    "file": "hero-neo-bedroom-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Смешение стилей: кровать в стиле букле и минималистичные тумбы диссонируют с классической люстрой и молдингами",
+        "Неудачное расположение розеток на левой стене портит эстетику стеновых панелей",
+        "Несоответствие оттенка штор и ковра"
+      ],
+      "verdict": "approve",
+      "cost": 0.00107
+    },
+    "product_ids": "234,364,366,60,367,270,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-neo-bedroom-hero-2",
+    "style_key": "neo",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Неоклассика · Спальня · hero 2",
+    "file": "hero-neo-bedroom-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 9,
+      "issues": [
+        "Overly simplified wardrobe design conflicts slightly with the ornate chandelier and moldings",
+        "Visible electrical outlets near the nightstands are a bit distracting"
+      ],
+      "verdict": "approve",
+      "cost": 0.000938
+    },
+    "product_ids": "234,364,366,60,367,270,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-neo-bedroom-hero-3",
+    "style_key": "neo",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Неоклассика · Спальня · hero 3",
+    "file": "hero-neo-bedroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 9,
+      "issues": [
+        "Люстра визуально перегружена для данной высоты потолка",
+        "Фактура дерева на шкафу слева выглядит слишком упрощенно относительно детализированной лепнины"
+      ],
+      "verdict": "approve",
+      "cost": 0.000968
+    },
+    "product_ids": "234,364,366,60,367,270,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-neo-bedroom-board",
+    "style_key": "neo",
+    "room_type": "Спальня",
+    "kind": "material_board",
+    "title": "Неоклассика · Спальня · material board",
+    "file": "board-neo-bedroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "234,364,366,60,367,270,37,63,69",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-neo-dining-hero-1",
+    "style_key": "neo",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Неоклассика · Столовая · hero 1",
+    "file": "hero-neo-dining-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.2,
+      "issues": [
+        "Слишком выраженный желтый подтон центрального светильника конфликтует с холодным мрамором стола",
+        "Неудачный ракурс с захватом дверного косяка слева, обрезающий композицию"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010105
+    },
+    "product_ids": "250,364,366,253,257,270,60,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-neo-dining-hero-2",
+    "style_key": "neo",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Неоклассика · Столовая · hero 2",
+    "file": "hero-neo-dining-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Overly aggressive texture on the wall panels creates visual noise",
+        "Slightly cramped framing due to the open door in the foreground",
+        "Color palette is a bit heavy/traditional for some modern interpretations of neoclassicism"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009985
+    },
+    "product_ids": "250,364,366,253,257,270,60,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-neo-dining-hero-3",
+    "style_key": "neo",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Неоклассика · Столовая · hero 3",
+    "file": "hero-neo-dining-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Foreground door frame on the left creates an unnecessary visual barrier",
+        "Slightly inconsistent color temperature between the warm interior lighting and cool natural window light",
+        "Rug size appears a bit small for the dining group scale"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009925
+    },
+    "product_ids": "250,364,366,253,257,270,60,37,63,69",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-neo-dining-board",
+    "style_key": "neo",
+    "room_type": "Столовая",
+    "kind": "material_board",
+    "title": "Неоклассика · Столовая · material board",
+    "file": "board-neo-dining.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "250,364,366,253,257,270,60,37,63,69",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-scandi-living-hero-1",
+    "style_key": "scandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Скандинавский · Гостиная (зал) · hero 1",
+    "file": "hero-scandi-living-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 7,
+      "total": 8,
+      "issues": [
+        "Стиль ближе к Japandi или минимализму из-за монохромности, не хватает типичных скандинавских контрастов или текстур",
+        "Композиция в левой части пуста, постер слишком мал для этой стены",
+        "Неудачное расположение розеток на виду портит редакционный вид"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010775
+    },
+    "product_ids": "239,364,365,246,245,369,268,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-scandi-living-hero-2",
+    "style_key": "scandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Скандинавский · Гостиная (зал) · hero 2",
+    "file": "hero-scandi-living-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 9,
+      "total": 8.5,
+      "issues": [
+        "Overly monochromatic beige palette lacks contrast for a classic Scandi look",
+        "TV placement looks a bit isolated on the large wall",
+        "Visible electrical outlets slightly distract from the aesthetic"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009785
+    },
+    "product_ids": "239,364,365,246,245,369,268,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-scandi-living-hero-3",
+    "style_key": "scandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "hero",
+    "title": "Скандинавский · Гостиная (зал) · hero 3",
+    "file": "hero-scandi-living-3.webp",
+    "sort": 2,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 8.5,
+      "issues": [
+        "Слишком теплая цветовая гамма уходит в Japandi (джапанди) больше, чем в классический скандинавский стиль",
+        "Непропорционально маленький ТВ относительно длинной тумбы и пустой стены",
+        "Пустая зона слева создает визуальный дисбаланс в композиции кадра"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010805
+    },
+    "product_ids": "239,364,365,246,245,369,268,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-scandi-living-board",
+    "style_key": "scandi",
+    "room_type": "Гостиная (зал)",
+    "kind": "material_board",
+    "title": "Скандинавский · Гостиная (зал) · material board",
+    "file": "board-scandi-living.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "239,364,365,246,245,369,268,37,61,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-scandi-office-hero-1",
+    "style_key": "scandi",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Скандинавский · Кабинет · hero 1",
+    "file": "hero-scandi-office-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 8,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Розетки на разной высоте и криво расположены относительно стола",
+        "Небольшая асимметрия в центровке ковра под креслом",
+        "Пустое пространство на стенах выглядит незавершенным для редакционного фото"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010105
+    },
+    "product_ids": "258,364,365,262,263,369,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-scandi-office-hero-2",
+    "style_key": "scandi",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Скандинавский · Кабинет · hero 2",
+    "file": "hero-scandi-office-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9.25,
+      "issues": [
+        "Overly simplistic wall texture might feel slightly flat in some lighting conditions",
+        "Visible electrical sockets are standard, not designer-grade"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009445
+    },
+    "product_ids": "258,364,365,262,263,369,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-scandi-office-hero-3",
+    "style_key": "scandi",
+    "room_type": "Кабинет",
+    "kind": "hero",
+    "title": "Скандинавский · Кабинет · hero 3",
+    "file": "hero-scandi-office-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.2,
+      "issues": [
+        "Overly monochromatic terracotta palette leans towards Japandi/Minimalism rather than classic Scandi",
+        "Empty wall space feels slightly unbalanced in the center",
+        "Visible electrical outlets are not aesthetically integrated"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009835
+    },
+    "product_ids": "258,364,365,262,263,369,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-scandi-office-board",
+    "style_key": "scandi",
+    "room_type": "Кабинет",
+    "kind": "material_board",
+    "title": "Скандинавский · Кабинет · material board",
+    "file": "board-scandi-office.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "258,364,365,262,263,369,37,61,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-scandi-kitchen-hero-1",
+    "style_key": "scandi",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Скандинавский · Кухня · hero 1",
+    "file": "hero-scandi-kitchen-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.25,
+      "issues": [
+        "Overly simplistic lighting (paper lantern)",
+        "Color palette is slightly too warm/terracotta for classic Scandi",
+        "Visible lighting reflections under the cabinets are too harsh",
+        "Standard contractor-grade window frame"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010075
+    },
+    "product_ids": "23,32,38,44,365,46,49,369,66,61",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-scandi-kitchen-hero-2",
+    "style_key": "scandi",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Скандинавский · Кухня · hero 2",
+    "file": "hero-scandi-kitchen-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 6,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 5,
+      "total": 6,
+      "issues": [
+        "The color palette is overly warm and terracotta-toned, leaning towards rustic or country rather than Scandinavian",
+        "Traditional cabinet door profiles (raised panels) conflict with the typical clean lines of Nordic design",
+        "Visible budget-grade plastic outlets and poor integration of the range hood",
+        "Uninspiring lighting and flat composition"
+      ],
+      "verdict": "reject",
+      "cost": 0.0010555
+    },
+    "product_ids": "23,32,38,44,365,46,49,369,66,61",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-scandi-kitchen-hero-3",
+    "style_key": "scandi",
+    "room_type": "Кухня",
+    "kind": "hero",
+    "title": "Скандинавский · Кухня · hero 3",
+    "file": "hero-scandi-kitchen-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 6,
+      "product_score": 7,
+      "total": 6.5,
+      "issues": [
+        "AI artifacts visible on the stove and oven controls",
+        "Irrational lighting: the paper pendant lamp is too low and misplaced relative to the sink/workspace",
+        "The terracotta wall color leans more towards rustic/country than pure Scandinavian",
+        "Strange perspective distortion on the window and right cabinets",
+        "Missing countertop texture consistency"
+      ],
+      "verdict": "reject",
+      "cost": 0.0010705
+    },
+    "product_ids": "23,32,38,44,365,46,49,369,66,61",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-scandi-kitchen-board",
+    "style_key": "scandi",
+    "room_type": "Кухня",
+    "kind": "material_board",
+    "title": "Скандинавский · Кухня · material board",
+    "file": "board-scandi-kitchen.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "23,32,38,44,365,46,49,369,66,61",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bathroom-hero-1",
+    "style_key": "scandi",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Скандинавский · Санузел · hero 1",
+    "file": "hero-scandi-bathroom-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Over-exposure on the pendant light and window",
+        "Visible plumbing/silver hose under the sink",
+        "Slightly amateurish camera angle (too low and distorted)",
+        "Generic 'metro' tile grout lines are a bit repetitive for high-end editorial"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010315
+    },
+    "product_ids": "23,32,44,38,46,49,51,369,61",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bathroom-hero-2",
+    "style_key": "scandi",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Скандинавский · Санузел · hero 2",
+    "file": "hero-scandi-bathroom-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Слишком тесное кадрирование слева (дверная коробка обрезана)",
+        "Несоответствие металла: латунный смеситель диссонирует с хромированной душевой стойкой",
+        "Бюджетная модель унитаза упрощает общий вид интерьера",
+        "Неудачный ракурс, искажающий пропорции помещения"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010975
+    },
+    "product_ids": "23,32,44,38,46,49,51,369,61",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bathroom-hero-3",
+    "style_key": "scandi",
+    "room_type": "Санузел",
+    "kind": "hero",
+    "title": "Скандинавский · Санузел · hero 3",
+    "file": "hero-scandi-bathroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 7,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Slightly amateur lighting in the photo, creating hard shadows",
+        "Visible plumbing/silicone joints look a bit budget-focused",
+        "Paper lantern fixture is an unusual choice for high humidity areas"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009895
+    },
+    "product_ids": "23,32,44,38,46,49,51,369,61",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bathroom-board",
+    "style_key": "scandi",
+    "room_type": "Санузел",
+    "kind": "material_board",
+    "title": "Скандинавский · Санузел · material board",
+    "file": "board-scandi-bathroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "23,32,44,38,46,49,51,369,61",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bedroom-hero-1",
+    "style_key": "scandi",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Скандинавский · Спальня · hero 1",
+    "file": "hero-scandi-bedroom-1.webp",
+    "sort": 0,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Цветовая палитра уходит в теплый терракотовый, что ближе к джапанди или софт-минимализму, чем к классическому скандинавскому стилю",
+        "Небольшой завал вертикалей на дверных проемах по краям кадра"
+      ],
+      "verdict": "approve",
+      "cost": 0.001049
+    },
+    "product_ids": "232,364,365,369,367,268,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bedroom-hero-2",
+    "style_key": "scandi",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Скандинавский · Спальня · hero 2",
+    "file": "hero-scandi-bedroom-2.webp",
+    "sort": 1,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Style leans slightly towards Japandi/Warm Minimalism rather than classic Scandinavian due to terra-cotta textured walls and lack of cool tones",
+        "Slightly tight space between the bed and the wardrobe"
+      ],
+      "verdict": "approve",
+      "cost": 0.000977
+    },
+    "product_ids": "232,364,365,369,367,268,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bedroom-hero-3",
+    "style_key": "scandi",
+    "room_type": "Спальня",
+    "kind": "hero",
+    "title": "Скандинавский · Спальня · hero 3",
+    "file": "hero-scandi-bedroom-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Стиль ближе к Japandi или софт-минимализму из-за теплой монохромной гаммы и бумажного светильника",
+        "Недостаточно контрастных элементов, характерных для классического скандинавского стиля"
+      ],
+      "verdict": "approve",
+      "cost": 0.001025
+    },
+    "product_ids": "232,364,365,369,367,268,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-scandi-bedroom-board",
+    "style_key": "scandi",
+    "room_type": "Спальня",
+    "kind": "material_board",
+    "title": "Скандинавский · Спальня · material board",
+    "file": "board-scandi-bedroom.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "232,364,365,369,367,268,37,61,368",
+    "meta": {
+      "tier": "premium"
+    }
+  },
+  {
+    "seed_key": "style-scandi-dining-hero-1",
+    "style_key": "scandi",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Скандинавский · Столовая · hero 1",
+    "file": "hero-scandi-dining-1.webp",
+    "sort": 0,
+    "approved": true,
+    "source": "ai",
+    "score": {
+      "style_score": 9,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 9,
+      "issues": [
+        "Overly warm white balance makes the wood tones look a bit repetitive",
+        "Slightly visible door frame on the left creates a visual distraction"
+      ],
+      "verdict": "approve",
+      "cost": 0.0009445
+    },
+    "product_ids": "249,364,365,252,370,268,369,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "calm, airy, soft natural daylight, restrained styling, lots of breathing space"
+    }
+  },
+  {
+    "seed_key": "style-scandi-dining-hero-2",
+    "style_key": "scandi",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Скандинавский · Столовая · hero 2",
+    "file": "hero-scandi-dining-2.webp",
+    "sort": 1,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 7,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 8,
+      "total": 8.5,
+      "issues": [
+        "Уклон в сторону Джапанди (Japandi) из-за текстуры стен и формы светильника",
+        "Недостаток контрастных элементов, характерных для традиционного скандинавского стиля",
+        "Небольшое искажение перспективы из-за кадрирования через дверной проем"
+      ],
+      "verdict": "approve",
+      "cost": 0.0010615
+    },
+    "product_ids": "249,364,365,252,370,268,369,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "richer material contrast, warm evening light, more layered decor and textiles"
+    }
+  },
+  {
+    "seed_key": "style-scandi-dining-hero-3",
+    "style_key": "scandi",
+    "room_type": "Столовая",
+    "kind": "hero",
+    "title": "Скандинавский · Столовая · hero 3",
+    "file": "hero-scandi-dining-3.webp",
+    "sort": 2,
+    "approved": false,
+    "source": "ai",
+    "score": {
+      "style_score": 8,
+      "room_score": 10,
+      "beauty_score": 9,
+      "product_score": 9,
+      "total": 9,
+      "issues": [
+        "Style leans slightly towards Japandi due to terracotta textures and paper lamp, but fits warm Scandinavian category well."
+      ],
+      "verdict": "approve",
+      "cost": 0.0009145
+    },
+    "product_ids": "249,364,365,252,370,268,369,37,61,368",
+    "meta": {
+      "tier": "premium",
+      "variant": "editorial magazine composition, strong focal light, sculptural furniture and styled details"
+    }
+  },
+  {
+    "seed_key": "style-scandi-dining-board",
+    "style_key": "scandi",
+    "room_type": "Столовая",
+    "kind": "material_board",
+    "title": "Скандинавский · Столовая · material board",
+    "file": "board-scandi-dining.webp",
+    "sort": 10,
+    "approved": false,
+    "source": "ai",
+    "score": null,
+    "product_ids": "249,364,365,252,370,268,369,37,61,368",
+    "meta": {
+      "tier": "premium"
+    }
+  }
+]

@@ -139,7 +139,9 @@ function matchStyle(product, style) {
   if (!tags.length) return 0.5;
   const wanted = STYLE_TAGS[style] || [];
   if (!wanted.length) return 0.5;
-  return tags.some(t => wanted.includes(t)) ? 1 : 0;
+  const primary = String(style || '').toLowerCase().replace(/ё/g, 'е').trim();
+  if (tags.includes(primary)) return 1;
+  return tags.some(t => wanted.includes(t)) ? 0.6 : 0;
 }
 
 const SUGGEST_BY_ROOM = {

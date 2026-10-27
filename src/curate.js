@@ -16,7 +16,7 @@ const REFCACHE = path.join(DATA_DIR, 'refcache');
 fs.mkdirSync(REFCACHE, { recursive: true });
 fs.mkdirSync(path.join(DATA_DIR, 'products'), { recursive: true });
 
-export const CATEGORIES = ['floor', 'paint', 'wallpaper', 'tile', 'skirting', 'countertop', 'cabinet', 'faucet', 'sink', 'toilet', 'shower', 'bathtub', 'light', 'outlets', 'appliance', 'textile'];
+export const CATEGORIES = ['bed', 'wardrobe', 'sofa', 'armchair', 'coffee_table', 'dining_table', 'dining_chair', 'sideboard', 'desk', 'office_chair', 'storage', 'bench', 'rug', 'floor', 'paint', 'wallpaper', 'tile', 'skirting', 'countertop', 'cabinet', 'faucet', 'sink', 'toilet', 'shower', 'bathtub', 'light', 'outlets', 'appliance', 'textile'];
 
 const norm = s => (s || '').toLowerCase().replace(/ё/g, 'е').trim();
 const STYLE_TAGS = {
@@ -44,7 +44,8 @@ export function styleScore(product, style) {
   if (!product.style_tags) return 0.5;
   const tags = norm(product.style_tags).split(',').map(t => t.trim()).filter(Boolean);
   if (!tags.length) return 0.5;
-  return tags.some(t => wanted.includes(t)) ? 1 : 0;
+  if (tags.includes(norm(style))) return 1;
+  return tags.some(t => wanted.includes(t)) ? 0.6 : 0;
 }
 
 export function productFitsRoom(product, roomType) {

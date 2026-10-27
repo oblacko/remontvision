@@ -50,25 +50,25 @@ async function editReference(render) {
 }
 
 async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
-  const buffers = [];
-  const add = async (stored) => {
-    if (!stored || buffers.length >= 2) return;
-    try { buffers.push(await getBuffer(stored)); } catch { /* пропускаем битый референс */ }
+  const refs = [];
+  const add = async (stored, kind = 'upload', title = '') => {
+    if (!stored || refs.length >= 2) return;
+    try { refs.push({ buf: await getBuffer(stored), kind, title }); } catch { /* пропускаем битый референс */ }
   };
   if (room.style_ref_path) {
     // Пользовательский референс главнее: не подмешиваем админские/обложку.
-    await add(room.style_ref_path);
-    return { buffers, user: true };
+    await add(room.style_ref_path, 'user', 'user style reference');
+    return { refs, user: true };
   }
-  for (const ref of adminStyleRefs) await add(ref.image_path);
-  if (!buffers.length && styleInfo) {
-    if (styleInfo.preset_image_path) await add(styleInfo.preset_image_path);
+  for (const ref of adminStyleRefs) await add(ref.image_path, ref.kind || 'upload', ref.title || '');
+  if (!refs.length && styleInfo) {
+    if (styleInfo.preset_image_path) await add(styleInfo.preset_image_path, 'cover', 'style cover');
     else {
       const staticStylePath = path.join(process.cwd(), 'web', 'dist', 'images', `style-${styleInfo.key}.webp`);
-      if (fs.existsSync(staticStylePath)) buffers.push(fs.readFileSync(staticStylePath));
+      if (fs.existsSync(staticStylePath)) refs.push({ buf: fs.readFileSync(staticStylePath), kind: 'cover', title: 'style cover' });
     }
   }
-  return { buffers, user: false };
+  return { refs, user: false };
 }
 
 async function processRender(renderId) {
@@ -147,16 +147,25 @@ async function processRender(renderId) {
       });
 
       const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
+      // Один стилевой референс: оставляем 3 слота под товары/мебель.
+      const chosenStyleRefs = styleRefs.refs.slice(0, 1);
       const styleRefUrls = [];
-      for (const buf of styleRefs.buffers.slice(0, 2)) styleRefUrls.push(await bufferToDataUrl(buf));
+      for (const ref of chosenStyleRefs) styleRefUrls.push(await bufferToDataUrl(ref.buf));
 
       const productLimit = Math.max(0, 4 - styleRefUrls.length);
       const productRefs = supportsInputRefs() ? await referenceImagesDetailed(curated.filter(hasImage), productLimit) : [];
       const refIds = new Set(productRefs.map(r => Number(r.product.id)));
 
+      const styleRole = kind => kind === 'material_board'
+        ? 'material board — exact finishes, colors and fixtures; do not copy layout'
+        : kind === 'user'
+          ? 'user style reference — primary target; follow its mood and materials'
+          : kind === 'cover'
+            ? 'style cover reference — mood and materials only'
+            : 'style reference — mood, furniture character, materials and lighting; do not copy layout';
       imageMap = [
         { role: 'source room', label: 'preserve architecture, camera and room proportions' },
-        ...styleRefUrls.map(() => ({ role: styleRefs.user ? 'user style reference' : 'style reference', label: 'mood, materials and palette only' })),
+        ...chosenStyleRefs.map((ref) => ({ role: styleRole(ref.kind), label: ref.title || '' })),
         ...productRefs.map(r => ({ role: 'product reference', label: `${r.product.name} — ${r.product.category}` })),
       ];
 

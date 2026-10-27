@@ -384,13 +384,30 @@ export const q = {
   },
   deleteStyle: id => pool.query(`DELETE FROM styles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
   styleReferences: (styleId, roomType = null) =>
+    pool.query(`SELECT * FROM style_references WHERE style_id = $1 AND approved IS NOT FALSE
+                ${roomType ? 'AND (room_type IS NULL OR room_type = $2)' : ''}
+                ORDER BY ${roomType ? 'CASE WHEN room_type = $2 THEN 0 ELSE 1 END,' : ''} sort, id`,
+      roomType ? [styleId, roomType] : [styleId]).then(r => r.rows),
+  adminStyleReferences: (styleId, roomType = null) =>
     pool.query(`SELECT * FROM style_references WHERE style_id = $1
                 ${roomType ? 'AND (room_type IS NULL OR room_type = $2)' : ''}
                 ORDER BY ${roomType ? 'CASE WHEN room_type = $2 THEN 0 ELSE 1 END,' : ''} sort, id`,
       roomType ? [styleId, roomType] : [styleId]).then(r => r.rows),
-  addStyleReference: (styleId, imagePath, title = '', sort = 0, roomType = null) =>
-    pool.query(`INSERT INTO style_references (style_id, image_path, title, sort, room_type) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [styleId, imagePath, title, sort, roomType]).then(r => r.rows[0]),
+  styleReferenceById: id => pool.query(`SELECT * FROM style_references WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  styleReferenceBySeedKey: key => pool.query(`SELECT id FROM style_references WHERE seed_key = $1`, [key]).then(r => r.rows[0] || null),
+  setStyleReferenceApproval: (id, approved) =>
+    pool.query(`UPDATE style_references SET approved = $2 WHERE id = $1 RETURNING *`, [id, Boolean(approved)]).then(r => r.rows[0] || null),
+  upsertSeedStyleReference: (f) =>
+    pool.query(`INSERT INTO style_references (seed_key, style_id, image_path, title, sort, room_type, kind, source, approved, score, product_ids, meta)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                ON CONFLICT (seed_key) DO NOTHING RETURNING *`,
+      [f.seed_key, f.style_id, f.image_path, f.title || '', f.sort || 0, f.room_type || null,
+       f.kind || 'hero', f.source || 'ai', f.approved !== false,
+       f.score ? JSON.stringify(f.score) : null, f.product_ids || null, JSON.stringify(f.meta || {})])
+      .then(r => r.rows[0] || null),
+  addStyleReference: (styleId, imagePath, title = '', sort = 0, roomType = null, kind = 'upload', source = 'upload', approved = true) =>
+    pool.query(`INSERT INTO style_references (style_id, image_path, title, sort, room_type, kind, source, approved) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [styleId, imagePath, title, sort, roomType, kind, source, approved]).then(r => r.rows[0]),
   deleteStyleReference: (styleId, refId) =>
     pool.query(`DELETE FROM style_references WHERE id = $1 AND style_id = $2`, [refId, styleId]).then(r => r.rowCount > 0),
   styleProducts: (styleId, roomType = null) =>

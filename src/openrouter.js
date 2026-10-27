@@ -350,11 +350,86 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   throw lastErr || new Error('generation failed');
 }
 
+
+// Генерация изображения только по тексту (для нейтральных room shells под стилевые референсы).
+export async function generateFromText({ prompt, aspectRatio = '3:2' }) {
+  const model = getModelConfig().render;
+  const cfg = getModelConfig();
+  const advanced = supportsAdvancedOptions(model);
+  const body = {
+    model,
+    prompt,
+    aspect_ratio: advanced ? (cfg.aspectRatio === 'auto' ? aspectRatio : cfg.aspectRatio) : aspectRatio,
+    ...(advanced && cfg.resolution ? { resolution: cfg.resolution } : {}),
+  };
+  let lastErr, spent = 0;
+  for (const [attempt, [endpoint, payload]] of [[`${BASE}/images`, body], [`${BASE}/chat/completions`, {
+    model,
+    messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+    modalities: ['image', 'text'],
+    image_config: { aspect_ratio: body.aspect_ratio },
+  }]].entries()) {
+    try {
+      const r = await fetch(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(150_000) });
+      const data = await r.json().catch(() => ({}));
+      const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
+      spent += cost;
+      if (!r.ok) { lastErr = new Error(`${endpoint} ${r.status}: ${JSON.stringify(data).slice(0, 300)}`); lastErr.cost = cost; continue; }
+      const b64 = data.choices?.[0]?.message?.images?.[0]?.image_url?.url?.match(/base64,(.+)$/)?.[1] || data.data?.[0]?.b64_json;
+      if (!b64) { lastErr = new Error(`${endpoint}: нет картинки`); lastErr.cost = cost; continue; }
+      log({ event: 'text_image_endpoint', model, endpoint, attempt: attempt + 1, aspect_ratio: body.aspect_ratio, cost_usd: spent || null });
+      return { b64, cost: spent || null, model, endpoint };
+    } catch (e) { lastErr = e; }
+  }
+  if (lastErr) lastErr.cost = spent || lastErr.cost;
+  throw lastErr || new Error('text image generation failed');
+}
+
+// Оценка стилевого референса: стиль, комната, красота, наличие материалов.
+export async function scoreStyleReference(imageB64, mime, { style, roomType } = {}) {
+  const sys = `Ты арт-директор интерьерного сервиса. Оцени изображение как референс стиля.
+Верни строго JSON:
+{"style_score":0-10,"room_score":0-10,"beauty_score":0-10,"product_score":0-10,"total":0-10,"issues":["..."],"verdict":"approve|reject"}
+style_score — насколько это заявленный стиль; room_score — совпадает ли тип комнаты; beauty_score — редакционное качество, свет, композиция, материалы; product_score — видны ли качественные материалы/мебель/свет, пригодные для дизайна; total — итоговая оценка. issues — только реальные проблемы. Без текста вокруг JSON.`;
+  const user = `Стиль: ${style || 'не указан'}. Тип комнаты: ${roomType || 'не указан'}. Оцени этот референс.`;
+  const r = await fetchWithRetry(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      model: getModelConfig().vision,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: [
+          { type: 'text', text: user },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${imageB64}` } },
+        ]},
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try { parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
+  const num = v => Math.max(0, Math.min(10, Number(v) || 0));
+  const out = {
+    style_score: num(parsed.style_score),
+    room_score: num(parsed.room_score),
+    beauty_score: num(parsed.beauty_score),
+    product_score: num(parsed.product_score),
+    total: num(parsed.total || ((num(parsed.style_score) + num(parsed.room_score) + num(parsed.beauty_score) + num(parsed.product_score)) / 4)),
+    issues: Array.isArray(parsed.issues) ? parsed.issues.slice(0, 6) : [],
+    verdict: parsed.verdict === 'approve' ? 'approve' : 'reject',
+    cost: data.usage?.cost ?? null,
+  };
+  return out;
+}
+
 // Vision: читаем готовый рендер и достаём материалы, поверхности, электрику и подсказки.
 export async function parseRender(renderB64, mime = 'image/png') {
   const sys = `Ты — анализатор интерьерных рендеров. Верни строго JSON-объект без текста вокруг:
 {
-  "items": [{"category": "floor|paint|wallpaper|tile|skirting|countertop|cabinet|faucet|sink|toilet|shower|bathtub|light|outlets|appliance|textile", "description": "кратко по-русски", "keywords": ["3-5 ключевых слов"]}],
+  "items": [{"category": "bed|wardrobe|sofa|armchair|coffee_table|dining_table|dining_chair|sideboard|desk|office_chair|storage|bench|rug|floor|paint|wallpaper|tile|skirting|countertop|cabinet|faucet|sink|toilet|shower|bathtub|light|outlets|appliance|textile", "description": "кратко по-русски", "keywords": ["3-5 ключевых слов"]}],
   "surfaces": [{"surface": "walls|floor|ceiling|cabinets|countertop|backsplash|textile|trim", "description": "кратко по-русски", "hex": "#RRGGBB"}],
   "visible": ["bed","sofa","pendant light","floor","walls","kitchen cabinets","toilet","shower","..."],
   "electrical": [{"title": "кратко по-русски", "text": "рекомендация по розеткам/свету для этой комнаты"}]

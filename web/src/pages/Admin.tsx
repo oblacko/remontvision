@@ -31,7 +31,12 @@ type Style = {
   image_url: string; active: boolean; sort: number;
   references_count?: number; products_count?: number;
 }
-type StyleRef = { id: number; title: string; image_url: string; sort: number; room_type?: string | null }
+type StyleRef = {
+  id: number; title: string; image_url: string; sort: number; room_type?: string | null;
+  kind?: string; source?: string | null; approved?: boolean;
+  score?: { total?: number; style_score?: number; room_score?: number; beauty_score?: number; product_score?: number; issues?: string[] } | null;
+  product_ids?: string | null;
+}
 type Product = {
   id: number; category: string; name: string; brand?: string | null; price: number;
   unit: string; qty: number; image_path?: string | null; image_url?: string | null;
@@ -130,6 +135,7 @@ export default function Admin() {
   const [productQuery, setProductQuery] = useState('')
   const [refTitle, setRefTitle] = useState('')
   const [styleRoomType, setStyleRoomType] = useState('Все')
+  const [refRoomFilter, setRefRoomFilter] = useState('Все')
   const [styleBusy, setStyleBusy] = useState(false)
   const styleImageRef = useRef<HTMLInputElement>(null)
   const styleRefsRef = useRef<HTMLInputElement>(null)
@@ -321,6 +327,13 @@ export default function Admin() {
     try { await api('/api/admin/styles/' + selectedStyleId + '/references/' + refId, { method: 'DELETE' }); await loadStyle(selectedStyleId); await loadStyles() }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
+  const approveStyleRef = async (refId: number, approved: boolean) => {
+    if (!selectedStyleId) return
+    try {
+      await readJson(await api('/api/admin/styles/' + selectedStyleId + '/references/' + refId, { method: 'PATCH', body: JSON.stringify({ approved }) }))
+      await loadStyle(selectedStyleId); await loadStyles()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
   const addStyleProduct = async (productId: number) => {
     if (!selectedStyleId) return
     try { await readJson(await api('/api/admin/styles/' + selectedStyleId + '/products', { method: 'POST', body: JSON.stringify({ product_id: productId, room_type: styleRoomType === 'Все' ? null : styleRoomType }) })); await loadStyle(selectedStyleId); await loadStyles() }
@@ -471,13 +484,28 @@ export default function Admin() {
                   <div className="mt-6 space-y-6">
                     <section>
                       <div className="flex flex-wrap items-center justify-between gap-3"><p className="eyebrow">Референсы общего дизайна</p><span className="text-xs text-muted-foreground">{styleDetail.references.length} шт.</span></div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2"><label htmlFor="style-room-type" className="text-xs text-muted-foreground">Добавлять для комнаты:</label><select id="style-room-type" value={styleRoomType} onChange={e => setStyleRoomType(e.target.value)} className="h-10 border bg-background px-2 text-sm outline-none focus:border-primary"><option value="Все">Все комнаты</option>{roomTypeNames.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2"><label htmlFor="style-room-type" className="text-xs text-muted-foreground">Добавлять для комнаты:</label><select id="style-room-type" value={styleRoomType} onChange={e => setStyleRoomType(e.target.value)} className="h-10 border bg-background px-2 text-sm outline-none focus:border-primary"><option value="Все">Все комнаты</option>{roomTypeNames.map(t => <option key={t} value={t}>{t}</option>)}</select><label htmlFor="ref-room-filter" className="ml-2 text-xs text-muted-foreground">Показать:</label><select id="ref-room-filter" value={refRoomFilter} onChange={e => setRefRoomFilter(e.target.value)} className="h-10 border bg-background px-2 text-sm outline-none focus:border-primary"><option value="Все">Все комнаты</option>{roomTypeNames.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <input value={refTitle} onChange={e => setRefTitle(e.target.value)} placeholder="Подпись (необязательно)" className="h-10 min-w-40 flex-1 border bg-background px-3 text-sm outline-none focus:border-primary" />
                         <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border px-3 text-sm hover:bg-muted"><Upload className="size-4 text-primary-text" />Добавить фото<input ref={styleRefsRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={uploadStyleRefs} /></label>
                       </div>
+                      <p className="mt-2 text-xs text-muted-foreground">Одобренные референсы уходят в генерацию. Hero — настроение и стиль, Board — точные материалы. Альтернативы можно включить вручную.</p>
                       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {styleDetail.references.map(ref => <div key={ref.id} className="group relative border"><img src={ref.image_url} alt={ref.title} className="aspect-[4/3] w-full object-cover" />{ref.room_type && <span className="absolute left-1 top-1 bg-background/90 px-1.5 py-0.5 text-[10px]">{ref.room_type}</span>}<button type="button" onClick={() => deleteStyleRef(ref.id)} className="absolute right-1 top-1 flex size-8 items-center justify-center bg-background/90 text-destructive hover:bg-background" aria-label="Удалить референс"><X className="size-4" /></button></div>)}
+                        {styleDetail.references.filter(ref => refRoomFilter === 'Все' || ref.room_type === refRoomFilter).map(ref => (
+                          <div key={ref.id} className={`group relative border ${ref.approved === false ? 'opacity-60' : ''}`} title={ref.score?.issues?.join(' · ') || undefined}>
+                            <img src={ref.image_url} alt={ref.title} className="aspect-[4/3] w-full object-cover" />
+                            <div className="absolute left-1 top-1 flex flex-wrap gap-1">
+                              {ref.room_type && <span className="bg-background/90 px-1.5 py-0.5 text-[10px]">{ref.room_type}</span>}
+                              <span className="bg-background/90 px-1.5 py-0.5 text-[10px] uppercase">{ref.kind === 'hero' ? 'hero' : ref.kind === 'material_board' ? 'board' : 'фото'}</span>
+                              {ref.score?.total != null && <span className="bg-foreground/90 px-1.5 py-0.5 text-[10px] text-background">{ref.score.total}</span>}
+                            </div>
+                            <div className="absolute right-1 top-1 flex gap-1">
+                              <button type="button" onClick={() => approveStyleRef(ref.id, ref.approved === false)} className={`flex size-8 items-center justify-center bg-background/90 ${ref.approved === false ? 'text-primary-text' : 'text-muted-foreground'} hover:bg-background`} aria-label={ref.approved === false ? 'Одобрить' : 'Скрыть'}>{ref.approved === false ? <Check className="size-4" /> : <X className="size-4" />}</button>
+                              <button type="button" onClick={() => deleteStyleRef(ref.id)} className="flex size-8 items-center justify-center bg-background/90 text-destructive hover:bg-background" aria-label="Удалить референс"><X className="size-4" /></button>
+                            </div>
+                            {ref.approved === false && <span className="absolute bottom-1 left-1 bg-background/90 px-1.5 py-0.5 text-[10px] text-muted-foreground">не одобрен</span>}
+                          </div>
+                        ))}
                         {!styleDetail.references.length && <p className="col-span-full py-4 text-sm text-muted-foreground">Пока нет референсов. Добавьте 1–2 изображения общего настроения стиля.</p>}
                       </div>
                     </section>

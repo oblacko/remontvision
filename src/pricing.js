@@ -38,6 +38,19 @@ export const PRICE_TIER_META = {
 };
 
 export const SLOT_LABELS = {
+  bed: 'bed',
+  wardrobe: 'wardrobe',
+  sofa: 'sofa',
+  armchair: 'armchair',
+  coffee_table: 'coffee table',
+  dining_table: 'dining table',
+  dining_chair: 'dining chair',
+  sideboard: 'sideboard',
+  desk: 'desk',
+  office_chair: 'office chair',
+  storage: 'storage / shelving',
+  bench: 'bench',
+  rug: 'rug',
   floor: 'floor finish',
   wall: 'wall finish',
   backsplash: 'kitchen backsplash',
@@ -57,6 +70,19 @@ export const SLOT_LABELS = {
 };
 
 export const SLOT_LABELS_RU = {
+  bed: 'Кровать',
+  wardrobe: 'Шкаф',
+  sofa: 'Диван',
+  armchair: 'Кресло',
+  coffee_table: 'Журнальный стол',
+  dining_table: 'Обеденный стол',
+  dining_chair: 'Стулья',
+  sideboard: 'Комод / консоль',
+  desk: 'Рабочий стол',
+  office_chair: 'Рабочее кресло',
+  storage: 'Хранение',
+  bench: 'Банкетка',
+  rug: 'Ковёр',
   floor: 'Пол',
   wall: 'Стены',
   backsplash: 'Фартук',

@@ -16,6 +16,7 @@ import { ROOM_TYPE_NAMES } from './roomtypes.js';
 import { SLOT_LABELS, normalizeTier } from './pricing.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedCatalog } from './catalogseed.js';
+import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
 import { validateModelOptions } from './modelcaps.js';
 
@@ -150,6 +151,11 @@ function styleReferenceDto(ref) {
     title: ref.title,
     sort: ref.sort,
     room_type: ref.room_type || null,
+    kind: ref.kind || 'upload',
+    source: ref.source || null,
+    approved: ref.approved !== false,
+    score: ref.score || null,
+    product_ids: ref.product_ids || null,
     image_url: `/style-images/${path.basename(ref.image_path)}`,
   };
 }
@@ -458,7 +464,7 @@ app.get('/api/admin/styles/:id', h(async (req, res) => {
   res.json({
     style: styleDto(style),
     prompt_description: style.prompt_description,
-    references: (await q.styleReferences(id)).map(styleReferenceDto),
+    references: (await q.adminStyleReferences(id)).map(styleReferenceDto),
     products: (await q.styleProducts(id)).map(styleProductDto),
   });
 }));
@@ -513,10 +519,21 @@ app.post('/api/admin/styles/:id/references', upload.array('images', 8), h(async 
   for (const file of files) {
     const imagePath = await saveUpload(file, 'style-images');
     const roomType = ROOM_TYPE_NAMES.includes(String(req.body.room_type || '')) ? String(req.body.room_type) : null;
-    const ref = await q.addStyleReference(styleId, imagePath, String(req.body.title || file.originalname || '').slice(0, 200), Number(req.body.sort) || 0, roomType);
+    const ref = await q.addStyleReference(styleId, imagePath, String(req.body.title || file.originalname || '').slice(0, 200), Number(req.body.sort) || 0, roomType, 'upload', 'upload', true);
     out.push(styleReferenceDto(ref));
   }
   res.status(201).json(out);
+}));
+
+app.patch('/api/admin/styles/:id/references/:refId', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const styleId = Number(req.params.id);
+  const refId = Number(req.params.refId);
+  const ref = await q.styleReferenceById(refId);
+  if (!ref || Number(ref.style_id) !== styleId) return res.status(404).json({ error: 'Не найдено' });
+  if (typeof req.body?.approved !== 'boolean') return res.status(400).json({ error: 'Нужен approved: true/false' });
+  const row = await q.setStyleReferenceApproval(refId, req.body.approved);
+  res.json(styleReferenceDto(row));
 }));
 
 app.delete('/api/admin/styles/:id/references/:refId', h(async (req, res) => {
@@ -858,6 +875,7 @@ app.use((err, req, res, _next) => {
 async function main() {
   await migrate();          // накат миграций Postgres
   await seedCatalog();      // идемпотентный сид каталога (catalog/seed.json)
+  await seedStyleReferences(); // сгенерированные референсы стилей (style-refs/seed.json)
   await loadModelConfig();  // модели из app_settings / env
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
