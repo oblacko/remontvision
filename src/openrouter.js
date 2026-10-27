@@ -203,8 +203,8 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
 
   const styleRefText = hasStyleRef
     ? (userStyleRef
-      ? 'The user style reference is the primary target. Follow its mood, materials, palette, furniture character and level of detail. Do not copy its layout, architecture or camera angle.'
-      : 'The style reference defines the target mood, materials, palette, furniture character and level of detail. Do not copy its layout, architecture or camera angle.')
+      ? 'The user style reference is the absolute style authority. Match its mood, materials, palette, lighting fixtures, furniture silhouettes, decor and level of detail. Do not introduce a generic chandelier or any fixture that contradicts the reference. Do not copy its layout, architecture or camera angle.'
+      : 'The style reference defines the target mood, materials, palette, lighting fixtures, furniture character and level of detail. Match its fixtures and light temperature; do not substitute a generic chandelier. Do not copy its layout, architecture or camera angle.')
     : 'There is no separate style reference. Build the style from the description and the selected materials.';
   const colors = [
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
@@ -233,12 +233,21 @@ Keep the result functional, keep realistic dimensions, and do not block doors or
 COMPOSITION
 Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved if it improves the design, but built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
 
+LIGHTING DESIGN — THE MAIN WOW TOOL
+Use warm layered lighting (2700–3000K): a statement fixture that matches the chosen style/reference, plus hidden LED cove or wall wash, bedside/floor/table lamps, and under-cabinet or backlit-mirror light where relevant. Create pools of warm light, soft shadows and depth. Do not rely on a single flat ceiling light. No boob lights, cold white light, visible bulbs or dangling wires. If the reference shows a specific fixture, match it; do not substitute a generic chandelier. If the catalog includes a light product, use that fixture as the visible statement piece.
+
+CLEANUP / REALISM
+Remove visual noise from the existing room: old TVs, cable boxes, exposed wires, dangling cables, bare radiators, window air conditioners, cheap plastic blinds, old roller blinds, torn or yellowed curtains, clutter and visible meters. If a radiator or window unit must remain, integrate it behind a slim cover/grille or a neat panel. If a TV remains, mount it flush with hidden cables or use a frame TV; otherwise remove it. No visible cables anywhere.
+
+WINDOW STYLING
+Windows are a key part of the styling. Replace old blinds and curtains with new window treatments that match the style: floor-length curtains, linen sheers, or a clean Roman/roller blind. Hide the cornice and mechanism. Never keep cheap plastic horizontal or vertical blinds, torn curtains or a bare window unless the style explicitly calls for it.
+
 ROOM RULES
 ${roomRules}
 
 LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
 ${styling}
-Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. Use warm layered lighting — ceiling, bedside/floor lamps and accent light — with soft shadows and tactile material contrast. The room must feel inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
+Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
 
 CATALOG / MATERIALS
 ${catalogRule}
@@ -256,7 +265,7 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected products already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, warm and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling.`;
+Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no clutter, no old plastic blinds, no torn curtains.`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.
