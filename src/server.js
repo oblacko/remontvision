@@ -14,6 +14,7 @@ import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES } from './roomtypes.js';
 import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
+import { validateModelOptions } from './modelcaps.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -544,10 +545,8 @@ app.put('/api/admin/settings/models', h(async (req, res) => {
   const resolution = String(req.body?.resolution || '1K').trim();
   const aspectRatio = String(req.body?.aspect_ratio || 'auto').trim();
   if (!renderModel || !visionModel) return res.status(400).json({ error: 'Нужны render_model и vision_model' });
-  if (!['1K', '2K'].includes(resolution)) return res.status(400).json({ error: 'resolution: 1K или 2K' });
-  if (!['auto', '1:1', '1:2', '2:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '9:20', '20:9', '9:21', '21:9'].includes(aspectRatio)) {
-    return res.status(400).json({ error: 'Некорректный aspect_ratio' });
-  }
+  const optionsError = validateModelOptions(renderModel, resolution, aspectRatio);
+  if (optionsError) return res.status(400).json({ error: optionsError });
   const listed = await listImageModels();
   const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
   const picked = imageModels.find(m => m.id === renderModel);

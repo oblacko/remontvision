@@ -48,6 +48,18 @@ const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru
 const productImage = (p: Product) => p.image_path ? `/products/${p.image_path.split('/').pop()}` : (p.image_url || '')
 const accents = ['sand', 'dust', 'graphite', 'forest', 'terra'] as const
 const accentNames: Record<string, string> = { sand: 'Песочный', dust: 'Синева', graphite: 'Графит', forest: 'Оливковый', terra: 'Терракота' }
+const modelFamily = (id: string) =>
+  /^bytedance-seed\/seedream/.test(id) ? 'seedream'
+    : /^black-forest-labs\/flux/.test(id) ? 'flux'
+      : /^google\//.test(id) ? 'google' : 'other'
+const modelCaps: Record<string, { resolutions: string[]; aspects: string[] }> = {
+  seedream: { resolutions: ['1K', '2K'], aspects: ['auto','1:1','1:2','2:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9','9:19.5','19.5:9','9:20','20:9','9:21','21:9'] },
+  flux: { resolutions: ['768', '1K', '1.5K', '2K', '4K'], aspects: ['auto','21:9','2:1','16:9','3:2','7:5','4:3','5:4','1:1','4:5','3:4','5:7','2:3','9:16','1:2','9:21'] },
+  google: { resolutions: ['1K'], aspects: ['auto','1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9'] },
+  other: { resolutions: ['1K', '2K'], aspects: ['auto','1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9'] },
+}
+const capsFor = (id: string) => modelCaps[modelFamily(id)] || modelCaps.other
+
 const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
   render: 'генерация', iterate: 'правка', iterate_refund: 'возврат кредита', refund: 'возврат',
@@ -517,17 +529,17 @@ export default function Admin() {
                 <form onSubmit={e => { e.preventDefault(); saveModels() }} className="mt-6 space-y-5 border p-4">
                   <div>
                     <label htmlFor="render-model" className="eyebrow mb-2 block">Модель генерации</label>
-                    <select id="render-model" value={renderDraft} onChange={e => setRenderDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">
+                    <select id="render-model" value={renderDraft} onChange={e => { const value = e.target.value; const caps = capsFor(value); setRenderDraft(value); if (!caps.resolutions.includes(resolutionDraft)) setResolutionDraft(caps.resolutions[0]); if (!caps.aspects.includes(aspectDraft)) setAspectDraft(caps.aspects.includes('auto') ? 'auto' : caps.aspects[0]) }} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">
                       {modelSettings.image_models.some(m => m.id === renderDraft) ? null : <option value={renderDraft}>{renderDraft}</option>}
                       {[...modelSettings.image_models].sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}
                     </select>
                     <p className="mt-2 text-xs text-muted-foreground">{modelSettings.image_models.find(m => m.id === renderDraft)?.input_refs ? 'Поддерживает input_references — фото комнаты, референсы стиля и товаров уйдут в модель.' : 'Не заявлены input_references — фото и референсы могут не уйти. Проверьте перед включением.'}</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div><label htmlFor="resolution" className="eyebrow mb-2 block">Разрешение</label><select id="resolution" value={resolutionDraft} onChange={e => setResolutionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary"><option value="1K">1K</option><option value="2K">2K</option></select></div>
-                    <div><label htmlFor="aspect-ratio" className="eyebrow mb-2 block">Aspect ratio</label><select id="aspect-ratio" value={aspectDraft} onChange={e => setAspectDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary"><option value="auto">auto</option>{['1:1','1:2','2:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9','9:20','20:9','9:21','21:9'].map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                    <div><label htmlFor="resolution" className="eyebrow mb-2 block">Разрешение</label><select id="resolution" value={resolutionDraft} onChange={e => setResolutionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(renderDraft).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                    <div><label htmlFor="aspect-ratio" className="eyebrow mb-2 block">Aspect ratio</label><select id="aspect-ratio" value={aspectDraft} onChange={e => setAspectDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(renderDraft).aspects.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
                   </div>
-                  <p className="-mt-1 text-xs text-muted-foreground">Для Seedream 5.0 Flash: 1K + auto — модель сама выбирает кадр, итоговая пропорция затем приводится к фото. Для Gemini разрешение не отправляется, используется авто/расчётное соотношение.</p>
+                  <p className="-mt-1 text-xs text-muted-foreground">Seedream 5.0 Flash: 1K/2K + auto. FLUX 3 Image Klein: 768/1K/1.5K/2K/4K + auto или фиксированная пропорция. Для Gemini разрешение не отправляется — используется пропорция исходного фото. Итоговое изображение всегда приводится к пропорции загруженного кадра.</p>
                   <div>
                     <label htmlFor="vision-model" className="eyebrow mb-2 block">Модель разбора (vision)</label>
                     <input id="vision-model" value={visionDraft} onChange={e => setVisionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />

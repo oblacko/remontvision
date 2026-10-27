@@ -4,6 +4,7 @@
 
 import { roomTypeByName } from './roomtypes.js';
 import { getModelConfig } from './modelconfig.js';
+import { supportsAdvancedOptions } from './modelcaps.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -195,14 +196,15 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
     ...productRefs.map(b => ({ type: 'image_url', image_url: { url: b } })),
   ];
   const cfg = getModelConfig();
-  const seedream = /^bytedance-seed\/seedream/.test(model);
-  const aspect = seedream ? (cfg.aspectRatio || 'auto') : (aspectRatio || '3:2');
+  const advanced = supportsAdvancedOptions(model);
+  const aspect = advanced ? (cfg.aspectRatio || 'auto') : (aspectRatio || '3:2');
+  const resolution = advanced ? (cfg.resolution || '1K') : null;
   const body = {
     model,
     prompt,
     aspect_ratio: aspect,
     input_references: refs,
-    ...(seedream ? { resolution: cfg.resolution || '1K' } : {}),
+    ...(resolution ? { resolution } : {}),
   };
 
   const chatBody = {
@@ -250,7 +252,7 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
         endpoint,
         attempt: attempt + 1,
         aspect_ratio: aspect,
-        resolution: seedream ? (cfg.resolution || '1K') : null,
+        resolution,
         refs: refs.length,
         cost_usd: spent || null,
       });
