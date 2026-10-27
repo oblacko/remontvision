@@ -32,11 +32,15 @@ type RoomResult = {
 type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
+  pricesAsOf?: string | null;
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
+const fmtDateTime = (iso?: string | null) => iso
+  ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  : null
 
 const stylePresets = [
   { key: 'modern', name: 'Современный', accent: 'sand' },
@@ -309,6 +313,7 @@ export function GenerationPanel({
         total: room.total,
         roomId: id,
         ratio: photoRatio,
+        pricesAsOf: room.prices_as_of,
       }
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
@@ -636,6 +641,7 @@ export function GenerationPanel({
                     )) : <p className="py-4 text-sm text-muted-foreground">Подборка не сформирована — попробуйте изменить запрос.</p>}
                   </div>
                   <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
+                  {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
                 </section>
 
                 <section aria-labelledby="gen-ral">
