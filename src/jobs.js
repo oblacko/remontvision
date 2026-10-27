@@ -80,12 +80,14 @@ async function processRender(renderId) {
   const roomType = room.room_type || 'Другое';
   const roomTypeInfo = roomTypeByName(roomType);
   const priceTier = normalizeTier(room.price_tier || 'comfort');
+  const keepFurniture = room.keep_furniture !== false;
+  const useCatalog = room.use_catalog !== false;
   let stage = 'start';
 
   try {
     stage = 'analyzing';
     await q.setRoomStatus('analyzing', room.id);
-    log({ event: 'render_start', room_id: room.id, render_id: renderId, iteration, target: render.edit_target || null, price_tier: priceTier });
+    log({ event: 'render_start', room_id: room.id, render_id: renderId, iteration, target: render.edit_target || null, price_tier: priceTier, keep_furniture: keepFurniture, use_catalog: useCatalog });
 
     let prompt;
     let curated = [];
@@ -95,6 +97,8 @@ async function processRender(renderId) {
       mode: iteration ? 'edit' : 'base',
       room_type: roomType,
       price_tier: priceTier,
+      keep_furniture: keepFurniture,
+      use_catalog: useCatalog,
       style: room.style,
       target: render.edit_target || null,
       product_ids: [],
@@ -132,12 +136,12 @@ async function processRender(renderId) {
       const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
       const stylePreferred = styleInfo ? await q.styleProducts(styleInfo.id, roomType) : [];
       const allowed = new Set(roomTypeInfo?.categories || []);
-      const preferred = stylePreferred.filter(p => p.active !== false && (
+      const preferred = useCatalog ? stylePreferred.filter(p => p.active !== false && (
         p.style_room_type === roomType ||
         (!p.style_room_type && (!allowed.size || allowed.has(p.category)))
-      ));
+      )) : [];
 
-      curated = await curateProducts({
+      curated = useCatalog ? await curateProducts({
         style: room.style,
         budget: room.budget,
         priceTier,
@@ -145,7 +149,7 @@ async function processRender(renderId) {
         preferredIds: preferred.map(p => p.id),
         allowedCategories: roomTypeInfo?.categories || null,
         seed: room.id,
-      });
+      }) : [];
 
       const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
       // Один стилевой референс: оставляем 3 слота под товары/мебель.
@@ -153,8 +157,8 @@ async function processRender(renderId) {
       const styleRefUrls = [];
       for (const ref of chosenStyleRefs) styleRefUrls.push(await bufferToDataUrl(ref.buf));
 
-      const productLimit = Math.max(0, 4 - styleRefUrls.length);
-      const productRefs = supportsInputRefs() ? await referenceImagesDetailed(curated.filter(hasImage), productLimit) : [];
+      const productLimit = useCatalog ? Math.max(0, 4 - styleRefUrls.length) : 0;
+      const productRefs = useCatalog && supportsInputRefs() ? await referenceImagesDetailed(curated.filter(hasImage), productLimit) : [];
       const refIds = new Set(productRefs.map(r => Number(r.product.id)));
 
       const styleRole = kind => kind === 'material_board'
@@ -182,6 +186,8 @@ async function processRender(renderId) {
         userStyleRef: styleRefs.user,
         styleDescription: styleInfo?.prompt_description || '',
         roomType,
+        keepFurniture,
+        useCatalog,
         imageMap,
       });
 
@@ -253,11 +259,13 @@ async function processRender(renderId) {
       }
     }
 
-    const allProducts = await q.allProducts();
+    const allProducts = useCatalog ? await q.allProducts() : [];
 
     let matched = [];
-    try { matched = matchCatalog(parsed.items, allProducts); }
-    catch (e) { log({ event: 'render_match_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) }); }
+    if (useCatalog) {
+      try { matched = matchCatalog(parsed.items, allProducts); }
+      catch (e) { log({ event: 'render_match_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) }); }
+    }
 
     await q.clearItems(render.id);
     if (iteration) {
@@ -300,7 +308,7 @@ async function processRender(renderId) {
         if (!presentGroups.has(group)) { await q.saveItem(render.id, m.product.id, m.score); presentGroups.add(group); }
       }
     }
-    if (!iteration && !curated.length && !matched.length && MOCK_MODE) {
+    if (useCatalog && !iteration && !curated.length && !matched.length && MOCK_MODE) {
       for (const p of allProducts.filter(p => ['light', 'floor', 'paint', 'outlets'].includes(p.category)).slice(0, 4)) {
         await q.saveItem(render.id, p.id, 0.9);
       }

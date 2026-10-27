@@ -43,6 +43,22 @@ test('base prompt is a deep redesign with explicit keep/change and material clas
   assert.match(prompt, /Image 1|1\. source room/);
 });
 
+test('prompt modes can drop furniture and catalog', () => {
+  const prompt = buildPrompt({
+    style: 'Джапанди',
+    priceTier: 'comfort',
+    products: [PRODUCT],
+    roomType: 'Спальня',
+    keepFurniture: false,
+    useCatalog: false,
+    imageMap: [{ role: 'style reference' }],
+  });
+  assert.match(prompt, /FURNITURE MODE/);
+  assert.match(prompt, /Do not preserve the existing freestanding furniture/);
+  assert.match(prompt, /CATALOG DISABLED/);
+  assert.doesNotMatch(prompt, /Инженерная доска/);
+});
+
 test('edit prompt is short, target-specific and reference-aware', () => {
   const prompt = buildEditPrompt({
     roomType: 'Спальня',

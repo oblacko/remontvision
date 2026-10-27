@@ -168,6 +168,8 @@ export function buildPrompt({
   userStyleRef = false,
   styleDescription = '',
   roomType = 'Другое',
+  keepFurniture = true,
+  useCatalog = true,
   imageMap = [],
 }) {
   const tierKey = normalizeTier(priceTier);
@@ -175,10 +177,21 @@ export function buildPrompt({
   const styleDesc = styleDescription || STYLES[style] || STYLES['Современный'];
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room shown in the source photo';
-  const keep = String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '');
+  const keep = keepFurniture
+    ? String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '')
+    : 'the architecture, camera, perspective, walls, windows, doors, ceiling height, room proportions, built-ins, plumbing and electrical points';
   const change = String(room?.change || 'finishes, lighting, textiles, decor and styling that match the chosen style').replace(/\.+$/, '');
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
   const styling = room?.styling || 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.';
+  const furnitureRule = keepFurniture
+    ? 'Preserve the existing large furniture and functional zones. You may move or restyle freestanding furniture, but do not remove it. Keep built-ins in place.'
+    : 'Do not preserve the existing freestanding furniture. You may remove or replace it with furniture that fits the style. Keep built-ins, plumbing, electrical points and the room purpose.';
+  const catalogText = useCatalog
+    ? productsText(products)
+    : 'No catalog products are used for this render. Choose materials, lighting and furniture that best fit the style and the room. Do not add a product list or estimate.';
+  const catalogRule = useCatalog
+    ? 'The listed products are the material palette. The estimate is built from them.'
+    : 'CATALOG DISABLED: design freely from the style; the estimate will not be generated.';
   const roles = imageRolesText(imageMap);
 
   if (iteration) {
@@ -209,6 +222,9 @@ KEEP EXACTLY
 ${keep}.
 Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.
 
+FURNITURE MODE
+${furnitureRule}
+
 CHANGE / DEEP TRANSFORMATION
 ${change}.
 If a floor product is listed below, replace the floor finish with it. If no floor product is listed, preserve the existing floor. The same applies to walls: change only when a wall finish is listed.
@@ -224,9 +240,12 @@ LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
 ${styling}
 Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. Use warm layered lighting — ceiling, bedside/floor lamps and accent light — with soft shadows and tactile material contrast. The room must feel inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
 
+CATALOG / MATERIALS
+${catalogRule}
+
 MATERIAL PALETTE — use these products where they fit
-${productsText(products)}
-Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Use the listed dimensions as physical scale: furniture must look its real size relative to the room, and tile/plank patterns must match the stated format. Do not shrink a 220 cm sofa into an armchair or turn a 60×120 tile into a mosaic. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures. Small decor, plants, textiles, art and books are encouraged to complete the styling.
+${catalogText}
+Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Use the listed dimensions as physical scale: furniture must look its real size relative to the room, and tile/plank patterns must match the stated format. Do not shrink a 220 cm sofa into an armchair or turn a 60×120 tile into a mosaic. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures when the catalog is enabled. Small decor, plants, textiles, art and books are encouraged to complete the styling.
 
 STYLE
 ${styleRefText}

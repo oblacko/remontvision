@@ -33,6 +33,7 @@ type Suggestion = { target: string; label: string; product_id: number; image_url
 type Analysis = { surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[] }
 type RoomResult = {
   id: string; status: string; error?: string | null; style: string; budget: number; price_tier?: string;
+  keep_furniture?: boolean; use_catalog?: boolean;
   render?: { id: string; image: string | null; status: string; analysis?: Analysis | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
@@ -40,6 +41,7 @@ type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
   budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
+  keepFurniture?: boolean; useCatalog?: boolean;
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
@@ -142,6 +144,8 @@ export function GenerationPanel({
   const [accent, setAccent] = useState('none')
   const [scheme, setScheme] = useState('none')
   const [priceTier, setPriceTier] = useState('comfort')
+  const [keepFurniture, setKeepFurniture] = useState(true)
+  const [useCatalog, setUseCatalog] = useState(true)
   const [customOpen, setCustomOpen] = useState(false)
   const [schemeOpen, setSchemeOpen] = useState(false)
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
@@ -154,7 +158,7 @@ export function GenerationPanel({
   const [editRefFile, setEditRefFile] = useState<File | null>(null)
   const [editRefName, setEditRefName] = useState('')
   const [editRefUrl, setEditRefUrl] = useState('')
-  const [editRefUrlDraft, setEditRefUrlDraft] = useState('')
+  const [editRefDrag, setEditRefDrag] = useState(false)
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
@@ -221,6 +225,8 @@ export function GenerationPanel({
         setStyle(d.style || null)
         setRoomType(d.room_type || null)
         setPriceTier(d.price_tier || 'comfort')
+        setKeepFurniture(d.keep_furniture !== false)
+        setUseCatalog(d.use_catalog !== false)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
         setPhotoError(''); setGenError('')
@@ -244,6 +250,8 @@ export function GenerationPanel({
             total: d.total || 0,
             budget: d.budget || 150,
             priceTier: d.price_tier || 'comfort',
+            keepFurniture: d.keep_furniture !== false,
+            useCatalog: d.use_catalog !== false,
             roomId: initialRoomId,
             ratio: 4 / 3,
             pricesAsOf: d.prices_as_of,
@@ -288,6 +296,7 @@ export function GenerationPanel({
     setPhotoError(''); setGenError('')
     setRoomType(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
+    setKeepFurniture(true); setUseCatalog(true)
   }
 
   const acceptRef = (nextFile?: File) => {
@@ -328,7 +337,7 @@ export function GenerationPanel({
     setEditRefPhoto(null)
     setEditRefFile(null)
     setEditRefName('')
-    setEditRefUrl(''); setEditRefUrlDraft('')
+    setEditRefUrl('')
     if (editRefInput.current) editRefInput.current.value = ''
   }
 
@@ -341,7 +350,7 @@ export function GenerationPanel({
     setEditRefPhoto(url)
     setEditRefFile(nextFile)
     setEditRefName(nextFile.name)
-    setEditRefUrl(''); setEditRefUrlDraft('')
+    setEditRefUrl('')
   }
 
   const acceptEditRefUrl = (url: string) => {
@@ -352,7 +361,6 @@ export function GenerationPanel({
     setEditRefFile(null)
     setEditRefName('Референс по ссылке')
     setEditRefUrl(clean)
-    setEditRefUrlDraft('')
     if (editRefInput.current) editRefInput.current.value = ''
   }
 
@@ -397,6 +405,8 @@ export function GenerationPanel({
         fd.append('style', styleName)
         fd.append('room_type', roomType)
         fd.append('price_tier', priceTier)
+        fd.append('keep_furniture', keepFurniture ? '1' : '0')
+        fd.append('use_catalog', useCatalog ? '1' : '0')
         fd.append('palette', scheme)
         fd.append('accent', accent)
         if (refFile) fd.append('style_ref', refFile)
@@ -437,6 +447,8 @@ export function GenerationPanel({
         total: room.total,
         budget: room.budget,
         priceTier: room.price_tier || priceTier,
+        keepFurniture: room.keep_furniture !== false,
+        useCatalog: room.use_catalog !== false,
         roomId: id,
         ratio: photoRatio,
         pricesAsOf: room.prices_as_of,
@@ -460,7 +472,7 @@ export function GenerationPanel({
     releaseUrl(refPhoto)
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
-    setStyle(null); setAccent('none'); setScheme('none'); setPriceTier('comfort')
+    setStyle(null); setAccent('none'); setScheme('none'); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(true)
     setCustomOpen(false); setSchemeOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
     loadedRoomRef.current = ''
@@ -545,7 +557,7 @@ export function GenerationPanel({
           <div>
             <p className="eyebrow">Шаг 02 / Стиль</p>
             <h3 className="display-title mt-6 text-4xl">Выберите направление</h3>
-            {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}</p>}
+            {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Можно не выбирать стиль — тогда загрузите свой референс ниже.</p>}
             <div className="mt-8 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3 lg:grid-cols-5">
               {stylePresets.map((item) => (
                 <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { setStyle(item.name); setAccent(item.accent) }} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
@@ -645,7 +657,18 @@ export function GenerationPanel({
                   </button>
                 ))}
               </div>
-              <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description} Итоговая смета может отличаться — она ориентировочная.</p>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description} {useCatalog ? 'Итоговая смета может отличаться — она ориентировочная.' : 'Класс не используется: каталог выключен.'}</p>
+            </div>
+
+            <div className="mt-8 grid gap-px border bg-border sm:grid-cols-2">
+              <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${keepFurniture ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
+                <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
+                <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Сохраняем существующую мебель и планировку. Можно двигать и переобивать.' : 'Мебель не учитываем: AI может убрать или заменить свободно стоящую мебель. Встроенное, сантехника и электрика остаются.'}</span></span>
+              </button>
+              <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${useCatalog ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
+                <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
+                <span><span className="block text-sm font-medium">Использовать каталог</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'Подбираем реальные товары, показываем смету и ссылки.' : 'AI свободно придумывает интерьер. Смета и товары не собираются.'}</span></span>
+              </button>
             </div>
 
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
@@ -721,8 +744,8 @@ export function GenerationPanel({
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm">
-                  <span className="text-muted-foreground">Класс «{tierName(current.priceTier)}» · подборка {rub(current.total)}</span>
-                  <span className="text-muted-foreground">Итог ориентировочный</span>
+                  <span className="text-muted-foreground">{current.useCatalog === false ? 'Каталог отключён · смета не формируется' : `Класс «${tierName(current.priceTier)}» · подборка ${rub(current.total)}`}</span>
+                  <span className="text-muted-foreground">{current.useCatalog === false ? 'Свободный дизайн' : 'Итог ориентировочный'}</span>
                 </div>
                 {current.analysis?.suggestions?.length ? (
                   <div className="mt-6 border p-4">
@@ -766,15 +789,50 @@ export function GenerationPanel({
                               ))}
                             </div>
                             <div className="mt-3 flex flex-col gap-2">
-                              <input value={refineText} onChange={(event) => setRefineText(event.target.value)} placeholder="Или опишите правку словами…" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                              <div className="flex flex-wrap items-center gap-2">
-                                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground">
-                                  <Upload className="size-3.5 text-primary-text" />Прикрепить референс
-                                  <input ref={editRefInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptEditRef(event.target.files?.[0])} />
-                                </label>
-                                <input value={editRefUrlDraft} onChange={(event) => setEditRefUrlDraft(event.target.value)} onBlur={() => { if (editRefUrlDraft) acceptEditRefUrl(editRefUrlDraft) }} onKeyDown={(event) => { if (event.key === 'Enter' && editRefUrlDraft) { event.preventDefault(); acceptEditRefUrl(editRefUrlDraft) } }} placeholder="или ссылка на референс" className="h-10 min-w-36 flex-1 border bg-background px-2 text-xs outline-none focus:border-primary" />
-                                {editRefPhoto ? <span className="inline-flex min-h-10 items-center gap-2 border border-foreground/30 px-2 text-xs"><img src={editRefPhoto} alt="" className="size-8 object-cover" /><span className="max-w-28 truncate">{editRefName}</span><button type="button" onClick={clearEditRef} className="p-1 text-destructive" aria-label="Убрать референс"><X className="size-3.5" /></button></span> : null}
-                                {!editRefPhoto && editRefUrl ? <span className="inline-flex min-h-10 max-w-48 items-center gap-2 border border-foreground/30 px-2 text-xs"><a href={editRefUrl} target="_blank" rel="noopener noreferrer" className="truncate underline underline-offset-2">{editRefUrl}</a><button type="button" onClick={clearEditRef} className="p-1 text-destructive" aria-label="Убрать референс"><X className="size-3.5" /></button></span> : null}
+                              <input value={refineText} onChange={(event) => setRefineText(event.target.value)} onPaste={(event) => {
+                                const file = event.clipboardData.files?.[0]
+                                if (file) { event.preventDefault(); acceptEditRef(file); return }
+                                const text = event.clipboardData.getData('text').trim()
+                                if (/^https?:\/\//i.test(text)) { event.preventDefault(); acceptEditRefUrl(text) }
+                              }} placeholder="Опишите правку. Можно вставить сюда ссылку на референс…" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
+                              <div
+                                className={`rounded-none border border-dashed p-2 transition-colors ${editRefDrag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
+                                onDragOver={(event) => { event.preventDefault(); setEditRefDrag(true) }}
+                                onDragLeave={() => setEditRefDrag(false)}
+                                onDrop={(event) => {
+                                  event.preventDefault(); setEditRefDrag(false)
+                                  const file = event.dataTransfer.files?.[0]
+                                  if (file) { acceptEditRef(file); return }
+                                  const text = event.dataTransfer.getData('text').trim()
+                                  if (/^https?:\/\//i.test(text)) acceptEditRefUrl(text)
+                                }}
+                                onPaste={(event) => {
+                                  const file = event.clipboardData.files?.[0]
+                                  if (file) { event.preventDefault(); acceptEditRef(file); return }
+                                  const text = event.clipboardData.getData('text').trim()
+                                  if (/^https?:\/\//i.test(text)) { event.preventDefault(); acceptEditRefUrl(text) }
+                                }}
+                              >
+                                {editRefPhoto ? (
+                                  <div className="flex items-center gap-2">
+                                    <img src={editRefPhoto} alt="" className="h-12 w-12 border object-cover" />
+                                    <span className="min-w-0 flex-1 truncate text-xs">{editRefName}</span>
+                                    <button type="button" onClick={clearEditRef} className="flex size-8 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
+                                  </div>
+                                ) : editRefUrl ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="flex size-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</span>
+                                    <a href={editRefUrl} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-xs underline underline-offset-2">{editRefUrl}</a>
+                                    <button type="button" onClick={clearEditRef} className="flex size-8 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
+                                  </div>
+                                ) : (
+                                  <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center gap-1 text-center">
+                                    <Upload className="size-4 text-primary-text" />
+                                    <span className="text-xs">Перетащите, вставьте из буфера или нажмите</span>
+                                    <span className="text-[11px] leading-4 text-muted-foreground">файл JPG/PNG/WebP или ссылка на референс</span>
+                                    <input ref={editRefInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptEditRef(event.target.files?.[0])} />
+                                  </label>
+                                )}
                               </div>
                               <button type="button" disabled={!refineText.trim()} onClick={() => startGeneration(refineText.trim(), item.styleName, { parentId: item.id, refFile: editRefFile || undefined, refUrl: editRefUrl || undefined })} className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                                 Перегенерировать <RotateCcw className="size-4" />

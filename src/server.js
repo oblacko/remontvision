@@ -752,6 +752,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   if (!requireAuth(req, res)) return;
   const photo = req.files?.photo?.[0];
   const styleRef = req.files?.style_ref?.[0];
+  const styleRefUrl = String(req.body?.style_ref_url || '').trim();
   if (!photo) return res.status(400).json({ error: 'Нет фото' });
   if (!MOCK_MODE) {
     const bal = await q.creditBalance(req.user.id);
@@ -767,31 +768,40 @@ app.post('/api/rooms', rateLimit, upload.fields([
   ];
   const requestedStyle = String(req.body?.style || '').trim();
   const requestedRoomType = String(req.body?.room_type || '').trim();
+  if (!requestedStyle && !styleRef && !styleRefUrl) {
+    return res.status(400).json({ error: 'Выберите стиль или загрузите референс' });
+  }
+  if (requestedStyle === 'Референс пользователя' && !styleRef && !styleRefUrl) {
+    return res.status(400).json({ error: 'Для стиля по референсу загрузите изображение или ссылку' });
+  }
   const roomType = ROOM_TYPE_NAMES.includes(requestedRoomType) ? requestedRoomType : 'Другое';
   const dbStyle = requestedStyle ? await q.styleByName(requestedStyle) : null;
-  const style = dbStyle && dbStyle.active ? dbStyle.name
-    : (allowedStyles.includes(requestedStyle) ? requestedStyle : 'Современный');
+  const style = requestedStyle
+    ? (dbStyle && dbStyle.active ? dbStyle.name : (allowedStyles.includes(requestedStyle) ? requestedStyle : 'Современный'))
+    : 'Референс пользователя';
   const allowedPalettes = new Set(['none', 'mono', 'analogous', 'complementary', 'split']);
   const allowedAccents = new Set(['none', 'forest', 'sand', 'terra', 'dust', 'graphite']);
   const palette = allowedPalettes.has(req.body.palette) ? req.body.palette : 'none';
   const accent = allowedAccents.has(req.body.accent) ? req.body.accent : 'none';
   const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 1000);
   const priceTier = normalizeTier(String(req.body.price_tier || req.body.tier || '').trim(), 'comfort');
+  const bool = (value, fallback = true) => value === undefined || value === null || value === ''
+    ? fallback
+    : !(value === false || value === 0 || value === '0' || value === 'false' || value === 'off');
+  const keepFurniture = bool(req.body.keep_furniture, true);
+  const useCatalog = bool(req.body.use_catalog, true);
   const photoKey = await saveUpload(photo, 'uploads');
   let styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
-  if (!styleRefKey) {
-    const styleRefUrl = String(req.body?.style_ref_url || '').trim();
-    if (styleRefUrl) {
-      try {
-        const img = await fetchRemoteImage(styleRefUrl);
-        styleRefKey = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
-      } catch (e) {
-        await remove(photoKey);
-        return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}` });
-      }
+  if (!styleRefKey && styleRefUrl) {
+    try {
+      const img = await fetchRemoteImage(styleRefUrl);
+      styleRefKey = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
+    } catch (e) {
+      await remove(photoKey);
+      return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}` });
     }
   }
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
@@ -825,6 +835,8 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     room_type: room.room_type,
     budget: room.budget,
     price_tier: room.price_tier || 'comfort',
+    keep_furniture: room.keep_furniture !== false,
+    use_catalog: room.use_catalog !== false,
     status: room.status,
     error: room.error,
     photo_url: `/files/${path.basename(room.photo_path)}`,
