@@ -10,6 +10,7 @@ import { MOCK_MODE, buildPrompt, generateRender, parseRender, matchCatalog, snap
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { curateProducts, referenceImages, hasImage } from './curate.js';
+import { roomTypeByName } from './roomtypes.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -43,17 +44,22 @@ async function processRender(renderId) {
     let styleInfo = null;
     let adminStyleRefs = [];
     let hasStyleRef = false;
+    const roomType = room.room_type || 'Другое';
+    const roomTypeInfo = roomTypeByName(roomType);
     if (iteration) {
-      prompt = buildPrompt({ style: room.style, budget: room.budget, requestText: render.request_text, iteration: true });
+      prompt = buildPrompt({ style: room.style, budget: room.budget, requestText: render.request_text, iteration: true, roomType });
     } else {
       styleInfo = await q.styleByName(room.style);
       adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id) : [];
       const preferred = styleInfo ? await q.styleProducts(styleInfo.id) : [];
-      hasStyleRef = Boolean(room.style_ref_path) || adminStyleRefs.length > 0;
+      const staticStylePath = styleInfo ? path.join(process.cwd(), 'web', 'dist', 'images', `style-${styleInfo.key}.webp`) : null;
+      const hasStaticStyleRef = Boolean(styleInfo && (styleInfo.preset_image_path || (staticStylePath && fs.existsSync(staticStylePath))));
+      hasStyleRef = Boolean(room.style_ref_path) || adminStyleRefs.length > 0 || hasStaticStyleRef;
       curated = await curateProducts({
         style: room.style,
         budget: room.budget,
         preferredIds: preferred.map(p => p.id),
+        allowedCategories: roomTypeInfo?.categories || null,
       });
       prompt = buildPrompt({
         style: room.style,
@@ -63,6 +69,7 @@ async function processRender(renderId) {
         accent: room.accent || 'none',
         hasStyleRef,
         styleDescription: styleInfo?.prompt_description || '',
+        roomType,
       });
     }
     await q.setRenderPrompt(renderId, prompt);
@@ -70,14 +77,21 @@ async function processRender(renderId) {
     let imageB64, cost = null, model = null, targetRatio = null;
     const styleRefs = [];
     if (!iteration && supportsInputRefs()) {
-      const paths = [];
-      if (room.style_ref_path) paths.push(room.style_ref_path);
-      for (const ref of adminStyleRefs) {
-        if (paths.length >= 2) break;
-        paths.push(ref.image_path);
+      const buffers = [];
+      const addStored = async (storedPath) => {
+        if (!storedPath || buffers.length >= 2) return;
+        try { buffers.push(await getBuffer(storedPath)); } catch { /* пропускаем битый референс */ }
+      };
+      if (room.style_ref_path) await addStored(room.style_ref_path);
+      for (const ref of adminStyleRefs) await addStored(ref.image_path);
+      if (!buffers.length && styleInfo) {
+        if (styleInfo.preset_image_path) await addStored(styleInfo.preset_image_path);
+        else {
+          const staticStylePath = path.join(process.cwd(), 'web', 'dist', 'images', `style-${styleInfo.key}.webp`);
+          if (fs.existsSync(staticStylePath)) buffers.push(fs.readFileSync(staticStylePath));
+        }
       }
-      for (const refPath of paths) {
-        const refBuf = await getBuffer(refPath);
+      for (const refBuf of buffers.slice(0, 2)) {
         styleRefs.push(`data:${MIME_BY_EXT[detectImageExt(refBuf)] || 'image/jpeg'};base64,${refBuf.toString('base64')}`);
       }
     }
@@ -107,7 +121,7 @@ async function processRender(renderId) {
         aspectRatio,
       });
       imageB64 = out.b64; cost = out.cost; model = out.model || null;
-      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, refs: refs.length, curated: curated.length, cost_usd: cost, ms: Date.now() - t0 });
+      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, style_refs: styleRefs.length, refs: refs.length, curated: curated.length, cost_usd: cost, ms: Date.now() - t0 });
     }
 
     const rawBytes = Buffer.from(imageB64, 'base64');

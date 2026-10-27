@@ -62,10 +62,10 @@ export async function migrate() {
 // ---------- запросы ----------
 export const q = {
   // rooms
-  createRoom: (id, style, budget, photoPath, userId, palette = null, accent = null, styleRefPath = null) =>
-    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, palette, accent, style_ref_path)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, style, budget, photoPath, userId, palette, accent, styleRefPath]),
+  createRoom: (id, style, budget, photoPath, userId, roomType = null, palette = null, accent = null, styleRefPath = null) =>
+    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, room_type, palette, accent, style_ref_path)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, style, budget, photoPath, userId, roomType, palette, accent, styleRefPath]),
   getRoom: id => pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   roomByPhotoKey: key =>
     pool.query(`SELECT user_id FROM rooms WHERE photo_path = $1 OR photo_path LIKE '%/' || $1 LIMIT 1`, [key])
@@ -202,7 +202,8 @@ export const q = {
       .then(r => r.rows),
   userGenerations: userId =>
     pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at, r.request_text,
-                       r.image_path, rm.style, rm.budget, rm.photo_path,
+                       r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms,
+                       rm.style, rm.budget, rm.photo_path, rm.room_type,
                        GREATEST(0,
                          COALESCE((SELECT SUM(-ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.delta < 0), 0)
                          - COALESCE((SELECT SUM(ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.reason = 'iterate_refund'), 0)
@@ -212,6 +213,18 @@ export const q = {
       .then(r => r.rows),
 
   // админка: аккаунты
+  adminRenders: (limit = 100) =>
+    pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at,
+                       r.request_text, r.prompt, r.model, r.cost_usd, r.duration_ms, r.image_path,
+                       rm.style, rm.room_type, rm.budget, rm.photo_path, u.email,
+                       GREATEST(0,
+                         COALESCE((SELECT SUM(-ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.delta < 0), 0)
+                         - COALESCE((SELECT SUM(ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.reason = 'iterate_refund'), 0)
+                       )::int AS credits_spent
+                FROM renders r JOIN rooms rm ON rm.id = r.room_id JOIN users u ON u.id = rm.user_id
+                ORDER BY r.created_at DESC LIMIT $1`, [Math.min(Math.max(Number(limit) || 100, 1), 500)])
+      .then(r => r.rows),
+
   adminUsers: search =>
     pool.query(`SELECT u.id, u.email, u.created_at,
                        COALESCE((SELECT SUM(delta) FROM credit_txn WHERE user_id = u.id), 0)::int AS balance,

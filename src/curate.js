@@ -38,12 +38,13 @@ function styleScore(product, style) {
   return tags.some(t => wanted.includes(t)) ? 1 : 0;
 }
 
-export async function curateProducts({ style, budget, preferredIds = [] }) {
+export async function curateProducts({ style, budget, preferredIds = [], allowedCategories = null }) {
   const budgetRub = budget * 1000;
   const all = await q.allProducts();
-  const preferred = all.filter(p => preferredIds.map(Number).includes(Number(p.id)));
+  const cats = Array.isArray(allowedCategories) && allowedCategories.length ? allowedCategories : CATEGORIES;
+  const preferred = all.filter(p => preferredIds.map(Number).includes(Number(p.id)) && cats.includes(p.category));
   const chosen = [];
-  for (const cat of CATEGORIES) {
+  for (const cat of cats) {
     const pinned = preferred.find(p => p.category === cat);
     if (pinned) { chosen.push(pinned); continue; }
     const share = (BUDGET_SHARE[cat] || 0.1) * budgetRub;

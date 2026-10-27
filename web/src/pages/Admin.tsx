@@ -3,16 +3,24 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles'
+type Tab = 'users' | 'packs' | 'styles' | 'prompts'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
 }
 type CreditRow = { id: number; delta: number; reason: string; note: string | null; created_at: string }
 type GenRow = {
-  id: string; room_id: string; style: string; status: string; request_text: string | null;
+  id: string; room_id: string; style: string; room_type?: string | null; status: string; request_text: string | null;
   credits_spent: number; created_at: string; finished_at: string | null;
+  prompt: string | null; model: string | null; cost_usd: number | null; duration_ms: number | null;
   image_url: string | null; photo_url: string | null; error: string | null;
+}
+type PromptRow = {
+  id: string; room_id: string; email: string; style: string; room_type: string | null; budget: number;
+  status: string; error: string | null; created_at: string; finished_at: string | null;
+  request_text: string | null; prompt: string | null; model: string | null;
+  cost_usd: number | null; duration_ms: number | null; credits_spent: number | null;
+  image_url: string | null; photo_url: string | null;
 }
 type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
@@ -84,6 +92,8 @@ export default function Admin() {
   const [editPackId, setEditPackId] = useState<string | null>(null)
   const [packForm, setPackForm] = useState({ id: '', title: '', credits: '2', price: '99', active: true, sort: '10' })
 
+  const [promptRows, setPromptRows] = useState<PromptRow[]>([])
+  const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
   const [selectedStyleId, setSelectedStyleId] = useState<number | null>(null)
   const [styleDetail, setStyleDetail] = useState<StyleDetail | null>(null)
@@ -138,6 +148,10 @@ export default function Admin() {
     try { setStyles(await readJson(await api('/api/admin/styles'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
+  const loadPrompts = async () => {
+    try { setPromptRows(await readJson(await api('/api/admin/renders?limit=150'))); }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
   const loadStyle = async (id: number) => {
     setSelectedStyleId(id)
     try {
@@ -152,7 +166,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -271,6 +285,12 @@ export default function Admin() {
     try { await api('/api/admin/styles/' + selectedStyleId + '/products/' + productId, { method: 'DELETE' }); await loadStyle(selectedStyleId); await loadStyles() }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
+  const filteredPrompts = useMemo(() => {
+    const q = promptQuery.trim().toLowerCase()
+    if (!q) return promptRows
+    return promptRows.filter(p => [p.email, p.style, p.room_type, p.prompt, p.request_text].filter(Boolean).join(' ').toLowerCase().includes(q))
+  }, [promptRows, promptQuery])
+
   const filteredProducts = useMemo(() => {
     const q = productQuery.trim().toLowerCase()
     return allProducts.filter(p => !styleDetail?.products.some(sp => sp.id === p.id) && (!q || p.name.toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)))
@@ -307,7 +327,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -347,7 +367,7 @@ export default function Admin() {
                     </div>
                     <h3 className="eyebrow mt-6">Генерации</h3>
                     <div className="mt-2 divide-y border-y">
-                      {userDetail.generations.map(g => <div key={g.id} className="flex gap-3 py-3"><AdminImage src={g.image_url || g.photo_url} kind={g.image_url ? 'renders' : 'files'} alt="" /><div className="min-w-0 text-xs"><p className="truncate font-medium">{g.request_text || `Дизайн · ${g.style}`}</p><p className="mt-1 text-muted-foreground">{dateTime(g.created_at)} · {g.status} · {g.credits_spent} кр.</p>{g.error && <p className="mt-1 line-clamp-2 text-destructive">{g.error}</p>}</div></div>)}
+                      {userDetail.generations.map(g => <div key={g.id} className="flex gap-3 py-3"><AdminImage src={g.image_url || g.photo_url} kind={g.image_url ? 'renders' : 'files'} alt="" /><div className="min-w-0 flex-1 text-xs"><p className="truncate font-medium">{g.request_text || `Дизайн · ${g.style}`}</p><p className="mt-1 text-muted-foreground">{dateTime(g.created_at)} · {g.status} · {g.credits_spent} кр.{g.room_type ? ` · ${g.room_type}` : ''}</p>{g.error && <p className="mt-1 line-clamp-2 text-destructive">{g.error}</p>}{g.prompt && <details className="mt-2"><summary className="cursor-pointer text-[11px] text-muted-foreground">Промт</summary><pre className="mt-1 max-h-44 overflow-auto whitespace-pre-wrap border bg-muted p-2 text-[10px] leading-4">{g.prompt}</pre></details>}</div></div>)}
                       {!userDetail.generations.length && <p className="py-4 text-sm text-muted-foreground">Генераций пока нет</p>}
                     </div>
                   </>
@@ -432,6 +452,32 @@ export default function Admin() {
                   </div>
                 )}
               </section>
+            </div>
+          )}
+
+          {tab === 'prompts' && (
+            <div className="mt-8">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div><p className="eyebrow">Промты</p><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Что уходит модели: тип комнаты, стиль, бюджет, товары, ограничения и ссылка на референсы стиля. Здесь видно, почему появилась та или иная люстра или предмет.</p></div>
+                <div className="relative w-full sm:w-80"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={promptQuery} onChange={e => setPromptQuery(e.target.value)} placeholder="E-mail, стиль, тип или текст промта" className="h-10 w-full border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary" /></div>
+              </div>
+              <div className="mt-4 space-y-4">
+                {filteredPrompts.map(p => (
+                  <article key={p.id} className="border p-4">
+                    <div className="flex gap-4">
+                      <AdminImage src={p.image_url || p.photo_url} kind={p.image_url ? 'renders' : 'files'} alt="" />
+                      <div className="min-w-0 flex-1 text-xs">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-sm">{p.email}</b><span className="font-mono uppercase tracking-wider text-muted-foreground">{p.status} · {dateTime(p.created_at)}</span></div>
+                        <p className="mt-1 text-muted-foreground">{p.style}{p.room_type ? ` · ${p.room_type}` : ''} · бюджет {p.budget} 000 ₽ · {p.credits_spent ?? '—'} кр.</p>
+                        <p className="mt-1 text-muted-foreground">{p.model || '—'} · {p.cost_usd != null ? `$${p.cost_usd}` : '—'}{p.duration_ms ? ` · ${(p.duration_ms / 1000).toFixed(1)} с` : ''}</p>
+                        <p className="mt-1">{p.request_text || 'Базовый дизайн'}</p>
+                      </div>
+                    </div>
+                    {p.prompt ? <details className="mt-3 border-t pt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Промт модели <span className="ml-2 underline">показать</span></summary><div className="mt-2"><button type="button" onClick={() => { navigator.clipboard?.writeText(p.prompt || '').catch(() => {}) }} className="mb-2 text-[11px] underline">копировать</button><pre className="max-h-80 overflow-auto whitespace-pre-wrap border bg-muted p-3 text-[11px] leading-5">{p.prompt}</pre></div></details> : <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">Промт не сохранён</p>}
+                  </article>
+                ))}
+                {!filteredPrompts.length && <p className="border border-dashed p-8 text-center text-sm text-muted-foreground">Промтов пока нет.</p>}
+              </div>
             </div>
           )}
         </main>

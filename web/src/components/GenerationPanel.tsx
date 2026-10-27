@@ -32,12 +32,16 @@ type RoomResult = {
 type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
-  pricesAsOf?: string | null;
+  budget: number; pricesAsOf?: string | null;
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
+const budgetInfo = (total: number, budgetThousands: number) => {
+  const diff = total - budgetThousands * 1000
+  return diff > 0 ? `Выше бюджета на ${rub(diff)}` : `В бюджете · остаток ${rub(-diff)}`
+}
 const fmtDateTime = (iso?: string | null) => iso
   ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   : null
@@ -104,6 +108,7 @@ const socketMarks = [
 ] as const
 
 const stepLabels = ['Фото', 'Стиль', 'Результат', 'Смета'] as const
+const roomTypes = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое'] as const
 
 function stepIndex(step: Step): number {
   if (step === 'photo') return 0
@@ -151,6 +156,7 @@ export function GenerationPanel({
   onRefreshUser: () => void | Promise<void>
 }) {
   const [step, setStep] = useState<Step>('photo')
+  const [roomType, setRoomType] = useState<string | null>(null)
   const [stylePresets, setStylePresets] = useState<StylePreset[]>(defaultStylePresets)
   const [photo, setPhoto] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -240,6 +246,7 @@ export function GenerationPanel({
     setPhotoRatio(4 / 3)
     setPhotoName(nextFile.name)
     setPhotoError(''); setGenError('')
+    setRoomType(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
   }
 
@@ -283,6 +290,7 @@ export function GenerationPanel({
 
   async function startGeneration(request: string, styleName: string) {
     if (!file) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
+    if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
     setBusy(true); setGenError(''); setRefineText(''); setProgress(3); setStep('generating')
     try {
@@ -292,6 +300,7 @@ export function GenerationPanel({
         const fd = new FormData()
         fd.append('photo', file)
         fd.append('style', styleName)
+        fd.append('room_type', roomType)
         fd.append('budget', String(budget))
         fd.append('palette', scheme)
         fd.append('accent', accent)
@@ -325,6 +334,7 @@ export function GenerationPanel({
         styleName,
         items: room.items,
         total: room.total,
+        budget: room.budget,
         roomId: id,
         ratio: photoRatio,
         pricesAsOf: room.prices_as_of,
@@ -345,7 +355,7 @@ export function GenerationPanel({
     releaseUrl(photo)
     releaseUrl(refPhoto)
     setStep('photo')
-    setPhoto(null); setFile(null); setPhotoName(''); setPhotoError('')
+    setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setStyle(null); setAccent('none'); setScheme('none'); setBudget(150)
     setCustomOpen(false); setSchemeOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setUsedRef(null)
@@ -405,9 +415,19 @@ export function GenerationPanel({
                   <span className="mt-2 text-sm leading-6 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP · до 15 МБ</span>
                 </label>
               )}
+              {photo && (
+                <div className="mt-5">
+                  <p className="eyebrow">Тип комнаты</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Чтобы в дизайне не появились предметы из другого помещения.</p>
+                  <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
+                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => setRoomType(type)} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
+                  </div>
+                </div>
+              )}
               <div className="mt-4" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
                 {photoError && <p className="mb-3 text-sm text-destructive" role="alert">{photoError}</p>}
-                <button type="button" disabled={!photo} onClick={() => setStep('style')} className="action-primary w-full disabled:opacity-40">
+                {photo && !roomType && <p className="mb-3 text-xs text-muted-foreground">Выберите тип комнаты, чтобы продолжить.</p>}
+                <button type="button" disabled={!photo || !roomType} onClick={() => setStep('style')} className="action-primary w-full disabled:opacity-40">
                   Продолжить <ArrowRight className="size-4" />
                 </button>
               </div>
@@ -419,6 +439,7 @@ export function GenerationPanel({
           <div>
             <p className="eyebrow">Шаг 02 / Стиль</p>
             <h3 className="display-title mt-6 text-4xl">Выберите направление</h3>
+            {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}</p>}
             <div className="mt-8 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3 lg:grid-cols-5">
               {stylePresets.map((item) => (
                 <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { setStyle(item.name); setAccent(item.accent) }} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
@@ -495,6 +516,7 @@ export function GenerationPanel({
               </div>
               <Slider min={50} max={1000} step={25} value={[budget]} onValueChange={(value) => setBudget(value[0])} aria-label="Бюджет на материалы в тысячах рублей" className="mt-5 rounded-none" />
               <div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>50 тыс.</span><span>1 млн ₽</span></div>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">Бюджет влияет на подбор товаров и уровень материалов. Итоговая смета может отличаться — она ориентировочная.</p>
             </div>
 
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
@@ -565,6 +587,10 @@ export function GenerationPanel({
                       <Download className="size-5" />
                     </a>
                   </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm">
+                  <span className="text-muted-foreground">Бюджет {current.budget} 000 ₽ · подборка {rub(current.total)}</span>
+                  <span className={current.total > current.budget * 1000 ? 'text-destructive' : 'text-primary-text'}>{budgetInfo(current.total, current.budget)}</span>
                 </div>
 
               </div>
@@ -655,6 +681,7 @@ export function GenerationPanel({
                     )) : <p className="py-4 text-sm text-muted-foreground">Подборка не сформирована — попробуйте изменить запрос.</p>}
                   </div>
                   <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
+                  <p className={current.total > current.budget * 1000 ? 'mt-1 text-right text-xs text-destructive' : 'mt-1 text-right text-xs text-primary-text'}>{budgetInfo(current.total, current.budget)}</p>
                   {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
                 </section>
 

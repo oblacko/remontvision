@@ -2,6 +2,8 @@
 // Документация: https://openrouter.ai/docs/guides/overview/multimodal/image-generation
 // Если задан HTTPS_PROXY/S3-прокси — гоним через него (нативный fetch env-прокси не читает).
 
+import { roomTypeByName } from './roomtypes.js';
+
 const BASE = 'https://openrouter.ai/api/v1';
 
 const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
@@ -136,16 +138,20 @@ const ACCENTS = {
   graphite: 'graphite',
 };
 
-export function buildPrompt({ style, budget, requestText, iteration, products, palette = 'none', accent = 'none', hasStyleRef = false, styleDescription = '' }) {
+export function buildPrompt({ style, budget, requestText, iteration, products, palette = 'none', accent = 'none', hasStyleRef = false, styleDescription = '', roomType = 'Другое' }) {
   const styleDesc = styleDescription || STYLES[style] || STYLES['Современный'];
-  const keep = 'CRITICAL: keep the exact same camera angle, walls positions, window and door openings. Do not change the room geometry or layout. Photorealistic professional interior photography.';
+  const room = roomTypeByName(roomType);
+  const roomRule = room ? `This room is a ${room.prompt}. ${room.forbid}` : '';
+  const keep = `CRITICAL: keep the exact same camera angle, walls positions, window and door openings. Do not change the room geometry or layout. Photorealistic professional interior photography. ${roomRule}`.trim();
   if (iteration) {
     return `${keep} Apply ONLY this change to the interior: "${requestText}". Keep everything else exactly as in the source image.`;
   }
+  const budgetTier = budget <= 80 ? 'budget-conscious' : budget <= 300 ? 'mid-range' : 'premium';
+  const budgetNote = `Target total materials budget: about ${budget} thousand RUB (${budgetTier}). Prefer materials and furniture whose combined cost fits this target; if the selected products require more, keep the remaining items modest.`;
   const extras = [
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
     ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
-    hasStyleRef ? 'Use the uploaded style reference for mood, materials and palette; do not copy its room layout.' : '',
+    hasStyleRef ? 'Use the attached style references for mood, materials and palette; do not copy their room layout.' : '',
   ].filter(Boolean).join(' ');
   // новое ядро: рисуем ИЗ товаров каталога — их фото уходят референсами (input_references)
   if (products?.length) {
@@ -154,9 +160,9 @@ export function buildPrompt({ style, budget, requestText, iteration, products, p
       const attrs = Object.entries(p.attrs || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
       return `${i + 1}) ${p.name}${p.brand ? ` (${p.brand})` : ''} — ${p.category}${attrs ? ` [${attrs}]` : ''}`;
     }).join('; ');
-    return `${keep} Redesign this room in ${styleDesc} style. ${extras} Use EXACTLY these specific products in the interior${hasRefs ? ' (reference photos attached)' : ''}: ${list}. Match the specified colors and materials; do not substitute unrelated products. Keep the listed products visually recognizable in the result. Materials budget context ~${budget} thousand RUB.`;
+    return `${keep} ${budgetNote} Redesign this room in ${styleDesc} style. ${extras} Use EXACTLY these specific products in the interior${hasRefs ? ' (reference photos attached)' : ''}: ${list}. Match the specified colors and materials; do not substitute unrelated products. Keep the listed products visually recognizable in the result.`;
   }
-  return `${keep} Redesign this room in ${styleDesc} style. ${extras} Materials and furniture for a total materials budget around ${budget} thousand RUB. Realistic materials, believable lighting.`;
+  return `${keep} ${budgetNote} Redesign this room in ${styleDesc} style. ${extras} Realistic materials, believable lighting.`;
 }
 
 // OpenRouter принимает только фиксированные пропорции — подбираем ближайшую к реальному фото.

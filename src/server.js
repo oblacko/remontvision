@@ -12,6 +12,7 @@ import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, y
 import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
+import { ROOM_TYPE_NAMES } from './roomtypes.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -168,6 +169,7 @@ function generationDto(g) {
     id: g.id,
     room_id: g.room_id,
     style: g.style,
+    room_type: g.room_type,
     budget: g.budget,
     status: g.status,
     error: g.error,
@@ -175,6 +177,10 @@ function generationDto(g) {
     finished_at: g.finished_at,
     request_text: g.request_text,
     credits_spent: g.credits_spent,
+    prompt: g.prompt || null,
+    model: g.model || null,
+    cost_usd: g.cost_usd ?? null,
+    duration_ms: g.duration_ms ?? null,
     image_url: g.image_path ? `/renders/${path.basename(g.image_path)}` : null,
     photo_url: g.photo_path ? `/files/${path.basename(g.photo_path)}` : null,
   };
@@ -191,6 +197,7 @@ app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: 
 app.get('/api/styles', h(async (_req, res) => {
   res.json((await q.styles(true)).map(styleDto));
 }));
+app.get('/api/room-types', (_req, res) => res.json(ROOM_TYPE_NAMES));
 
 // ---------- авторизация (e-mail код; заделка под OAuth yandex/vk/mailru) ----------
 app.post('/api/auth/request-code', rateLimit, h(async (req, res) => {
@@ -520,6 +527,17 @@ app.delete('/api/admin/styles/:id/products/:productId', h(async (req, res) => {
   res.status(ok ? 204 : 404).end();
 }));
 
+// ---------- промты генераций: только админ ----------
+app.get('/api/admin/renders', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const rows = await q.adminRenders(Number(req.query.limit) || 100);
+  res.json(rows.map(r => ({
+    ...r,
+    image_url: r.image_path ? `/renders/${path.basename(r.image_path)}` : null,
+    photo_url: r.photo_path ? `/files/${path.basename(r.photo_path)}` : null,
+  })));
+}));
+
 // ---------- админские изображения пользователей ----------
 app.get('/api/admin/renders/:file', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -582,6 +600,8 @@ app.post('/api/rooms', rateLimit, upload.fields([
     'Тёмный модерн', 'Бохо', 'Ар-деко', 'Кантри', 'Референс пользователя',
   ];
   const requestedStyle = String(req.body?.style || '').trim();
+  const requestedRoomType = String(req.body?.room_type || '').trim();
+  const roomType = ROOM_TYPE_NAMES.includes(requestedRoomType) ? requestedRoomType : 'Другое';
   const dbStyle = requestedStyle ? await q.styleByName(requestedStyle) : null;
   const style = dbStyle && dbStyle.active ? dbStyle.name
     : (allowedStyles.includes(requestedStyle) ? requestedStyle : 'Современный');
@@ -592,7 +612,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 1000);
   const photoKey = await saveUpload(photo, 'uploads');
   const styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
-  await q.createRoom(id, style, budget, photoKey, req.user.id, palette, accent, styleRefKey);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
@@ -623,6 +643,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
   res.json({
     id: room.id,
     style: room.style,
+    room_type: room.room_type,
     budget: room.budget,
     status: room.status,
     error: room.error,
