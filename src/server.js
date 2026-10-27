@@ -343,28 +343,43 @@ app.post('/api/admin/refunds', h(async (req, res) => {
 }));
 
 // ---------- комнаты ----------
-app.post('/api/rooms', rateLimit, upload.single('photo'), h(async (req, res) => {
+app.post('/api/rooms', rateLimit, upload.fields([
+  { name: 'photo', maxCount: 1 },
+  { name: 'style_ref', maxCount: 1 },
+]), h(async (req, res) => {
   if (!requireAuth(req, res)) return;
-  if (!req.file) return res.status(400).json({ error: 'Нет фото' });
+  const photo = req.files?.photo?.[0];
+  const styleRef = req.files?.style_ref?.[0];
+  if (!photo) return res.status(400).json({ error: 'Нет фото' });
   if (!MOCK_MODE) {
     const bal = await q.creditBalance(req.user.id);
     if (bal < 1) {
-      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: bal });
+      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: bal });
     }
   }
   const id = crypto.randomUUID();
-  const allowedStyles = ['Современный', 'Светлый', 'Тёмный', 'Классика'];
+  const allowedStyles = [
+    'Современный', 'Светлый', 'Тёмный', 'Классика',
+    'Скандинавский', 'Лофт', 'Джапанди', 'Неоклассика', 'Минимализм',
+    'Тёмный модерн', 'Бохо', 'Ар-деко', 'Кантри', 'Референс пользователя',
+  ];
   const style = allowedStyles.includes(req.body.style) ? req.body.style : 'Современный';
+  const allowedPalettes = new Set(['none', 'mono', 'analogous', 'complementary', 'split']);
+  const allowedAccents = new Set(['none', 'forest', 'sand', 'terra', 'dust', 'graphite']);
+  const palette = allowedPalettes.has(req.body.palette) ? req.body.palette : 'none';
+  const accent = allowedAccents.has(req.body.accent) ? req.body.accent : 'none';
   const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 1000);
-  const photoKey = await saveUpload(req.file, 'uploads');
-  await q.createRoom(id, style, budget, photoKey, req.user.id);
+  const photoKey = await saveUpload(photo, 'uploads');
+  const styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
+  await q.createRoom(id, style, budget, photoKey, req.user.id, palette, accent, styleRefKey);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
     if (e.status === 402) {
       await q.deleteRoom(id);
       await remove(photoKey);
-      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: await q.creditBalance(req.user.id) });
+      if (styleRefKey) await remove(styleRefKey);
+      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: await q.creditBalance(req.user.id) });
     }
     throw e;
   }

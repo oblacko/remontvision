@@ -40,16 +40,30 @@ async function processRender(renderId) {
     // отбор товаров и промпт собираем здесь, где есть доступ к каталогу
     let curated = [];
     let prompt;
+    const hasStyleRef = Boolean(room.style_ref_path);
     if (iteration) {
       prompt = buildPrompt({ style: room.style, budget: room.budget, requestText: render.request_text, iteration: true });
     } else {
       curated = await curateProducts({ style: room.style, budget: room.budget });
-      prompt = buildPrompt({ style: room.style, budget: room.budget, products: curated });
+      prompt = buildPrompt({
+        style: room.style,
+        budget: room.budget,
+        products: curated,
+        palette: room.palette || 'none',
+        accent: room.accent || 'none',
+        hasStyleRef,
+      });
     }
     await q.setRenderPrompt(renderId, prompt);
 
     let imageB64, cost = null, model = null, targetRatio = null;
-    const refs = iteration || !supportsInputRefs() ? [] : await referenceImages(curated.filter(hasImage));
+    let styleRefB64 = null;
+    if (!iteration && hasStyleRef && supportsInputRefs()) {
+      const refBuf = await getBuffer(room.style_ref_path);
+      styleRefB64 = `data:${MIME_BY_EXT[detectImageExt(refBuf)] || 'image/jpeg'};base64,${refBuf.toString('base64')}`;
+    }
+    const productRefs = iteration || !supportsInputRefs() ? [] : await referenceImages(curated.filter(hasImage));
+    const refs = styleRefB64 ? [styleRefB64, ...productRefs.slice(0, 3)] : productRefs.slice(0, 4);
 
     if (MOCK_MODE) {
       // демо без ключа: имитируем задержки и отдаём демо-картинку

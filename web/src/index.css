@@ -18,6 +18,32 @@
     --p-orange-soft: 92% 0.04 70;
     --p-danger: 52% 0.19 28;
 
+    --pl-forest-1: 45% 0.07 150;
+    --pl-forest-2: 60% 0.09 145;
+    --pl-forest-3: 72% 0.10 140;
+    --pl-forest-4: 84% 0.08 135;
+    --pl-forest-5: 93% 0.04 130;
+    --pl-sand-1: 40% 0.06 70;
+    --pl-sand-2: 55% 0.08 75;
+    --pl-sand-3: 70% 0.09 80;
+    --pl-sand-4: 84% 0.08 85;
+    --pl-sand-5: 94% 0.03 90;
+    --pl-terra-1: 45% 0.13 45;
+    --pl-terra-2: 58% 0.15 50;
+    --pl-terra-3: 70% 0.14 55;
+    --pl-terra-4: 83% 0.10 60;
+    --pl-terra-5: 93% 0.05 70;
+    --pl-dust-1: 40% 0.07 240;
+    --pl-dust-2: 55% 0.08 245;
+    --pl-dust-3: 70% 0.08 250;
+    --pl-dust-4: 84% 0.06 255;
+    --pl-dust-5: 94% 0.03 260;
+    --pl-graphite-1: 25% 0.01 70;
+    --pl-graphite-2: 40% 0.015 75;
+    --pl-graphite-3: 58% 0.015 80;
+    --pl-graphite-4: 75% 0.012 85;
+    --pl-graphite-5: 92% 0.01 90;
+
     --background: var(--p-paper);
     --foreground: var(--p-ink);
     --card: var(--p-paper);

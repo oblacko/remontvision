@@ -62,8 +62,10 @@ export async function migrate() {
 // ---------- запросы ----------
 export const q = {
   // rooms
-  createRoom: (id, style, budget, photoPath, userId) =>
-    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id) VALUES ($1,$2,$3,$4,$5)`, [id, style, budget, photoPath, userId]),
+  createRoom: (id, style, budget, photoPath, userId, palette = null, accent = null, styleRefPath = null) =>
+    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, palette, accent, style_ref_path)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [id, style, budget, photoPath, userId, palette, accent, styleRefPath]),
   getRoom: id => pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   roomByPhotoKey: key =>
     pool.query(`SELECT user_id FROM rooms WHERE photo_path = $1 OR photo_path LIKE '%/' || $1 LIMIT 1`, [key])

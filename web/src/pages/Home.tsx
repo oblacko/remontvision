@@ -1,49 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties, ChangeEvent, DragEvent, FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import '../App.css'
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Check,
-  Download,
-  Info,
-  LoaderCircle,
-  Menu,
-  RotateCcw,
-  Upload,
-  X,
-} from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { ExamplesCarousel } from '@/components/ExamplesCarousel'
+import { GenerationPanel } from '@/components/GenerationPanel'
 
-const styles = ['Современный', 'Светлый', 'Тёмный', 'Классика']
 const site = 'https://www.remontvision.ru'
 const navItems = [['До / после', '#examples', 'examples'], ['Что вы получите', '#result', 'result'], ['Как работает', '#how', 'how'], ['Цены', '#prices', 'prices']] as const
 
-type UploadStyle = CSSProperties & { '--upload-ratio': number }
 type Me = { email: string; balance: number }
-type GenItem = {
-  name: string; price: number; qty: number; unit: string;
-  url: string; link_label?: string; source?: string; match_score?: number;
-}
-type RoomResult = {
-  id: string; status: string; error?: string | null; style: string; budget: number;
-  render?: { id: string; image: string | null; status: string } | null;
-  items: GenItem[]; total: number; prices_as_of?: string | null;
-}
 type Consents = { offer: boolean; personal: boolean; transfer: boolean }
 const consentsOf = (c: Consents) => ({ offer: c.offer, privacy: c.personal, cross_border: c.transfer })
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
-const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
 const faq = [
   { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатные генерации. Дальше: 2 кредита за 99 ₽, 5 за 229 ₽ или 15 за 599 ₽. Один кредит — одна генерация или правка. Подписка не нужна.' },
   { q: 'Какое фото подойдёт?', a: 'Чёткое фото комнаты при дневном свете: JPG, PNG или WebP до 15 МБ. Подойдут портретные, квадратные и альбомные кадры. Чем лучше видно стены, пол и мебель, тем полезнее результат.' },
-  { q: 'Что я получу, кроме картинки?', a: 'Подбор материалов и товаров с ценами и ссылками на магазины: отделку, свет, мебель и другие позиции для выбранного интерьера.' },
-  { q: 'Можно изменить готовый дизайн?', a: 'Да, результат можно уточнять текстовыми запросами: например, изменить цвет стен, заменить пол или сделать интерьер светлее. Одна правка расходует один кредит.' },
+  { q: 'Что я получу, кроме картинки?', a: 'Подбор материалов и товаров с ценами и ссылками на магазины, палитру в RAL и рекомендации по розеткам и выключателям — всё для выбранного интерьера.' },
+  { q: 'Можно изменить готовый дизайн?', a: 'Да, результат можно уточнять текстовыми запросами: например, изменить цвет пола, заменить текстиль или сделать интерьер светлее. Каждая версия сохраняется в истории правок.' },
   { q: 'Можно сразу закупаться по смете?', a: 'Смета помогает сориентироваться, но ИИ может ошибаться. Перед покупкой проверьте размеры, количество, цены и наличие товаров в магазинах.' },
 ]
 
@@ -63,38 +38,6 @@ function SectionMarker({ index, children }: { index: string; children: string })
   return <p className="eyebrow">[ {index} ] <span className="ml-3">{children}</span></p>
 }
 
-function HeroBlueprint() {
-  return (
-    <svg className="hero-blueprint" viewBox="0 0 560 400" fill="none" aria-hidden="true">
-      <g className="hero-blueprint-room" stroke="currentColor" strokeWidth="1.2" vectorEffect="non-scaling-stroke">
-        <path d="M72 306V126L264 48L488 132V306H72Z" />
-        <path d="M264 48V226M72 126L264 226L488 132M264 226V306" />
-        <path d="M110 270V186L176 160V240L110 270ZM342 264V190L430 162V238L342 264Z" />
-        <path d="M308 306V250L402 224L450 242V306M308 250L350 272L450 242M350 272V306" />
-        <path d="M42 334H516M42 324V344M516 324V344M42 334L58 328M42 334L58 340M516 334L500 328M516 334L500 340" />
-        <path d="M42 126H22V306H42M16 126H28M16 306H28" />
-        <circle cx="264" cy="226" r="5" />
-        <circle cx="72" cy="306" r="3" />
-        <circle cx="488" cy="306" r="3" />
-      </g>
-      <g className="hero-blueprint-accent" stroke="currentColor" strokeWidth="2">
-        <path d="M176 160L264 126L342 154" />
-        <path d="M238 346H290" />
-      </g>
-      <g className="hero-blueprint-labels" fill="currentColor">
-        <text x="248" y="366">4 200 MM</text>
-        <text x="4" y="222" transform="rotate(-90 4 222)">2 800 MM</text>
-        <text x="300" y="116">01 / ПЛАН КОМНАТЫ</text>
-      </g>
-      <g className="hero-blueprint-compass" stroke="currentColor" strokeWidth="1.2">
-        <circle cx="488" cy="62" r="28" />
-        <path d="M488 26V98M452 62H524M488 38L496 62L488 86L480 62L488 38Z" />
-        <circle cx="488" cy="62" r="3" fill="currentColor" />
-      </g>
-    </svg>
-  )
-}
-
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeSection, setActiveSection] = useState('')
@@ -106,22 +49,8 @@ export default function Home() {
   const [loginBusy, setLoginBusy] = useState(false)
   const [consents, setConsents] = useState<Consents>({ offer: false, personal: false, transfer: false })
   const [me, setMe] = useState<Me | null>(null)
-  const [style, setStyle] = useState('Современный')
-  const [budget, setBudget] = useState(150)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [photoRatio, setPhotoRatio] = useState(4 / 3)
-  const [fileName, setFileName] = useState('')
-  const [error, setError] = useState('')
-  const [genError, setGenError] = useState('')
-  const [stage, setStage] = useState<'edit' | 'generating' | 'result'>('edit')
-  const [progress, setProgress] = useState(0)
-  const [roomId, setRoomId] = useState('')
-  const [result, setResult] = useState<RoomResult | null>(null)
-  const [pendingGenerate, setPendingGenerate] = useState(false)
-  const [editText, setEditText] = useState('')
-  const [iterating, setIterating] = useState(false)
-  const fileInput = useRef<HTMLInputElement>(null)
+  const [pendingPanel, setPendingPanel] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   async function loadMe() {
     try {
@@ -143,47 +72,11 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (stage !== 'generating') return
-    const interval = window.setInterval(() => setProgress((value) => value < 94 ? Math.min(94, value + 2) : value), 700)
-    return () => window.clearInterval(interval)
-  }, [stage])
-
-  useEffect(() => {
     if (!menuOpen) return
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
     window.addEventListener('keydown', close)
     return () => window.removeEventListener('keydown', close)
   }, [menuOpen])
-
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
-
-  const acceptFile = (nextFile?: File) => {
-    if (!nextFile) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(nextFile.type)) {
-      setError('Подойдёт файл JPG, PNG или WebP')
-      return
-    }
-    if (nextFile.size > 15 * 1024 * 1024) {
-      setError('Файл больше 15 МБ. Выберите фото меньшего размера')
-      return
-    }
-    if (preview) URL.revokeObjectURL(preview)
-    setPreview(URL.createObjectURL(nextFile))
-    setFile(nextFile)
-    setPhotoRatio(4 / 3)
-    setFileName(nextFile.name)
-    setError(''); setGenError(''); setResult(null); setRoomId('')
-    setProgress(0)
-    setStage('edit')
-  }
-
-  const removeFile = () => {
-    if (preview) URL.revokeObjectURL(preview)
-    setPreview(null); setFile(null); setFileName('')
-    setResult(null); setRoomId(''); setEditText('')
-    setStage('edit'); setError(''); setGenError(''); setProgress(0)
-    if (fileInput.current) fileInput.current.value = ''
-  }
 
   const openLogin = () => {
     setLoginStep('email')
@@ -195,7 +88,10 @@ export default function Home() {
 
   const closeLogin = (open: boolean) => {
     setLoginOpen(open)
-    if (!open) { setLoginStep('email'); setLoginCode(''); setLoginError(''); setLoginBusy(false) }
+    if (!open) {
+      setLoginStep('email'); setLoginCode(''); setLoginError(''); setLoginBusy(false)
+      setPendingPanel(false)
+    }
   }
 
   const requestLogin = async () => {
@@ -219,6 +115,7 @@ export default function Home() {
 
   const verifyLogin = async () => {
     if (!/^\d{6}$/.test(loginCode)) { setLoginError('Код — 6 цифр'); return }
+    const openAfter = pendingPanel
     setLoginBusy(true); setLoginError('')
     try {
       const r = await fetch('/api/auth/verify', {
@@ -229,92 +126,17 @@ export default function Home() {
       if (!r.ok) throw new Error(d.error || String(r.status))
       localStorage.setItem('rv_last_email', loginEmail)
       await loadMe()
+      setPendingPanel(false)
       setLoginOpen(false)
-      if (pendingGenerate && file) { setPendingGenerate(false); void startGeneration() }
+      if (openAfter) setPanelOpen(true)
     } catch (e) { setLoginError(e instanceof Error ? e.message : 'Не удалось войти') }
     finally { setLoginBusy(false) }
   }
 
-  async function pollRoom(id: string, hadResult: boolean) {
-    const started = Date.now()
-    while (true) {
-      if (Date.now() - started > 180000) {
-        setStage(hadResult ? 'result' : 'edit')
-        setGenError('Генерация идёт слишком долго. Попробуйте снова.')
-        return
-      }
-      await sleep(2000)
-      const r = await fetch('/api/rooms/' + id)
-      const d = await r.json().catch(() => ({})) as RoomResult
-      if (r.status === 401) { setStage(hadResult ? 'result' : 'edit'); setPendingGenerate(true); openLogin(); return }
-      if (!r.ok) {
-        setStage(hadResult ? 'result' : 'edit')
-        setGenError((d as { error?: string }).error || 'Не удалось получить результат')
-        return
-      }
-      if (d.status === 'done') {
-        setResult(d); setProgress(100); setStage('result'); setGenError('')
-        await loadMe()
-        return
-      }
-      if (d.status === 'error') {
-        setStage(hadResult ? 'result' : 'edit')
-        setGenError(d.error || 'Генерация не удалась')
-        await loadMe()
-        return
-      }
-    }
-  }
-
-  async function startGeneration() {
-    if (!file) return
-    setError(''); setGenError(''); setResult(null); setProgress(8); setStage('generating')
-    const fd = new FormData()
-    fd.append('photo', file); fd.append('style', style); fd.append('budget', String(budget))
-    try {
-      const r = await fetch('/api/rooms', { method: 'POST', body: fd })
-      const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { setStage('edit'); setPendingGenerate(true); openLogin(); return }
-      if (r.status === 402) { setStage('edit'); setGenError('Кредиты закончились. Пополните баланс в кабинете.'); return }
-      if (!r.ok) throw new Error(d.error || String(r.status))
-      setRoomId(d.id)
-      await pollRoom(d.id, false)
-    } catch (e) {
-      setStage('edit')
-      setGenError(e instanceof Error ? e.message : 'Не удалось запустить генерацию')
-    }
-  }
-
-  const generate = () => {
-    if (!preview || !file) {
-      setError('Сначала загрузите фото комнаты')
-      fileInput.current?.focus()
-      return
-    }
-    setError('')
-    if (!me) { setPendingGenerate(true); openLogin(); return }
-    void startGeneration()
-  }
-
-  const iterate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!editText.trim() || !roomId || iterating) return
-    setIterating(true); setGenError(''); setProgress(30); setStage('generating')
-    try {
-      const r = await fetch(`/api/rooms/${roomId}/iterate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: editText.trim() }),
-      })
-      const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { setStage('result'); openLogin(); return }
-      if (r.status === 402) { setStage('result'); setGenError('Кредиты закончились. Пополните баланс в кабинете.'); return }
-      if (!r.ok) throw new Error(d.error || String(r.status))
-      setEditText('')
-      await pollRoom(roomId, true)
-    } catch (e) {
-      setStage('result')
-      setGenError(e instanceof Error ? e.message : 'Не удалось применить правку')
-    } finally { setIterating(false) }
+  const openPanel = () => {
+    setMenuOpen(false)
+    if (!me) { setPendingPanel(true); openLogin(); return }
+    setPanelOpen(true)
   }
 
   return (
@@ -385,7 +207,7 @@ export default function Home() {
                 )}
               </DialogContent>
             </Dialog>
-            <a href="#upload" className="action-primary hidden sm:inline-flex">Попробовать <ArrowUpRight className="size-4" /></a>
+            <button type="button" onClick={openPanel} className="action-primary hidden sm:inline-flex">Попробовать <ArrowUpRight className="size-4" /></button>
             <button type="button" className="flex size-12 items-center justify-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden" aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
               {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
             </button>
@@ -401,7 +223,7 @@ export default function Home() {
             ) : (
               <button type="button" onClick={() => { setMenuOpen(false); openLogin() }} className="flex min-h-12 items-center justify-between border-b text-left text-sm hover:opacity-50">Войти<ArrowUpRight className="size-4" /></button>
             )}
-            <a href="#upload" onClick={() => setMenuOpen(false)} className="action-primary mt-3">Попробовать бесплатно</a>
+            <button type="button" onClick={openPanel} className="action-primary mt-3">Попробовать бесплатно</button>
           </nav>
         )}
       </header>
@@ -431,9 +253,9 @@ export default function Home() {
                 </p>
                 <div className="lg:col-span-7 lg:pl-8">
                   <div className="flex flex-col gap-4 sm:flex-row">
-                    <a href="#upload" className="action-primary hero-action-primary button-shift min-h-14 flex-1 px-8 text-base">
+                    <button type="button" onClick={openPanel} className="action-primary hero-action-primary button-shift min-h-14 flex-1 px-8 text-base">
                       <span className="sr-only">Создать мой дизайн</span><ShiftLabel>Создать мой дизайн</ShiftLabel><ArrowUpRight className="size-5" />
-                    </a>
+                    </button>
                     <a href="#how" className="action-hero-secondary button-shift min-h-14 flex-1 px-8 text-base">
                       <span className="sr-only">Как это работает</span><ShiftLabel>Как это работает</ShiftLabel><ArrowRight className="size-5" />
                     </a>
@@ -482,106 +304,25 @@ export default function Home() {
         <section id="upload" className="scroll-mt-20 border-y bg-secondary" aria-labelledby="upload-title">
           <div className="page-shell grid lg:grid-cols-12">
             <div className="border-b py-12 lg:col-span-5 lg:border-b-0 lg:border-r lg:py-16 lg:pr-12">
-              <SectionMarker index="03">Ваша комната</SectionMarker>
-              <h2 id="upload-title" className="display-title mt-8 text-4xl sm:text-5xl">Попробуйте<br />на своём фото</h2>
-              <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Три решения — и вы увидите направление будущего интерьера. Загрузка поддерживает вертикальные, квадратные и горизонтальные фото.</p>
-              <div className="mt-8 space-y-3 border-t pt-6 text-sm">
-                <p className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />2 генерации бесплатно после регистрации</p>
-                <p className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Обычно результат готов за 30–60 секунд</p>
-                <p className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Правки простыми словами, без сложного редактора</p>
-              </div>
+              <SectionMarker index="03">Генератор</SectionMarker>
+              <h2 id="upload-title" className="display-title mt-8 text-4xl sm:text-5xl">Четыре шага<br />до сметы</h2>
+              <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Фото комнаты, пресет стиля или ваш референс, правки текстом — а в финале товары, цвета RAL и разметка розеток.</p>
+              <ol className="mt-8 space-y-3 border-t pt-6 text-sm">
+                {['Загрузите фото комнаты', 'Выберите пресет стиля или референс', 'Правьте результат текстом', 'Получите смету, RAL и электрику'].map((item, index) => (
+                  <li key={item} className="flex gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span>{item}</li>
+                ))}
+              </ol>
+              <button type="button" onClick={openPanel} className="action-primary button-shift mt-8 min-h-14 px-8 text-base">
+                <span className="sr-only">Открыть генератор</span><ShiftLabel>Открыть генератор</ShiftLabel><ArrowUpRight className="size-5" />
+              </button>
+              <p className="mt-4 text-xs text-muted-foreground">2 генерации бесплатно после регистрации · без подписки</p>
             </div>
-
-            <div className="py-12 lg:col-span-7 lg:py-16 lg:pl-12">
-              {stage === 'result' && result ? (
-                <div role="status">
-                  <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-4">
-                    <div><p className="eyebrow">Результат</p><h3 className="mt-2 text-2xl font-light uppercase">Дизайн готов</h3></div>
-                    <span className="text-sm text-muted-foreground">{result.style}</span>
-                  </div>
-                  {result.render?.image && (
-                    <div className="upload-preview mt-6 bg-foreground" style={{ '--upload-ratio': photoRatio } as UploadStyle}>
-                      <img src={result.render.image} alt="Визуализация комнаты после ремонта" className="h-full w-full object-contain" />
-                    </div>
-                  )}
-                  <div className="mt-6 grid gap-4 border-y py-6 sm:grid-cols-2">
-                    <div><p className="eyebrow">Бюджет</p><p className="mt-2 text-xl font-light">{result.budget} 000 ₽</p></div>
-                    <div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(result.total)}</p></div>
-                  </div>
-                  {result.items.length > 0 && (
-                    <div className="mt-2 divide-y">
-                      {result.items.slice(0, 8).map((item, index) => (
-                        <div key={`${item.name}-${index}`} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 py-3 text-sm">
-                          <span>{item.name}</span>
-                          <span className="font-medium">{rub(item.price * item.qty)}</span>
-                          <span className="col-span-2 text-xs leading-5 text-muted-foreground">
-                            {rub(item.price)} × {item.qty} {item.unit}
-                            {item.url && <> · <a className="underline underline-offset-2" href={item.url} target="_blank" rel="noopener nofollow">{item.link_label || 'в магазин'}</a></>}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {genError && <p className="mt-3 text-sm text-destructive" role="alert">{genError}</p>}
-                  <p className="mt-4 flex gap-2 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-4 shrink-0" />ИИ может ошибаться. Проверяйте размеры, цены, количество и наличие перед покупкой.</p>
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                    {result.render?.image && <a href={result.render.image} download="remontvision-result.jpg" className="action-primary"><Download className="size-4" />Скачать</a>}
-                    <a href={`/app?room=${encodeURIComponent(roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
-                    <Button variant="outline" className="h-12 rounded-none" onClick={removeFile}><RotateCcw className="mr-2 size-4" />Новая комната</Button>
-                  </div>
-                  <form onSubmit={iterate} className="mt-8 border-t pt-6">
-                    <label htmlFor="edit-request" className="eyebrow mb-3 block">03 / Правка дизайна · 1 кредит</label>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <input id="edit-request" value={editText} onChange={(event) => setEditText(event.target.value)} maxLength={500} placeholder="Например: пол темнее, стены светлее" className="h-12 flex-1 border bg-background px-4 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                      <Button type="submit" disabled={iterating || !editText.trim()} className="h-12 rounded-none">{iterating ? 'Применяем…' : 'Изменить'}</Button>
-                    </div>
-                  </form>
-                </div>
-              ) : stage === 'generating' ? (
-                <div className="flex min-h-96 flex-col justify-center" role="status" aria-live="polite">
-                  <LoaderCircle className="size-8 animate-spin text-primary-text motion-reduce:animate-none" />
-                  <h3 className="display-title mt-8 text-4xl">{iterating ? 'Применяем правку' : 'Создаём дизайн'}</h3>
-                  <p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">Подбираем отделку, рисуем визуализацию и собираем подборку товаров.</p>
-                  <div className="mt-8 h-1 overflow-hidden bg-border" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><div className="h-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} /></div>
-                  <p className="mt-3 font-mono text-sm">{progress}%</p>
-                  <p className="mt-8 text-xs leading-5 text-muted-foreground">Обычно 30–60 секунд. Не закрывайте страницу.</p>
-                </div>
-              ) : (
-                <div>
-                  <div className="grid gap-6 sm:grid-cols-2">
-                    <div className="sm:col-span-2" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptFile(event.dataTransfer.files?.[0]) }}>
-                      <input ref={fileInput} id="room-photo" type="file" accept="image/jpeg,image/png,image/webp" className="peer sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptFile(event.target.files?.[0])} />
-                      {preview ? (
-                        <div className="upload-preview relative border bg-foreground" style={{ '--upload-ratio': photoRatio } as UploadStyle}>
-                          <img src={preview} alt="Загруженное фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
-                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
-                            <span className="truncate text-xs">{fileName}</span>
-                            <button type="button" onClick={removeFile} className="flex size-11 shrink-0 items-center justify-center hover:bg-background/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Удалить фото"><X className="size-4" /></button>
-                          </div>
-                        </div>
-                      ) : (
-                        <label htmlFor="room-photo" className="flex min-h-56 cursor-pointer flex-col items-center justify-center border border-dashed border-foreground/40 bg-background px-4 text-center transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
-                          <Upload className="mb-4 size-7 text-primary-text" /><span className="text-sm font-medium">Загрузить фото комнаты</span><span className="mt-2 text-xs leading-5 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP · до 15 МБ</span>
-                        </label>
-                      )}
-                    </div>
-                    {(error || genError) && <p className="text-sm text-destructive sm:col-span-2" role="alert">{error || genError}</p>}
-                    <fieldset className="sm:col-span-2">
-                      <legend className="eyebrow mb-3">01 / Стиль</legend>
-                      <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-4">
-                        {styles.map((item) => <button key={item} type="button" aria-pressed={style === item} onClick={() => setStyle(item)} className={`min-h-12 px-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>{item}</button>)}
-                      </div>
-                    </fieldset>
-                    <div className="sm:col-span-2">
-                      <div className="mb-5 flex items-end justify-between gap-4"><label htmlFor="budget" className="eyebrow">02 / Бюджет на материалы</label><output htmlFor="budget" className="text-lg font-light">{budget} тыс. ₽</output></div>
-                      <Slider id="budget" min={50} max={1000} step={25} value={[budget]} onValueChange={(value) => setBudget(value[0])} aria-label="Бюджет на материалы в тысячах рублей" className="rounded-none" />
-                      <div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>50 тыс.</span><span>1 млн ₽</span></div>
-                    </div>
-                  </div>
-                  <button type="button" onClick={generate} className="action-primary button-shift mt-8 min-h-14 w-full text-base"><span className="sr-only">Сделать дизайн</span><ShiftLabel>Сделать дизайн</ShiftLabel><ArrowRight className="ml-2 size-4" /></button>
-                  <p className="mt-4 flex gap-2 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-4 shrink-0" />ИИ может ошибаться. Проверяйте размеры, цены, количество и наличие перед покупкой.</p>
-                </div>
-              )}
+            <div className="relative min-h-80 overflow-hidden bg-foreground lg:col-span-7 lg:min-h-full">
+              <img src="/images/living-after.webp" alt="Готовая гостиная в современной классике после генерации" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
+              <div className="absolute inset-0 bg-foreground/35" aria-hidden="true" />
+              <button type="button" onClick={openPanel} className="action-primary absolute inset-x-6 bottom-6 min-h-14 text-base sm:inset-x-auto sm:bottom-10 sm:left-1/2 sm:w-80 sm:-translate-x-1/2">
+                Собрать мой дизайн <ArrowUpRight className="size-5" />
+              </button>
             </div>
           </div>
         </section>
@@ -632,9 +373,9 @@ export default function Home() {
             <div className="lg:col-span-7 lg:pl-12">
               {[
                 ['Сфотографируйте комнату', 'Подойдёт чёткий кадр при дневном свете. Загрузите JPG, PNG или WebP до 15 МБ.'],
-                ['Выберите стиль и бюджет', 'Задайте настроение интерьера и сумму, на которую ориентироваться при подборе.'],
-                ['Получите дизайн и подбор', 'Обычно 30–60 секунд — и вы видите визуализацию, материалы и товары с ценами.'],
-                ['Уточните текстом', 'Попросите заменить цвет, пол или детали. Сохраните результат и проверьте товары перед покупкой.'],
+                ['Выберите стиль и палитру', 'Задайте направление интерьера, цветовую схему или загрузите свой референс.'],
+                ['Получите дизайн и правьте текстом', 'Каждая версия сохраняется в истории — можно вернуться к любой.'],
+                ['Соберите смету', 'Товары с ценами, цвета RAL и рекомендации по розеткам и выключателям.'],
               ].map(([title, text], index) => <div key={title} className="step-row grid gap-4 border-t border-background/20 py-6"><span className="font-mono text-xs text-primary">0{index + 1}</span><div><h3 className="text-lg font-light uppercase tracking-wide">{title}</h3><p className="mt-2 max-w-xl text-sm leading-6 text-background/60">{text}</p></div></div>)}
             </div>
           </div>
@@ -654,7 +395,7 @@ export default function Home() {
             </div>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row">
-                <a href="#upload" className="action-primary">Начать бесплатно <ArrowUpRight className="size-4" /></a>
+                <button type="button" onClick={openPanel} className="action-primary">Начать бесплатно <ArrowUpRight className="size-4" /></button>
                 <a href="/app?buy=1" className="action-secondary">Купить кредиты <ArrowUpRight className="size-4" /></a>
               </div>
               <a href={`${site}/prices`} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Все условия и цены <ArrowUpRight className="size-4" /></a>
@@ -678,7 +419,7 @@ export default function Home() {
               <h2 id="final-cta-title" className="display-title section-title mt-8">Посмотрите,<br />что возможно</h2>
               <div className="mt-8 flex flex-col gap-6 border-t border-foreground/30 pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <p className="max-w-lg text-sm leading-6">Две генерации бесплатно после регистрации. Дизайн, материалы, цены и ссылки — в одном результате.</p>
-                <a href="#upload" className="action-final button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><ArrowRight className="size-4" /></a>
+                <button type="button" onClick={openPanel} className="action-final button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><ArrowRight className="size-4" /></button>
               </div>
             </div>
             <div className="relative min-h-80 overflow-hidden lg:col-span-4 lg:min-h-full">
@@ -697,6 +438,45 @@ export default function Home() {
           </nav>
         </div>
       </footer>
+
+      <GenerationPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        onRequireLogin={() => { setPanelOpen(false); openLogin() }}
+        onRefreshUser={loadMe}
+      />
     </div>
+  )
+}
+
+function HeroBlueprint() {
+  return (
+    <svg className="hero-blueprint" viewBox="0 0 560 400" fill="none" aria-hidden="true">
+      <g className="hero-blueprint-room" stroke="currentColor" strokeWidth="1.2" vectorEffect="non-scaling-stroke">
+        <path d="M72 306V126L264 48L488 132V306H72Z" />
+        <path d="M264 48V226M72 126L264 226L488 132M264 226V306" />
+        <path d="M110 270V186L176 160V240L110 270ZM342 264V190L430 162V238L342 264Z" />
+        <path d="M308 306V250L402 224L450 242V306M308 250L350 272L450 242M350 272V306" />
+        <path d="M42 334H516M42 324V344M516 324V344M42 334L58 328M42 334L58 340M516 334L500 328M516 334L500 340" />
+        <path d="M42 126H22V306H42M16 126H28M16 306H28" />
+        <circle cx="264" cy="226" r="5" />
+        <circle cx="72" cy="306" r="3" />
+        <circle cx="488" cy="306" r="3" />
+      </g>
+      <g className="hero-blueprint-accent" stroke="currentColor" strokeWidth="2">
+        <path d="M176 160L264 126L342 154" />
+        <path d="M238 346H290" />
+      </g>
+      <g className="hero-blueprint-labels" fill="currentColor">
+        <text x="248" y="366">4 200 MM</text>
+        <text x="4" y="222" transform="rotate(-90 4 222)">2 800 MM</text>
+        <text x="300" y="116">01 / ПЛАН КОМНАТЫ</text>
+      </g>
+      <g className="hero-blueprint-compass" stroke="currentColor" strokeWidth="1.2">
+        <circle cx="488" cy="62" r="28" />
+        <path d="M488 26V98M452 62H524M488 38L496 62L488 86L480 62L488 38Z" />
+        <circle cx="488" cy="62" r="3" fill="currentColor" />
+      </g>
+    </svg>
   )
 }
