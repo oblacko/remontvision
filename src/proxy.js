@@ -16,10 +16,16 @@ function normalize(url) {
   return raw;
 }
 
-export function getProxyState() {
+export function maskProxy(url) {
+  return String(url || '').replace(/\/\/[^/@]+@/, '//***@');
+}
+
+export function getProxyState({ masked = false } = {}) {
+  const env = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
   return {
-    url: currentUrl,
-    env_url: process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '',
+    url: masked ? maskProxy(currentUrl) : currentUrl,
+    has_url: Boolean(currentUrl),
+    env_url: masked ? maskProxy(env) : env,
     status: lastTest,
   };
 }
@@ -30,8 +36,8 @@ export async function applyProxy(url) {
   if (clean) setGlobalDispatcher(new ProxyAgent(clean));
   else setGlobalDispatcher(new Agent());
   currentUrl = clean;
-  console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'proxy_applied', url: clean ? clean.replace(/\/\/.*@/, '//***@') : '' }));
-  return getProxyState();
+  console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'proxy_applied', url: maskProxy(clean) }));
+  return getProxyState({ masked: true });
 }
 
 export async function testProxy(url) {

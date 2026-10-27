@@ -204,7 +204,7 @@ export default function Admin() {
     try {
       const d = await readJson(await api('/api/admin/settings/proxy', { method: 'PUT', body: JSON.stringify({ url: proxyUrl }) }))
       setProxyUrl(d.url || ''); setProxyEnv(d.env_url || ''); setProxyStatus(d.status || null)
-      setProxyNotice(d.url ? 'Прокси сохранён и применён' : 'Прокси отключён')
+      setProxyNotice(d.has_url ? 'Прокси применён' : 'Прокси отключён')
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
     finally { setProxyBusy(false) }
   }
@@ -627,12 +627,12 @@ export default function Admin() {
                 <div>
                   <label htmlFor="proxy-url" className="eyebrow mb-2 block">URL прокси</label>
                   <input id="proxy-url" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="http://user:pass@host:port" className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
-                  <p className="mt-2 text-xs text-muted-foreground">Env-фолбэк: {proxyEnv ? <span className="font-mono">{proxyEnv.replace(/\/\/.*@/, '//***@')}</span> : 'не задан'}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">Env-фолбэк: {proxyEnv ? <span className="font-mono">{proxyEnv}</span> : 'не задан'}. Пароль в URL маскируется; чтобы изменить — введите новый URL целиком.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button type="submit" disabled={proxyBusy} className="action-primary">{proxyBusy ? 'Проверяем…' : 'Сохранить'}</button>
                   <button type="button" disabled={proxyBusy} onClick={() => void testProxy()} className="action-secondary">Проверить</button>
-                  {proxyEnv && <button type="button" disabled={proxyBusy} onClick={() => setProxyUrl(proxyEnv)} className="action-secondary">Подставить env</button>}
+
                 </div>
                 {proxyNotice && <p className="border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{proxyNotice}</p>}
                 {proxyStatus && (

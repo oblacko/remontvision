@@ -576,15 +576,19 @@ app.get('/api/admin/settings/models', h(async (req, res) => {
 
 app.get('/api/admin/settings/proxy', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  res.json(getProxyState());
+  res.json(getProxyState({ masked: true }));
 }));
 
 app.put('/api/admin/settings/proxy', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
+  const raw = String(req.body?.url ?? '').trim();
   try {
-    await applyProxy(String(req.body?.url || ''));
-    await q.setSetting('proxy.url', getProxyState().url);
-    res.json(getProxyState());
+    // Маскированное значение = «не менять»; пустая строка = отключить.
+    if (!raw.includes('***')) {
+      await applyProxy(raw);
+      await q.setSetting('proxy.url', getProxyState().url);
+    }
+    res.json(getProxyState({ masked: true }));
   } catch (e) {
     res.status(400).json({ error: String(e.message || e).slice(0, 300) });
   }
@@ -592,9 +596,11 @@ app.put('/api/admin/settings/proxy', h(async (req, res) => {
 
 app.post('/api/admin/settings/proxy/test', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
+  const raw = String(req.body?.url ?? '').trim();
+  const target = raw && !raw.includes('***') ? raw : getProxyState().url;
   try {
-    const result = await testProxy(String(req.body?.url ?? getProxyState().url ?? ''));
-    res.json({ ...getProxyState(), status: result });
+    const result = await testProxy(target);
+    res.json({ ...getProxyState({ masked: true }), status: result });
   } catch (e) {
     res.status(400).json({ error: String(e.message || e).slice(0, 300) });
   }
