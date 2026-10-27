@@ -534,23 +534,29 @@ app.get('/api/admin/settings/models', h(async (req, res) => {
   const config = getModelConfig();
   const listed = await listImageModels();
   const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
-  res.json({ render_model: config.render, vision_model: config.vision, image_models: imageModels });
+  res.json({ render_model: config.render, vision_model: config.vision, resolution: config.resolution, aspect_ratio: config.aspectRatio, image_models: imageModels });
 }));
 
 app.put('/api/admin/settings/models', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const renderModel = String(req.body?.render_model || '').trim();
   const visionModel = String(req.body?.vision_model || '').trim();
+  const resolution = String(req.body?.resolution || '1K').trim();
+  const aspectRatio = String(req.body?.aspect_ratio || 'auto').trim();
   if (!renderModel || !visionModel) return res.status(400).json({ error: 'Нужны render_model и vision_model' });
+  if (!['1K', '2K'].includes(resolution)) return res.status(400).json({ error: 'resolution: 1K или 2K' });
+  if (!['auto', '1:1', '1:2', '2:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '9:20', '20:9', '9:21', '21:9'].includes(aspectRatio)) {
+    return res.status(400).json({ error: 'Некорректный aspect_ratio' });
+  }
   const listed = await listImageModels();
   const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
   const picked = imageModels.find(m => m.id === renderModel);
   if (!picked) return res.status(400).json({ error: 'Модель не найдена среди image-моделей OpenRouter' });
-  const saved = await saveModelConfig({ render: renderModel, vision: visionModel });
+  const saved = await saveModelConfig({ render: renderModel, vision: visionModel, resolution, aspectRatio });
   let warning = '';
   try { await assertConfig(); }
   catch (e) { warning = String(e.message || e).slice(0, 300); log({ event: 'model_config_warning', error: warning }); }
-  log({ event: 'model_config_saved', render_model: saved.render, vision_model: saved.vision, input_refs: picked.input_refs });
+  log({ event: 'model_config_saved', render_model: saved.render, vision_model: saved.vision, resolution: saved.resolution, aspect_ratio: saved.aspectRatio, input_refs: picked.input_refs });
   res.json({ ...saved, input_refs: Boolean(picked.input_refs), warning });
 }));
 

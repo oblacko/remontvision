@@ -36,7 +36,7 @@ type Product = {
   source?: string | null; url?: string | null;
 }
 type ModelSettings = {
-  render_model: string; vision_model: string;
+  render_model: string; vision_model: string; resolution: string; aspect_ratio: string;
   image_models: Array<{ id: string; input_refs: boolean }>;
 }
 type StyleDetail = { style: Style; prompt_description: string; references: StyleRef[]; products: Product[] }
@@ -99,6 +99,8 @@ export default function Admin() {
   const [modelSettings, setModelSettings] = useState<ModelSettings | null>(null)
   const [renderDraft, setRenderDraft] = useState('')
   const [visionDraft, setVisionDraft] = useState('')
+  const [resolutionDraft, setResolutionDraft] = useState('1K')
+  const [aspectDraft, setAspectDraft] = useState('auto')
   const [modelNotice, setModelNotice] = useState('')
   const [modelSaving, setModelSaving] = useState(false)
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
@@ -160,14 +162,14 @@ export default function Admin() {
   const loadModels = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/models'))
-      setModelSettings(d); setRenderDraft(d.render_model); setVisionDraft(d.vision_model); setModelNotice('')
+      setModelSettings(d); setRenderDraft(d.render_model); setVisionDraft(d.vision_model); setResolutionDraft(d.resolution || '1K'); setAspectDraft(d.aspect_ratio || 'auto'); setModelNotice('')
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
   const saveModels = async () => {
     setModelSaving(true); setModelNotice(''); setAdminError('')
     try {
       const d = await readJson(await api('/api/admin/settings/models', {
-        method: 'PUT', body: JSON.stringify({ render_model: renderDraft, vision_model: visionDraft }),
+        method: 'PUT', body: JSON.stringify({ render_model: renderDraft, vision_model: visionDraft, resolution: resolutionDraft, aspect_ratio: aspectDraft }),
       }))
       setModelNotice(d.warning ? `Сохранено, но проверка предупредила: ${d.warning}` : 'Модели сохранены — новые генерации будут использовать их')
       await loadModels()
@@ -521,6 +523,11 @@ export default function Admin() {
                     </select>
                     <p className="mt-2 text-xs text-muted-foreground">{modelSettings.image_models.find(m => m.id === renderDraft)?.input_refs ? 'Поддерживает input_references — фото комнаты, референсы стиля и товаров уйдут в модель.' : 'Не заявлены input_references — фото и референсы могут не уйти. Проверьте перед включением.'}</p>
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div><label htmlFor="resolution" className="eyebrow mb-2 block">Разрешение</label><select id="resolution" value={resolutionDraft} onChange={e => setResolutionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary"><option value="1K">1K</option><option value="2K">2K</option></select></div>
+                    <div><label htmlFor="aspect-ratio" className="eyebrow mb-2 block">Aspect ratio</label><select id="aspect-ratio" value={aspectDraft} onChange={e => setAspectDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary"><option value="auto">auto</option>{['1:1','1:2','2:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9','9:20','20:9','9:21','21:9'].map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                  </div>
+                  <p className="-mt-1 text-xs text-muted-foreground">Для Seedream 5.0 Flash: 1K + auto — модель сама выбирает кадр, итоговая пропорция затем приводится к фото. Для Gemini разрешение не отправляется, используется авто/расчётное соотношение.</p>
                   <div>
                     <label htmlFor="vision-model" className="eyebrow mb-2 block">Модель разбора (vision)</label>
                     <input id="vision-model" value={visionDraft} onChange={e => setVisionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />

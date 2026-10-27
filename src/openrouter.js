@@ -194,11 +194,15 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
     { type: 'image_url', image_url: { url: sourceImageB64 } },
     ...productRefs.map(b => ({ type: 'image_url', image_url: { url: b } })),
   ];
+  const cfg = getModelConfig();
+  const seedream = /^bytedance-seed\/seedream/.test(model);
+  const aspect = seedream ? (cfg.aspectRatio || 'auto') : (aspectRatio || '3:2');
   const body = {
     model,
     prompt,
-    aspect_ratio: aspectRatio || '3:2',
+    aspect_ratio: aspect,
     input_references: refs,
+    ...(seedream ? { resolution: cfg.resolution || '1K' } : {}),
   };
 
   const chatBody = {
@@ -210,7 +214,7 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
       ]},
     ],
     modalities: ['image', 'text'],
-    image_config: { aspect_ratio: aspectRatio || '3:2' },
+    image_config: { aspect_ratio: aspect },
   };
 
   let lastErr, spent = 0;
@@ -245,7 +249,8 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
         model,
         endpoint,
         attempt: attempt + 1,
-        aspect_ratio: aspectRatio || '3:2',
+        aspect_ratio: aspect,
+        resolution: seedream ? (cfg.resolution || '1K') : null,
         refs: refs.length,
         cost_usd: spent || null,
       });
