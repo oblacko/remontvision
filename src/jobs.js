@@ -30,7 +30,7 @@ async function editReference(render) {
   if (render.ref_path) {
     try {
       const buf = await getBuffer(render.ref_path);
-      return { b64: await bufferToDataUrl(buf), label: 'user reference' };
+      return { b64: await bufferToDataUrl(buf), label: 'user reference', product: null };
     } catch (e) {
       log({ event: 'edit_ref_error', render_id: render.id, error: String(e.message || e).slice(0, 200) });
     }
@@ -40,7 +40,7 @@ async function editReference(render) {
       const product = await q.getProduct(render.ref_product_id);
       if (product) {
         const refs = await referenceImagesDetailed([product], 1);
-        if (refs[0]) return { b64: refs[0].b64, label: product.name };
+        if (refs[0]) return { b64: refs[0].b64, label: product.name, product };
       }
     } catch (e) {
       log({ event: 'edit_ref_product_error', render_id: render.id, product_id: render.ref_product_id, error: String(e.message || e).slice(0, 200) });
@@ -102,6 +102,7 @@ async function processRender(renderId) {
       model_config: getModelConfig(),
     };
     let parentItems = [];
+    let editProduct = null;
     let sourceStored = room.photo_path;
     let referenceImagesB64 = [];
 
@@ -110,6 +111,7 @@ async function processRender(renderId) {
       if (parent?.image_path) sourceStored = parent.image_path;
       if (parent) parentItems = await q.itemsForRender(parent.id);
       const ref = await editReference(render);
+      editProduct = ref?.product || null;
       if (ref) referenceImagesB64.push(ref.b64);
       imageMap = [
         { role: 'current interior render', label: 'edit only the target object' },
@@ -254,11 +256,39 @@ async function processRender(renderId) {
     } else {
       for (const p of curated) await q.saveItem(render.id, p.id, null);
     }
+    const finalItemsBeforeMatch = await q.itemsForRender(render.id);
     const categoryGroup = category => (category === 'paint' || category === 'wallpaper')
       ? ['paint', 'wallpaper']
       : [category];
-    for (const m of matched) {
-      await q.replaceItemByCategories(render.id, categoryGroup(m.product.category), m.product.id, m.score);
+    const groupForTarget = target => {
+      if (!target) return null;
+      if (target === 'wall') return ['paint', 'wallpaper'];
+      if (target === 'backsplash' || target === 'tile') return ['tile'];
+      return [target];
+    };
+    const presentGroups = new Set(finalItemsBeforeMatch.map(p => categoryGroup(p.category).join('|')));
+    if (iteration) {
+      if (editProduct) {
+        // Быстрая подсказка/товарный референс: фиксируем именно этот товар в смете.
+        await q.replaceItemByCategories(render.id, categoryGroup(editProduct.category), editProduct.id, 1);
+      } else if (render.edit_target) {
+        const targetGroup = groupForTarget(render.edit_target);
+        const match = matched.find(m => targetGroup.includes(m.product.category));
+        if (match) await q.replaceItemByCategories(render.id, targetGroup, match.product.id, match.score);
+      } else {
+        // Правка без target: не переписываем смету родителя, только дополняем недостающие группы.
+        for (const m of matched) {
+          const group = categoryGroup(m.product.category).join('|');
+          if (!presentGroups.has(group)) { await q.saveItem(render.id, m.product.id, m.score); presentGroups.add(group); }
+        }
+      }
+    } else {
+      // Первый рендер: curated — источник истины (его и просили нарисовать).
+      // Vision только добавляет то, чего не было в подборке, и не подменяет выбранный товар.
+      for (const m of matched) {
+        const group = categoryGroup(m.product.category).join('|');
+        if (!presentGroups.has(group)) { await q.saveItem(render.id, m.product.id, m.score); presentGroups.add(group); }
+      }
     }
     if (!iteration && !curated.length && !matched.length && MOCK_MODE) {
       for (const p of allProducts.filter(p => ['light', 'floor', 'paint', 'outlets'].includes(p.category)).slice(0, 4)) {
