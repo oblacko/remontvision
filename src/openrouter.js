@@ -251,12 +251,13 @@ Add generous but tasteful small details: layered textiles, cushions, throws, cur
 
 PINTEREST-LEVEL STYLING
 Make it look like a saved Pinterest reference: curated, layered and personal, with 3–5 styled vignettes rather than random clutter.
+MUST INCLUDE at least one art grouping (2–4 frames) or one large poster, one open shelf/console/ledge styled with 3–5 objects, floor-length curtains or a clean blind, and layered textiles (throw, cushions or rug).
 - Textiles: floor-length curtains, throws, cushions, rugs, table runners.
 - Walls: framed art, posters, a small gallery wall, textile panel or wall hanging.
 - Shelves: open shelving with books, ceramics, vases, candles, small sculptures, records and plants.
 - Personal objects: a modern laptop (MacBook-style), headphones, a speaker, a camera, magazines. Place them on a desk, nightstand, console, shelf, coffee table or bed — never on the floor or rug. A laptop may be open on a desk or closed on a nightstand/console. Hide chargers, cables, camera straps and loose wires.
 - Plush toys: only in a children's room or a bedroom, one or two, styled on a chair, bed or shelf — never on the floor. Never in bathrooms, kitchens or adult living rooms.
-Keep it tasteful and uncluttered: every object should look intentional, not scattered.
+Keep it tasteful and uncluttered: every object should look intentional, not scattered. The scene must feel personal and collected, not like a furniture showroom.
 
 CATALOG / MATERIALS
 ${catalogRule}
@@ -274,7 +275,7 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected products already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no visible radiator panel, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no random clutter, no old electronics, no electronics on the floor or rug, no loose cables, chargers or camera straps, no plush toys in bathrooms or kitchens, no old plastic blinds, no torn curtains.`;
+Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no visible radiator panel, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no random clutter, no old electronics, no electronics on the floor or rug, no loose cables, chargers or camera straps, no plush toys in bathrooms or kitchens, no old plastic blinds, no torn curtains, no empty shelves, no empty walls.`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.
