@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles' | 'prompts' | 'models' | 'proxy'
+type Tab = 'users' | 'packs' | 'styles' | 'prompts' | 'models' | 'proxy' | 'catalog'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -42,7 +42,19 @@ type Product = {
   unit: string; qty: number; image_path?: string | null; image_url?: string | null;
   source?: string | null; url?: string | null; room_type?: string | null;
   price_tier?: string | null; room_types?: string | null; surface?: string | null; active?: boolean;
+  seed_key?: string | null;
 }
+type ImportPreview = {
+  url: string; domain: string; allowed_domain: boolean;
+  name: string; brand: string; description: string; price: number; currency: string;
+  category: string | null; unit: string; qty: number; price_tier: string;
+  room_types: string; style_tags: string; surface: string | null;
+  source: string; url_source: string; image_path: string | null; image_url: string | null;
+  sku?: string; availability?: string; rating?: number | null; reviews?: number | null;
+  attrs: Record<string, unknown>;
+  quality: { score: number; allowed_domain: boolean; used: boolean; duplicate_of?: { id: number; name: string; active: boolean } | null; image_ok: boolean; issues: string[] };
+}
+const productCategories = ['bed','wardrobe','sofa','armchair','coffee_table','dining_table','dining_chair','sideboard','desk','office_chair','storage','bench','rug','floor','paint','wallpaper','tile','skirting','countertop','cabinet','faucet','sink','toilet','shower','bathtub','light','outlets','appliance','textile'] as const
 type ModelSettings = {
   render_model: string; vision_model: string; resolution: string; aspect_ratio: string;
   image_models: Array<{ id: string; input_refs: boolean }>;
@@ -129,6 +141,14 @@ export default function Admin() {
   const [proxyStatus, setProxyStatus] = useState<{ ok: boolean; status: number; ms: number; at: string; error?: string } | null>(null)
   const [proxyNotice, setProxyNotice] = useState('')
   const [proxyBusy, setProxyBusy] = useState(false)
+  const [catalog, setCatalog] = useState<Product[]>([])
+  const [catalogQuery, setCatalogQuery] = useState('')
+  const [catalogBusy, setCatalogBusy] = useState(false)
+  const [importUrl, setImportUrl] = useState('')
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importNotice, setImportNotice] = useState('')
+  const [importAllowAny, setImportAllowAny] = useState(false)
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -193,6 +213,55 @@ export default function Admin() {
       setModelSettings(d); setRenderDraft(d.render_model); setVisionDraft(d.vision_model); setResolutionDraft(d.resolution || '1K'); setAspectDraft(d.aspect_ratio || 'auto'); setModelNotice('')
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
+  const loadCatalog = async () => {
+    try { setCatalog(await readJson(await api('/api/admin/products'))) }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const parseImport = async () => {
+    if (!importUrl.trim()) return
+    setImportBusy(true); setImportNotice(''); setImportPreview(null); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/products/import', { method: 'POST', body: JSON.stringify({ url: importUrl.trim() }) }))
+      setImportPreview(d); setImportNotice(d.allowed_domain ? 'Товар разобран' : 'Домен не в allowlist — включите разрешение вручную')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка импорта') }
+    finally { setImportBusy(false) }
+  }
+  const addImported = async () => {
+    if (!importPreview) return
+    if (!importPreview.category || !importPreview.name || !importPreview.price) { setAdminError('Нужны название, цена и категория'); return }
+    if (!importPreview.allowed_domain && !importAllowAny) { setAdminError('Домен не в allowlist. Подтвердите импорт вручную'); return }
+    setCatalogBusy(true); setAdminError(''); setImportNotice('')
+    try {
+      await readJson(await api('/api/admin/products', { method: 'POST', body: JSON.stringify({
+        name: importPreview.name, brand: importPreview.brand, attrs: importPreview.attrs,
+        price: importPreview.price, unit: importPreview.unit, qty: importPreview.qty,
+        source: importPreview.domain, keywords: [importPreview.name, importPreview.category, importPreview.brand].filter(Boolean).join(','),
+        style_tags: importPreview.style_tags, url: importPreview.url_source || importPreview.url,
+        image_path: importPreview.image_path, image_url: importPreview.image_url,
+        price_tier: importPreview.price_tier, room_types: importPreview.room_types,
+        surface: importPreview.surface, active: false,
+      }) }))
+      setImportNotice('Товар добавлен черновиком. Включите его в таблице ниже.')
+      setImportPreview(null); setImportUrl(''); setImportAllowAny(false)
+      await loadCatalog()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setCatalogBusy(false) }
+  }
+  const updateCatalog = async (p: Product, fields: Record<string, unknown>) => {
+    setCatalogBusy(true); setAdminError('')
+    try {
+      await readJson(await api('/api/admin/products/' + p.id, { method: 'PUT', body: JSON.stringify(fields) }))
+      await loadCatalog()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setCatalogBusy(false) }
+  }
+  const deleteCatalog = async (p: Product) => {
+    if (!confirm(`Удалить товар «${p.name}»?`)) return
+    setCatalogBusy(true); setAdminError('')
+    try { await api('/api/admin/products/' + p.id, { method: 'DELETE' }); await loadCatalog() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setCatalogBusy(false) }
+  }
   const loadProxy = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/proxy'))
@@ -246,7 +315,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -415,7 +484,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты'], ['models', 'Модели'], ['proxy', 'Прокси']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты'], ['models', 'Модели'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -616,6 +685,77 @@ export default function Admin() {
                 </form>
               )}
               {!modelSettings && <p className="mt-4 text-sm text-muted-foreground">Загружаем список моделей…</p>}
+            </div>
+          )}
+
+
+          {tab === 'catalog' && (
+            <div className="mt-8 space-y-8">
+              <section className="border p-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div><p className="eyebrow">Импорт товара по ссылке</p><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Вставьте ссылку на товар из allowlist. Мы разберём JSON-LD/OpenGraph, скачаем картинку, проверим дубли, рейтинг и цену. В каталог товар попадёт только после ручного подтверждения.</p></div>
+                  <span className="text-xs text-muted-foreground">allowlist: 10 доменов</span>
+                </div>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <input value={importUrl} onChange={e => setImportUrl(e.target.value)} placeholder="https://.../product/..." className="h-11 min-w-0 flex-1 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                  <button type="button" disabled={importBusy || !importUrl.trim()} onClick={() => void parseImport()} className="action-primary min-h-11">{importBusy ? 'Разбираем…' : 'Разобрать ссылку'}</button>
+                </div>
+                {importNotice && <p className="mt-3 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{importNotice}</p>}
+                {importPreview && (
+                  <div className="mt-5 grid gap-5 border-t pt-5 lg:grid-cols-[220px_1fr]">
+                    <div>
+                      {importPreview.image_url ? <img src={importPreview.image_url} alt="" className="aspect-square w-full border object-cover" /> : <div className="flex aspect-square items-center justify-center border bg-muted text-xs text-muted-foreground">нет картинки</div>}
+                      <div className={`mt-3 border px-3 py-2 text-xs ${importPreview.quality.score >= 70 ? 'border-primary/40 bg-primary/5' : 'border-destructive/40 bg-destructive/5 text-destructive'}`}>
+                        <p className="font-medium">Quality score: {importPreview.quality.score}/100</p>
+                        {importPreview.quality.issues.length > 0 && <ul className="mt-1 list-disc space-y-1 pl-4">{importPreview.quality.issues.map((issue, i) => <li key={i}>{issue}</li>)}</ul>}
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Название</label><input value={importPreview.name} onChange={e => setImportPreview({ ...importPreview, name: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div><label className="eyebrow mb-1 block">Бренд</label><input value={importPreview.brand} onChange={e => setImportPreview({ ...importPreview, brand: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div><label className="eyebrow mb-1 block">Цена, ₽</label><input value={importPreview.price || ''} inputMode="numeric" onChange={e => setImportPreview({ ...importPreview, price: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div><label className="eyebrow mb-1 block">Категория</label><select value={importPreview.category || ''} onChange={e => setImportPreview({ ...importPreview, category: e.target.value || null })} className="h-10 w-full border bg-background px-2 text-sm outline-none focus:border-primary"><option value="">— выберите —</option>{productCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                      <div><label className="eyebrow mb-1 block">Класс</label><select value={importPreview.price_tier} onChange={e => setImportPreview({ ...importPreview, price_tier: e.target.value })} className="h-10 w-full border bg-background px-2 text-sm outline-none focus:border-primary">{['start','comfort','premium','atelier'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                      <div><label className="eyebrow mb-1 block">Ед.</label><input value={importPreview.unit} onChange={e => setImportPreview({ ...importPreview, unit: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div><label className="eyebrow mb-1 block">Кол-во</label><input value={importPreview.qty} inputMode="numeric" onChange={e => setImportPreview({ ...importPreview, qty: Number(e.target.value.replace(/[^\d]/g, '')) || 1 })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Комнаты</label><input value={importPreview.room_types} onChange={e => setImportPreview({ ...importPreview, room_types: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Стили</label><input value={importPreview.style_tags} onChange={e => setImportPreview({ ...importPreview, style_tags: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Ссылка</label><a href={importPreview.url_source || importPreview.url} target="_blank" rel="noopener noreferrer" className="block truncate text-xs underline underline-offset-2">{importPreview.url_source || importPreview.url}</a></div>
+                      {!importPreview.allowed_domain && <label className="flex items-center gap-2 text-xs sm:col-span-2"><input type="checkbox" checked={importAllowAny} onChange={e => setImportAllowAny(e.target.checked)} />Домен не в allowlist — разрешить импорт вручную</label>}
+                      <div className="flex flex-wrap gap-2 sm:col-span-2">
+                        <button type="button" disabled={catalogBusy || !importPreview.category || !importPreview.name || !importPreview.price || (!importPreview.allowed_domain && !importAllowAny)} onClick={() => void addImported()} className="action-primary">{catalogBusy ? 'Сохраняем…' : 'Добавить черновиком'}</button>
+                        <button type="button" onClick={() => { setImportPreview(null); setImportNotice(''); setImportAllowAny(false) }} className="action-secondary">Сбросить</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Каталог</p><p className="mt-1 text-xs text-muted-foreground">{catalog.filter(p => p.active !== false).length} активных · {catalog.filter(p => p.active === false).length} черновиков</p></div><input value={catalogQuery} onChange={e => setCatalogQuery(e.target.value)} placeholder="Поиск по названию, категории, источнику" className="h-10 w-full max-w-sm border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                <div className="mt-3 overflow-x-auto border">
+                  <table className="w-full min-w-[980px] text-left text-sm">
+                    <thead><tr className="border-b"><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Товар</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Категория</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Класс</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Цена</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Комнаты</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Статус</th><th /></tr></thead>
+                    <tbody>
+                      {catalog.filter(p => {
+                        const q = catalogQuery.trim().toLowerCase()
+                        return !q || [p.name, p.category, p.source, p.room_types].filter(Boolean).join(' ').toLowerCase().includes(q)
+                      }).slice(0, 300).map(p => (
+                        <tr key={p.id} className={`border-b last:border-b-0 ${p.active === false ? 'bg-muted/40' : ''}`}>
+                          <td className="p-3"><div className="flex items-center gap-3"><img src={productImage(p)} alt="" className="h-12 w-12 border object-cover" /><div className="min-w-0"><p className="max-w-72 truncate font-medium">{p.name}</p><p className="max-w-72 truncate text-xs text-muted-foreground">{p.source || '—'}{p.seed_key ? ' · seed' : ''}</p></div></div></td>
+                          <td className="p-3 font-mono text-xs">{p.category}</td>
+                          <td className="p-3"><select value={p.price_tier || 'comfort'} onChange={e => void updateCatalog(p, { price_tier: e.target.value })} className="h-8 border bg-background px-1 text-xs">{['start','comfort','premium','atelier'].map(t => <option key={t} value={t}>{t}</option>)}</select></td>
+                          <td className="p-3"><input defaultValue={Math.round(Number(p.price) || 0)} inputMode="numeric" onBlur={e => { const value = Number(e.target.value.replace(/[^\d]/g, '')) || 0; if (value !== Number(p.price)) void updateCatalog(p, { price: value }) }} className="h-8 w-24 border bg-background px-2 text-xs" /></td>
+                          <td className="max-w-52 truncate p-3 text-xs text-muted-foreground">{p.room_types || 'все'}</td>
+                          <td className="p-3"><button type="button" onClick={() => void updateCatalog(p, { active: p.active === false })} className={`inline-flex min-h-8 items-center gap-1 border px-2 text-xs ${p.active === false ? 'border-foreground/30 text-muted-foreground' : 'border-primary/40 text-primary-text'}`}>{p.active === false ? 'включить' : 'активен'}</button></td>
+                          <td className="p-3 text-right"><button type="button" onClick={() => void deleteCatalog(p)} className="text-xs text-destructive underline">удал.</button></td>
+                        </tr>
+                      ))}
+                      {!catalog.length && <tr><td colSpan={7} className="p-6 text-center text-sm text-muted-foreground">Каталог пуст.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
           )}
 

@@ -25,7 +25,7 @@ function isPrivateIp(ip) {
   return false;
 }
 
-async function assertPublicUrl(raw) {
+export async function assertPublicUrl(raw) {
   let url;
   try { url = new URL(raw); } catch { throw new Error('Некорректная ссылка'); }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Ссылка должна быть http(s)');

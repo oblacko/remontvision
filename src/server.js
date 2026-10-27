@@ -20,6 +20,7 @@ import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
 import { validateModelOptions } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
+import { importProductFromUrl } from './productimport.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -336,6 +337,18 @@ app.post('/api/payments/webhook', h(async (req, res) => {
 app.get('/api/admin/products', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json(await q.adminProducts());
+}));
+
+app.post('/api/admin/products/import', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const url = String(req.body?.url || '').trim();
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'Нужна http(s)-ссылка на товар' });
+  try {
+    const preview = await importProductFromUrl(url);
+    res.json(preview);
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
 }));
 
 app.post('/api/admin/products', productUpload.single('image'), h(async (req, res) => {
