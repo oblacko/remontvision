@@ -178,6 +178,7 @@ export function buildPrompt({
   const keep = String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '');
   const change = String(room?.change || 'finishes, lighting, textiles, decor and styling that match the chosen style').replace(/\.+$/, '');
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
+  const styling = room?.styling || 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.';
   const roles = imageRolesText(imageMap);
 
   if (iteration) {
@@ -200,8 +201,9 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
   return `${roles}
 
 TASK
-Create a photorealistic, editorial-quality photograph of this ${roomName} after a deep renovation in ${styleDesc} style.
-The result must feel like a completed designer renovation, not a moodboard or a furniture showroom. Deeply transform the finishes, lighting, textiles, decor and styling while keeping the architecture believable and buildable.
+Create a photorealistic, aspirational editorial photograph of this ${roomName} after a deep renovation in ${styleDesc} style.
+The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
+Deeply transform the finishes, lighting, textiles, decor and styling while keeping the architecture believable and buildable.
 
 KEEP EXACTLY
 ${keep}.
@@ -210,14 +212,21 @@ Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical
 CHANGE / DEEP TRANSFORMATION
 ${change}.
 If a floor product is listed below, replace the floor finish with it. If no floor product is listed, preserve the existing floor. The same applies to walls: change only when a wall finish is listed.
-You may restyle upholstery, headboards and cabinet fronts, but keep the size and realistic position of large furniture.
+Keep the result functional, keep realistic dimensions, and do not block doors or windows.
+
+COMPOSITION
+Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved if it improves the design, but built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
 
 ROOM RULES
 ${roomRules}
 
+LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
+${styling}
+Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. Use warm layered lighting — ceiling, bedside/floor lamps and accent light — with soft shadows and tactile material contrast. The room must feel inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
+
 MATERIAL PALETTE — use these products where they fit
 ${productsText(products)}
-Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Use the listed dimensions as physical scale: furniture must look its real size relative to the room, and tile/plank patterns must match the stated format. Do not shrink a 220 cm sofa into an armchair or turn a 60×120 tile into a mosaic. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures. Small decor, plants and textiles may be added to complete the styling.
+Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Use the listed dimensions as physical scale: furniture must look its real size relative to the room, and tile/plank patterns must match the stated format. Do not shrink a 220 cm sofa into an armchair or turn a 60×120 tile into a mosaic. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures. Small decor, plants, textiles, art and books are encouraged to complete the styling.
 
 STYLE
 ${styleRefText}
@@ -228,7 +237,7 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected products already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-Photorealistic interior photograph, natural realistic lighting, believable materials, correct proportions, high detail, livable styling. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look.`;
+Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, warm and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling.`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.

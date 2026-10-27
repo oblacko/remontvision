@@ -18,8 +18,8 @@ export const ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'the sofa footprint, armchairs, coffee table, TV/media console and their positions; walls, windows, doors, ceiling height and camera angle',
-    change: 'floor finish, wall finish, lighting, textiles, decor and styling. Replace or restyle the sofa, armchairs, coffee table and storage using the listed furniture, but keep their footprints realistic and in place.',
+    keep: 'the sofa, armchairs, coffee table, TV/media console and their realistic proportions; the architecture, camera, walls, windows, doors and ceiling height. Do not block doors or windows.',
+    change: 'floor finish, wall finish, lighting, textiles, decor and styling. Replace or restyle the sofa, armchairs, coffee table and storage using the listed furniture. You may rearrange freestanding furniture to improve composition and flow while keeping it functional.',
     guidance: 'A sofa or armchairs, coffee table, TV/media console, shelving, rug and layered lighting are appropriate.',
     forbid: 'No bed, no kitchen cabinets, countertop, sink or faucet, no toilet, shower or bathroom fixtures. Do not replace the floor with large-format porcelain tile unless a floor product is provided.',
     electrical: [
@@ -43,8 +43,8 @@ export const ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'the bed footprint and position, bedside tables, wardrobe position, walls, windows, doors, ceiling height and camera angle. Keep the bed proportions realistic.',
-    change: 'floor finish, wall finish, ceiling and bedside lighting, textiles, and replace or restyle the bed, headboard and wardrobe using the listed furniture. Do not move the bed to another wall.',
+    keep: 'the bed, bedside tables, wardrobe and their realistic proportions; the architecture, camera, walls, windows, doors and ceiling height. Keep the bed functional and do not block doors or windows.',
+    change: 'floor finish, wall finish, ceiling and bedside lighting, textiles, and replace or restyle the bed, headboard and wardrobe using the listed furniture. You may move the bed and other freestanding furniture to improve composition and flow, but keep the layout realistic and functional.',
     guidance: 'A comfortable bed with an upholstered headboard, two bedside tables, soft textiles, a wardrobe and calm layered lighting are appropriate.',
     forbid: 'No kitchen, no sink/faucet, no toilet, shower or bathroom fixtures, no kitchen cabinets or countertop, no large-format porcelain floor tile. The floor must stay wood, laminate, carpet or vinyl unless a floor product explicitly says otherwise.',
     electrical: [
@@ -69,8 +69,8 @@ export const ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'the bed, desk, storage and their positions; architecture and camera angle. Keep the room child-safe and practical.',
-    change: 'floor finish, wall finish, lighting, textiles, decor and styling. Replace or restyle the bed, desk and storage using the listed furniture, but keep their footprints. Keep surfaces wipeable and safe.',
+    keep: 'the bed, desk, storage and their realistic proportions; the architecture, camera, walls, windows and doors. Keep the room child-safe and practical.',
+    change: 'floor finish, wall finish, lighting, textiles, decor and styling. Replace or restyle the bed, desk and storage using the listed furniture. You may rearrange the bed, desk and storage for a better safe layout.',
     guidance: 'A single or bunk bed, desk, storage, playful accents and child-safe materials are appropriate.',
     forbid: 'No kitchen, no bar area, no bathroom fixtures, no adult bedroom styling, no fragile decor at child height. Keep the room child-safe and appropriate for children.',
     electrical: [
@@ -165,8 +165,8 @@ export const ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'wardrobe, bench and shoe storage positions; doors, walls and camera angle.',
-    change: 'floor, walls, cabinet fronts, lighting, textiles and styling. Keep durable materials near the entrance.',
+    keep: 'wardrobe, bench and shoe storage and their realistic proportions; doors, walls and camera angle.',
+    change: 'floor, walls, cabinet fronts, lighting, textiles and styling. You may rearrange freestanding storage and the bench for better flow. Keep durable materials near the entrance.',
     guidance: 'A bench, wardrobe, mirror, shoe storage and durable floor materials are appropriate.',
     forbid: 'No bed, no kitchen, no bathroom fixtures. Do not add living-room furniture.',
     electrical: [
@@ -191,8 +191,8 @@ export const ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'the dining table footprint, chairs, sideboard and their positions; architecture and camera angle.',
-    change: 'floor, walls, lighting, textiles, decor and styling. Replace or restyle the dining table, chairs and sideboard using the listed furniture; the pendant should relate to the table.',
+    keep: 'the dining table, chairs, sideboard and their realistic proportions; the architecture, camera, walls, windows and doors.',
+    change: 'floor, walls, lighting, textiles, decor and styling. Replace or restyle the dining table, chairs and sideboard using the listed furniture. You may rearrange the table, chairs and sideboard for a better composition; keep circulation around the table.',
     guidance: 'A dining table, chairs, sideboard and pendant light are appropriate.',
     forbid: 'No bed, no kitchen sink/cooktop, no bathroom fixtures. Do not add a sofa or kitchen cabinets.',
     electrical: [
@@ -216,8 +216,8 @@ export const ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'desk, chair, shelving and their positions; architecture and camera angle.',
-    change: 'floor, walls, lighting, textiles, storage fronts and styling. Replace or restyle the desk, chair and storage using the listed furniture, but keep the workspace ergonomic.',
+    keep: 'desk, chair, shelving and their realistic proportions; the architecture, camera, walls, windows and doors.',
+    change: 'floor, walls, lighting, textiles, storage fronts and styling. Replace or restyle the desk, chair and storage using the listed furniture. You may reposition freestanding furniture for a better composition, keeping the workspace ergonomic.',
     guidance: 'A desk, ergonomic office chair, shelving and task lighting are appropriate.',
     forbid: 'No bed, no kitchen, no bathroom fixtures. Do not add living-room furniture.',
     electrical: [
@@ -284,6 +284,22 @@ export const ROOM_TYPES = [
     ],
   },
 ];
+
+const STYLING_BY_ROOM = {
+  'Спальня': 'Dress the bed like an editorial shoot: layered linen bedding, duvet, mixed-texture pillows, a throw, bedside books, a carafe and warm lamps. Add a rug, floor-length curtains, framed art, a plant, ceramics and a sculptural object. Use warm layered lighting and tactile materials.',
+  'Гостиная (зал)': 'Style the sofa with cushions and a throw; add a rug, coffee-table books, ceramics, a tray, candles, art, plants, a floor lamp and a sculptural chair. Layer textiles and warm light; make it feel collected, not staged.',
+  'Кухня': 'Style with a wooden board, ceramics, herbs, a bowl of fruit, a runner, a small plant and warm under-cabinet light. Keep counters uncluttered; make it look like a real home, not a showroom.',
+  'Санузел': 'Fold towels, add soap, a tray, a plant, a mirror, warm spa lighting and a small stool. Make it feel like a boutique hotel bathroom.',
+  'Столовая': 'Set the table with ceramics, glassware, a linen runner, candles and a small vase. Style the sideboard with art, books and a lamp; add a plant and a pendant that relates to the table.',
+  'Кабинет': 'Style the desk with a lamp, books, ceramics, a plant and a tray. Add art, a rug, shelving details and a comfortable chair; make it feel calm and productive.',
+  'Детская': 'Add soft textiles, books, toys, art, a rug and a night light; keep it playful but styled, safe and not cluttered.',
+  'Прихожая': 'Style with a bench, tray, mirror, hooks, a plant, a runner and warm light; make the first impression inviting.',
+  'Балкон / лоджия': 'Add plants, a small table, a chair, textiles and warm light; make it a cozy retreat.',
+  'Гардеробная': 'Style shelves with folded textiles, boxes, a mirror and warm integrated light.',
+  'Кладовка': 'Keep it practical: boxes, labels, shelving and warm light; no decor clutter.',
+  'Другое': 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.',
+};
+for (const type of ROOM_TYPES) type.styling = STYLING_BY_ROOM[type.name] || STYLING_BY_ROOM['Другое'];
 
 const byName = new Map(ROOM_TYPES.map(type => [type.name.toLowerCase(), type]));
 export const ROOM_TYPE_NAMES = ROOM_TYPES.map(type => type.name);
