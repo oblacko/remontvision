@@ -42,7 +42,8 @@ const fmtDateTime = (iso?: string | null) => iso
   ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   : null
 
-const stylePresets = [
+type StylePreset = { key: string; name: string; accent: string; image_url?: string }
+const defaultStylePresets: StylePreset[] = [
   { key: 'modern', name: 'Современный', accent: 'sand' },
   { key: 'scandi', name: 'Скандинавский', accent: 'dust' },
   { key: 'loft', name: 'Лофт', accent: 'graphite' },
@@ -150,6 +151,7 @@ export function GenerationPanel({
   onRefreshUser: () => void | Promise<void>
 }) {
   const [step, setStep] = useState<Step>('photo')
+  const [stylePresets, setStylePresets] = useState<StylePreset[]>(defaultStylePresets)
   const [photo, setPhoto] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [photoName, setPhotoName] = useState('')
@@ -189,6 +191,17 @@ export function GenerationPanel({
     urls.current = urls.current.filter((item) => item !== url)
   }
   useEffect(() => () => { urls.current.forEach((url) => URL.revokeObjectURL(url)) }, [])
+
+  useEffect(() => {
+    fetch('/api/styles')
+      .then(r => r.ok ? r.json() : null)
+      .then(list => {
+        if (Array.isArray(list) && list.length) {
+          setStylePresets(list.map(s => ({ key: s.key, name: s.name, accent: s.accent || 'sand', image_url: s.image_url })))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!open) { setCreditOpen(false); return }
@@ -410,7 +423,7 @@ export function GenerationPanel({
               {stylePresets.map((item) => (
                 <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { setStyle(item.name); setAccent(item.accent) }} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
                   <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
-                    <img src={`/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                    <img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
                     {style === item.name && (
                       <span className="absolute right-2 top-2 flex size-6 items-center justify-center bg-primary text-primary-foreground">
                         <Check className="size-4" />

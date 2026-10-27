@@ -40,11 +40,21 @@ async function processRender(renderId) {
     // отбор товаров и промпт собираем здесь, где есть доступ к каталогу
     let curated = [];
     let prompt;
-    const hasStyleRef = Boolean(room.style_ref_path);
+    let styleInfo = null;
+    let adminStyleRefs = [];
+    let hasStyleRef = false;
     if (iteration) {
       prompt = buildPrompt({ style: room.style, budget: room.budget, requestText: render.request_text, iteration: true });
     } else {
-      curated = await curateProducts({ style: room.style, budget: room.budget });
+      styleInfo = await q.styleByName(room.style);
+      adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id) : [];
+      const preferred = styleInfo ? await q.styleProducts(styleInfo.id) : [];
+      hasStyleRef = Boolean(room.style_ref_path) || adminStyleRefs.length > 0;
+      curated = await curateProducts({
+        style: room.style,
+        budget: room.budget,
+        preferredIds: preferred.map(p => p.id),
+      });
       prompt = buildPrompt({
         style: room.style,
         budget: room.budget,
@@ -52,18 +62,27 @@ async function processRender(renderId) {
         palette: room.palette || 'none',
         accent: room.accent || 'none',
         hasStyleRef,
+        styleDescription: styleInfo?.prompt_description || '',
       });
     }
     await q.setRenderPrompt(renderId, prompt);
 
     let imageB64, cost = null, model = null, targetRatio = null;
-    let styleRefB64 = null;
-    if (!iteration && hasStyleRef && supportsInputRefs()) {
-      const refBuf = await getBuffer(room.style_ref_path);
-      styleRefB64 = `data:${MIME_BY_EXT[detectImageExt(refBuf)] || 'image/jpeg'};base64,${refBuf.toString('base64')}`;
+    const styleRefs = [];
+    if (!iteration && supportsInputRefs()) {
+      const paths = [];
+      if (room.style_ref_path) paths.push(room.style_ref_path);
+      for (const ref of adminStyleRefs) {
+        if (paths.length >= 2) break;
+        paths.push(ref.image_path);
+      }
+      for (const refPath of paths) {
+        const refBuf = await getBuffer(refPath);
+        styleRefs.push(`data:${MIME_BY_EXT[detectImageExt(refBuf)] || 'image/jpeg'};base64,${refBuf.toString('base64')}`);
+      }
     }
     const productRefs = iteration || !supportsInputRefs() ? [] : await referenceImages(curated.filter(hasImage));
-    const refs = styleRefB64 ? [styleRefB64, ...productRefs.slice(0, 3)] : productRefs.slice(0, 4);
+    const refs = [...styleRefs, ...productRefs.slice(0, Math.max(0, 4 - styleRefs.length))];
 
     if (MOCK_MODE) {
       // демо без ключа: имитируем задержки и отдаём демо-картинку

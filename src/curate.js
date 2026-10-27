@@ -38,11 +38,14 @@ function styleScore(product, style) {
   return tags.some(t => wanted.includes(t)) ? 1 : 0;
 }
 
-export async function curateProducts({ style, budget }) {
+export async function curateProducts({ style, budget, preferredIds = [] }) {
   const budgetRub = budget * 1000;
   const all = await q.allProducts();
+  const preferred = all.filter(p => preferredIds.map(Number).includes(Number(p.id)));
   const chosen = [];
   for (const cat of CATEGORIES) {
+    const pinned = preferred.find(p => p.category === cat);
+    if (pinned) { chosen.push(pinned); continue; }
     const share = (BUDGET_SHARE[cat] || 0.1) * budgetRub;
     const candidates = all
       .filter(p => p.category === cat && p.price * (p.qty || 1) <= share * 1.6) // допуск 60% сверх доли

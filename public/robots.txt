@@ -4,5 +4,6 @@ Disallow: /api/
 Disallow: /files/
 Disallow: /renders/
 Disallow: /app
+Disallow: /admin
 
 Sitemap: https://www.remontvision.ru/sitemap.xml

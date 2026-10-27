@@ -1,0 +1,441 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
+import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
+import '../App.css'
+
+type Tab = 'users' | 'packs' | 'styles'
+type AdminUser = {
+  id: number; email: string; balance: number; rooms_count: number; renders_count: number;
+  created_at: string; last_generation_at: string | null;
+}
+type CreditRow = { id: number; delta: number; reason: string; note: string | null; created_at: string }
+type GenRow = {
+  id: string; room_id: string; style: string; status: string; request_text: string | null;
+  credits_spent: number; created_at: string; finished_at: string | null;
+  image_url: string | null; photo_url: string | null; error: string | null;
+}
+type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
+type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
+type Style = {
+  id: number; key: string; name: string; accent: string; description: string;
+  image_url: string; active: boolean; sort: number;
+  references_count?: number; products_count?: number;
+}
+type StyleRef = { id: number; title: string; image_url: string; sort: number }
+type Product = {
+  id: number; category: string; name: string; brand?: string | null; price: number;
+  unit: string; qty: number; image_path?: string | null; image_url?: string | null;
+  source?: string | null; url?: string | null;
+}
+type StyleDetail = { style: Style; prompt_description: string; references: StyleRef[]; products: Product[] }
+
+const KEY_STORAGE = 'rv_admin_key'
+const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value / 100)) + ' ₽'
+const money = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
+const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+const productImage = (p: Product) => p.image_path ? `/products/${p.image_path.split('/').pop()}` : (p.image_url || '')
+const accents = ['sand', 'dust', 'graphite', 'forest', 'terra'] as const
+const accentNames: Record<string, string> = { sand: 'Песочный', dust: 'Синева', graphite: 'Графит', forest: 'Оливковый', terra: 'Терракота' }
+const reasonNames: Record<string, string> = {
+  signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
+  render: 'генерация', iterate: 'правка', iterate_refund: 'возврат кредита', refund: 'возврат',
+  admin_adjust: 'корректировка', admin_test: 'корректировка',
+}
+
+function AdminImage({ src, kind, alt = '' }: { src?: string | null; kind: 'renders' | 'files'; alt?: string }) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    setUrl('')
+    if (!src) return
+    const file = src.split('/').pop()
+    const key = localStorage.getItem(KEY_STORAGE) || ''
+    if (!file || !key) return
+    let objectUrl = ''
+    fetch(`/api/admin/${kind}/${encodeURIComponent(file)}`, { headers: { 'X-Admin-Key': key } })
+      .then(r => r.ok ? r.blob() : null)
+      .then(blob => { if (blob) { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl) } })
+      .catch(() => {})
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [src, kind])
+  return url
+    ? <img src={url} alt={alt} className="h-14 w-14 border border-foreground/20 object-cover" />
+    : <span className="flex h-14 w-14 items-center justify-center border border-dashed border-foreground/25 text-[10px] text-muted-foreground">фото</span>
+}
+
+export default function Admin() {
+  const [key, setKey] = useState(() => localStorage.getItem(KEY_STORAGE) || '')
+  const [keyInput, setKeyInput] = useState(() => localStorage.getItem(KEY_STORAGE) || '')
+  const [authed, setAuthed] = useState(false)
+  const [boot, setBoot] = useState(true)
+  const [keyError, setKeyError] = useState('')
+  const [tab, setTab] = useState<Tab>('users')
+
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [userQuery, setUserQuery] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+  const [userDetail, setUserDetail] = useState<UserDetail | null>(null)
+  const [creditDelta, setCreditDelta] = useState('1')
+  const [creditReason, setCreditReason] = useState('бонус')
+  const [creditNote, setCreditNote] = useState('')
+  const [creditBusy, setCreditBusy] = useState(false)
+  const [adminError, setAdminError] = useState('')
+
+  const [packs, setPacks] = useState<Pack[]>([])
+  const [editPackId, setEditPackId] = useState<string | null>(null)
+  const [packForm, setPackForm] = useState({ id: '', title: '', credits: '2', price: '99', active: true, sort: '10' })
+
+  const [styles, setStyles] = useState<Style[]>([])
+  const [selectedStyleId, setSelectedStyleId] = useState<number | null>(null)
+  const [styleDetail, setStyleDetail] = useState<StyleDetail | null>(null)
+  const [styleForm, setStyleForm] = useState({ key: '', name: '', accent: 'sand', prompt_description: '', description: '', active: true, sort: '10' })
+  const [editStyleId, setEditStyleId] = useState<number | null>(null)
+  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [productQuery, setProductQuery] = useState('')
+  const [refTitle, setRefTitle] = useState('')
+  const [styleBusy, setStyleBusy] = useState(false)
+  const styleImageRef = useRef<HTMLInputElement>(null)
+  const styleRefsRef = useRef<HTMLInputElement>(null)
+
+  const api = async (path: string, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers)
+    headers.set('X-Admin-Key', key)
+    if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
+    const r = await fetch(path, { ...init, headers })
+    if (r.status === 403) { setAuthed(false); throw new Error('Неверный ключ') }
+    return r
+  }
+  const readJson = async (r: Response) => {
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(data.error || String(r.status))
+    return data
+  }
+
+  useEffect(() => {
+    if (!key) { setAuthed(false); setBoot(false); return }
+    setBoot(true)
+    fetch('/api/admin/users', { headers: { 'X-Admin-Key': key } })
+      .then(r => { if (!r.ok) throw new Error('bad key'); setAuthed(true); setKeyError('') })
+      .catch(() => { setAuthed(false); setKeyError('Неверный ключ') })
+      .finally(() => setBoot(false))
+  }, [key])
+
+  const loadUsers = async (q = userQuery) => {
+    try {
+      const data = await readJson(await api('/api/admin/users?q=' + encodeURIComponent(q)))
+      setUsers(data)
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const loadUser = async (id: number) => {
+    setSelectedUserId(id)
+    try { setUserDetail(await readJson(await api('/api/admin/users/' + id))) }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const loadPacks = async () => {
+    try { setPacks(await readJson(await api('/api/admin/packs'))); }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const loadStyles = async () => {
+    try { setStyles(await readJson(await api('/api/admin/styles'))); }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const loadStyle = async (id: number) => {
+    setSelectedStyleId(id)
+    try {
+      const d = await readJson(await api('/api/admin/styles/' + id))
+      setStyleDetail(d)
+      setStyleForm({
+        key: d.style.key, name: d.style.name, accent: d.style.accent || 'sand',
+        prompt_description: d.prompt_description || '', description: d.style.description || '',
+        active: d.style.active, sort: String(d.style.sort || 0),
+      })
+      setEditStyleId(id)
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles() }, [authed, tab])
+  useEffect(() => {
+    if (!authed) return
+    api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
+  }, [authed])
+
+  const submitKey = (event: FormEvent) => {
+    event.preventDefault()
+    const value = keyInput.trim()
+    if (!value) return setKeyError('Введите ключ')
+    localStorage.setItem(KEY_STORAGE, value)
+    setKey(value)
+    setKeyError('')
+  }
+  const logout = () => {
+    localStorage.removeItem(KEY_STORAGE)
+    setKey(''); setKeyInput(''); setAuthed(false); setUserDetail(null); setStyleDetail(null)
+  }
+  const adjustCredits = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!selectedUserId) return
+    const delta = Number(creditDelta)
+    if (!Number.isInteger(delta) || delta === 0) return setAdminError('Кредиты: целое число, не 0')
+    setCreditBusy(true); setAdminError('')
+    try {
+      await readJson(await api('/api/admin/users/' + selectedUserId + '/credits', {
+        method: 'POST', body: JSON.stringify({ delta, reason: creditReason || 'admin_adjust', note: creditNote || null }),
+      }))
+      setCreditNote('')
+      await Promise.all([loadUsers(), loadUser(selectedUserId)])
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setCreditBusy(false) }
+  }
+  const startNewPack = () => {
+    setEditPackId(null)
+    setPackForm({ id: '', title: '', credits: '2', price: '99', active: true, sort: '10' })
+  }
+  const editPack = (p: Pack) => {
+    setEditPackId(p.id)
+    setPackForm({ id: p.id, title: p.title, credits: String(p.credits), price: String(p.price_kopecks / 100), active: p.active, sort: String(p.sort) })
+  }
+  const savePack = async (event: FormEvent) => {
+    event.preventDefault()
+    setAdminError('')
+    try {
+      const body = {
+        id: packForm.id, title: packForm.title, credits: Number(packForm.credits),
+        price_kopecks: Math.round(Number(packForm.price) * 100), active: packForm.active, sort: Number(packForm.sort) || 0,
+      }
+      const r = editPackId
+        ? await api('/api/admin/packs/' + editPackId, { method: 'PUT', body: JSON.stringify(body) })
+        : await api('/api/admin/packs', { method: 'POST', body: JSON.stringify(body) })
+      await readJson(r)
+      await loadPacks()
+      startNewPack()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const deletePack = async (id: string) => {
+    if (!confirm('Удалить пакет ' + id + '?')) return
+    try { await api('/api/admin/packs/' + id, { method: 'DELETE' }); await loadPacks() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const startNewStyle = () => {
+    setEditStyleId(null); setSelectedStyleId(null); setStyleDetail(null)
+    setStyleForm({ key: '', name: '', accent: 'sand', prompt_description: '', description: '', active: true, sort: '10' })
+  }
+  const saveStyle = async (event: FormEvent) => {
+    event.preventDefault()
+    setStyleBusy(true); setAdminError('')
+    try {
+      const fd = new FormData()
+      fd.append('key', styleForm.key); fd.append('name', styleForm.name)
+      fd.append('accent', styleForm.accent); fd.append('prompt_description', styleForm.prompt_description)
+      fd.append('description', styleForm.description); fd.append('active', String(styleForm.active)); fd.append('sort', styleForm.sort)
+      const file = styleImageRef.current?.files?.[0]
+      if (file) fd.append('image', file)
+      const r = editStyleId
+        ? await api('/api/admin/styles/' + editStyleId, { method: 'PUT', body: fd })
+        : await api('/api/admin/styles', { method: 'POST', body: fd })
+      const data = await readJson(r)
+      if (styleImageRef.current) styleImageRef.current.value = ''
+      await loadStyles()
+      await loadStyle(data.id)
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setStyleBusy(false) }
+  }
+  const uploadStyleRefs = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!selectedStyleId || !files?.length) return
+    setStyleBusy(true); setAdminError('')
+    try {
+      for (let i = 0; i < files.length; i += 8) {
+        const fd = new FormData()
+        fd.append('title', refTitle)
+        for (const file of Array.from(files).slice(i, i + 8)) fd.append('images', file)
+        await readJson(await api('/api/admin/styles/' + selectedStyleId + '/references', { method: 'POST', body: fd }))
+      }
+      if (styleRefsRef.current) styleRefsRef.current.value = ''
+      setRefTitle('')
+      await loadStyle(selectedStyleId)
+      await loadStyles()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setStyleBusy(false) }
+  }
+  const deleteStyleRef = async (refId: number) => {
+    if (!selectedStyleId) return
+    try { await api('/api/admin/styles/' + selectedStyleId + '/references/' + refId, { method: 'DELETE' }); await loadStyle(selectedStyleId); await loadStyles() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const addStyleProduct = async (productId: number) => {
+    if (!selectedStyleId) return
+    try { await readJson(await api('/api/admin/styles/' + selectedStyleId + '/products', { method: 'POST', body: JSON.stringify({ product_id: productId }) })); await loadStyle(selectedStyleId); await loadStyles() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const deleteStyleProduct = async (productId: number) => {
+    if (!selectedStyleId) return
+    try { await api('/api/admin/styles/' + selectedStyleId + '/products/' + productId, { method: 'DELETE' }); await loadStyle(selectedStyleId); await loadStyles() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const filteredProducts = useMemo(() => {
+    const q = productQuery.trim().toLowerCase()
+    return allProducts.filter(p => !styleDetail?.products.some(sp => sp.id === p.id) && (!q || p.name.toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)))
+  }, [allProducts, productQuery, styleDetail])
+
+  return (
+    <div className="min-h-dvh bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b bg-background">
+        <div className="page-shell flex min-h-16 items-center justify-between gap-4">
+          <div className="flex items-center gap-3"><a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span></a><span className="eyebrow">/ админка</span></div>
+          <nav className="flex items-center gap-3 text-sm">
+            <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
+            <a href="/app" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">Кабинет</a>
+            {authed && <button type="button" onClick={logout} className="inline-flex min-h-11 items-center gap-2 px-2 hover:opacity-50"><LogOut className="size-4" />Выйти</button>}
+          </nav>
+        </div>
+      </header>
+
+      {boot ? (
+        <div className="flex min-h-[60svh] items-center justify-center"><LoaderCircle className="size-8 animate-spin text-primary-text" /></div>
+      ) : !authed ? (
+        <main className="mx-auto flex min-h-[70svh] max-w-md flex-col justify-center px-4 py-12">
+          <p className="eyebrow">Доступ</p>
+          <h1 className="display-title mt-4 text-4xl">Админка</h1>
+          <p className="mt-4 text-sm leading-6 text-muted-foreground">Введите ключ администратора. Он хранится только в этом браузере.</p>
+          <form onSubmit={submitKey} className="mt-6 space-y-3">
+            <input type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)} placeholder="X-Admin-Key" autoFocus className="h-12 w-full border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20" />
+            {keyError && <p className="text-sm text-destructive" role="alert">{keyError}</p>}
+            <button type="submit" className="action-primary w-full">Войти <ArrowUpRight className="size-4" /></button>
+          </form>
+        </main>
+      ) : (
+        <main className="page-shell py-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
+            <nav className="flex border-b" aria-label="Разделы админки">
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили']] as const).map(([id, label]) => (
+                <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
+              ))}
+            </nav>
+          </div>
+          {adminError && <p className="mt-4 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{adminError}</p>}
+
+          {tab === 'users' && (
+            <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_26rem]">
+              <section>
+                <form onSubmit={e => { e.preventDefault(); loadUsers() }} className="flex gap-2">
+                  <input value={userQuery} onChange={e => setUserQuery(e.target.value)} placeholder="Поиск по e-mail" className="h-11 min-w-0 flex-1 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                  <button type="submit" className="action-secondary px-4"><Search className="size-4" />Найти</button>
+                </form>
+                <div className="mt-4 overflow-x-auto border">
+                  <table className="w-full text-left text-sm">
+                    <thead><tr className="border-b"><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">E-mail</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Баланс</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Комнат</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Генераций</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Последняя</th></tr></thead>
+                    <tbody>{users.map(u => <tr key={u.id} onClick={() => loadUser(u.id)} className={`cursor-pointer border-b last:border-b-0 hover:bg-muted ${selectedUserId === u.id ? 'bg-muted' : ''}`}><td className="p-3"><b>{u.email}</b><div className="text-xs text-muted-foreground">{dateTime(u.created_at)}</div></td><td className="p-3">{u.balance} кр.</td><td className="p-3">{u.rooms_count}</td><td className="p-3">{u.renders_count}</td><td className="p-3 text-xs text-muted-foreground">{dateTime(u.last_generation_at)}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              </section>
+              <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                {userDetail ? (
+                  <>
+                    <div className="flex items-start justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Пользователь</p><h2 className="mt-2 text-xl font-light">{userDetail.user.email}</h2><p className="mt-1 text-xs text-muted-foreground">с {dateTime(userDetail.user.created_at)}</p></div><strong className="text-2xl font-light text-primary-text">{userDetail.user.balance} кр.</strong></div>
+                    <form onSubmit={adjustCredits} className="mt-4 border p-4">
+                      <p className="eyebrow">Изменить кредиты</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <input value={creditDelta} onChange={e => setCreditDelta(e.target.value)} inputMode="numeric" placeholder="+1 / -1" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                        <input value={creditReason} onChange={e => setCreditReason(e.target.value)} placeholder="Причина" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                      </div>
+                      <input value={creditNote} onChange={e => setCreditNote(e.target.value)} placeholder="Заметка" className="mt-2 h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
+                      <button type="submit" disabled={creditBusy} className="action-primary mt-3 w-full">{creditBusy ? 'Сохраняем…' : 'Применить'}</button>
+                    </form>
+                    <h3 className="eyebrow mt-6">История кредитов</h3>
+                    <div className="mt-2 max-h-64 overflow-y-auto border">
+                      <table className="w-full text-left text-xs"><tbody>{userDetail.credits.map(c => <tr key={c.id} className="border-b last:border-b-0"><td className={`p-2 font-mono ${c.delta > 0 ? 'text-primary-text' : ''}`}>{c.delta > 0 ? '+' : ''}{c.delta}</td><td className="p-2">{reasonNames[c.reason] || c.reason}<div className="text-muted-foreground">{c.note}</div></td><td className="p-2 text-right text-muted-foreground">{dateTime(c.created_at)}</td></tr>)}</tbody></table>
+                    </div>
+                    <h3 className="eyebrow mt-6">Генерации</h3>
+                    <div className="mt-2 divide-y border-y">
+                      {userDetail.generations.map(g => <div key={g.id} className="flex gap-3 py-3"><AdminImage src={g.image_url || g.photo_url} kind={g.image_url ? 'renders' : 'files'} alt="" /><div className="min-w-0 text-xs"><p className="truncate font-medium">{g.request_text || `Дизайн · ${g.style}`}</p><p className="mt-1 text-muted-foreground">{dateTime(g.created_at)} · {g.status} · {g.credits_spent} кр.</p>{g.error && <p className="mt-1 line-clamp-2 text-destructive">{g.error}</p>}</div></div>)}
+                      {!userDetail.generations.length && <p className="py-4 text-sm text-muted-foreground">Генераций пока нет</p>}
+                    </div>
+                  </>
+                ) : <p className="text-sm text-muted-foreground">Выберите пользователя, чтобы увидеть кредиты и историю генераций.</p>}
+              </aside>
+            </div>
+          )}
+
+          {tab === 'packs' && (
+            <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_24rem]">
+              <section className="overflow-x-auto border">
+                <table className="w-full text-left text-sm">
+                  <thead><tr className="border-b"><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">ID</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Название</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Кредиты</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Цена</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Активен</th><th /></tr></thead>
+                  <tbody>{packs.map(p => <tr key={p.id} className="border-b last:border-b-0"><td className="p-3 font-mono text-xs">{p.id}</td><td className="p-3">{p.title}</td><td className="p-3">{p.credits}</td><td className="p-3">{rub(p.price_kopecks)}</td><td className="p-3">{p.active ? <Check className="size-4 text-primary-text" /> : '—'}</td><td className="p-3 text-right"><button type="button" onClick={() => editPack(p)} className="mr-2 text-xs underline">изм.</button><button type="button" onClick={() => deletePack(p.id)} className="text-xs text-destructive underline">удал.</button></td></tr>)}</tbody>
+                </table>
+              </section>
+              <form onSubmit={savePack} className="border p-4">
+                <div className="flex items-center justify-between gap-2"><p className="eyebrow">{editPackId ? 'Редактировать пакет' : 'Новый пакет'}</p><button type="button" onClick={startNewPack} className="text-xs underline"><Plus className="mr-1 inline size-3" />сброс</button></div>
+                <div className="mt-4 space-y-2">
+                  <input value={packForm.id} disabled={Boolean(editPackId)} onChange={e => setPackForm({ ...packForm, id: e.target.value })} placeholder="id: pack2" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary disabled:opacity-60" />
+                  <input value={packForm.title} onChange={e => setPackForm({ ...packForm, title: e.target.value })} placeholder="Название" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
+                  <div className="grid grid-cols-2 gap-2"><input value={packForm.credits} onChange={e => setPackForm({ ...packForm, credits: e.target.value })} inputMode="numeric" placeholder="Кредиты" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /><input value={packForm.price} onChange={e => setPackForm({ ...packForm, price: e.target.value })} inputMode="decimal" placeholder="Цена, ₽" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                  <div className="grid grid-cols-2 gap-2"><input value={packForm.sort} onChange={e => setPackForm({ ...packForm, sort: e.target.value })} inputMode="numeric" placeholder="Сортировка" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /><label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={packForm.active} onChange={e => setPackForm({ ...packForm, active: e.target.checked })} className="size-4 accent-primary" />активен</label></div>
+                </div>
+                <button type="submit" className="action-primary mt-4 w-full">{editPackId ? 'Сохранить' : 'Создать пакет'}</button>
+              </form>
+            </div>
+          )}
+
+          {tab === 'styles' && (
+            <div className="mt-8 grid gap-6 xl:grid-cols-[22rem_1fr]">
+              <section>
+                <div className="flex items-center justify-between gap-2"><p className="eyebrow">Стили</p><button type="button" onClick={startNewStyle} className="text-xs underline"><Plus className="mr-1 inline size-3" />новый</button></div>
+                <div className="mt-3 space-y-2">
+                  {styles.map(s => <button key={s.id} type="button" onClick={() => loadStyle(s.id)} className={`flex w-full items-center gap-3 border p-2 text-left transition-colors hover:bg-muted ${selectedStyleId === s.id ? 'bg-muted' : ''}`}><img src={s.image_url} alt="" className="h-14 w-16 shrink-0 object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{s.name}</span><span className="mt-1 block text-xs text-muted-foreground">{s.key} · {s.references_count || 0} реф. · {s.products_count || 0} тов.</span></span>{!s.active && <span className="text-[10px] uppercase text-muted-foreground">off</span>}</button>)}
+                </div>
+              </section>
+              <section className="min-w-0">
+                <form onSubmit={saveStyle} className="border p-4">
+                  <div className="flex items-center justify-between gap-2"><p className="eyebrow">{editStyleId ? 'Редактировать стиль' : 'Новый стиль'}</p>{editStyleId && <span className="font-mono text-xs text-muted-foreground">#{editStyleId}</span>}</div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <input value={styleForm.key} onChange={e => setStyleForm({ ...styleForm, key: e.target.value })} placeholder="key: modern" className="h-10 border bg-background px-3 font-mono text-sm outline-none focus:border-primary" />
+                    <input value={styleForm.name} onChange={e => setStyleForm({ ...styleForm, name: e.target.value })} placeholder="Название" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                    <select value={styleForm.accent} onChange={e => setStyleForm({ ...styleForm, accent: e.target.value })} className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary">{accents.map(a => <option key={a} value={a}>{accentNames[a]}</option>)}</select>
+                    <input value={styleForm.sort} onChange={e => setStyleForm({ ...styleForm, sort: e.target.value })} inputMode="numeric" placeholder="Сортировка" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                    <label className="flex min-h-10 items-center gap-2 border px-3 text-sm sm:col-span-2"><input type="checkbox" checked={styleForm.active} onChange={e => setStyleForm({ ...styleForm, active: e.target.checked })} className="size-4 accent-primary" />активен</label>
+                    <textarea value={styleForm.description} onChange={e => setStyleForm({ ...styleForm, description: e.target.value })} placeholder="Короткое описание для админки" rows={2} className="border bg-background px-3 py-2 text-sm outline-none focus:border-primary sm:col-span-2" />
+                    <textarea value={styleForm.prompt_description} onChange={e => setStyleForm({ ...styleForm, prompt_description: e.target.value })} placeholder="Prompt description (английский, для модели)" rows={2} className="border bg-background px-3 py-2 text-sm outline-none focus:border-primary sm:col-span-2" />
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 border px-3 text-sm sm:col-span-2"><Upload className="size-4 text-primary-text" />Обложка стиля<input ref={styleImageRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" /></label>
+                  </div>
+                  <button type="submit" disabled={styleBusy} className="action-primary mt-4 w-full">{styleBusy ? 'Сохраняем…' : editStyleId ? 'Сохранить стиль' : 'Создать стиль'}</button>
+                </form>
+
+                {styleDetail && (
+                  <div className="mt-6 space-y-6">
+                    <section>
+                      <div className="flex flex-wrap items-center justify-between gap-3"><p className="eyebrow">Референсы общего дизайна</p><span className="text-xs text-muted-foreground">{styleDetail.references.length} шт.</span></div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <input value={refTitle} onChange={e => setRefTitle(e.target.value)} placeholder="Подпись (необязательно)" className="h-10 min-w-40 flex-1 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border px-3 text-sm hover:bg-muted"><Upload className="size-4 text-primary-text" />Добавить фото<input ref={styleRefsRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={uploadStyleRefs} /></label>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {styleDetail.references.map(ref => <div key={ref.id} className="group relative border"><img src={ref.image_url} alt={ref.title} className="aspect-[4/3] w-full object-cover" /><button type="button" onClick={() => deleteStyleRef(ref.id)} className="absolute right-1 top-1 flex size-8 items-center justify-center bg-background/90 text-destructive hover:bg-background" aria-label="Удалить референс"><X className="size-4" /></button></div>)}
+                        {!styleDetail.references.length && <p className="col-span-full py-4 text-sm text-muted-foreground">Пока нет референсов. Добавьте 1–2 изображения общего настроения стиля.</p>}
+                      </div>
+                    </section>
+
+                    <section>
+                      <p className="eyebrow">Товары стиля (избранное)</p>
+                      <div className="mt-3 divide-y border-y">
+                        {styleDetail.products.map(p => <div key={p.id} className="flex items-center gap-3 py-2 text-sm"><img src={productImage(p)} alt="" className="h-10 w-10 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category}</span></span><button type="button" onClick={() => deleteStyleProduct(p.id)} className="text-xs text-destructive underline">убрать</button></div>)}
+                        {!styleDetail.products.length && <p className="py-3 text-sm text-muted-foreground">Товары не выбраны — генерация возьмёт каталог по бюджету.</p>}
+                      </div>
+                      <div className="mt-4">
+                        <input value={productQuery} onChange={e => setProductQuery(e.target.value)} placeholder="Найти товар по названию или бренду" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
+                        <div className="mt-2 max-h-64 overflow-y-auto border">
+                          {filteredProducts.slice(0, 20).map(p => <button key={p.id} type="button" onClick={() => addStyleProduct(p.id)} className="flex w-full items-center gap-3 border-b p-2 text-left text-sm last:border-b-0 hover:bg-muted"><img src={productImage(p)} alt="" className="h-9 w-9 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category} · {money(p.price)}</span></span><Plus className="size-4 shrink-0 text-primary-text" /></button>)}
+                          {!filteredProducts.length && <p className="p-3 text-sm text-muted-foreground">Ничего не найдено</p>}
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+        </main>
+      )}
+    </div>
+  )
+}

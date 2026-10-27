@@ -11,6 +11,12 @@ const site = 'https://www.remontvision.ru'
 const navItems = [['До / после', '#examples', 'examples'], ['Что вы получите', '#result', 'result'], ['Как работает', '#how', 'how'], ['Цены', '#prices', 'prices']] as const
 
 type Me = { email: string; balance: number }
+type PublicPack = { id: string; title: string; credits: number; price_kopecks: number }
+const defaultPacks: PublicPack[] = [
+  { id: 'pack2', title: 'Попробовать ещё', credits: 2, price_kopecks: 9900 },
+  { id: 'pack5', title: 'Обдумать варианты', credits: 5, price_kopecks: 22900 },
+  { id: 'pack15', title: 'Для нескольких комнат', credits: 15, price_kopecks: 59900 },
+]
 type Consents = { offer: boolean; personal: boolean; transfer: boolean }
 const consentsOf = (c: Consents) => ({ offer: c.offer, privacy: c.personal, cross_border: c.transfer })
 
@@ -51,6 +57,7 @@ export default function Home() {
   const [me, setMe] = useState<Me | null>(null)
   const [pendingPanel, setPendingPanel] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [packs, setPacks] = useState<PublicPack[]>(defaultPacks)
 
   async function loadMe() {
     try {
@@ -60,6 +67,11 @@ export default function Home() {
   }
 
   useEffect(() => { void loadMe() }, [])
+  useEffect(() => {
+    fetch('/api/packs').then(r => r.ok ? r.json() : null).then(list => {
+      if (Array.isArray(list) && list.length) setPacks(list)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const sections = navItems.map(([, , id]) => document.getElementById(id)).filter((section): section is HTMLElement => Boolean(section))
@@ -389,9 +401,11 @@ export default function Home() {
               <p className="max-w-sm text-sm leading-6 text-muted-foreground md:col-span-4">Один кредит — одна генерация или правка. Покупайте только то, что нужно сейчас.</p>
             </div>
             <div className="mt-12 grid border-y md:grid-cols-3">
-              {[
-                ['02', '99 ₽', 'Попробовать ещё', 'кредита'], ['05', '229 ₽', 'Обдумать варианты', 'кредитов'], ['15', '599 ₽', 'Для нескольких комнат', 'кредитов'],
-              ].map(([count, price, note, unit], index) => <div key={count} className="border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0"><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{count}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{note}</p>{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 генерации бесплатно</p>}</div>)}
+              {packs.map((pack, index) => {
+                const unit = pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'
+                const price = new Intl.NumberFormat('ru-RU').format(pack.price_kopecks / 100) + ' ₽'
+                return <div key={pack.id} className="border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0"><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{pack.title}</p>{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 генерации бесплатно</p>}</div>
+              })}
             </div>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row">

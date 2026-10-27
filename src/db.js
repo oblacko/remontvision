@@ -285,4 +285,69 @@ export const q = {
     return pool.query(`UPDATE products SET ${set.join(', ')} WHERE id = $1 RETURNING *`, [id, ...vals]).then(r => r.rows[0] || null);
   },
   deleteProduct: id => pool.query(`DELETE FROM products WHERE id = $1`, [id]).then(r => r.rowCount > 0),
+
+  // пакеты кредитов
+  creditPacks: activeOnly =>
+    pool.query(`SELECT * FROM credit_packs ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)
+      .then(r => r.rows),
+  packById: id =>
+    pool.query(`SELECT * FROM credit_packs WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  createPack: f =>
+    pool.query(`INSERT INTO credit_packs (id, title, credits, price_kopecks, active, sort)
+                VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [f.id, f.title, f.credits, f.price_kopecks, f.active !== false, f.sort || 0])
+      .then(r => r.rows[0]),
+  updatePack: (id, fields) => {
+    const keys = Object.keys(fields).filter(k => ['title','credits','price_kopecks','active','sort'].includes(k));
+    if (!keys.length) return Promise.resolve(null);
+    const set = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+    return pool.query(`UPDATE credit_packs SET ${set}, updated_at = now() WHERE id = $1 RETURNING *`,
+      [id, ...keys.map(k => fields[k])]).then(r => r.rows[0] || null);
+  },
+  deletePack: id => pool.query(`DELETE FROM credit_packs WHERE id = $1`, [id]).then(r => r.rowCount > 0),
+
+  // стили и их референсы/товары
+  styles: activeOnly =>
+    pool.query(`SELECT * FROM styles ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)
+      .then(r => r.rows),
+  adminStyles: () =>
+    pool.query(`SELECT s.*,
+                       (SELECT COUNT(*) FROM style_references r WHERE r.style_id = s.id)::int AS references_count,
+                       (SELECT COUNT(*) FROM style_products sp WHERE sp.style_id = s.id)::int AS products_count
+                FROM styles s ORDER BY s.sort, s.id`).then(r => r.rows),
+  styleById: id =>
+    pool.query(`SELECT * FROM styles WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  styleByName: name =>
+    pool.query(`SELECT * FROM styles WHERE name = $1`, [name]).then(r => r.rows[0] || null),
+  createStyle: f =>
+    pool.query(`INSERT INTO styles (key, name, accent, prompt_description, description, preset_image_path, active, sort)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [f.key, f.name, f.accent || 'sand', f.prompt_description || '', f.description || '',
+       f.preset_image_path || null, f.active !== false, f.sort || 0])
+      .then(r => r.rows[0]),
+  updateStyle: (id, fields) => {
+    const keys = Object.keys(fields).filter(k => ['key','name','accent','prompt_description','description','preset_image_path','active','sort'].includes(k));
+    if (!keys.length) return Promise.resolve(null);
+    const set = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+    return pool.query(`UPDATE styles SET ${set}, updated_at = now() WHERE id = $1 RETURNING *`,
+      [id, ...keys.map(k => fields[k])]).then(r => r.rows[0] || null);
+  },
+  deleteStyle: id => pool.query(`DELETE FROM styles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
+  styleReferences: styleId =>
+    pool.query(`SELECT * FROM style_references WHERE style_id = $1 ORDER BY sort, id`, [styleId]).then(r => r.rows),
+  addStyleReference: (styleId, imagePath, title = '', sort = 0) =>
+    pool.query(`INSERT INTO style_references (style_id, image_path, title, sort) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [styleId, imagePath, title, sort]).then(r => r.rows[0]),
+  deleteStyleReference: (styleId, refId) =>
+    pool.query(`DELETE FROM style_references WHERE id = $1 AND style_id = $2`, [refId, styleId]).then(r => r.rowCount > 0),
+  styleProducts: styleId =>
+    pool.query(`SELECT p.*, sp.sort AS style_sort FROM style_products sp
+                JOIN products p ON p.id = sp.product_id WHERE sp.style_id = $1
+                ORDER BY sp.sort, p.id`, [styleId]).then(r => r.rows),
+  addStyleProduct: (styleId, productId, sort = 0) =>
+    pool.query(`INSERT INTO style_products (style_id, product_id, sort) VALUES ($1,$2,$3)
+                ON CONFLICT (style_id, product_id) DO UPDATE SET sort = EXCLUDED.sort RETURNING *`,
+      [styleId, productId, sort]).then(r => r.rows[0]),
+  deleteStyleProduct: (styleId, productId) =>
+    pool.query(`DELETE FROM style_products WHERE style_id = $1 AND product_id = $2`, [styleId, productId]).then(r => r.rowCount > 0),
 };

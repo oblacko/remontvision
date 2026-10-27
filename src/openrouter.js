@@ -136,8 +136,8 @@ const ACCENTS = {
   graphite: 'graphite',
 };
 
-export function buildPrompt({ style, budget, requestText, iteration, products, palette = 'none', accent = 'none', hasStyleRef = false }) {
-  const styleDesc = hasStyleRef ? 'the uploaded style reference' : (STYLES[style] || STYLES['Современный']);
+export function buildPrompt({ style, budget, requestText, iteration, products, palette = 'none', accent = 'none', hasStyleRef = false, styleDescription = '' }) {
+  const styleDesc = styleDescription || STYLES[style] || STYLES['Современный'];
   const keep = 'CRITICAL: keep the exact same camera angle, walls positions, window and door openings. Do not change the room geometry or layout. Photorealistic professional interior photography.';
   if (iteration) {
     return `${keep} Apply ONLY this change to the interior: "${requestText}". Keep everything else exactly as in the source image.`;

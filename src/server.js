@@ -8,7 +8,7 @@ import { startWorker, enqueueRender } from './jobs.js';
 import { listImageModels, MOCK_MODE, assertConfig, log } from './openrouter.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
-import { PACKS, packById, createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured } from './payments.js';
+import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured } from './payments.js';
 import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
@@ -53,9 +53,10 @@ app.use('/images', express.static(path.join(WEB_DIST, 'images')));
 app.use('/fonts', express.static(path.join(WEB_DIST, 'fonts')));
 app.use('/web-assets', express.static(path.join(WEB_DIST, 'web-assets')));
 app.get(['/app', '/app/'], (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'app.html')));
+const webIndexPath = path.join(WEB_DIST, 'index.html');
+app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
-  const webIndex = path.join(WEB_DIST, 'index.html');
-  res.sendFile(fs.existsSync(webIndex) ? webIndex : path.join(process.cwd(), 'public', 'app.html'));
+  res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
 });
 
 const LEGAL_PAGES = {
@@ -116,6 +117,51 @@ function productLink(p) {
   return `https://yandex.ru/search/?text=${encodeURIComponent(query)}`;
 }
 
+const STATIC_STYLE_KEYS = new Set(['modern', 'scandi', 'loft', 'japandi', 'neo', 'minimal', 'dark', 'boho', 'deco', 'country']);
+
+function styleImageUrl(style) {
+  if (style.preset_image_path) return `/style-images/${path.basename(style.preset_image_path)}`;
+  return STATIC_STYLE_KEYS.has(style.key) ? `/images/style-${style.key}.webp` : '/images/style-modern.webp';
+}
+
+function styleDto(style) {
+  return {
+    id: style.id,
+    key: style.key,
+    name: style.name,
+    accent: style.accent,
+    description: style.description,
+    image_url: styleImageUrl(style),
+    active: style.active,
+    sort: style.sort,
+  };
+}
+
+function styleReferenceDto(ref) {
+  return {
+    id: ref.id,
+    title: ref.title,
+    sort: ref.sort,
+    image_url: `/style-images/${path.basename(ref.image_path)}`,
+  };
+}
+
+function styleProductDto(product) {
+  return {
+    id: product.id,
+    category: product.category,
+    name: product.name,
+    brand: product.brand,
+    attrs: product.attrs || {},
+    price: product.price,
+    unit: product.unit,
+    qty: product.qty,
+    source: product.source,
+    url: productLink(product),
+    image_url: product.image_path ? `/products/${path.basename(product.image_path)}` : product.image_url,
+  };
+}
+
 function generationDto(g) {
   return {
     id: g.id,
@@ -141,6 +187,9 @@ app.get('/api/health', (_req, res) => res.json({
 }));
 app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
+app.get('/api/styles', h(async (_req, res) => {
+  res.json((await q.styles(true)).map(styleDto));
+}));
 
 // ---------- авторизация (e-mail код; заделка под OAuth yandex/vk/mailru) ----------
 app.post('/api/auth/request-code', rateLimit, h(async (req, res) => {
@@ -191,9 +240,10 @@ app.get('/api/credits', h(async (req, res) => {
 }));
 
 // ---------- оплата ----------
-app.get('/api/packs', (_req, res) => {
-  res.json(PACKS.map(p => ({ id: p.id, credits: p.credits, price_kopecks: p.price_kopecks, title: p.title })));
-});
+app.get('/api/packs', h(async (_req, res) => {
+  const packs = await q.creditPacks(true);
+  res.json(packs.map(p => ({ id: p.id, credits: p.credits, price_kopecks: p.price_kopecks, title: p.title })));
+}));
 
 app.post('/api/payments/create', h(async (req, res) => {
   if (!PAYMENTS_ENABLED) return res.status(503).json({ error: 'Платежи временно отключены (бесплатный пилот)' });
@@ -201,8 +251,8 @@ app.post('/api/payments/create', h(async (req, res) => {
   if (req.body?.accept_offer !== true) {
     return res.status(400).json({ error: 'Нужен отдельный акцепт оферты', legal_version: LEGAL_VERSIONS.offer });
   }
-  const pack = packById(req.body?.pack_id);
-  if (!pack) return res.status(400).json({ error: 'Неизвестный пакет' });
+  const pack = await q.packById(String(req.body?.pack_id || ''));
+  if (!pack || !pack.active) return res.status(400).json({ error: 'Неизвестный пакет' });
   const base = (process.env.APP_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
   const payment = await createPayment({ userId: req.user.id, pack, returnUrl: `${base}/?paid=${pack.id}` });
   await recordAcceptances({
@@ -312,6 +362,171 @@ app.post('/api/admin/users/:id/credits', h(async (req, res) => {
   res.json(out);
 }));
 
+
+// ---------- пакеты кредитов: только админ ----------
+app.get('/api/admin/packs', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(await q.creditPacks(false));
+}));
+
+app.post('/api/admin/packs', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = String(req.body?.id || '').trim().toLowerCase();
+  const title = String(req.body?.title || '').trim();
+  const credits = Number(req.body?.credits);
+  const price = Number(req.body?.price_kopecks);
+  if (!/^[a-z0-9_-]{2,40}$/.test(id) || !title || !Number.isInteger(credits) || credits < 1 || !Number.isInteger(price) || price < 100) {
+    return res.status(400).json({ error: 'Нужны id (латиница), title, credits>0 и price_kopecks>=100' });
+  }
+  try {
+    const row = await q.createPack({ id, title, credits, price_kopecks: price, active: req.body?.active !== false, sort: Number(req.body?.sort) || 0 });
+    res.status(201).json(row);
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Пакет с таким id уже есть' });
+    throw e;
+  }
+}));
+
+app.put('/api/admin/packs/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const row = await q.updatePack(String(req.params.id), req.body || {});
+  if (!row) return res.status(404).json({ error: 'Не найдено' });
+  res.json(row);
+}));
+
+app.delete('/api/admin/packs/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const ok = await q.deletePack(String(req.params.id));
+  res.status(ok ? 204 : 404).end();
+}));
+
+// ---------- стили: только админ ----------
+function styleFields(req, { creating = false } = {}) {
+  const f = {};
+  if (creating || req.body.key !== undefined) f.key = String(req.body.key || '').trim().toLowerCase();
+  if (creating || req.body.name !== undefined) f.name = String(req.body.name || '').trim();
+  if (req.body.accent !== undefined) f.accent = String(req.body.accent || 'sand');
+  if (req.body.prompt_description !== undefined) f.prompt_description = String(req.body.prompt_description || '');
+  if (req.body.description !== undefined) f.description = String(req.body.description || '');
+  if (req.body.active !== undefined) f.active = String(req.body.active) === 'true' || String(req.body.active) === '1';
+  if (req.body.sort !== undefined) f.sort = Number(req.body.sort) || 0;
+  if (req.file) f.preset_image_path = null; // заполним ниже после сохранения
+  return f;
+}
+
+async function stylePresetFromRequest(req, f) {
+  if (req.file) f.preset_image_path = await saveUpload(req.file, 'style-images');
+  return f;
+}
+
+app.get('/api/admin/styles', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json((await q.adminStyles()).map(row => ({
+    ...styleDto(row),
+    references_count: row.references_count,
+    products_count: row.products_count,
+  })));
+}));
+
+app.get('/api/admin/styles/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = Number(req.params.id);
+  const style = await q.styleById(id);
+  if (!style) return res.status(404).json({ error: 'Не найдено' });
+  res.json({
+    style: styleDto(style),
+    prompt_description: style.prompt_description,
+    references: (await q.styleReferences(id)).map(styleReferenceDto),
+    products: (await q.styleProducts(id)).map(styleProductDto),
+  });
+}));
+
+app.post('/api/admin/styles', upload.single('image'), h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const f = await stylePresetFromRequest(req, styleFields(req, { creating: true }));
+  if (!/^[a-z0-9_-]{2,40}$/.test(f.key || '') || !f.name) {
+    return res.status(400).json({ error: 'Нужны key (латиница) и name' });
+  }
+  try {
+    const row = await q.createStyle(f);
+    log({ event: 'style_created', style_id: row.id, key: row.key, name: row.name });
+    res.status(201).json(styleDto(row));
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Стиль с таким key или name уже есть' });
+    throw e;
+  }
+}));
+
+app.put('/api/admin/styles/:id', upload.single('image'), h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = Number(req.params.id);
+  const style = await q.styleById(id);
+  if (!style) return res.status(404).json({ error: 'Не найдено' });
+  const f = await stylePresetFromRequest(req, styleFields(req));
+  if (f.key !== undefined && !/^[a-z0-9_-]{2,40}$/.test(f.key)) return res.status(400).json({ error: 'key: только латиница/цифры/-_' });
+  if (f.name !== undefined && !f.name) return res.status(400).json({ error: 'name не может быть пустым' });
+  try {
+    const row = await q.updateStyle(id, f);
+    res.json(styleDto(row));
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Стиль с таким key или name уже есть' });
+    throw e;
+  }
+}));
+
+app.delete('/api/admin/styles/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const ok = await q.deleteStyle(Number(req.params.id));
+  res.status(ok ? 204 : 404).end();
+}));
+
+app.post('/api/admin/styles/:id/references', upload.array('images', 8), h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const styleId = Number(req.params.id);
+  const style = await q.styleById(styleId);
+  if (!style) return res.status(404).json({ error: 'Не найдено' });
+  const files = req.files || [];
+  if (!files.length) return res.status(400).json({ error: 'Нужно хотя бы одно изображение' });
+  const out = [];
+  for (const file of files) {
+    const imagePath = await saveUpload(file, 'style-images');
+    const ref = await q.addStyleReference(styleId, imagePath, String(req.body.title || file.originalname || '').slice(0, 200), Number(req.body.sort) || 0);
+    out.push(styleReferenceDto(ref));
+  }
+  res.status(201).json(out);
+}));
+
+app.delete('/api/admin/styles/:id/references/:refId', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const ok = await q.deleteStyleReference(Number(req.params.id), Number(req.params.refId));
+  res.status(ok ? 204 : 404).end();
+}));
+
+app.post('/api/admin/styles/:id/products', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const styleId = Number(req.params.id);
+  const productId = Number(req.body?.product_id);
+  if (!styleId || !productId) return res.status(400).json({ error: 'Нужны style id и product_id' });
+  const row = await q.addStyleProduct(styleId, productId, Number(req.body?.sort) || 0);
+  res.status(201).json(row);
+}));
+
+app.delete('/api/admin/styles/:id/products/:productId', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const ok = await q.deleteStyleProduct(Number(req.params.id), Number(req.params.productId));
+  res.status(ok ? 204 : 404).end();
+}));
+
+// ---------- админские изображения пользователей ----------
+app.get('/api/admin/renders/:file', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  await serveStored(req, res, 'renders', req.params.file);
+}));
+app.get('/api/admin/files/:name', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  await serveStored(req, res, 'uploads', req.params.name);
+}));
+
 // ---------- возвраты: только админ ----------
 app.get('/api/admin/payments', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -363,7 +578,10 @@ app.post('/api/rooms', rateLimit, upload.fields([
     'Скандинавский', 'Лофт', 'Джапанди', 'Неоклассика', 'Минимализм',
     'Тёмный модерн', 'Бохо', 'Ар-деко', 'Кантри', 'Референс пользователя',
   ];
-  const style = allowedStyles.includes(req.body.style) ? req.body.style : 'Современный';
+  const requestedStyle = String(req.body?.style || '').trim();
+  const dbStyle = requestedStyle ? await q.styleByName(requestedStyle) : null;
+  const style = dbStyle && dbStyle.active ? dbStyle.name
+    : (allowedStyles.includes(requestedStyle) ? requestedStyle : 'Современный');
   const allowedPalettes = new Set(['none', 'mono', 'analogous', 'complementary', 'split']);
   const allowedAccents = new Set(['none', 'forest', 'sand', 'terra', 'dust', 'graphite']);
   const palette = allowedPalettes.has(req.body.palette) ? req.body.palette : 'none';
@@ -447,6 +665,7 @@ async function serveStored(req, res, dir, name, ownerQuery = null) {
 app.get('/files/:name', h(async (req, res) => serveStored(req, res, 'uploads', req.params.name, q.roomByPhotoKey)));
 app.get('/renders/:file', h(async (req, res) => serveStored(req, res, 'renders', req.params.file, q.roomByRenderKey)));
 app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products', req.params.file)));
+app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
 
 // итерация: только для авторизованных, стоит 1 кредит
 app.post('/api/rooms/:id/iterate', rateLimit, h(async (req, res) => {
