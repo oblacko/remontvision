@@ -4,15 +4,16 @@ import assert from 'node:assert/strict';
 process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
-const { parseProductHtml, inferCategory, inferTier } = await import('../src/productimport.js');
+const { parseProductHtml, inferCategory, inferTier, extractDimensions } = await import('../src/productimport.js');
 
 const HTML = `<!doctype html><html><head>
 <title>Диван Osло — купить в интернет-магазине</title>
 <meta property="og:title" content="Диван Osло, букле" />
 <meta property="og:description" content="Трёхместный диван из букле для гостиной" />
 <meta property="og:image" content="https://cdn.example.com/sofa.jpg" />
+<meta property="product:price:amount" content="129 990" />
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"Product","name":"Диван Osло, букле","brand":{"name":"Osло"},"image":["https://cdn.example.com/sofa.jpg"],"description":"Трёхместный диван из букле для гостиной","sku":"OS-123","offers":{"@type":"Offer","price":"129990","priceCurrency":"RUB","availability":"https://schema.org/InStock"},"aggregateRating":{"ratingValue":"4.8","reviewCount":"42"}}
+{"@context":"https://schema.org","@type":"Product","name":"Диван Osло, букле","brand":{"name":"Osло"},"image":["https://cdn.example.com/sofa.jpg"],"description":"Трёхместный диван из букле для гостиной. Габариты: 220×95×85 см","sku":"OS-123","offers":{"@type":"Offer","price":"129990","priceCurrency":"RUB","availability":"https://schema.org/InStock"},"aggregateRating":{"ratingValue":"4.8","reviewCount":"42"}}
 </script></head><body></body></html>`;
 
 test('parses JSON-LD product fields', () => {
@@ -25,6 +26,22 @@ test('parses JSON-LD product fields', () => {
   assert.equal(p.rating, 4.8);
   assert.equal(p.reviews, 42);
   assert.equal(p.sku, 'OS-123');
+  assert.equal(p.dimensions.text, '220×95×85 см');
+  assert.equal(p.dimensions.width_cm, 220);
+  assert.equal(p.dimensions.depth_cm, 95);
+  assert.equal(p.dimensions.height_cm, 85);
+});
+
+test('extracts dimensions from additionalProperty and named text', () => {
+  const d = extractDimensions('<html></html>', { additionalProperty: [
+    { name: 'Ширина', value: '2200', unitCode: 'MMT' },
+    { name: 'Глубина', value: '950', unitCode: 'MMT' },
+    { name: 'Высота', value: '850', unitCode: 'MMT' },
+  ] }, 'Диван');
+  assert.equal(d.text, '220×95×85 см');
+  const d2 = extractDimensions('<html></html>', null, 'Габариты: 60×120 см, формат плитки');
+  assert.equal(d2.width_cm, 60);
+  assert.equal(d2.depth_cm, 120);
 });
 
 test('falls back to OpenGraph and title', () => {

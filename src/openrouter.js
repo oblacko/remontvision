@@ -150,7 +150,8 @@ function productsText(products = []) {
     const attrs = Object.entries(p.attrs || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
     const slot = p.slot ? `${SLOT_LABELS[p.slot] || p.slot}: ` : '';
     const ref = p.has_ref ? 'reference image attached' : 'no reference image — use the described color/finish only';
-    return `${i + 1}. ${slot}${p.name}${p.brand ? ` (${p.brand})` : ''} — ${p.category}${attrs ? ` [${attrs}]` : ''} (${ref})`;
+    const dims = p.dimensions?.text ? ` [dimensions: ${p.dimensions.text}]` : '';
+    return `${i + 1}. ${slot}${p.name}${p.brand ? ` (${p.brand})` : ''} — ${p.category}${dims}${attrs ? ` [${attrs}]` : ''} (${ref})`;
   }).join('\n');
 }
 
@@ -216,7 +217,7 @@ ${roomRules}
 
 MATERIAL PALETTE — use these products where they fit
 ${productsText(products)}
-Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures. Small decor, plants and textiles may be added to complete the styling.
+Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Use the listed dimensions as physical scale: furniture must look its real size relative to the room, and tile/plank patterns must match the stated format. Do not shrink a 220 cm sofa into an armchair or turn a 60×120 tile into a mosaic. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures. Small decor, plants and textiles may be added to complete the styling.
 
 STYLE
 ${styleRefText}
@@ -231,18 +232,18 @@ Photorealistic interior photograph, natural realistic lighting, believable mater
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.
-export function buildEditPrompt({ roomType = 'Другое', target = null, instruction = '', hasRef = false, refLabel = '' }) {
+export function buildEditPrompt({ roomType = 'Другое', target = null, instruction = '', hasRef = false, refLabel = '', refDimensions = '' }) {
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room';
   const targetLabel = SLOT_LABELS[target] || 'the requested element';
   const roles = hasRef
-    ? `IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.\nImage 2 — reference for the new ${targetLabel}${refLabel ? ` — ${refLabel}` : ''}.`
+    ? `IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.\nImage 2 — reference for the new ${targetLabel}${refLabel ? ` — ${refLabel}` : ''}${refDimensions ? `, dimensions ${refDimensions}` : ''}.`
     : 'IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.';
   return `${roles}
 
 This is a ${roomName}.
 Change only the ${targetLabel}. ${instruction}
-Match the reference's shape, color, material and finish${hasRef ? '' : ' from the described material'}. Keep the size and realistic position appropriate for the room.
+Match the reference's shape, color, material and finish${hasRef ? '' : ' from the described material'}${refDimensions ? ` and its real dimensions (${refDimensions})` : ''}. Keep the size and realistic position appropriate for the room.
 Keep everything else exactly as in Image 1: camera, geometry, walls, floor, furniture, decor and lighting. Do not restyle the room. Do not move objects. Do not add extra furniture or fixtures.
 Photorealistic result, no text, no watermarks, no people.`;
 }

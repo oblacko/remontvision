@@ -153,6 +153,89 @@ function parsePrice(value) {
   return Math.round(n);
 }
 
+
+function unitToCm(value, unit) {
+  const n = Number(String(value).replace(',', '.').replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(n)) return null;
+  const u = String(unit || 'см').toLowerCase().replace('.', '');
+  if (u.startsWith('мм') || u === 'mm') return Math.round(n) / 10;
+  if (u === 'м' || u === 'm') return Math.round(n * 100);
+  if (u === 'in' || u === 'inch' || u === 'дюйм') return Math.round(n * 2.54 * 10) / 10;
+  return Math.round(n * 10) / 10;
+}
+
+function measured(value) {
+  if (value == null) return null;
+  if (typeof value === 'object') {
+    const v = value.value ?? value.minValue ?? value.maxValue;
+    const unit = value.unitCode || value.unitText || 'CMT';
+    const map = { CMT: 'см', MMT: 'мм', MTR: 'м', INH: 'in' };
+    return { cm: unitToCm(v, map[unit] || unit), raw: `${v} ${map[unit] || ''}`.trim() };
+  }
+  const m = String(value).match(/([\d.,]+)\s*(мм|см|м|mm|cm|m|in|inch)?/i);
+  if (!m) return null;
+  return { cm: unitToCm(m[1], m[2] || 'см'), raw: String(value).trim() };
+}
+
+export function extractDimensions(html, ld, description = '') {
+  const dims = { text: '', width_cm: null, depth_cm: null, height_cm: null, diameter_cm: null, raw: '' };
+  const named = {};
+  const props = [];
+  if (ld?.additionalProperty) props.push(...(Array.isArray(ld.additionalProperty) ? ld.additionalProperty : [ld.additionalProperty]));
+  if (Array.isArray(ld?.hasMeasurement)) props.push(...ld.hasMeasurement);
+  for (const prop of props) {
+    const name = norm(`${prop?.name || ''} ${prop?.propertyID || ''}`);
+    const value = prop?.value ?? prop?.minValue ?? prop?.maxValue;
+    if (!name || value == null) continue;
+    const withUnit = (typeof value === 'object') ? value : { value, unitCode: prop.unitCode || prop.unitText };
+    if (name.includes('ширин')) named.width = measured(withUnit);
+    else if (name.includes('глубин')) named.depth = measured(withUnit);
+    else if (name.includes('высот')) named.height = measured(withUnit);
+    else if (name.includes('диаметр')) named.diameter = measured(withUnit);
+    else if (name.includes('габарит') || name.includes('размер')) dims.raw = String(value);
+  }
+  if (ld?.width) named.width = measured(ld.width);
+  if (ld?.depth) named.depth = measured(ld.depth);
+  if (ld?.height) named.height = measured(ld.height);
+  if (ld?.diameter) named.diameter = measured(ld.diameter);
+
+  const text = norm(`${description} ${meta(html, 'og:description')}`);
+  const triple = text.match(/(\d+(?:[.,]\d+)?)\s*[x×х]\s*(\d+(?:[.,]\d+)?)(?:\s*[x×х]\s*(\d+(?:[.,]\d+)?))?\s*(мм|см|м)(?=\s|$|[,.;])/);
+  if (triple) {
+    const unit = triple[4];
+    const a = unitToCm(triple[1], unit), b = unitToCm(triple[2], unit), c = triple[3] ? unitToCm(triple[3], unit) : null;
+    if (!named.width) named.width = { cm: a, raw: `${triple[1]} ${unit}` };
+    if (!named.depth) named.depth = { cm: b, raw: `${triple[2]} ${unit}` };
+    if (c != null && !named.height) named.height = { cm: c, raw: `${triple[3]} ${unit}` };
+    dims.raw = triple[0];
+  }
+  const one = name => {
+    const re = new RegExp(`${name}\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(мм|см|м)`, 'i');
+    const m = text.match(re);
+    return m ? { cm: unitToCm(m[1], m[2]), raw: m[0] } : null;
+  };
+  named.width ||= one('ширин');
+  named.depth ||= one('глубин');
+  named.height ||= one('высот');
+  named.diameter ||= one('диаметр');
+
+  if (named.diameter?.cm) {
+    dims.diameter_cm = named.diameter.cm;
+    dims.text = `⌀${named.diameter.cm} см`;
+  } else if (named.width?.cm && named.depth?.cm && named.height?.cm) {
+    dims.width_cm = named.width.cm; dims.depth_cm = named.depth.cm; dims.height_cm = named.height.cm;
+    dims.text = `${dims.width_cm}×${dims.depth_cm}×${dims.height_cm} см`;
+  } else if (named.width?.cm && named.depth?.cm) {
+    dims.width_cm = named.width.cm; dims.depth_cm = named.depth.cm;
+    dims.text = `${dims.width_cm}×${dims.depth_cm} см`;
+  } else if (dims.raw) {
+    dims.text = dims.raw;
+  } else if (named.width?.cm) {
+    dims.width_cm = named.width.cm; dims.text = `${named.width.cm} см`;
+  }
+  return dims;
+}
+
 export function inferCategory(text) {
   const s = norm(text);
   let best = null, bestScore = 0;
@@ -244,6 +327,7 @@ export function parseProductHtml(html, pageUrl = '') {
   const price = parsePrice(offers?.price ?? offers?.lowPrice ?? offers?.priceSpecification?.price ?? meta(html, 'product:price:amount') ?? meta(html, 'og:price:amount'));
   const currency = String(offers?.priceCurrency || meta(html, 'product:price:currency') || 'RUB').toUpperCase();
   const availability = String(offers?.availability || ld?.offers?.availability || '');
+  const dimensions = extractDimensions(html, ld, description);
   return {
     name: title.replace(/\s*[|—–-]\s*(купить|интернет-магазин|официальный сайт|catalog|каталог).*$/i, '').trim().slice(0, 200),
     brand: String(brand || '').slice(0, 80),
@@ -254,6 +338,7 @@ export function parseProductHtml(html, pageUrl = '') {
     source_url: pageUrl,
     sku: String(ld?.sku || ld?.mpn || '').slice(0, 80),
     availability,
+    dimensions,
     rating: Number(rating.ratingValue) || 0,
     reviews: Number(rating.reviewCount || rating.ratingCount) || 0,
   };
@@ -266,6 +351,7 @@ export async function importProductFromUrl(rawUrl) {
   const tier = inferTier(category, data.price);
   const rooms = category ? ROOMS_BY_CATEGORY[category] || '' : '';
   const styleTags = inferStyles(`${data.name} ${data.description}`);
+  const dimensions = data.dimensions || { text: '', width_cm: null, depth_cm: null, height_cm: null, diameter_cm: null, raw: '' };
   const host = new URL(url).hostname.replace(/^www\./, '');
   const allowedDomains = String(process.env.PRODUCT_IMPORT_DOMAINS || DEFAULT_IMPORT_DOMAINS.join(','))
     .split(',').map(s => s.trim().toLowerCase().replace(/^www\./, '')).filter(Boolean);
@@ -280,6 +366,10 @@ export async function importProductFromUrl(rawUrl) {
   if (used) issues.push('Похоже на б/у, уценку или витринный образец');
   if (data.rating && data.rating < 4.3) issues.push(`Низкий рейтинг: ${data.rating}`);
   if (data.reviews && data.reviews < 10) issues.push(`Мало отзывов: ${data.reviews}`);
+  const furniture = ['bed','wardrobe','sofa','armchair','coffee_table','dining_table','dining_chair','sideboard','desk','office_chair','storage','bench','rug'].includes(category);
+  if (furniture && !dimensions.text) issues.push('Не найдены габариты — добавьте ширину/глубину/высоту вручную');
+  if (dimensions.text && dimensions.width_cm && dimensions.width_cm > 400) issues.push(`Подозрительная ширина: ${dimensions.width_cm} см`);
+  if (dimensions.text && dimensions.height_cm && dimensions.height_cm > 300) issues.push(`Подозрительная высота: ${dimensions.height_cm} см`);
 
   let imagePath = null;
   let imageExternal = data.image_url;
@@ -319,6 +409,7 @@ export async function importProductFromUrl(rawUrl) {
   if (used) score -= 20;
   if (data.rating && data.rating < 4.3) score -= 10;
   if (duplicateOf) score -= 15;
+  if (furniture && !dimensions.text) score -= 10;
   score = Math.max(0, Math.min(100, score));
 
   return {
@@ -345,8 +436,10 @@ export async function importProductFromUrl(rawUrl) {
     availability: data.availability,
     rating: data.rating || null,
     reviews: data.reviews || null,
+    dimensions,
     attrs: {
       ...(data.brand ? { бренд: data.brand } : {}),
+      ...(dimensions.text ? { габариты: dimensions.text } : {}),
       ...(data.sku ? { артикул: data.sku } : {}),
       ...(data.rating ? { рейтинг: data.rating } : {}),
       ...(data.reviews ? { отзывов: data.reviews } : {}),

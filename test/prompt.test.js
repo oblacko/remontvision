@@ -16,6 +16,7 @@ const PRODUCT = {
   name: 'Инженерная доска «Светлый дуб»',
   brand: null,
   attrs: { цвет: 'светлый дуб', материал: 'инженерная доска' },
+  dimensions: { text: '220×2200×14 мм' },
   has_ref: true,
 };
 
@@ -35,6 +36,7 @@ test('base prompt is a deep redesign with explicit keep/change and material clas
   assert.match(prompt, /CHANGE \/ DEEP TRANSFORMATION/);
   assert.match(prompt, /MATERIAL CLASS/);
   assert.match(prompt, /floor finish/);
+  assert.match(prompt, /dimensions: 220×2200×14 мм/);
   assert.match(prompt, /Comfort/);
   assert.match(prompt, /preserve the existing floor/i);
   assert.doesNotMatch(prompt, /Use EXACTLY these specific products/);
@@ -48,9 +50,11 @@ test('edit prompt is short, target-specific and reference-aware', () => {
     instruction: 'Заменить на латунный подвес',
     hasRef: true,
     refLabel: 'Подвес «Латунь»',
+    refDimensions: '⌀45×30 см',
   });
   assert.match(prompt, /Change only the ceiling light/);
   assert.match(prompt, /Image 2/);
+  assert.match(prompt, /dimensions ⌀45×30 см/);
   assert.match(prompt, /Keep everything else exactly as in Image 1/);
   assert.doesNotMatch(prompt, /MATERIAL PALETTE/);
   assert.doesNotMatch(prompt, /KEEP EXACTLY/);

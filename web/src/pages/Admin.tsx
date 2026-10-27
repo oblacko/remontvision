@@ -43,6 +43,7 @@ type Product = {
   source?: string | null; url?: string | null; room_type?: string | null;
   price_tier?: string | null; room_types?: string | null; surface?: string | null; active?: boolean;
   seed_key?: string | null;
+  dimensions?: { text?: string; width_cm?: number | null; depth_cm?: number | null; height_cm?: number | null; diameter_cm?: number | null } | null;
 }
 type ImportPreview = {
   url: string; domain: string; allowed_domain: boolean;
@@ -51,6 +52,7 @@ type ImportPreview = {
   room_types: string; style_tags: string; surface: string | null;
   source: string; url_source: string; image_path: string | null; image_url: string | null;
   sku?: string; availability?: string; rating?: number | null; reviews?: number | null;
+  dimensions: { text?: string; width_cm?: number | null; depth_cm?: number | null; height_cm?: number | null; diameter_cm?: number | null; raw?: string };
   attrs: Record<string, unknown>;
   quality: { score: number; allowed_domain: boolean; used: boolean; duplicate_of?: { id: number; name: string; active: boolean } | null; image_ok: boolean; issues: string[] };
 }
@@ -239,7 +241,7 @@ export default function Admin() {
         style_tags: importPreview.style_tags, url: importPreview.url_source || importPreview.url,
         image_path: importPreview.image_path, image_url: importPreview.image_url,
         price_tier: importPreview.price_tier, room_types: importPreview.room_types,
-        surface: importPreview.surface, active: false,
+        surface: importPreview.surface, dimensions: importPreview.dimensions, active: false,
       }) }))
       setImportNotice('Товар добавлен черновиком. Включите его в таблице ниже.')
       setImportPreview(null); setImportUrl(''); setImportAllowAny(false)
@@ -718,6 +720,17 @@ export default function Admin() {
                       <div><label className="eyebrow mb-1 block">Класс</label><select value={importPreview.price_tier} onChange={e => setImportPreview({ ...importPreview, price_tier: e.target.value })} className="h-10 w-full border bg-background px-2 text-sm outline-none focus:border-primary">{['start','comfort','premium','atelier'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                       <div><label className="eyebrow mb-1 block">Ед.</label><input value={importPreview.unit} onChange={e => setImportPreview({ ...importPreview, unit: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
                       <div><label className="eyebrow mb-1 block">Кол-во</label><input value={importPreview.qty} inputMode="numeric" onChange={e => setImportPreview({ ...importPreview, qty: Number(e.target.value.replace(/[^\d]/g, '')) || 1 })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div className="sm:col-span-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {[
+                          ['width_cm', 'Ширина, см'],
+                          ['depth_cm', 'Глубина, см'],
+                          ['height_cm', 'Высота, см'],
+                          ['diameter_cm', 'Диаметр, см'],
+                        ].map(([key, label]) => (
+                          <div key={key}><label className="eyebrow mb-1 block">{label}</label><input value={(importPreview.dimensions as Record<string, number | null | undefined>)[key] ?? ''} inputMode="decimal" onChange={e => setImportPreview({ ...importPreview, dimensions: { ...importPreview.dimensions, [key]: e.target.value === '' ? null : Number(e.target.value.replace(',', '.')) || null } })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                        ))}
+                      </div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Габариты текстом</label><input value={importPreview.dimensions.text || ''} onChange={e => setImportPreview({ ...importPreview, dimensions: { ...importPreview.dimensions, text: e.target.value } })} placeholder="например, 220×95×90 см" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
                       <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Комнаты</label><input value={importPreview.room_types} onChange={e => setImportPreview({ ...importPreview, room_types: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
                       <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Стили</label><input value={importPreview.style_tags} onChange={e => setImportPreview({ ...importPreview, style_tags: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
                       <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Ссылка</label><a href={importPreview.url_source || importPreview.url} target="_blank" rel="noopener noreferrer" className="block truncate text-xs underline underline-offset-2">{importPreview.url_source || importPreview.url}</a></div>
@@ -742,7 +755,7 @@ export default function Admin() {
                         return !q || [p.name, p.category, p.source, p.room_types].filter(Boolean).join(' ').toLowerCase().includes(q)
                       }).slice(0, 300).map(p => (
                         <tr key={p.id} className={`border-b last:border-b-0 ${p.active === false ? 'bg-muted/40' : ''}`}>
-                          <td className="p-3"><div className="flex items-center gap-3"><img src={productImage(p)} alt="" className="h-12 w-12 border object-cover" /><div className="min-w-0"><p className="max-w-72 truncate font-medium">{p.name}</p><p className="max-w-72 truncate text-xs text-muted-foreground">{p.source || '—'}{p.seed_key ? ' · seed' : ''}</p></div></div></td>
+                          <td className="p-3"><div className="flex items-center gap-3"><img src={productImage(p)} alt="" className="h-12 w-12 border object-cover" /><div className="min-w-0"><p className="max-w-72 truncate font-medium">{p.name}</p><p className="max-w-72 truncate text-xs text-muted-foreground">{p.source || '—'}{p.seed_key ? ' · seed' : ''}{p.dimensions?.text ? ` · ${p.dimensions.text}` : ''}</p></div></div></td>
                           <td className="p-3 font-mono text-xs">{p.category}</td>
                           <td className="p-3"><select value={p.price_tier || 'comfort'} onChange={e => void updateCatalog(p, { price_tier: e.target.value })} className="h-8 border bg-background px-1 text-xs">{['start','comfort','premium','atelier'].map(t => <option key={t} value={t}>{t}</option>)}</select></td>
                           <td className="p-3"><input defaultValue={Math.round(Number(p.price) || 0)} inputMode="numeric" onBlur={e => { const value = Number(e.target.value.replace(/[^\d]/g, '')) || 0; if (value !== Number(p.price)) void updateCatalog(p, { price: value }) }} className="h-8 w-24 border bg-background px-2 text-xs" /></td>

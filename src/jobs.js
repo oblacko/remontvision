@@ -123,6 +123,7 @@ async function processRender(renderId) {
         instruction: render.request_text,
         hasRef: Boolean(ref),
         refLabel: ref?.label || '',
+        refDimensions: editProduct?.dimensions?.text || '',
       });
       meta.refs = imageMap.map((m, i) => ({ index: i + 1, ...m }));
       meta.parent_render_id = render.parent_render_id || null;

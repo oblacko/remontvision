@@ -1152,7 +1152,13 @@
     "style_tags": "скандинавский,джапанди,современный,неоклассика,бохо",
     "keywords": "кровать,мягкая,беж,велюр,спальня",
     "image": "bed-upholstered-beige-comfort.webp",
-    "image_prompt": "Product photography of a single upholstered bed with a soft beige velvet headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single upholstered bed with a soft beige velvet headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 160,
+      "depth_cm": 200,
+      "height_cm": 110,
+      "text": "160×200×110 см"
+    }
   },
   {
     "seed_key": "bed-oak-platform-comfort",
@@ -1173,7 +1179,13 @@
     "style_tags": "джапанди,скандинавский,минимализм,кантри",
     "keywords": "кровать,дуб,платформа,дерево,спальня",
     "image": "bed-oak-platform-comfort.webp",
-    "image_prompt": "Product photography of a single low solid oak platform bed, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single low solid oak platform bed, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 160,
+      "depth_cm": 200,
+      "height_cm": 90,
+      "text": "160×200×90 см"
+    }
   },
   {
     "seed_key": "bed-boucle-premium",
@@ -1194,7 +1206,13 @@
     "style_tags": "современный,джапанди,неоклассика,бохо",
     "keywords": "кровать,букле,крем,премиум,спальня",
     "image": "bed-boucle-premium.webp",
-    "image_prompt": "Product photography of a single sculptural boucle bed in ivory, rounded headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single sculptural boucle bed in ivory, rounded headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 180,
+      "depth_cm": 200,
+      "height_cm": 120,
+      "text": "180×200×120 см"
+    }
   },
   {
     "seed_key": "bed-velvet-terra-atelier",
@@ -1215,7 +1233,13 @@
     "style_tags": "ар-деко,неоклассика,бохо",
     "keywords": "кровать,бархат,терракота,ар-деко,спальня",
     "image": "bed-velvet-terra-atelier.webp",
-    "image_prompt": "Product photography of a single luxurious terracotta velvet bed with a tall channel-tufted headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single luxurious terracotta velvet bed with a tall channel-tufted headboard, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 180,
+      "depth_cm": 200,
+      "height_cm": 140,
+      "text": "180×200×140 см"
+    }
   },
   {
     "seed_key": "wardrobe-white-matte-start",
@@ -1236,7 +1260,13 @@
     "style_tags": "современный,скандинавский,минимализм",
     "keywords": "шкаф,белый,матовый,хранение,спальня",
     "image": "wardrobe-white-matte-start.webp",
-    "image_prompt": "Product photography of a single white matte handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single white matte handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 200,
+      "depth_cm": 60,
+      "height_cm": 240,
+      "text": "200×60×240 см"
+    }
   },
   {
     "seed_key": "wardrobe-oak-veneer-comfort",
@@ -1257,7 +1287,13 @@
     "style_tags": "джапанди,скандинавский,неоклассика,кантри",
     "keywords": "шкаф,дуб,шпон,хранение,спальня",
     "image": "wardrobe-oak-veneer-comfort.webp",
-    "image_prompt": "Product photography of a single natural oak veneer wardrobe with slim handles, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single natural oak veneer wardrobe with slim handles, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 220,
+      "depth_cm": 60,
+      "height_cm": 240,
+      "text": "220×60×240 см"
+    }
   },
   {
     "seed_key": "wardrobe-graphite-premium",
@@ -1278,7 +1314,13 @@
     "style_tags": "современный,тёмный модерн,минимализм,лофт",
     "keywords": "шкаф,графит,тёмный,хранение,спальня",
     "image": "wardrobe-graphite-premium.webp",
-    "image_prompt": "Product photography of a single deep graphite matte handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single deep graphite matte handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 240,
+      "depth_cm": 60,
+      "height_cm": 250,
+      "text": "240×60×250 см"
+    }
   },
   {
     "seed_key": "sofa-linen-sand-comfort",
@@ -1299,7 +1341,13 @@
     "style_tags": "скандинавский,джапанди,бохо,современный",
     "keywords": "диван,лён,песочный,гостиная,мягкая мебель",
     "image": "sofa-linen-sand-comfort.webp",
-    "image_prompt": "Product photography of a single three-seat linen sofa in warm sand, relaxed silhouette, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single three-seat linen sofa in warm sand, relaxed silhouette, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 220,
+      "depth_cm": 95,
+      "height_cm": 85,
+      "text": "220×95×85 см"
+    }
   },
   {
     "seed_key": "sofa-boucle-cream-premium",
@@ -1320,7 +1368,13 @@
     "style_tags": "современный,джапанди,неоклассика",
     "keywords": "диван,букле,крем,гостиная,премиум",
     "image": "sofa-boucle-cream-premium.webp",
-    "image_prompt": "Product photography of a single sculptural cream boucle sofa with rounded arms, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single sculptural cream boucle sofa with rounded arms, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 240,
+      "depth_cm": 100,
+      "height_cm": 80,
+      "text": "240×100×80 см"
+    }
   },
   {
     "seed_key": "sofa-velvet-green-atelier",
@@ -1341,7 +1395,13 @@
     "style_tags": "ар-деко,неоклассика,бохо",
     "keywords": "диван,бархат,оливковый,гостиная,ар-деко",
     "image": "sofa-velvet-green-atelier.webp",
-    "image_prompt": "Product photography of a single deep olive velvet sofa with elegant curved arms, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single deep olive velvet sofa with elegant curved arms, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 230,
+      "depth_cm": 98,
+      "height_cm": 82,
+      "text": "230×98×82 см"
+    }
   },
   {
     "seed_key": "sofa-leather-cognac-premium",
@@ -1362,7 +1422,13 @@
     "style_tags": "лофт,тёмный модерн,неоклассика",
     "keywords": "диван,кожа,коньяк,гостиная,лофт",
     "image": "sofa-leather-cognac-premium.webp",
-    "image_prompt": "Product photography of a single cognac leather sofa with clean modern lines, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single cognac leather sofa with clean modern lines, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 220,
+      "depth_cm": 95,
+      "height_cm": 80,
+      "text": "220×95×80 см"
+    }
   },
   {
     "seed_key": "armchair-boucle-comfort",
@@ -1382,7 +1448,13 @@
     "style_tags": "современный,джапанди,бохо,скандинавский",
     "keywords": "кресло,букле,беж,гостиная",
     "image": "armchair-boucle-comfort.webp",
-    "image_prompt": "Product photography of a single beige boucle armchair with a rounded silhouette, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single beige boucle armchair with a rounded silhouette, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 82,
+      "depth_cm": 85,
+      "height_cm": 80,
+      "text": "82×85×80 см"
+    }
   },
   {
     "seed_key": "armchair-leather-premium",
@@ -1402,7 +1474,13 @@
     "style_tags": "лофт,неоклассика,тёмный модерн",
     "keywords": "кресло,кожа,коньяк,лофт",
     "image": "armchair-leather-premium.webp",
-    "image_prompt": "Product photography of a single cognac leather lounge armchair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single cognac leather lounge armchair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 80,
+      "depth_cm": 85,
+      "height_cm": 78,
+      "text": "80×85×78 см"
+    }
   },
   {
     "seed_key": "armchair-cane-comfort",
@@ -1422,7 +1500,13 @@
     "style_tags": "джапанди,бохо,кантри,скандинавский",
     "keywords": "кресло,дуб,ротанг,плетёное,гостиная",
     "image": "armchair-cane-comfort.webp",
-    "image_prompt": "Product photography of a single oak armchair with a woven cane back, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single oak armchair with a woven cane back, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 70,
+      "depth_cm": 78,
+      "height_cm": 82,
+      "text": "70×78×82 см"
+    }
   },
   {
     "seed_key": "coffee-table-oak-comfort",
@@ -1443,7 +1527,13 @@
     "style_tags": "джапанди,скандинавский,минимализм,кантри",
     "keywords": "стол,журнальный,дуб,гостиная",
     "image": "coffee-table-oak-comfort.webp",
-    "image_prompt": "Product photography of a single oval solid oak coffee table, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single oval solid oak coffee table, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 110,
+      "depth_cm": 60,
+      "height_cm": 40,
+      "text": "110×60×40 см"
+    }
   },
   {
     "seed_key": "coffee-table-travertine-premium",
@@ -1464,7 +1554,13 @@
     "style_tags": "неоклассика,современный,джапанди",
     "keywords": "стол,журнальный,травертин,камень,гостиная",
     "image": "coffee-table-travertine-premium.webp",
-    "image_prompt": "Product photography of a single travertine stone coffee table with a thick slab top, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single travertine stone coffee table with a thick slab top, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 120,
+      "depth_cm": 70,
+      "height_cm": 35,
+      "text": "120×70×35 см"
+    }
   },
   {
     "seed_key": "coffee-table-glass-brass-atelier",
@@ -1485,7 +1581,13 @@
     "style_tags": "ар-деко,неоклассика",
     "keywords": "стол,журнальный,стекло,латунь,ар-деко",
     "image": "coffee-table-glass-brass-atelier.webp",
-    "image_prompt": "Product photography of a single round glass coffee table with a sculptural brass base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single round glass coffee table with a sculptural brass base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 90,
+      "depth_cm": 90,
+      "height_cm": 40,
+      "text": "90×90×40 см"
+    }
   },
   {
     "seed_key": "dining-table-oak-comfort",
@@ -1506,7 +1608,13 @@
     "style_tags": "джапанди,скандинавский,кантри,современный",
     "keywords": "стол,обеденный,дуб,столовая",
     "image": "dining-table-oak-comfort.webp",
-    "image_prompt": "Product photography of a single solid oak dining table, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single solid oak dining table, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 180,
+      "depth_cm": 90,
+      "height_cm": 75,
+      "text": "180×90×75 см"
+    }
   },
   {
     "seed_key": "dining-table-marble-premium",
@@ -1527,7 +1635,13 @@
     "style_tags": "неоклассика,ар-деко,современный",
     "keywords": "стол,обеденный,мрамор,столовая,премиум",
     "image": "dining-table-marble-premium.webp",
-    "image_prompt": "Product photography of a single white marble dining table with a sculptural base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single white marble dining table with a sculptural base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 200,
+      "depth_cm": 100,
+      "height_cm": 75,
+      "text": "200×100×75 см"
+    }
   },
   {
     "seed_key": "dining-table-black-atelier",
@@ -1548,7 +1662,13 @@
     "style_tags": "ар-деко,тёмный модерн,лофт",
     "keywords": "стол,обеденный,чёрный,камень,столовая",
     "image": "dining-table-black-atelier.webp",
-    "image_prompt": "Product photography of a single black stone dining table with a bold architectural base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single black stone dining table with a bold architectural base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 220,
+      "depth_cm": 100,
+      "height_cm": 76,
+      "text": "220×100×76 см"
+    }
   },
   {
     "seed_key": "dining-chair-oak-comfort",
@@ -1568,7 +1688,13 @@
     "style_tags": "джапанди,скандинавский,кантри,минимализм",
     "keywords": "стул,дуб,дерево,столовая",
     "image": "dining-chair-oak-comfort.webp",
-    "image_prompt": "Product photography of a single solid oak dining chair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single solid oak dining chair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 48,
+      "depth_cm": 52,
+      "height_cm": 82,
+      "text": "48×52×82 см"
+    }
   },
   {
     "seed_key": "dining-chair-upholstered-premium",
@@ -1588,7 +1714,13 @@
     "style_tags": "неоклассика,ар-деко,современный",
     "keywords": "стул,велюр,оливковый,столовая,премиум",
     "image": "dining-chair-upholstered-premium.webp",
-    "image_prompt": "Product photography of a single olive velvet upholstered dining chair with a slim metal frame, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single olive velvet upholstered dining chair with a slim metal frame, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 50,
+      "depth_cm": 56,
+      "height_cm": 84,
+      "text": "50×56×84 см"
+    }
   },
   {
     "seed_key": "dining-chair-cane-comfort",
@@ -1608,7 +1740,13 @@
     "style_tags": "бохо,кантри,джапанди",
     "keywords": "стул,дуб,ротанг,плетёный,столовая",
     "image": "dining-chair-cane-comfort.webp",
-    "image_prompt": "Product photography of a single oak dining chair with a woven cane back, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single oak dining chair with a woven cane back, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 47,
+      "depth_cm": 50,
+      "height_cm": 80,
+      "text": "47×50×80 см"
+    }
   },
   {
     "seed_key": "sideboard-oak-comfort",
@@ -1628,7 +1766,13 @@
     "style_tags": "джапанди,скандинавский,современный",
     "keywords": "комод,консоль,дуб,гостиная",
     "image": "sideboard-oak-comfort.webp",
-    "image_prompt": "Product photography of a single oak sideboard with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single oak sideboard with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 160,
+      "depth_cm": 45,
+      "height_cm": 75,
+      "text": "160×45×75 см"
+    }
   },
   {
     "seed_key": "sideboard-graphite-premium",
@@ -1648,7 +1792,13 @@
     "style_tags": "современный,тёмный модерн,минимализм",
     "keywords": "комод,консоль,графит,гостиная",
     "image": "sideboard-graphite-premium.webp",
-    "image_prompt": "Product photography of a single deep graphite sideboard with handleless doors, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single deep graphite sideboard with handleless doors, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 180,
+      "depth_cm": 45,
+      "height_cm": 70,
+      "text": "180×45×70 см"
+    }
   },
   {
     "seed_key": "sideboard-classic-atelier",
@@ -1668,7 +1818,13 @@
     "style_tags": "неоклассика,ар-деко",
     "keywords": "комод,консоль,классика,латунь,гостиная",
     "image": "sideboard-classic-atelier.webp",
-    "image_prompt": "Product photography of a single elegant dark walnut sideboard with brass details, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single elegant dark walnut sideboard with brass details, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 170,
+      "depth_cm": 48,
+      "height_cm": 80,
+      "text": "170×48×80 см"
+    }
   },
   {
     "seed_key": "desk-oak-comfort",
@@ -1689,7 +1845,13 @@
     "style_tags": "джапанди,скандинавский,минимализм",
     "keywords": "стол,рабочий,дуб,кабинет",
     "image": "desk-oak-comfort.webp",
-    "image_prompt": "Product photography of a single solid oak desk with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single solid oak desk with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 140,
+      "depth_cm": 70,
+      "height_cm": 75,
+      "text": "140×70×75 см"
+    }
   },
   {
     "seed_key": "desk-black-premium",
@@ -1710,7 +1872,13 @@
     "style_tags": "современный,тёмный модерн,лофт",
     "keywords": "стол,рабочий,графит,кабинет,премиум",
     "image": "desk-black-premium.webp",
-    "image_prompt": "Product photography of a single graphite executive desk with a slim metal frame, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single graphite executive desk with a slim metal frame, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 160,
+      "depth_cm": 80,
+      "height_cm": 76,
+      "text": "160×80×76 см"
+    }
   },
   {
     "seed_key": "desk-white-start",
@@ -1731,7 +1899,13 @@
     "style_tags": "современный,скандинавский,минимализм",
     "keywords": "стол,рабочий,белый,кабинет",
     "image": "desk-white-start.webp",
-    "image_prompt": "Product photography of a single white minimalist desk, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single white minimalist desk, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 120,
+      "depth_cm": 60,
+      "height_cm": 75,
+      "text": "120×60×75 см"
+    }
   },
   {
     "seed_key": "office-chair-black-comfort",
@@ -1751,7 +1925,13 @@
     "style_tags": "современный,минимализм,тёмный модерн",
     "keywords": "кресло,рабочее,эргономичное,графит,кабинет",
     "image": "office-chair-black-comfort.webp",
-    "image_prompt": "Product photography of a single ergonomic graphite office chair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single ergonomic graphite office chair, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 68,
+      "depth_cm": 68,
+      "height_cm": 120,
+      "text": "68×68×120 см"
+    }
   },
   {
     "seed_key": "office-chair-fabric-comfort",
@@ -1771,7 +1951,13 @@
     "style_tags": "скандинавский,джапанди,современный",
     "keywords": "кресло,рабочее,ткань,беж,кабинет",
     "image": "office-chair-fabric-comfort.webp",
-    "image_prompt": "Product photography of a single beige fabric office chair with a wooden base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single beige fabric office chair with a wooden base, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 65,
+      "depth_cm": 65,
+      "height_cm": 110,
+      "text": "65×65×110 см"
+    }
   },
   {
     "seed_key": "storage-oak-comfort",
@@ -1792,7 +1978,13 @@
     "style_tags": "джапанди,скандинавский,минимализм",
     "keywords": "стеллаж,хранение,дуб,кабинет",
     "image": "storage-oak-comfort.webp",
-    "image_prompt": "Product photography of a single open oak shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single open oak shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 180,
+      "depth_cm": 40,
+      "height_cm": 200,
+      "text": "180×40×200 см"
+    }
   },
   {
     "seed_key": "storage-white-start",
@@ -1813,7 +2005,13 @@
     "style_tags": "современный,скандинавский,минимализм",
     "keywords": "стеллаж,хранение,белый,кабинет",
     "image": "storage-white-start.webp",
-    "image_prompt": "Product photography of a single white open shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single white open shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 160,
+      "depth_cm": 35,
+      "height_cm": 180,
+      "text": "160×35×180 см"
+    }
   },
   {
     "seed_key": "storage-metal-loft-comfort",
@@ -1834,7 +2032,13 @@
     "style_tags": "лофт,современный",
     "keywords": "стеллаж,металл,дерево,лофт,хранение",
     "image": "storage-metal-loft-comfort.webp",
-    "image_prompt": "Product photography of a single black metal and oak shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single black metal and oak shelving unit, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 180,
+      "depth_cm": 40,
+      "height_cm": 200,
+      "text": "180×40×200 см"
+    }
   },
   {
     "seed_key": "bench-oak-comfort",
@@ -1855,7 +2059,13 @@
     "style_tags": "джапанди,скандинавский,кантри",
     "keywords": "банкетка,дуб,прихожая,спальня",
     "image": "bench-oak-comfort.webp",
-    "image_prompt": "Product photography of a single solid oak bench, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single solid oak bench, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 120,
+      "depth_cm": 40,
+      "height_cm": 45,
+      "text": "120×40×45 см"
+    }
   },
   {
     "seed_key": "bench-upholstered-premium",
@@ -1876,7 +2086,13 @@
     "style_tags": "неоклассика,ар-деко,современный",
     "keywords": "банкетка,велюр,оливковый,прихожая",
     "image": "bench-upholstered-premium.webp",
-    "image_prompt": "Product photography of a single olive velvet upholstered bench with slim metal legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single olive velvet upholstered bench with slim metal legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 120,
+      "depth_cm": 42,
+      "height_cm": 48,
+      "text": "120×42×48 см"
+    }
   },
   {
     "seed_key": "rug-wool-sand-comfort",
@@ -1897,7 +2113,13 @@
     "style_tags": "скандинавский,джапанди,бохо,кантри",
     "keywords": "ковёр,шерсть,песочный,гостиная",
     "image": "rug-wool-sand-comfort.webp",
-    "image_prompt": "Top-down close-up of a textured sand wool rug, soft pile, subtle tonal variations, even studio light, no perspective, no objects, no text, photorealistic, fills the frame"
+    "image_prompt": "Top-down close-up of a textured sand wool rug, soft pile, subtle tonal variations, even studio light, no perspective, no objects, no text, photorealistic, fills the frame",
+    "dimensions": {
+      "width_cm": 200,
+      "depth_cm": 300,
+      "height_cm": 1,
+      "text": "200×300 см"
+    }
   },
   {
     "seed_key": "rug-jute-start",
@@ -1918,7 +2140,13 @@
     "style_tags": "бохо,кантри,скандинавский",
     "keywords": "ковёр,джут,натуральный,гостиная",
     "image": "rug-jute-start.webp",
-    "image_prompt": "Top-down close-up of a natural jute rug with woven texture, warm neutral color, even studio light, no perspective, no objects, no text, photorealistic, fills the frame"
+    "image_prompt": "Top-down close-up of a natural jute rug with woven texture, warm neutral color, even studio light, no perspective, no objects, no text, photorealistic, fills the frame",
+    "dimensions": {
+      "width_cm": 160,
+      "depth_cm": 230,
+      "height_cm": 1,
+      "text": "160×230 см"
+    }
   },
   {
     "seed_key": "rug-vintage-premium",
@@ -1939,7 +2167,13 @@
     "style_tags": "ар-деко,неоклассика,бохо",
     "keywords": "ковёр,винтаж,терракота,гостиная",
     "image": "rug-vintage-premium.webp",
-    "image_prompt": "Top-down close-up of a vintage terracotta wool rug with a faded ornamental pattern, even studio light, no perspective, no objects, no text, photorealistic, fills the frame"
+    "image_prompt": "Top-down close-up of a vintage terracotta wool rug with a faded ornamental pattern, even studio light, no perspective, no objects, no text, photorealistic, fills the frame",
+    "dimensions": {
+      "width_cm": 200,
+      "depth_cm": 300,
+      "height_cm": 1,
+      "text": "200×300 см"
+    }
   },
   {
     "seed_key": "floor-wide-oak-premium",
@@ -2023,7 +2257,13 @@
     "style_tags": "джапанди,скандинавский,минимализм,неоклассика",
     "keywords": "шкаф,дуб,без ручек,хранение,спальня,премиум",
     "image": "wardrobe-oak-premium.webp",
-    "image_prompt": "Product photography of a single natural oak veneer handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single natural oak veneer handleless wardrobe, full product, centered on pure white seamless background, soft studio light, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 240,
+      "depth_cm": 62,
+      "height_cm": 250,
+      "text": "240×62×250 см"
+    }
   },
   {
     "seed_key": "textile-linen-oat-premium",
@@ -2086,6 +2326,12 @@
     "style_tags": "джапанди,скандинавский,современный,минимализм",
     "keywords": "комод,консоль,дуб,рейка,гостиная,премиум",
     "image": "sideboard-oak-premium.webp",
-    "image_prompt": "Product photography of a single oak slatted sideboard with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail"
+    "image_prompt": "Product photography of a single oak slatted sideboard with slim legs, full product, centered on pure white seamless background, soft studio light, three-quarter view, no room, no text, no watermark, photorealistic, high detail",
+    "dimensions": {
+      "width_cm": 180,
+      "depth_cm": 45,
+      "height_cm": 75,
+      "text": "180×45×75 см"
+    }
   }
 ]

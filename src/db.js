@@ -315,14 +315,15 @@ export const q = {
 
   // каталог (админ)
   insertProduct: f =>
-    pool.query(`INSERT INTO products (category, name, brand, attrs, price, unit, qty, source, keywords, style_tags, url, image_url, image_path, price_date, price_tier, room_types, surface, active)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, COALESCE($14, CURRENT_DATE), $15,$16,$17,$18) RETURNING *`,
+    pool.query(`INSERT INTO products (category, name, brand, attrs, price, unit, qty, source, keywords, style_tags, url, image_url, image_path, price_date, price_tier, room_types, surface, active, dimensions)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, COALESCE($14, CURRENT_DATE), $15,$16,$17,$18,$19) RETURNING *`,
       [f.category, f.name, f.brand || null, JSON.stringify(f.attrs || {}), f.price, f.unit || 'шт', f.qty || 1,
        f.source || null, f.keywords || null, f.style_tags || null, f.url || null, f.image_url || null, f.image_path || null, f.price_date || null,
-       f.price_tier || 'comfort', f.room_types || null, f.surface || null, f.active !== false])
+       f.price_tier || 'comfort', f.room_types || null, f.surface || null, f.active !== false,
+       JSON.stringify(f.dimensions || {})])
       .then(r => r.rows[0]),
   updateProduct: (id, fields) => {
-    const keys = Object.keys(fields).filter(k => ['category','name','brand','attrs','price','unit','qty','source','keywords','style_tags','url','image_url','image_path','price_date','price_tier','room_types','surface','active'].includes(k));
+    const keys = Object.keys(fields).filter(k => ['category','name','brand','attrs','price','unit','qty','source','keywords','style_tags','url','image_url','image_path','price_date','price_tier','room_types','surface','active','dimensions'].includes(k));
     if (!keys.length) return Promise.resolve(null);
     const set = keys.map((k, i) => `${k} = $${i + 2}`);
     if (keys.includes('price')) set.push('price_updated_at = now()');
@@ -331,12 +332,12 @@ export const q = {
   },
   deleteProduct: id => pool.query(`DELETE FROM products WHERE id = $1`, [id]).then(r => r.rowCount > 0),
   upsertSeedProduct: f =>
-    pool.query(`INSERT INTO products (seed_key, category, name, brand, attrs, price, unit, qty, source, keywords, style_tags, url, image_url, price_tier, room_types, surface, active, price_date)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,CURRENT_DATE)
+    pool.query(`INSERT INTO products (seed_key, category, name, brand, attrs, price, unit, qty, source, keywords, style_tags, url, image_url, price_tier, room_types, surface, active, price_date, dimensions)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,CURRENT_DATE,$17)
                 ON CONFLICT (seed_key) DO NOTHING RETURNING id`,
       [f.seed_key, f.category, f.name, f.brand || null, JSON.stringify(f.attrs || {}), f.price, f.unit || 'шт', f.qty || 1,
        'remontvision catalog', f.keywords || null, f.style_tags || null, f.url || null, f.image_url || null,
-       f.price_tier || 'comfort', f.room_types || null, f.surface || null])
+       f.price_tier || 'comfort', f.room_types || null, f.surface || null, JSON.stringify(f.dimensions || {})])
       .then(r => r.rows[0] || null),
 
   // настройки приложения
