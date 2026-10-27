@@ -203,7 +203,7 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
 
   const styleRefText = hasStyleRef
     ? (userStyleRef
-      ? 'The user style reference is the absolute style authority. Match its mood, materials, palette, lighting fixtures, furniture silhouettes, decor and level of detail. Do not introduce a generic chandelier or any fixture that contradicts the reference. Do not copy its layout, architecture or camera angle.'
+      ? 'The user style reference is the absolute style authority. Match its mood, materials, palette, lighting fixtures, furniture silhouettes, decor, personal styling and level of detail. Do not introduce a generic chandelier or any fixture that contradicts the reference. Do not copy its layout, architecture or camera angle.'
       : 'The style reference defines the target mood, materials, palette, lighting fixtures, furniture character and level of detail. Match its fixtures and light temperature; do not substitute a generic chandelier. Do not copy its layout, architecture or camera angle.')
     : 'There is no separate style reference. Build the style from the description and the selected materials.';
   const colors = [
@@ -215,7 +215,7 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
 
 TASK
 Create a photorealistic, aspirational editorial photograph of this ${roomName} after a deep renovation in ${styleDesc} style.
-The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
+The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
 Deeply transform the finishes, lighting, textiles, decor and styling while keeping the architecture believable and buildable.
 
 KEEP EXACTLY
@@ -249,6 +249,15 @@ LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
 ${styling}
 Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
 
+PINTEREST-LEVEL STYLING
+Make it look like a saved Pinterest reference: curated, layered and personal, with 3–5 styled vignettes rather than random clutter.
+- Textiles: floor-length curtains, throws, cushions, rugs, table runners.
+- Walls: framed art, posters, a small gallery wall, textile panel or wall hanging.
+- Shelves: open shelving with books, ceramics, vases, candles, small sculptures, records and plants.
+- Personal objects: a modern laptop (MacBook-style), headphones, a speaker, a camera, magazines. Place them naturally on a desk, bed, coffee table or shelf; hide all cables.
+- Plush toys: only in a children's room or a bedroom, one or two, styled on a chair, bed or shelf. Never in bathrooms, kitchens or adult living rooms.
+Keep it tasteful and uncluttered: every object should look intentional, not scattered.
+
 CATALOG / MATERIALS
 ${catalogRule}
 
@@ -265,7 +274,7 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected products already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no clutter, no old plastic blinds, no torn curtains.`;
+Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no random clutter, no old electronics, no visible cables, no plush toys in bathrooms or kitchens, no old plastic blinds, no torn curtains.`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.
