@@ -1,0 +1,14 @@
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/fonts/lora-0.woff2) format('truetype');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(/fonts/lora-1.woff2) format('truetype');
+}

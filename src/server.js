@@ -23,6 +23,7 @@ app.use(express.json({ limit: '1mb' }));
 // один canonical URL на документ: .html и слэш → чистый маршрут
 const CANONICAL_REDIRECTS = {
   '/index.html': '/',
+  '/app.html': '/app',
   '/prices.html': '/prices',
   '/offer.html': '/offer',
   '/delivery.html': '/delivery',
@@ -45,6 +46,17 @@ for (const [from, to] of Object.entries({
 app.use(express.static('public'));
 app.use('/assets', express.static('assets'));
 app.use(sessionUser);
+
+// Новый лендинг (React/Vite) и старый полнофункциональный кабинет.
+const WEB_DIST = path.join(process.cwd(), 'web', 'dist');
+app.use('/images', express.static(path.join(WEB_DIST, 'images')));
+app.use('/fonts', express.static(path.join(WEB_DIST, 'fonts')));
+app.use('/web-assets', express.static(path.join(WEB_DIST, 'web-assets')));
+app.get(['/app', '/app/'], (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'app.html')));
+app.get('/', (_req, res) => {
+  const webIndex = path.join(WEB_DIST, 'index.html');
+  res.sendFile(fs.existsSync(webIndex) ? webIndex : path.join(process.cwd(), 'public', 'app.html'));
+});
 
 const LEGAL_PAGES = {
   '/prices': 'prices.html',
@@ -343,7 +355,7 @@ app.post('/api/rooms', rateLimit, upload.single('photo'), h(async (req, res) => 
   const id = crypto.randomUUID();
   const allowedStyles = ['Современный', 'Светлый', 'Тёмный', 'Классика'];
   const style = allowedStyles.includes(req.body.style) ? req.body.style : 'Современный';
-  const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 500);
+  const budget = Math.min(Math.max(Number(req.body.budget) || 150, 50), 1000);
   const photoKey = await saveUpload(req.file, 'uploads');
   await q.createRoom(id, style, budget, photoKey, req.user.id);
   try {

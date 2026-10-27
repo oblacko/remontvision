@@ -6,11 +6,11 @@
 <title>Ремонт по фото — AI-дизайн интерьера | Ремонтвижн</title>
 <meta name="description" content="Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и подберёт товары с ценами. 2 генерации бесплатно.">
 <meta name="keywords" content="ремонт по фото, дизайн интерьера по фото, AI дизайн, нейросеть ремонт, визуализация ремонта, смета материалов, дизайн кухни онлайн">
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="robots" content="noindex, nofollow">
 <meta name="author" content="Ремонтвижн">
 <meta name="theme-color" content="#FF5F1F">
 <meta name="format-detection" content="telephone=no">
-<link rel="canonical" href="https://www.remontvision.ru/">
+<link rel="canonical" href="https://www.remontvision.ru/app">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Ремонтвижн">
 <meta property="og:locale" content="ru_RU">
@@ -612,7 +612,7 @@
 
 <script>
   const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-  let roomId=null, polling=null, me=null, pendingGo=false, paymentsEnabled=false;
+  let roomId=null, polling=null, me=null, pendingGo=false, pendingBuy=false, paymentsEnabled=false;
 
   fetch('/api/health').then(r=>r.json()).then(h=>{
     paymentsEnabled=Boolean(h.payments_enabled);
@@ -647,9 +647,9 @@
   // ---------- модалки ----------
   function openModal(id){ $('#'+id).classList.add('open'); }
   function closeModal(id){ $('#'+id).classList.remove('open'); }
-  $$('[data-close]').forEach(b=>b.onclick=()=>{ if(b.dataset.close==='authModal') pendingGo=false; closeModal(b.dataset.close); });
-  $$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m){ if(m.id==='authModal') pendingGo=false; m.classList.remove('open'); } }));
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $$('.modal.open').forEach(m=>{ if(m.id==='authModal') pendingGo=false; m.classList.remove('open'); }); } });
+  $$('[data-close]').forEach(b=>b.onclick=()=>{ if(b.dataset.close==='authModal'){ pendingGo=false; pendingBuy=false; } closeModal(b.dataset.close); });
+  $$('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m){ if(m.id==='authModal'){ pendingGo=false; pendingBuy=false; } m.classList.remove('open'); } }));
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $$('.modal.open').forEach(m=>{ if(m.id==='authModal'){ pendingGo=false; pendingBuy=false; } m.classList.remove('open'); }); } });
 
   function openAuth(){
     if(me){ openBuy(); return; }
@@ -703,7 +703,8 @@
       closeModal('authModal');
       await loadMe();
       toast(d.is_new ? 'Готово! Начислено 2 кредита за регистрацию' : 'Вошли как '+d.email);
-      if(pendingGo && photoFile){ pendingGo=false; setTimeout(()=>$('#go').click(),0); }
+      if(pendingBuy){ pendingBuy=false; pendingGo=false; openBuy(); }
+      else if(pendingGo && photoFile){ pendingGo=false; setTimeout(()=>$('#go').click(),0); }
       else pendingGo=false;
     }catch(e){ toast(e.message); }
     finally{ $('#authVerify').disabled=false; }
@@ -1208,6 +1209,26 @@
   }).catch(()=>{});
   loadMe();
   if(adminHash()) openAdmin();
+  (async()=>{
+    const m=location.search.match(/[?&]room=([^&]+)/);
+    if(!m) return;
+    await loadMe();
+    if(!me){ openAuth(); return; }
+    roomId=decodeURIComponent(m[1]);
+    try{
+      const d=await (await fetch('/api/rooms/'+roomId)).json();
+      if(!d?.id) throw new Error('not found');
+      if(d.render?.image){ renderResult(d); go('s3'); }
+      else { go('s2'); poll(); }
+    }catch{ toast('Не удалось открыть комнату'); }
+  })();
+  (async()=>{
+    if(!location.search.includes('buy=')) return;
+    try{ const h=await (await fetch('/api/health')).json(); paymentsEnabled=Boolean(h.payments_enabled); }catch{}
+    await loadMe();
+    if(me){ openBuy(); }
+    else { pendingBuy=true; openAuth(); }
+  })();
 </script>
 </body>
 </html>

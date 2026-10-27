@@ -28,7 +28,7 @@ jobs:
           for i in 1 2 3 4 5; do
             body=$(curl -fsS https://www.remontvision.ru/api/health) || true
             echo "$body"
-            echo "$body" | grep -q '"ok":true' && echo "$body" | grep -q '"payments_enabled":true' && echo "$body" | grep -q '"refunds_enabled":false' && exit 0
+            echo "$body" | grep -q '"ok":true' && echo "$body" | grep -q '"payments_enabled":true' && echo "$body" | grep -q '"refunds_enabled":false' && curl -fsS https://www.remontvision.ru/ | grep -q 'id="root"' && curl -fsS -o /dev/null https://www.remontvision.ru/app && exit 0
             sleep 5
           done
           exit 1

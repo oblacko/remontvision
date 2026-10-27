@@ -3,5 +3,6 @@ Allow: /
 Disallow: /api/
 Disallow: /files/
 Disallow: /renders/
+Disallow: /app
 
 Sitemap: https://www.remontvision.ru/sitemap.xml
