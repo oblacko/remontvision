@@ -174,6 +174,7 @@ export function GenerationPanel({
   const [roomId, setRoomId] = useState('')
   const [genError, setGenError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [creditOpen, setCreditOpen] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const refInput = useRef<HTMLInputElement>(null)
@@ -190,7 +191,7 @@ export function GenerationPanel({
   useEffect(() => () => { urls.current.forEach((url) => URL.revokeObjectURL(url)) }, [])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) { setCreditOpen(false); return }
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     window.setTimeout(() => closeRef.current?.focus(), 380)
@@ -285,7 +286,7 @@ export function GenerationPanel({
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { onRequireLogin(); return }
-        if (r.status === 402) { setGenError('Кредиты закончились. Пополните баланс в кабинете.'); setStep('style'); return }
+        if (r.status === 402) { setGenError(''); setStep('style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
         id = d.id
         setRoomId(id)
@@ -296,7 +297,7 @@ export function GenerationPanel({
         })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { onRequireLogin(); return }
-        if (r.status === 402) { setGenError('Кредиты закончились. Пополните баланс в кабинете.'); setStep(iterations.length ? 'result' : 'style'); return }
+        if (r.status === 402) { setGenError(''); setStep(iterations.length ? 'result' : 'style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
       }
 
@@ -336,7 +337,7 @@ export function GenerationPanel({
     setCustomOpen(false); setSchemeOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setUsedRef(null)
     setIterations([]); setCurrentId(null); setOpenHistory(null)
-    setRefineText(''); setGenError(''); setProgress(0); setRoomId(''); setBusy(false)
+    setRefineText(''); setGenError(''); setProgress(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     if (photoInput.current) photoInput.current.value = ''
     if (refInput.current) refInput.current.value = ''
   }
@@ -688,6 +689,20 @@ export function GenerationPanel({
           <div className="relative mx-auto my-auto overflow-hidden bg-foreground" style={{ aspectRatio: String(current.ratio), width: `min(100vw, calc(100svh * ${current.ratio}))` }}>
             <img src={current.image} alt="Сгенерированный дизайн интерьера в полном размере" className="absolute inset-0 h-full w-full object-cover" />
             {step === 'estimates' && <ElectricalOverlay />}
+          </div>
+        </div>
+      )}
+
+      {creditOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/80 p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
+          <div className="w-full max-w-md border border-foreground bg-background p-6 shadow-[8px_8px_0_oklch(var(--foreground))]">
+            <p className="eyebrow">Баланс</p>
+            <h3 className="display-title mt-3 text-3xl">Кредиты закончились</h3>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">Каждая генерация или правка стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <a href="/app?buy=1" target="_blank" rel="noopener" onClick={() => setCreditOpen(false)} className="action-primary">Пополнить <ArrowUpRight className="size-4" /></a>
+              <button type="button" onClick={() => setCreditOpen(false)} className="action-secondary">Позже</button>
+            </div>
           </div>
         </div>
       )}
