@@ -17,8 +17,8 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/room-types` | 12 типов комнат |
 | GET | `/api/packs` | пакеты кредитов |
 | GET/POST | `/api/payments/robokassa/result` | ResultURL Robokassa: проверка `Password#2`, ответ `OK{InvId}` |
-| GET/POST | `/api/payments/robokassa/success` | редирект в кабинет после оплаты |
-| GET/POST | `/api/payments/robokassa/fail` | редирект в кабинет после отказа |
+| GET/POST | `/api/payments/robokassa/success` | fallback-редирект в кабинет; SuccessURL лучше указывать сразу на `/cabinet?paid=robokassa` |
+| GET/POST | `/api/payments/robokassa/fail` | fallback-редирект в кабинет; FailURL лучше указывать сразу на `/cabinet?payment=failed` |
 | POST | `/api/auth/request-code` | `{email}` → OTP |
 | POST | `/api/auth/verify` | `{email, code}` → cookie |
 | POST | `/api/auth/logout` | выход |

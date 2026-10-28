@@ -72,9 +72,11 @@ S3_ENDPOINT=
 | Поле | Значение |
 |---|---|
 | ResultURL | `${APP_URL}/api/payments/robokassa/result` |
-| SuccessURL | `${APP_URL}/api/payments/robokassa/success` |
-| FailURL | `${APP_URL}/api/payments/robokassa/fail` |
-| Метод | GET или POST (обрабатываются оба) |
+| SuccessURL | `${APP_URL}/cabinet?paid=robokassa` |
+| FailURL | `${APP_URL}/cabinet?payment=failed` |
+| Метод ResultURL / Success / Fail | GET или POST (обрабатываются оба) |
+
+ResultURL — только серверное уведомление Robokassa (начисление кредитов). SuccessURL/FailURL — возврат браузера пользователя на страницы приложения, поэтому они указывают прямо на `/cabinet`, а не на API.
 
 - Алгоритм подписи в кабинете должен совпадать с `ROBOKASSA_HASH_ALGO` (по умолчанию `md5`).
 - `ROBOKASSA_PASSWORD_1` — подпись платежа и SuccessURL, `ROBOKASSA_PASSWORD_2` — ResultURL и OpStateExt, `ROBOKASSA_PASSWORD_3` — возвраты.
