@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-28T11:45:54.229Z
+Generated: 2026-10-28T12:05:45.923Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -1314,7 +1314,7 @@ ResultURL — только серверное уведомление Robokassa (
 - Алгоритм подписи в кабинете должен совпадать с `ROBOKASSA_HASH_ALGO` (по умолчанию `md5`).
 - `ROBOKASSA_PASSWORD_1` — подпись платежа и SuccessURL, `ROBOKASSA_PASSWORD_2` — ResultURL и OpStateExt, `ROBOKASSA_PASSWORD_3` — возвраты.
 - `ROBOKASSA_TEST=1` включает `IsTest=1`; используйте тестовую пару паролей, иначе Robokassa вернёт ошибку подписи. В тестовом режиме OpStateExt недоступен — подтверждение приходит только на ResultURL.
-- `ROBOKASSA_RECEIPT_ENABLED=1` (по умолчанию) передаёт `Receipt` с номенклатурой: одна услуга, `quantity=1`, `sum=цена пакета`, `payment_method=full_payment`, `payment_object=service`, `tax=none`. Это нужно для Робочеков СМЗ и требований 54-ФЗ. `Receipt` участвует в подписи и передаётся дважды URL-кодированным, как в официальном SDK. Если фискализация ещё не подключена и Robokassa отклоняет чек, временно поставьте `0`.
+- `ROBOKASSA_RECEIPT_ENABLED=1` (по умолчанию) передаёт `Receipt` с номенклатурой: `Доступ к онлайн-сервису генерации дизайна интерьера — пакет на N генераций`, `quantity=1`, `sum=цена пакета`, `payment_method=full_payment`, `payment_object=service`, `tax=none`. Это нужно для Робочеков СМЗ и требований 54-ФЗ. `Receipt` участвует в подписи и передаётся дважды URL-кодированным, как в официальном SDK. Если фискализация ещё не подключена и Robokassa отклоняет чек, временно поставьте `0`.
 - Отдельный `RECEIPTS_WEBHOOK_URL` — альтернативный путь чеков. Не включайте его одновременно с Робочеками, иначе будут дубли.
 - `PAYMENT_PROVIDER=robokassa` принудительно выбирает провайдера; без переменной Robokassa выбирается автоматически, если заданы её ключи.
 - `InvId` = локальный `payments.id`; `provider_payment_id` хранит его же строкой. Начисление кредитов идемпотентно по ResultURL/синхронизации.
@@ -1669,7 +1669,7 @@ export const MAX_REFERENCES; // 4
 - Начисление кредитов идемпотентно, как у ЮKassa: повторный ResultURL не дублирует `credit_txn`; `provider_payment_id` заполняется в той же транзакции.
 - Добавлены возвраты Robokassa через Refund API (JWT HS256, `ROBOKASSA_PASSWORD_3`, `OpKey` из `OpStateExt`); без них остаётся ручной способ. Возвраты по-прежнему выключены флагом.
 - Добавлены `src/robokassa.js` и 8 unit-тестов подписей/URL/XML/refund JWT/receipt (`npm test` — 29 тестов). Тестовый платёж на проде прошёл: ResultURL начислил кредиты; боевой платёж ещё не проверялся.
-- Добавлен `Receipt` для фискализации: одна услуга на пакет, `tax=none`, `payment_object=service`, `payment_method=full_payment`. Подпись и URL повторяют официальный SDK: одиночное URL-кодирование в подписи, двойное — в query. Включается `ROBOKASSA_RECEIPT_ENABLED` (по умолчанию).
+- Добавлен `Receipt` для фискализации: услуга «Доступ к онлайн-сервису генерации дизайна интерьера — пакет на N генераций», `tax=none`, `payment_object=service`, `payment_method=full_payment`. Подпись и URL повторяют официальный SDK: одиночное URL-кодирование в подписи, двойное — в query. Включается `ROBOKASSA_RECEIPT_ENABLED` (по умолчанию).
 - `/api/payments/robokassa/` и `/success` оставлены как fallback-редиректы; кабинет показывает успех, если ResultURL уже начислил кредиты до возврата пользователя.
 - Документация: `.env.example`, `docs/OPERATIONS.md` (настройка кабинетов), `docs/API.md`, `docs/ARCHITECTURE.md`, README/llms.
 

@@ -97,10 +97,18 @@ async function createYukassaPayment({ userId, pack, returnUrl }) {
   return { ...payment, local_payment_id: local?.id || null };
 }
 
+function generationWord(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'генерация';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'генерации';
+  return 'генераций';
+}
+
 function robokassaReceipt(pack) {
   return {
     items: [{
-      name: `Пакет кредитов на генерацию дизайна интерьера, ${pack.credits} шт.`,
+      name: `Доступ к онлайн-сервису генерации дизайна интерьера — пакет на ${pack.credits} ${generationWord(pack.credits)}`,
       quantity: 1,
       sum: Number((pack.price_kopecks / 100).toFixed(2)),
       payment_method: 'full_payment',
