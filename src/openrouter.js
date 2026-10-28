@@ -4,7 +4,7 @@
 
 import { roomTypeByName } from './roomtypes.js';
 import { getModelConfig } from './modelconfig.js';
-import { supportsAdvancedOptions } from './modelcaps.js';
+import { supportsAdvancedOptions, modelFamily, supportsResolution } from './modelcaps.js';
 import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 import { getPromptConfig } from './promptconfig.js';
 
@@ -324,7 +324,8 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   // auto из настроек — это «подстройся под источник»; конкретную пропорцию всё равно
   // считаем по исходнику, чтобы не потерять края при финальном fitAspect.
   const aspect = advanced ? (cfg.aspectRatio === 'auto' ? (aspectRatio || 'auto') : cfg.aspectRatio) : (aspectRatio || '3:2');
-  const resolution = advanced ? (cfg.resolution || '1K') : null;
+  // resolution поддерживает Seedream; FLUX 2 Pro не принимает этот параметр.
+  const resolution = advanced && supportsResolution(model) ? (cfg.resolution || '1K') : null;
   const body = {
     model,
     prompt,
@@ -346,7 +347,11 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   };
 
   let lastErr, spent = 0;
-  for (const [attempt, [endpoint, payload]] of [[`${BASE}/images`, body], [`${BASE}/chat/completions`, chatBody]].entries()) {
+  const attempts = [[`${BASE}/images`, body]];
+  // chat-completions как fallback имеет смысл только для моделей с image-output в чате.
+  // Seedream/FLUX — image-only, их fallback всегда даёт 404 и прячет реальную ошибку /images.
+  if (!['seedream', 'flux'].includes(modelFamily(model))) attempts.push([`${BASE}/chat/completions`, chatBody]);
+  for (const [attempt, [endpoint, payload]] of attempts.entries()) {
     try {
       const r = await fetch(endpoint, {
         method: 'POST',
@@ -358,9 +363,9 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
       const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
       spent += cost;
       if (!r.ok) {
-        lastErr = new Error(`${endpoint} ${r.status}: ${JSON.stringify(data).slice(0, 300)}`);
+        lastErr = new Error(`${endpoint} ${r.status}: ${JSON.stringify(data).slice(0, 500)}`);
         lastErr.cost = cost;
-        log({ event: 'render_attempt_error', model, endpoint, attempt: attempt + 1, status: r.status, cost_usd: cost || null });
+        log({ event: 'render_attempt_error', model, endpoint, attempt: attempt + 1, status: r.status, cost_usd: cost || null, error: String(lastErr.message).slice(0, 500) });
         continue;
       }
       const b64out =
@@ -398,25 +403,28 @@ export async function generateFromText({ prompt, aspectRatio = '3:2' }) {
   const model = getModelConfig().render;
   const cfg = getModelConfig();
   const advanced = supportsAdvancedOptions(model);
+  const resolution = advanced && supportsResolution(model) ? (cfg.resolution || '1K') : null;
   const body = {
     model,
     prompt,
     aspect_ratio: advanced ? (cfg.aspectRatio === 'auto' ? aspectRatio : cfg.aspectRatio) : aspectRatio,
-    ...(advanced && cfg.resolution ? { resolution: cfg.resolution } : {}),
+    ...(resolution ? { resolution } : {}),
   };
   let lastErr, spent = 0;
-  for (const [attempt, [endpoint, payload]] of [[`${BASE}/images`, body], [`${BASE}/chat/completions`, {
+  const attempts = [[`${BASE}/images`, body]];
+  if (!['seedream', 'flux'].includes(modelFamily(model))) attempts.push([`${BASE}/chat/completions`, {
     model,
     messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
     modalities: ['image', 'text'],
     image_config: { aspect_ratio: body.aspect_ratio },
-  }]].entries()) {
+  }]);
+  for (const [attempt, [endpoint, payload]] of attempts.entries()) {
     try {
       const r = await fetch(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(150_000) });
       const data = await r.json().catch(() => ({}));
       const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
       spent += cost;
-      if (!r.ok) { lastErr = new Error(`${endpoint} ${r.status}: ${JSON.stringify(data).slice(0, 300)}`); lastErr.cost = cost; continue; }
+      if (!r.ok) { lastErr = new Error(`${endpoint} ${r.status}: ${JSON.stringify(data).slice(0, 500)}`); lastErr.cost = cost; continue; }
       const b64 = data.choices?.[0]?.message?.images?.[0]?.image_url?.url?.match(/base64,(.+)$/)?.[1] || data.data?.[0]?.b64_json;
       if (!b64) { lastErr = new Error(`${endpoint}: нет картинки`); lastErr.cost = cost; continue; }
       log({ event: 'text_image_endpoint', model, endpoint, attempt: attempt + 1, aspect_ratio: body.aspect_ratio, cost_usd: spent || null });

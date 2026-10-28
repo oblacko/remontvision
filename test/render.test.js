@@ -5,6 +5,7 @@ process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
 const { generateRender, parseRender, snapAspect } = await import('../src/openrouter.js');
+const { supportsResolution } = await import('../src/modelcaps.js');
 
 const SOURCE = 'data:image/jpeg;base64,SOURCE';
 const REF = 'data:image/png;base64,REF';
@@ -69,6 +70,12 @@ test('vision receives the real image MIME', async () => {
 
   await parseRender('abc', 'image/jpeg');
   assert.match(body.messages[1].content[1].image_url.url, /^data:image\/jpeg;base64,/);
+});
+
+test('FLUX does not receive resolution, Seedream does', () => {
+  assert.equal(supportsResolution('black-forest-labs/flux.2-pro'), false);
+  assert.equal(supportsResolution('bytedance-seed/seedream-5-0-flash'), true);
+  assert.equal(supportsResolution('google/gemini-3.1-flash-image-preview'), false);
 });
 
 test('portrait source keeps a portrait aspect request', () => {

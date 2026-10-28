@@ -5,7 +5,7 @@ const SAFE_ASPECTS = ['auto','1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','1
 
 export const MODEL_CAPS = {
   seedream: { resolutions: ['1K', '2K'], aspects: SEEDREAM_ASPECTS },
-  flux: { resolutions: ['768', '1K', '1.5K', '2K', '4K'], aspects: FLUX_ASPECTS },
+  flux: { resolutions: [], aspects: FLUX_ASPECTS },
   google: { resolutions: ['1K'], aspects: SAFE_ASPECTS },
   other: { resolutions: ['1K', '2K'], aspects: SAFE_ASPECTS },
 };
@@ -23,12 +23,18 @@ export function supportsAdvancedOptions(id) {
   return family === 'seedream' || family === 'flux';
 }
 
+export function supportsResolution(id) {
+  return modelFamily(id) === 'seedream';
+}
+
 export function validateModelOptions(id, resolution, aspectRatio) {
   const family = modelFamily(id);
   const caps = MODEL_CAPS[family];
   if (!caps) return null;
   if (supportsAdvancedOptions(id)) {
-    if (!caps.resolutions.includes(resolution)) {
+    // FLUX 2 Pro (и текущее семейство FLUX в OpenRouter Image API) не принимает resolution:
+    // размер задаётся моделью/вендором. Отправка resolution даёт 400.
+    if (caps.resolutions.length && !caps.resolutions.includes(resolution)) {
       return `resolution для ${family}: ${caps.resolutions.join(', ')}`;
     }
     if (!caps.aspects.includes(aspectRatio)) {
