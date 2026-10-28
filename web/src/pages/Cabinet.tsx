@@ -92,9 +92,16 @@ export default function Cabinet() {
   useEffect(() => {
     if (!me || paidRef.current) return
     const params = new URLSearchParams(location.search)
-    if (!params.get('paid')) return
+    const paid = Boolean(params.get('paid')) || /\/cabinet\/paid\/?$/.test(location.pathname)
+    const failed = /\/cabinet\/fail\/?$/.test(location.pathname)
+    if (!paid && !failed) return
     paidRef.current = true
     setTab('credits')
+    if (failed) {
+      setNotice('Оплата не завершена — кредиты не начислены')
+      history.replaceState(null, '', '/cabinet' + location.hash)
+      return
+    }
     ;(async () => {
       setNotice('Проверяем оплату…')
       let sync: { granted?: boolean; status?: string } = {}
@@ -114,8 +121,7 @@ export default function Cabinet() {
       await loadMe()
       await loadData()
       setNotice(updated ? 'Оплата прошла — баланс обновлён' : 'Оплата ещё обрабатывается — обновите страницу через минуту')
-      params.delete('paid')
-      history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : '') + location.hash)
+      history.replaceState(null, '', '/cabinet' + location.hash)
     })()
   }, [me])
 

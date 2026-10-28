@@ -7,7 +7,7 @@
 ## 2026-10-28 — Robokassa
 
 - Добавлен провайдер Robokassa: создание платежа через `Merchant/Index.aspx`, `InvId` = локальный `payments.id`, `PAYMENT_PROVIDER=robokassa` (или автовыбор при заданных `ROBOKASSA_*`).
-- Реализованы ResultURL с проверкой подписи `Password#2` и ответом `OK{InvId}`, возврат пользователя прямо на страницы `/cabinet?paid=…` / `/cabinet?payment=failed`, синхронизация через `OpStateExt` (кроме тестового режима).
+- Реализованы ResultURL с проверкой подписи `Password#2` и ответом `OK{InvId}`, возврат пользователя прямо на страницы `/cabinet/paid` / `/cabinet/fail` без query-параметров (GET-параметры Robokassa не конфликтуют), синхронизация через `OpStateExt` (кроме тестового режима).
 - Начисление кредитов идемпотентно, как у ЮKassa: повторный ResultURL не дублирует `credit_txn`; `provider_payment_id` заполняется в той же транзакции.
 - Добавлены возвраты Robokassa через Refund API (JWT HS256, `ROBOKASSA_PASSWORD_3`, `OpKey` из `OpStateExt`); без них остаётся ручной способ. Возвраты по-прежнему выключены флагом.
 - Добавлены `src/robokassa.js` и 7 unit-тестов подписей/URL/XML/refund JWT (`npm test` — 28 тестов). Живой платёж не проверялся — нужен canary в тестовом кабинете Robokassa.
