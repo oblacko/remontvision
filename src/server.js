@@ -369,11 +369,11 @@ app.all('/api/payments/robokassa/result', express.urlencoded({ extended: false }
   return res.status(status).type('text/plain').send('not confirmed');
 }));
 
-app.all('/api/payments/robokassa/success', (_req, res) => {
+app.all(['/api/payments/robokassa', '/api/payments/robokassa/', '/api/payments/robokassa/success', '/api/payments/robokassa/success/'], (_req, res) => {
   res.redirect(302, `${APP_URL}/cabinet?paid=robokassa`);
 });
 
-app.all('/api/payments/robokassa/fail', (_req, res) => {
+app.all(['/api/payments/robokassa/fail', '/api/payments/robokassa/fail/'], (_req, res) => {
   res.redirect(302, `${APP_URL}/cabinet?payment=failed`);
 });
 

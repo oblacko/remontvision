@@ -97,10 +97,14 @@ export default function Cabinet() {
     setTab('credits')
     ;(async () => {
       setNotice('Проверяем оплату…')
-      try { await fetch('/api/payments/sync', { method: 'POST' }) } catch { /* ignore */ }
+      let sync: { granted?: boolean; status?: string } = {}
+      try {
+        const r = await fetch('/api/payments/sync', { method: 'POST' })
+        sync = await r.json().catch(() => ({}))
+      } catch { /* ignore */ }
       let balance = me.balance
-      let updated = false
-      for (let i = 0; i < 15; i++) {
+      let updated = Boolean(sync.granted) || sync.status === 'already' || sync.status === 'no_pending'
+      for (let i = 0; !updated && i < 15; i++) {
         await new Promise(r => setTimeout(r, 1500))
         const r = await fetch('/api/me')
         if (!r.ok) continue
