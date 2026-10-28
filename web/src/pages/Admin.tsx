@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles' | 'prompts' | 'models' | 'proxy' | 'catalog'
+type Tab = 'users' | 'packs' | 'styles' | 'rules' | 'prompts' | 'models' | 'proxy' | 'catalog'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -161,6 +161,9 @@ export default function Admin() {
   const [kit, setKit] = useState<KitResult | null>(null)
   const [kitBusy, setKitBusy] = useState(false)
   const [kitNotice, setKitNotice] = useState('')
+  const [promptConfig, setPromptConfig] = useState<Record<string, string> | null>(null)
+  const [promptRulesBusy, setPromptRulesBusy] = useState(false)
+  const [promptRulesNotice, setPromptRulesNotice] = useState('')
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -297,6 +300,31 @@ export default function Admin() {
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
     finally { setCatalogBusy(false) }
   }
+  const loadPromptRules = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/prompt'))
+      setPromptConfig(d.config || {});; setPromptRulesNotice('')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const savePromptRules = async () => {
+    if (!promptConfig) return
+    setPromptRulesBusy(true); setPromptRulesNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/prompt', { method: 'PUT', body: JSON.stringify({ config: promptConfig }) }))
+      setPromptConfig(d.config || {});
+      setPromptRulesNotice('Правила сохранены и применяются к новым генерациям')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setPromptRulesBusy(false) }
+  }
+  const resetPromptRules = async () => {
+    setPromptRulesBusy(true); setPromptRulesNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/prompt/reset', { method: 'POST' }))
+      setPromptConfig(d.config || {});
+      setPromptRulesNotice('Возвращены заводские правила')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setPromptRulesBusy(false) }
+  }
   const loadProxy = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/proxy'))
@@ -350,7 +378,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -539,7 +567,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['prompts', 'Промты'], ['models', 'Модели'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -698,6 +726,50 @@ export default function Admin() {
                   </div>
                 )}
               </section>
+            </div>
+          )}
+
+          {tab === 'rules' && (
+            <div className="mt-8 max-w-5xl">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div><p className="eyebrow">Правила базового промта</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Редактируются без деплоя и применяются к новым генерациям. Стили, комнаты, товары и модели остаются отдельно. Сброс возвращает текущие заводские правила.</p></div>
+                <div className="flex gap-2"><button type="button" disabled={promptRulesBusy} onClick={() => void resetPromptRules()} className="action-secondary">Сбросить</button><button type="button" disabled={promptRulesBusy} onClick={() => void savePromptRules()} className="action-primary">{promptRulesBusy ? 'Сохраняем…' : 'Сохранить'}</button></div>
+              </div>
+              {promptRulesNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{promptRulesNotice}</p>}
+              {promptConfig ? (
+                <div className="mt-6 space-y-5">
+                  {([
+                    ['lighting', 'Свет', 'Главный вау-инструмент: слои, cove, подсветка, запреты.'],
+                    ['cleanup', 'Уборка и техника', 'Что убрать или спрятать: радиатор, ТВ, провода, старые вещи.'],
+                    ['window', 'Окна и текстиль', 'Шторы, жалюзи, карнизы, тюль.'],
+                    ['pinterest', 'Pinterest-стайлинг', 'Арт, полки, мелочи, техника, плюш, 3–5 сцен.'],
+                  ] as const).map(([key, label, help]) => (
+                    <label key={key} className="block">
+                      <span className="flex flex-wrap items-baseline justify-between gap-2"><span className="eyebrow">{label}</span><span className="text-[11px] text-muted-foreground">{help}</span></span>
+                      <textarea value={promptConfig[key] || ''} onChange={e => setPromptConfig({ ...promptConfig, [key]: e.target.value })} rows={5} maxLength={8000} className="mt-2 w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" />
+                    </label>
+                  ))}
+                  <details className="border p-4">
+                    <summary className="cursor-pointer text-sm font-medium">Ещё правила: мебель, каталог, доп. art direction, запреты</summary>
+                    <div className="mt-4 space-y-5">
+                      {([
+                        ['furnitureOn', 'Мебель: оставить', 'Когда тумблер «Оставить мебель» включён.'],
+                        ['furnitureOff', 'Мебель: не учитывать', 'Когда мебель можно убрать или заменить.'],
+                        ['catalogOn', 'Каталог включён', 'Как использовать товары и смету.'],
+                        ['catalogOff', 'Каталог выключен', 'Свободный дизайн без товаров.'],
+                        ['extra', 'Дополнительно', 'Свободный текст в конец art direction.'],
+                        ['avoid', 'Запреты', 'Негативный список в конце промта.'],
+                      ] as const).map(([key, label, help]) => (
+                        <label key={key} className="block">
+                          <span className="flex flex-wrap items-baseline justify-between gap-2"><span className="eyebrow">{label}</span><span className="text-[11px] text-muted-foreground">{help}</span></span>
+                          <textarea value={promptConfig[key] || ''} onChange={e => setPromptConfig({ ...promptConfig, [key]: e.target.value })} rows={4} maxLength={8000} className="mt-2 w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" />
+                        </label>
+                      ))}
+                    </div>
+                  </details>
+                  <p className="text-xs text-muted-foreground">После сохранения новые генерации используют эти правила. Уже готовые рендеры не меняются.</p>
+                </div>
+              ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем правила…</p>}
             </div>
           )}
 

@@ -6,6 +6,7 @@ import { roomTypeByName } from './roomtypes.js';
 import { getModelConfig } from './modelconfig.js';
 import { supportsAdvancedOptions } from './modelcaps.js';
 import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
+import { getPromptConfig } from './promptconfig.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -183,15 +184,12 @@ export function buildPrompt({
   const change = String(room?.change || 'finishes, lighting, textiles, decor and styling that match the chosen style').replace(/\.+$/, '');
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
   const styling = room?.styling || 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.';
-  const furnitureRule = keepFurniture
-    ? 'Preserve the existing large furniture and functional zones. You may move or restyle freestanding furniture, but do not remove it. Keep built-ins in place.'
-    : 'Do not preserve the existing freestanding furniture. You may remove or replace it with furniture that fits the style. Keep built-ins, plumbing, electrical points and the room purpose.';
+  const rules = getPromptConfig();
+  const furnitureRule = keepFurniture ? rules.furnitureOn : rules.furnitureOff;
   const catalogText = useCatalog
     ? productsText(products)
     : 'No catalog products are used for this render. Choose materials, lighting and furniture that best fit the style and the room. Do not add a product list or estimate.';
-  const catalogRule = useCatalog
-    ? 'The listed products are the material palette. The estimate is built from them.'
-    : 'CATALOG DISABLED: design freely from the style; the estimate will not be generated.';
+  const catalogRule = useCatalog ? rules.catalogOn : rules.catalogOff;
   const roles = imageRolesText(imageMap);
 
   if (iteration) {
@@ -234,13 +232,13 @@ COMPOSITION
 Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved if it improves the design, but built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
 
 LIGHTING DESIGN — THE MAIN WOW TOOL
-Use warm layered lighting (2700–3000K): a statement fixture that matches the chosen style/reference, plus hidden LED cove or wall wash, bedside/floor/table lamps, and under-cabinet or backlit-mirror light where relevant. Create pools of warm light, soft shadows and depth. Do not rely on a single flat ceiling light. No boob lights, cold white light, visible bulbs or dangling wires. If the reference shows a specific fixture, match it; do not substitute a generic chandelier. If the catalog includes a light product, use that fixture as the visible statement piece.
+${rules.lighting}
 
 CLEANUP / REALISM
-Remove visual noise from the existing room: old TVs, cable boxes, exposed wires, dangling cables, bare radiators, window air conditioners, cheap plastic blinds, old roller blinds, torn or yellowed curtains, clutter and visible meters. Remove the radiator from view completely. If it must remain, hide it behind a flush wall-colored grille or built-in panel so it disappears into the wall; never leave a white radiator panel under the window. If a TV remains, mount it flush with hidden cables or use a frame TV; otherwise remove it. No visible cables anywhere.
+${rules.cleanup}
 
 WINDOW STYLING
-Windows are a key part of the styling. Replace old blinds and curtains with new window treatments that match the style: floor-length curtains, linen sheers, or a clean Roman/roller blind. Hide the cornice and mechanism. Never keep cheap plastic horizontal or vertical blinds, torn curtains or a bare window unless the style explicitly calls for it.
+${rules.window}
 
 ROOM RULES
 ${roomRules}
@@ -250,14 +248,10 @@ ${styling}
 Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
 
 PINTEREST-LEVEL STYLING
-Make it look like a saved Pinterest reference: curated, layered and personal, with 3–5 styled vignettes rather than random clutter.
-MUST INCLUDE at least one art grouping (2–4 frames) or one large poster, one open shelf/console/ledge styled with 3–5 objects, floor-length curtains or a clean blind, and layered textiles (throw, cushions or rug).
-- Textiles: floor-length curtains, throws, cushions, rugs, table runners.
-- Walls: framed art, posters, a small gallery wall, textile panel or wall hanging.
-- Shelves: open shelving with books, ceramics, vases, candles, small sculptures, records and plants.
-- Personal objects: a modern laptop (MacBook-style), headphones, a speaker, a camera, magazines. Place them on a desk, nightstand, console, shelf, coffee table or bed — never on the floor or rug. A laptop may be open on a desk or closed on a nightstand/console. Hide chargers, cables, camera straps and loose wires.
-- Plush toys: only in a children's room or a bedroom, one or two, styled on a chair, bed or shelf — never on the floor. Never in bathrooms, kitchens or adult living rooms.
-Keep it tasteful and uncluttered: every object should look intentional, not scattered. The scene must feel personal and collected, not like a furniture showroom.
+${rules.pinterest}
+${rules.extra ? `
+EXTRA ART DIRECTION
+${rules.extra}` : ''}
 
 CATALOG / MATERIALS
 ${catalogRule}
@@ -275,7 +269,7 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected products already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no visible radiator panel, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no random clutter, no old electronics, no electronics on the floor or rug, no loose cables, chargers or camera straps, no plush toys in bathrooms or kitchens, no old plastic blinds, no torn curtains, no empty shelves, no empty walls.`;
+Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. ${rules.avoid}`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.

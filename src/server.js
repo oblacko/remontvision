@@ -23,6 +23,7 @@ import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.
 import { validateModelOptions } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
+import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -640,6 +641,33 @@ app.get('/api/admin/settings/models', h(async (req, res) => {
   res.json({ render_model: config.render, vision_model: config.vision, resolution: config.resolution, aspect_ratio: config.aspectRatio, image_models: imageModels });
 }));
 
+app.get('/api/admin/settings/prompt', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ config: getPromptConfig(), defaults: getPromptDefaults() });
+}));
+
+app.put('/api/admin/settings/prompt', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const config = await savePromptConfig(req.body?.config || req.body || {});
+    log({ event: 'prompt_config_saved' });
+    res.json({ config, defaults: getPromptDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/settings/prompt/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const config = await resetPromptConfig();
+    log({ event: 'prompt_config_reset' });
+    res.json({ config, defaults: getPromptDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
 app.get('/api/admin/settings/proxy', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json(getProxyState({ masked: true }));
@@ -1088,6 +1116,7 @@ async function main() {
   await seedStyleReferences(); // сгенерированные референсы стилей (style-refs/seed.json)
   await loadModelConfig();  // модели из app_settings / env
   await loadProxyConfig();  // прокси из app_settings / env
+  await loadPromptConfig(); // редактируемые правила промта из app_settings
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }

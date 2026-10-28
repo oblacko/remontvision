@@ -1,0 +1,80 @@
+// Редактируемые из админки правила базового промта. Хранятся в app_settings (prompt.rules.v1).
+// Код комнат, стилей и товаров остаётся в roomtypes/openrouter, а art direction — здесь.
+export const PROMPT_FIELDS = [
+  { key: 'lighting', label: 'Свет', help: 'Главный вау-инструмент: слои, cove, подсветка, запреты.' },
+  { key: 'cleanup', label: 'Уборка и техника', help: 'Что убрать/спрятать: радиатор, ТВ, провода, старые вещи.' },
+  { key: 'window', label: 'Окна и текстиль', help: 'Шторы, жалюзи, карнизы, тюль.' },
+  { key: 'pinterest', label: 'Pinterest-стайлинг', help: 'Арт, полки, мелочи, техника, плюш, 3–5 сцен.' },
+  { key: 'furnitureOn', label: 'Мебель: оставить', help: 'Правило, когда «Оставить мебель» включено.' },
+  { key: 'furnitureOff', label: 'Мебель: не учитывать', help: 'Правило, когда мебель можно убрать/заменить.' },
+  { key: 'catalogOn', label: 'Каталог: включён', help: 'Как использовать товары и смету.' },
+  { key: 'catalogOff', label: 'Каталог: выключен', help: 'Свободный дизайн без товаров.' },
+  { key: 'extra', label: 'Дополнительно', help: 'Свободный текст, добавляется в конец art direction.' },
+  { key: 'avoid', label: 'Запреты', help: 'Негативный список в конце промта.' },
+];
+
+export const DEFAULT_PROMPT_CONFIG = {
+  lighting: 'Use warm layered lighting (2700–3000K): a statement fixture that matches the chosen style/reference, plus hidden LED cove or wall wash, bedside/floor/table lamps, and under-cabinet or backlit-mirror light where relevant. Create pools of warm light, soft shadows and depth. Do not rely on a single flat ceiling light. No boob lights, cold white light, visible bulbs or dangling wires. If the reference shows a specific fixture, match it; do not substitute a generic chandelier. If the catalog includes a light product, use that fixture as the visible statement piece.',
+  cleanup: 'Remove visual noise from the existing room: old TVs, cable boxes, exposed wires, dangling cables, bare radiators, window air conditioners, cheap plastic blinds, old roller blinds, torn or yellowed curtains, clutter and visible meters. Remove the radiator from view completely. If it must remain, hide it behind a flush wall-colored grille or built-in panel so it disappears into the wall; never leave a white radiator panel under the window. If a TV remains, mount it flush with hidden cables or use a frame TV; otherwise remove it. No visible cables anywhere.',
+  window: 'Windows are a key part of the styling. Replace old blinds and curtains with new window treatments that match the style: floor-length curtains, linen sheers, or a clean Roman/roller blind. Hide the cornice and mechanism. Never keep cheap plastic horizontal or vertical blinds, torn curtains or a bare window unless the style explicitly calls for it.',
+  pinterest: 'Make it look like a saved Pinterest reference: curated, layered and personal, with 3–5 styled vignettes rather than random clutter. MUST INCLUDE at least one art grouping (2–4 frames) or one large poster, one open shelf/console/ledge styled with 3–5 objects, floor-length curtains or a clean blind, and layered textiles (throw, cushions or rug). Textiles: floor-length curtains, throws, cushions, rugs, table runners. Walls: framed art, posters, a small gallery wall, textile panel or wall hanging. Shelves: open shelving with books, ceramics, vases, candles, small sculptures, records and plants. Personal objects: a modern laptop (MacBook-style), headphones, a speaker, a camera, magazines. Place them on a desk, nightstand, console, shelf, coffee table or bed — never on the floor or rug. A laptop may be open on a desk or closed on a nightstand/console. Hide chargers, cables, camera straps and loose wires. Plush toys: only in a children\'s room or a bedroom, one or two, styled on a chair, bed or shelf — never on the floor. Never in bathrooms, kitchens or adult living rooms. Keep it tasteful and uncluttered: every object should look intentional, not scattered. The scene must feel personal and collected, not like a furniture showroom.',
+  furnitureOn: 'Preserve the existing large furniture and functional zones. You may move or restyle freestanding furniture, but do not remove it. Keep built-ins in place.',
+  furnitureOff: 'Do not preserve the existing freestanding furniture. You may remove or replace it with furniture that fits the style. Keep built-ins, plumbing, electrical points and the room purpose.',
+  catalogOn: 'The listed products are the material palette. The estimate is built from them.',
+  catalogOff: 'CATALOG DISABLED: design freely from the style; the estimate will not be generated.',
+  extra: '',
+  avoid: 'No text, no watermarks, no people, no extra windows or doors, no duplicated furniture, no distorted geometry, no cartoon or CGI look, no bare mattress, no empty walls, no sterile showroom feeling, no visible radiator panel, no exposed radiators, no old TV with dangling cables, no generic chandelier, no mismatched light fixtures, no cold flat lighting, no random clutter, no old electronics, no electronics on the floor or rug, no loose cables, chargers or camera straps, no plush toys in bathrooms or kitchens, no old plastic blinds, no torn curtains, no empty shelves.',
+};
+
+const KEY = 'prompt.rules.v1';
+let cache = { ...DEFAULT_PROMPT_CONFIG };
+
+const cleanConfig = (input = {}) => {
+  const out = {};
+  for (const field of PROMPT_FIELDS) {
+    if (!(field.key in input)) continue;
+    const value = String(input[field.key] ?? '');
+    if (value.length > 8000) throw new Error(`Слишком длинный текст: ${field.label}`);
+    out[field.key] = value.trim();
+  }
+  return out;
+};
+
+export function getPromptConfig() {
+  return { ...cache };
+}
+
+export function getPromptDefaults() {
+  return { ...DEFAULT_PROMPT_CONFIG };
+}
+
+export function setPromptConfigForTests(patch) {
+  cache = { ...DEFAULT_PROMPT_CONFIG, ...cleanConfig(patch) };
+}
+
+export async function loadPromptConfig() {
+  try {
+    const { q } = await import('./db.js');
+    const rows = await q.settingsByKeys([KEY]);
+    const raw = rows.find(r => r.key === KEY)?.value;
+    cache = raw ? { ...DEFAULT_PROMPT_CONFIG, ...cleanConfig(JSON.parse(raw)) } : { ...DEFAULT_PROMPT_CONFIG };
+  } catch {
+    cache = { ...DEFAULT_PROMPT_CONFIG };
+  }
+  return getPromptConfig();
+}
+
+export async function savePromptConfig(patch) {
+  const next = { ...cache, ...cleanConfig(patch) };
+  const { q } = await import('./db.js');
+  await q.setSetting(KEY, JSON.stringify(next));
+  cache = next;
+  return getPromptConfig();
+}
+
+export async function resetPromptConfig() {
+  const { q } = await import('./db.js');
+  await q.setSetting(KEY, JSON.stringify(DEFAULT_PROMPT_CONFIG));
+  cache = { ...DEFAULT_PROMPT_CONFIG };
+  return getPromptConfig();
+}
