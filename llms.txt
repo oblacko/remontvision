@@ -48,9 +48,9 @@ Last updated: 2026-10-28
 
 1. `POST /api/rooms` with photo, room type, style or reference, tier, flags.
 2. Credit + `render(status=queued)`.
-3. Worker: room/style/tier → style refs → curate products by slot → prompt → cleanup (FLUX 3 Klein) when furniture off → design (FLUX 3 Image) → vision → estimate.
-4. `render_items` + `renders.analysis` + `done`.
-5. Edit: parent render + short edit prompt + target reference.
+3. Worker: room/style/tier → one art ref → curate products → text-only material constraints → cleanup when furniture off → design without product refs → vision → estimate.
+4. `render_items` have `curated|matched|verified` statuses; unverified products are not claimed as exact matches.
+5. Product edit: parent + one target/product ref → mandatory vision QA → `done|rejected`; rejection restores the credit and keeps the parent active.
 6. Share/links: `/s/:token`, `/go/:id`.
 
 ## Key files
@@ -71,7 +71,7 @@ Last updated: 2026-10-28
 
 ```bash
 npm install
-npm test                 # 15 tests
+npm test                 # 21 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -84,7 +84,7 @@ docker compose up -d db  # local Postgres 127.0.0.1:5434
 - FLUX.2 Pro does not accept `resolution`; may be blocked by content moderation.
 - Seedream/FLUX are image-only: do not use chat fallback.
 - Demo catalog has no real URLs; do not claim real checkout works.
-- Cleanup two-pass exists only when furniture is off; no inpainting yet.
+- Design-first product binding exists; no automatic 2–4 design variants or inpainting yet.
 - No automated backups/metrics yet.
 - `db.js` exits without `RV_DATABASE_URL`; avoid importing it in unit tests.
 
@@ -93,5 +93,5 @@ docker compose up -d db  # local Postgres 127.0.0.1:5434
 1. Import 20–50 real products with URLs for one style/room.
 2. Build a style kit from real products, re-generate hero refs.
 3. Validate `/go` and real order links.
-4. Add two-stage generation (empty shell → design) and inpainting.
+4. Add automatic design variants with explicit selection and billing, plus inpainting.
 5. Add feeds/CPA, price/availability sync, backups/monitoring.

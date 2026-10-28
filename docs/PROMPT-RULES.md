@@ -23,8 +23,8 @@
 
 ## Структура base-промта
 
-1. `IMAGE ROLES` — исходник, style ref, product refs.
-2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум.
+1. `IMAGE ROLES` — исходник как единственный источник геометрии + максимум один art ref; product refs в base не передаются.
+2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум и не сборка каталога.
 3. `KEEP EXACTLY` — архитектура/камера/мебель.
 4. `FURNITURE MODE`.
 5. `CHANGE / DEEP TRANSFORMATION`.
@@ -34,7 +34,7 @@
 9. `WINDOW STYLING`.
 10. `ROOM RULES` — guidance/forbid комнаты.
 11. `LIFE & STYLING` + `PINTEREST-LEVEL STYLING`.
-12. `CATALOG / MATERIALS` + product list.
+12. `CATALOG / MATERIALS` — только текстовые ограничения для материалов и фоновых товаров, без hero-мебели.
 13. `STYLE` — style ref/text/palette/accent.
 14. `MATERIAL CLASS`.
 15. `OUTPUT` + `AVOID`.
@@ -47,7 +47,7 @@
 - Pinterest: арт-группа, полка/консоль, текстиль, техника на поверхностях, плюш только в спальне/детской.
 - Электроника не на полу, провода скрыты.
 - Радиатор — за flush-решёткой или убрать.
-- Светильник строго в стиле/референсе, без generic-хрусталя.
+- Светильник соответствует выбранному стилю и художественному референсу, без generic-хрусталя.
 - Фото: editorial, 24–35 мм, natural/golden hour, film grain, не 3D/CGI.
 - Если мебель не учитываем — удалить всё, кроме архитектуры/встроенного/сантехники/электрики, и обставить заново.
 - Если каталог выключен — не добавлять товары/смету.
@@ -58,7 +58,7 @@
 
 ## Правки
 
-Edit-промт **не** использует полный base. Он короткий: «Image 1 — current render, Image 2 — reference, change only target, keep everything else». Правила `lighting/cleanup/...` к нему не применяются.
+Edit-промт **не** использует полный base. Он короткий: «Image 1 — current render, Image 2 — reference, change only target, keep everything else». Правила `lighting/cleanup/...` к нему не применяются. У товарной карточки игнорируются фон, студийный свет, ракурс и стейджинг. После товарной правки vision проверяет архитектуру, сходство с товаром, артефакты и качество кадра; при провале версия отклоняется.
 
 ## Как менять
 

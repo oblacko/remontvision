@@ -181,7 +181,10 @@ export function buildPrompt({
   const keep = keepFurniture
     ? String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '')
     : 'the architecture, camera, perspective, walls, windows, doors, ceiling height, room proportions, built-ins, plumbing and electrical points';
-  const change = String(room?.change || 'finishes, lighting, textiles, decor and styling that match the chosen style').replace(/\.+$/, '');
+  const fullChange = String(room?.change || 'finishes, lighting, textiles, decor and styling that match the chosen style').replace(/\.+$/, '');
+  const change = keepFurniture
+    ? fullChange.split(/(?<=[.!?])\s+/).filter(sentence => !/\b(replace|restyle|rearrange)\b/i.test(sentence)).join(' ')
+    : fullChange;
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
   const styling = room?.styling || 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.';
   const rules = getPromptConfig();
@@ -201,9 +204,9 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
 
   const styleRefText = hasStyleRef
     ? (userStyleRef
-      ? 'The user style reference is the absolute style authority. Match its mood, materials, palette, lighting fixtures, furniture silhouettes, decor, personal styling and level of detail. Do not introduce a generic chandelier or any fixture that contradicts the reference. Do not copy its layout, architecture or camera angle.'
-      : 'The style reference defines the target mood, materials, palette, lighting fixtures, furniture character and level of detail. Match its fixtures and light temperature; do not substitute a generic chandelier. Do not copy its layout, architecture or camera angle.')
-    : 'There is no separate style reference. Build the style from the description and the selected materials.';
+      ? 'The user style reference guides only the mood, light, palette, materials and level of styling. Do not copy its furniture, fixtures, layout, windows, architecture, camera angle or composition. The source room remains the only authority for geometry.'
+      : 'The style reference guides only the mood, light direction and temperature, palette, material character and level of styling. Do not copy its furniture, fixtures, layout, windows, architecture, camera angle or composition. The source room remains the only authority for geometry.')
+    : 'There is no separate style reference. Build the photographic language from the style description, room and material constraints.';
   const colors = [
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
     ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
@@ -215,6 +218,7 @@ TASK
 Create a photorealistic, aspirational editorial photograph of this ${roomName} after a deep renovation in ${styleDesc} style.
 The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
 Deeply transform the finishes, lighting, textiles, decor and styling while keeping the architecture believable and buildable.
+This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
 
 KEEP EXACTLY
 ${keep}.
@@ -229,7 +233,7 @@ If a floor product is listed below, replace the floor finish with it. If no floo
 Keep the result functional, keep realistic dimensions, and do not block doors or windows.
 
 COMPOSITION
-Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved if it improves the design, but built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
+Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved only when furniture replacement is allowed; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
 
 LIGHTING DESIGN — THE MAIN WOW TOOL
 ${rules.lighting}
@@ -256,9 +260,9 @@ ${rules.extra}` : ''}
 CATALOG / MATERIALS
 ${catalogRule}
 
-MATERIAL PALETTE — use these products where they fit
+MATERIAL CONSTRAINTS — TEXT ONLY, NO PRODUCT IMAGES
 ${catalogText}
-Use the palette as the material and color source. For large surfaces (floor, walls, countertop, cabinet fronts), match the listed product exactly. For lighting, plumbing and sockets, match the form and finish where visible. Use the listed dimensions as physical scale: furniture must look its real size relative to the room, and tile/plank patterns must match the stated format. Do not shrink a 220 cm sofa into an armchair or turn a 60×120 tile into a mosaic. Do not force a product into the frame if it is not visible from this camera angle. Do not add unlisted large furniture or fixtures when the catalog is enabled. Small decor, plants, textiles, art and books are encouraged to complete the styling.
+Use these text descriptions only as constraints for finishes, colors, formats and physical scale. Match large surfaces (floor, walls, countertop, cabinet fronts) to the listed material where visible. Tile/plank patterns must match the stated format. Do not force a material into the frame if it is not visible. Choose furniture, lighting, decor and composition for the strength of the design rather than trying to depict the estimate. Small decor, plants, textiles, art and books are encouraged to complete the styling.
 
 STYLE
 ${styleRefText}
@@ -266,7 +270,7 @@ ${colors}
 
 MATERIAL CLASS
 ${tier.promptName || tier.name} — ${tier.prompt}
-The selected products already match this class; keep the rest of the room consistent with it.
+The selected materials already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
 ${rules.photo} ${rules.avoid}`;
@@ -285,6 +289,7 @@ export function buildEditPrompt({ roomType = 'Другое', target = null, inst
 This is a ${roomName}.
 Change only the ${targetLabel}. ${instruction}
 Match the reference's shape, color, material and finish${hasRef ? '' : ' from the described material'}${refDimensions ? ` and its real dimensions (${refDimensions})` : ''}. Keep the size and realistic position appropriate for the room.
+The product reference describes only the product. Ignore its background, studio lighting, camera angle, staging and photographic style; preserve the interior's own light and composition.
 Keep everything else exactly as in Image 1: camera, geometry, walls, floor, furniture, decor and lighting. Do not restyle the room. Do not move objects. Do not add extra furniture or fixtures.
 Photorealistic result, no text, no watermarks, no people.`;
 }
@@ -488,6 +493,52 @@ style_score — насколько это заявленный стиль; room_
     cost: data.usage?.cost ?? null,
   };
   return out;
+}
+
+export async function assessProductEdit({ parentImageUrl, editedImageUrl, productImageUrl, productName = '', target = '' }) {
+  const sys = `Ты проверяешь точечную замену товара в интерьерном рендере. Сравни три изображения в порядке передачи: 1 — исходный рендер, 2 — рендер после замены, 3 — карточка товара.
+Верни строго JSON без текста вокруг:
+{"architecture_preserved":boolean,"product_match":boolean,"no_artifacts":boolean,"quality_not_worse":boolean,"issues":["кратко по-русски"]}
+architecture_preserved — камера, архитектура, окна, двери и все объекты кроме целевого сохранены.
+product_match — целевой объект виден и узнаваемо совпадает с товаром по форме, цвету, материалу и пропорциям; фон карточки не важен.
+no_artifacts — нет дублей, деформаций, плавающих объектов и новых посторонних предметов.
+quality_not_worse — свет, композиция, фотографичность и общий визуальный уровень не стали хуже.
+Все проверки обязательны. Не угадывай: при сомнении ставь false и объясняй в issues.`;
+  const r = await fetchWithRetry(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      model: getModelConfig().vision,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: [
+          { type: 'text', text: `Проверь замену «${target || 'объект'}» на товар «${productName || 'без названия'}».` },
+          { type: 'image_url', image_url: { url: parentImageUrl } },
+          { type: 'image_url', image_url: { url: editedImageUrl } },
+          { type: 'image_url', image_url: { url: productImageUrl } },
+        ] },
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try { parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
+  const checks = {
+    architecture_preserved: parsed.architecture_preserved === true,
+    product_match: parsed.product_match === true,
+    no_artifacts: parsed.no_artifacts === true,
+    quality_not_worse: parsed.quality_not_worse === true,
+  };
+  const accepted = Object.values(checks).every(Boolean);
+  return {
+    status: accepted ? 'accepted' : 'rejected',
+    accepted,
+    checks,
+    issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 6) : [],
+    cost: data.usage?.cost ?? null,
+  };
 }
 
 // Vision: читаем готовый рендер и достаём материалы, поверхности, электрику и подсказки.

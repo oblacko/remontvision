@@ -25,6 +25,7 @@ import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.j
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
 import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig } from './cleanupconfig.js';
+import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -886,7 +887,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
   let render = null;
   if (req.query.render_id) {
     const picked = await q.getRender(String(req.query.render_id));
-    if (picked && picked.room_id === room.id) render = picked;
+    if (picked && picked.room_id === room.id && picked.status === 'done' && picked.image_path) render = picked;
   }
   if (!render) render = await q.latestRender(room.id);
   const items = render ? await q.itemsForRender(render.id) : [];
@@ -902,6 +903,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     use_catalog: room.use_catalog !== false,
     status: room.status,
     error: room.error,
+    notice: room.notice || null,
     photo_url: `/files/${path.basename(room.photo_path)}`,
     render: render ? {
       id: render.id,
@@ -913,11 +915,19 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       model: render.model,
       edit_target: render.edit_target || null,
       analysis: render.analysis || null,
+      product_qa: render.meta?.product_qa ? {
+        status: render.meta.product_qa.status,
+        accepted: render.meta.product_qa.accepted,
+        issues: render.meta.product_qa.issues || [],
+      } : null,
     } : null,
     items: items.map(p => ({
       id: p.id,
-      name: p.name, brand: p.brand, attrs: p.attrs || {},
+      name: p.name, brand: p.brand, attrs: p.attrs || {}, category: p.category,
       price: p.price, unit: p.unit, qty: p.qty, source: p.source, match_score: p.match_score,
+      presentation_status: p.presentation_status || 'curated',
+      target: productTarget(p),
+      can_bind: p.presentation_status !== 'verified' && canBindProduct(p, room.keep_furniture !== false),
       price_tier: p.price_tier || 'comfort',
       price_date: p.price_date, price_updated_at: p.price_updated_at,
       url: `/go/${p.id}${render ? `?r=${encodeURIComponent(render.id)}` : ''}`,
@@ -1074,8 +1084,15 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.single('ref'), h(async (req
   if (refProductId) {
     refProduct = await q.getProduct(refProductId);
     if (!refProduct || refProduct.active === false) return res.status(400).json({ error: 'Товар для референса не найден' });
-    if (!target) target = refProduct.category;
-    if (target === 'paint' || target === 'wallpaper') target = 'wall';
+    if (!refProduct.image_path && !refProduct.image_url) return res.status(400).json({ error: 'У товара нет изображения для привязки' });
+    if (!canReplaceWithProduct(refProduct, room.keep_furniture !== false)) {
+      return res.status(400).json({ error: 'В режиме «Оставить мебель» эту мебель нельзя заменить. Создайте свободный дизайн.' });
+    }
+    const expectedTarget = productTarget(refProduct);
+    if (target && target !== expectedTarget && !(refProduct.category === 'tile' && target === 'backsplash')) {
+      return res.status(400).json({ error: 'Товар не соответствует выбранному объекту правки' });
+    }
+    target = target || expectedTarget;
     if (!SLOT_LABELS[target]) target = null;
   }
 

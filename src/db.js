@@ -78,9 +78,11 @@ export const q = {
     pool.query(`SELECT image_path, shell_path FROM renders WHERE room_id = $1 AND (image_path IS NOT NULL OR shell_path IS NOT NULL)`, [roomId])
       .then(r => r.rows.flatMap(row => [row.image_path, row.shell_path]).filter(Boolean)),
   setRoomStatus: (status, id) =>
-    pool.query(`UPDATE rooms SET status = $1, error = NULL, updated_at = now() WHERE id = $2`, [status, id]),
+    pool.query(`UPDATE rooms SET status = $1, error = NULL, notice = NULL, updated_at = now() WHERE id = $2`, [status, id]),
   setRoomError: (error, id) =>
-    pool.query(`UPDATE rooms SET status = 'error', error = $1, updated_at = now() WHERE id = $2`, [error, id]),
+    pool.query(`UPDATE rooms SET status = 'error', error = $1, notice = NULL, updated_at = now() WHERE id = $2`, [error, id]),
+  setRoomNotice: (notice, id) =>
+    pool.query(`UPDATE rooms SET status = 'done', error = NULL, notice = $1, updated_at = now() WHERE id = $2`, [notice, id]),
   deleteRoom: id => withTransaction(async client => {
     await client.query(`DELETE FROM render_items WHERE render_id IN (SELECT id FROM renders WHERE room_id = $1)`, [id]);
     await client.query(`DELETE FROM renders WHERE room_id = $1`, [id]);
@@ -105,6 +107,11 @@ export const q = {
                 finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
                 WHERE id = $2`, [error, id, stage, costUsd]),
+  setRenderRejected: (error, imagePath, costUsd, model, id) =>
+    pool.query(`UPDATE renders SET status='rejected', error = $1, error_stage = 'product_qa', image_path = $2,
+                cost_usd = $3, model = $4, finished_at = now(),
+                duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
+                WHERE id = $5`, [error, imagePath, costUsd, model, id]),
   failStaleRender: (id, error, stage = 'timeout') =>
     pool.query(`UPDATE renders SET status='error', error = $2, error_stage = $3,
                 finished_at = now(),
@@ -128,18 +135,18 @@ export const q = {
     pool.query(`INSERT INTO product_clicks (product_id, user_id, render_id, ip_hash) VALUES ($1,$2,$3,$4)`,
       [productId, userId || null, renderId || null, ipHash || null]),
   copyItems: (fromRenderId, toRenderId) =>
-    pool.query(`INSERT INTO render_items (render_id, product_id, match_score)
-                SELECT $2, product_id, match_score FROM render_items WHERE render_id = $1`, [fromRenderId, toRenderId]),
+    pool.query(`INSERT INTO render_items (render_id, product_id, match_score, presentation_status)
+                SELECT $2, product_id, match_score, presentation_status FROM render_items WHERE render_id = $1`, [fromRenderId, toRenderId]),
   // заменяем позицию той же категории: vision уточнил материал, но остальные позиции сохраняем
-  replaceItemByCategories: async (renderId, categories, productId, score) => {
+  replaceItemByCategories: async (renderId, categories, productId, score, presentationStatus = 'matched') => {
     await pool.query(`DELETE FROM render_items WHERE render_id = $1
                       AND product_id IN (SELECT id FROM products WHERE category = ANY($2))`, [renderId, categories]);
-    return pool.query(`INSERT INTO render_items (render_id, product_id, match_score) VALUES ($1,$2,$3)`, [renderId, productId, score]);
+    return pool.query(`INSERT INTO render_items (render_id, product_id, match_score, presentation_status) VALUES ($1,$2,$3,$4)`, [renderId, productId, score, presentationStatus]);
   },
-  replaceItemByCategory: async (renderId, category, productId, score) => {
+  replaceItemByCategory: async (renderId, category, productId, score, presentationStatus = 'matched') => {
     await pool.query(`DELETE FROM render_items WHERE render_id = $1
                       AND product_id IN (SELECT id FROM products WHERE category = $2)`, [renderId, category]);
-    return pool.query(`INSERT INTO render_items (render_id, product_id, match_score) VALUES ($1,$2,$3)`, [renderId, productId, score]);
+    return pool.query(`INSERT INTO render_items (render_id, product_id, match_score, presentation_status) VALUES ($1,$2,$3,$4)`, [renderId, productId, score, presentationStatus]);
   },
   setRenderShareToken: (id, token) =>
     pool.query(`UPDATE renders SET share_token = $2 WHERE id = $1 RETURNING share_token`, [id, token]).then(r => r.rows[0]?.share_token || null),
@@ -162,11 +169,11 @@ export const q = {
                 RETURNING id`).then(r => r.rows[0] || null),
   requeueProcessing: () =>
     pool.query(`UPDATE renders SET status = 'queued' WHERE status = 'processing'`).then(r => r.rowCount),
-  saveItem: (renderId, productId, score) =>
-    pool.query(`INSERT INTO render_items (render_id, product_id, match_score) VALUES ($1,$2,$3)`, [renderId, productId, score]),
+  saveItem: (renderId, productId, score, presentationStatus = score == null ? 'curated' : 'matched') =>
+    pool.query(`INSERT INTO render_items (render_id, product_id, match_score, presentation_status) VALUES ($1,$2,$3,$4)`, [renderId, productId, score, presentationStatus]),
   clearItems: renderId => pool.query(`DELETE FROM render_items WHERE render_id = $1`, [renderId]),
   itemsForRender: renderId =>
-    pool.query(`SELECT p.*, ri.match_score FROM render_items ri
+    pool.query(`SELECT p.*, ri.match_score, ri.presentation_status FROM render_items ri
                 JOIN products p ON p.id = ri.product_id
                 WHERE ri.render_id = $1 ORDER BY p.price * p.qty DESC`, [renderId]).then(r => r.rows),
   totalForRender: renderId =>
@@ -242,7 +249,7 @@ export const q = {
                          - COALESCE((SELECT SUM(ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.reason = 'iterate_refund'), 0)
                        )::int AS credits_spent
                 FROM renders r JOIN rooms rm ON rm.id = r.room_id
-                WHERE rm.user_id = $1 ORDER BY r.created_at DESC LIMIT 100`, [userId])
+                WHERE rm.user_id = $1 AND r.status <> 'rejected' ORDER BY r.created_at DESC LIMIT 100`, [userId])
       .then(r => r.rows),
 
   // админка: аккаунты

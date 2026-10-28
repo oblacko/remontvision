@@ -21,8 +21,9 @@ import { ShareDialog } from '@/components/ShareDialog'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
-  name: string; price: number; qty: number; unit: string;
+  id: number; name: string; price: number; qty: number; unit: string; category?: string;
   url: string; link_label?: string; direct_url?: boolean; source?: string; match_score?: number; price_tier?: string;
+  image_url?: string | null; target?: string; can_bind?: boolean; presentation_status?: 'curated' | 'matched' | 'verified';
 }
 type Surface = {
   surface: string; label: string; description?: string; hex: string;
@@ -32,7 +33,7 @@ type ElectricalItem = { title: string; text: string }
 type Suggestion = { target: string; label: string; product_id: number; image_url?: string | null }
 type Analysis = { surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[] }
 type RoomResult = {
-  id: string; status: string; error?: string | null; style: string; budget: number; price_tier?: string;
+  id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
   keep_furniture?: boolean; use_catalog?: boolean;
   render?: { id: string; image: string | null; status: string; analysis?: Analysis | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
@@ -96,6 +97,9 @@ const priceTiers = [
   { key: 'atelier', name: 'Ателье', short: 'Дизайнерские решения', description: 'Редкие фактуры, кастомные решения и коллекционные предметы.' },
 ] as const
 const tierName = (key?: string | null) => priceTiers.find(item => item.key === key)?.name || 'Комфорт'
+const presentationLabel = (status?: GenItem['presentation_status']) => status === 'verified'
+  ? 'Проверен на рендере'
+  : status === 'matched' ? 'Похожий по рендеру' : 'Подобран к дизайну'
 
 const stepLabels = ['Фото', 'Стиль', 'Результат', 'Смета'] as const
 const roomTypes = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое'] as const
@@ -168,6 +172,7 @@ export function GenerationPanel({
   const [roomId, setRoomId] = useState('')
   const [genError, setGenError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [productBinding, setProductBinding] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -178,6 +183,7 @@ export function GenerationPanel({
   const loadedRoomRef = useRef('')
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
+  const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
 
   const rememberUrl = (url: string) => { urls.current.push(url) }
   const releaseUrl = (url: string | null) => {
@@ -229,7 +235,7 @@ export function GenerationPanel({
         setUseCatalog(d.use_catalog !== false)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
-        setPhotoError(''); setGenError('')
+        setPhotoError(''); setGenError(d.notice || '')
         if (d.photo_url) {
           try {
             const pr = await fetch(d.photo_url)
@@ -394,7 +400,7 @@ export function GenerationPanel({
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
-    setBusy(true); setGenError(''); setRefineText(''); setProgress(3); setStep('generating')
+    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setRefineText(''); setProgress(3); setStep('generating')
     try {
       const isBase = !roomId || Boolean(refFile && refFile !== usedRef)
       let id = roomId
@@ -436,6 +442,12 @@ export function GenerationPanel({
 
       const room = await pollRoom(id)
       if (!room) return
+      if (room.notice) {
+        setGenError(room.notice)
+        setStep('result')
+        await onRefreshUser()
+        return
+      }
       const render = room.render
       if (!render?.image) throw new Error('Модель не вернула изображение')
       const next: Iteration = {
@@ -464,7 +476,7 @@ export function GenerationPanel({
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось выполнить генерацию')
       setStep(iterations.length ? 'result' : 'style')
-    } finally { setBusy(false) }
+    } finally { setBusy(false); setProductBinding(false) }
   }
 
   const resetAll = () => {
@@ -700,8 +712,8 @@ export function GenerationPanel({
         {step === 'generating' && (
           <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-16 text-center" role="status" aria-live="polite">
             <LoaderCircle className="size-10 animate-spin text-primary-text motion-reduce:animate-none" />
-            <h3 className="display-title mt-8 text-4xl">Создаём ваш дизайн</h3>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">Рисуем визуализацию, подбираем отделку и собираем палитру комнаты.</p>
+            <h3 className="display-title mt-8 text-4xl">{productBinding ? 'Привязываем товар' : 'Создаём ваш дизайн'}</h3>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">{productBinding ? 'Меняем только выбранный объект, затем проверяем сходство, архитектуру и качество кадра.' : 'Рисуем визуализацию без каталожных карточек, подбираем отделку и собираем палитру комнаты.'}</p>
             <div className="mt-8 h-1 w-full overflow-hidden bg-border" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />
             </div>
@@ -748,6 +760,26 @@ export function GenerationPanel({
                   <span className="text-muted-foreground">{current.useCatalog === false ? 'Каталог отключён · смета не формируется' : `Класс «${tierName(current.priceTier)}» · подборка ${rub(current.total)}`}</span>
                   <span className="text-muted-foreground">{current.useCatalog === false ? 'Свободный дизайн' : 'Итог ориентировочный'}</span>
                 </div>
+                {heroItems.length ? (
+                  <section className="mt-6 border p-4" aria-labelledby="hero-products">
+                    <p id="hero-products" className="eyebrow">Привязать товар к этому кадру</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Один товар за правку. Если сходство или качество не пройдут проверку, версия откатится, а кредит вернётся.</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      {heroItems.map(item => (
+                        <div key={item.id} className="flex min-w-0 flex-col border border-foreground/20">
+                          {item.image_url ? <img src={item.image_url} alt={item.name} className="aspect-[4/3] w-full border-b object-cover" /> : null}
+                          <div className="flex flex-1 flex-col p-3">
+                            <p className="line-clamp-2 text-xs font-medium leading-5">{item.name}</p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">{presentationLabel(item.presentation_status)}</p>
+                            <button type="button" onClick={() => startGeneration(`Перенести товар «${item.name}» в интерьер, изменив только этот объект`, current.styleName, { target: item.target, productId: item.id, parentId: current.id })} className="mt-3 min-h-10 border border-foreground px-2 text-[11px] leading-4 transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                              Перенести в интерьер · 1 кредит
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
                 {current.analysis?.suggestions?.length ? (
                   <div className="mt-6 border p-4">
                     <p className="eyebrow">Что улучшить</p>
@@ -886,6 +918,7 @@ export function GenerationPanel({
                         <span className="row-span-2 self-center font-medium">{rub(item.price * item.qty)}</span>
                         <span className="text-xs text-muted-foreground">
                           {rub(item.price)} × {item.qty} {item.unit}
+                          {` · ${presentationLabel(item.presentation_status)}`}
                           {item.source ? ` · ${item.source}` : ''}
                           {item.price_tier ? ` · ${tierName(item.price_tier)}` : ''}
                           {item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}

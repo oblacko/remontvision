@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-28T07:44:33.539Z
+Generated: 2026-10-28T09:08:00.163Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -46,10 +46,11 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 1. Пользователь загружает фото комнаты, выбирает тип комнаты, стиль или свой референс, класс материалов.
 2. Если мебель не сохраняем — сначала очищаем комнату до пустого каркаса, затем делаем дизайн с сохранением архитектуры, камеры и пропорций.
-3. Vision-разбор достаёт материалы, поверхности, электрику и подсказки для правок.
-4. Смета собирается из товаров каталога, подобранных под комнату, класс и стиль.
-5. Пользователь может точечно править дизайн: заменить люстру, пол, светильник, текстиль — с референсом.
-6. Результат можно скачать, открыть в кабинете или поделиться публичной ссылкой.
+3. Базовый дизайн создаётся без карточек товаров: исходник задаёт геометрию, один art ref — только свет, палитру, материалы и стайлинг.
+4. Vision-разбор достаёт материалы, поверхности, электрику и подсказки для правок.
+5. Смета собирается из товаров каталога и честно разделяет подобранные, похожие и проверенные на рендере позиции.
+6. Hero-товар можно перенести в кадр отдельной правкой; vision QA отклоняет ухудшенный результат и возвращает кредит.
+7. Результат можно скачать, открыть в кабинете или поделиться публичной ссылкой.
 
 Подробно: [docs/GENERATION.md](docs/GENERATION.md).
 
@@ -130,6 +131,7 @@ app/
     promptconfig.js    редактируемые правила промта (админка)
     roomtypes.js       типы комнат, слоты, keep/change, электрика
     curate.js          подбор товаров, референсы
+    productpipeline.js роли товаров, hero targets, статусы сметы
     catalogseed.js     идемпотентный сид каталога
     stylerefseed.js    идемпотентный сид hero-референсов
     db.js              pg pool, миграции, SQL-запросы
@@ -147,7 +149,7 @@ app/
   public/catalog/      картинки демо-каталога
   public/style-refs/   hero-референсы стилей
   style-refs/seed.json сид референсов стилей
-  migrations/          SQL-миграции 001–020
+  migrations/          SQL-миграции 001–022
   docs/                документация
   test/                node:test
 ```
@@ -196,7 +198,7 @@ app/
    - код: `src/openrouter.js`, `src/roomtypes.js`;
    - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
    Не дублируйте правила в разных местах: меняйте defaults в `promptconfig.js` и/или через админку.
-5. **Смета первого рендера:** curated-товары — источник истины, vision только добавляет недостающие категории. Правка копирует смету родителя и заменяет только target.
+5. **Design-first и смета:** базовый рендер получает только исходник + один art ref и текстовые материалы, без product refs. Curated-товары — подборка, не обещание точного совпадения. Товарная правка использует один product ref и обязательное vision QA; при отказе версия отклоняется, кредит возвращается.
 6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
 ## Команды
@@ -204,7 +206,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 15 тестов
+npm test                    # node:test, 21 тест
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -266,7 +268,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 15 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps.
+- `npm test` — 21 тест: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -346,9 +348,9 @@ Last updated: 2026-10-28
 
 1. `POST /api/rooms` with photo, room type, style or reference, tier, flags.
 2. Credit + `render(status=queued)`.
-3. Worker: room/style/tier → style refs → curate products by slot → prompt → cleanup (FLUX 3 Klein) when furniture off → design (FLUX 3 Image) → vision → estimate.
-4. `render_items` + `renders.analysis` + `done`.
-5. Edit: parent render + short edit prompt + target reference.
+3. Worker: room/style/tier → one art ref → curate products → text-only material constraints → cleanup when furniture off → design without product refs → vision → estimate.
+4. `render_items` have `curated|matched|verified` statuses; unverified products are not claimed as exact matches.
+5. Product edit: parent + one target/product ref → mandatory vision QA → `done|rejected`; rejection restores the credit and keeps the parent active.
 6. Share/links: `/s/:token`, `/go/:id`.
 
 ## Key files
@@ -369,7 +371,7 @@ Last updated: 2026-10-28
 
 ```bash
 npm install
-npm test                 # 15 tests
+npm test                 # 21 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -382,7 +384,7 @@ docker compose up -d db  # local Postgres 127.0.0.1:5434
 - FLUX.2 Pro does not accept `resolution`; may be blocked by content moderation.
 - Seedream/FLUX are image-only: do not use chat fallback.
 - Demo catalog has no real URLs; do not claim real checkout works.
-- Cleanup two-pass exists only when furniture is off; no inpainting yet.
+- Design-first product binding exists; no automatic 2–4 design variants or inpainting yet.
 - No automated backups/metrics yet.
 - `db.js` exits without `RV_DATABASE_URL`; avoid importing it in unit tests.
 
@@ -391,7 +393,7 @@ docker compose up -d db  # local Postgres 127.0.0.1:5434
 1. Import 20–50 real products with URLs for one style/room.
 2. Build a style kit from real products, re-generate hero refs.
 3. Validate `/go` and real order links.
-4. Add two-stage generation (empty shell → design) and inpainting.
+4. Add automatic design variants with explicit selection and billing, plus inpainting.
 5. Add feeds/CPA, price/availability sync, backups/monitoring.
 
 
@@ -453,7 +455,7 @@ flowchart LR
 
 ### Правка
 
-`POST /api/rooms/:id/iterate` создаёт дочерний render с `parent_render_id`, коротким edit-промтом и референсом (товар/файл/URL). Смета копируется у родителя, заменяется только target.
+`POST /api/rooms/:id/iterate` создаёт дочерний render с `parent_render_id`, коротким edit-промтом и референсом (товар/файл/URL). Смета копируется у родителя, заменяется только target. Для товарной правки vision сравнивает родителя, результат и карточку: при провале QA дочерний render получает `rejected`, родитель остаётся последней успешной версией, кредит возвращается.
 
 ### Публичный шаринг
 
@@ -506,7 +508,7 @@ flowchart LR
 ## Текущие ограничения
 
 - Один основной провайдер (OpenRouter).
-- Нет двухстадийной генерации и inpainting.
+- Нет автоматического выбора из 2–4 дизайн-вариантов и inpainting.
 - Каталог демонстрационный, 0 URL.
 - Нет автоматических бэкапов/метрик.
 - Старый `/app` не в новом стиле.
@@ -588,7 +590,7 @@ flowchart LR
 2. approved `style_references` для стиля + комнаты (hero, затем board/upload);
 3. статическая обложка стиля.
 
-В генерацию уходит **один** style ref + до 3 product refs (всего до 4 refs + исходник).
+В базовый дизайн уходит исходник + максимум **один art reference**, без изображений товаров. Art ref передаёт только свет, атмосферу, палитру, материалы и стайлинг; мебель, планировку и композицию из него копировать запрещено. Product ref появляется позже — в отдельной точечной правке.
 
 ### 4. Curate
 
@@ -605,7 +607,7 @@ flowchart LR
 
 Собирается в `src/openrouter.js`:
 
-- карта изображений: 1 — исходник, 2 — style ref, далее product refs;
+- карта изображений: 1 — исходник, 2 — необязательный art ref; product refs отсутствуют;
 - `KEEP EXACTLY` — архитектура, камера, окна/двери, мебель (если включено);
 - `FURNITURE MODE` — сохранить/убрать;
 - `CHANGE / DEEP TRANSFORMATION`;
@@ -614,7 +616,7 @@ flowchart LR
 - `CLEANUP / REALISM` — ТВ, провода, радиатор, старые зеркала/люстры;
 - `WINDOW STYLING` — шторы/жалюзи;
 - `LIFE & STYLING` + `PINTEREST-LEVEL STYLING` — арт, полки, техника, плюш, декор;
-- `CATALOG / MATERIALS` — список товаров, габариты, класс;
+- `CATALOG / MATERIALS` — текстовые материалы, цвета, фактуры и габариты; hero-мебель в этот список не входит;
 - `STYLE`, `MATERIAL CLASS`;
 - `OUTPUT` — фото-язык (24–35 мм, golden hour, film grain, не CGI);
 - `AVOID` — негативный список.
@@ -655,7 +657,8 @@ flowchart LR
 
 ### 8. Смета
 
-- Первый рендер: curated-товары — источник истины; vision только добавляет недостающие группы.
+- Первый рендер: curated-товары — источник сметы; vision только добавляет недостающие группы.
+- `curated` — подобран к дизайну, точное присутствие не подтверждено; `matched` — похожая позиция по vision; `verified` — конкретный товар прошёл QA после товарной правки.
 - Правка: копируется смета родителя, заменяется только target (товар из подсказки фиксируется).
 - Стены `paint`/`wallpaper` — одна группа.
 - Для товаров с URL ссылка идёт через `/go/:productId?r=renderId`; для демо — поиск.
@@ -680,11 +683,14 @@ Image 2 — reference for the new pendant.
 Change only the pendant. Keep everything else exactly as in Image 1.
 ```
 
-Это лучше, чем полный стилевой промт: модель не перерисовывает комнату.
+Это лучше, чем полный стилевой промт: модель не перерисовывает комнату. У product ref используются только внешний вид и габариты товара; фон, студийный свет, ракурс и стейджинг карточки игнорируются. При `keep_furniture=true` нельзя заменять крупную мебель.
+
+Для товарной правки `assessProductEdit` получает родителя, результат и карточку товара. Он проверяет `architecture_preserved`, `product_match`, `no_artifacts`, `quality_not_worse`; принимаются только четыре строгих `true`. При отказе или ошибке QA дочерний render получает `rejected`, родитель остаётся активным, причина записывается в `rooms.notice`, кредит возвращается с reason `product_qa_rejected`. Смета отклонённой версии не публикуется. В mock-режиме QA имеет статус `skipped`, поэтому товар остаётся `curated`, а не `verified`.
 
 ## Ошибки и кредиты
 
 - Ошибка generation/vision → `render.error`, `room.error`, кредит возвращается.
+- Отказ товарного QA → `render.rejected`, `rooms.notice`, прежняя версия сохраняется, кредит возвращается.
 - Таймаут 24 часа → ошибка + возврат кредита.
 - 402 → UI открывает пополнение.
 - 401 → требуется вход.
@@ -693,17 +699,19 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 ## Логи
 
 - JSON-логи в stdout: `render_start`, `render_endpoint`, `render_image_ok`, `render_analysis`, `render_matched`, `render_done`, `render_error`.
-- Полный промт хранится в `renders.prompt`, метаданные (refs, model, tier, flags) — в `renders.meta`.
-- В админке «Логи» видно промт, модель, стоимость, референсы.
+- Товарный QA: `product_qa_done`, `product_qa_rejected`, `product_qa_error`; результат и стоимость пишутся в `renders.meta.product_qa` и `renders.cost_usd`.
+- Полный промт хранится в `renders.prompt`, метаданные (pipeline, refs, model, tier, flags) — в `renders.meta`.
+- В админке «Логи» видно промт, модель, стоимость, референсы и отклонённые версии.
 
 ## Текущие ограничения
 
 - Очистка + дизайн работают только при выключенной мебели; при включённой — один проход.
-- Нет inpainting для люстр/розеток.
+- Нет автоматической генерации и выбора 2–4 дизайн-вариантов; нужны отдельные UI выбора и биллинг.
+- Нет inpainting для люстр/розеток; товарная привязка использует обычную edit-генерацию.
 - Очистка добавляет второй вызов, но биллинг пока 1 кредит.
 - Один основной провайдер.
 - Каталог демонстрационный, 0 URL.
-- Vision может ошибаться в мелких предметах; curated защищает смету.
+- Vision может ошибаться в мелких предметах; curated защищает смету от ложного обещания точного совпадения.
 
 ## Связанные документы
 
@@ -742,8 +750,8 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 
 ## Структура base-промта
 
-1. `IMAGE ROLES` — исходник, style ref, product refs.
-2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум.
+1. `IMAGE ROLES` — исходник как единственный источник геометрии + максимум один art ref; product refs в base не передаются.
+2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум и не сборка каталога.
 3. `KEEP EXACTLY` — архитектура/камера/мебель.
 4. `FURNITURE MODE`.
 5. `CHANGE / DEEP TRANSFORMATION`.
@@ -753,7 +761,7 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 9. `WINDOW STYLING`.
 10. `ROOM RULES` — guidance/forbid комнаты.
 11. `LIFE & STYLING` + `PINTEREST-LEVEL STYLING`.
-12. `CATALOG / MATERIALS` + product list.
+12. `CATALOG / MATERIALS` — только текстовые ограничения для материалов и фоновых товаров, без hero-мебели.
 13. `STYLE` — style ref/text/palette/accent.
 14. `MATERIAL CLASS`.
 15. `OUTPUT` + `AVOID`.
@@ -766,7 +774,7 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 - Pinterest: арт-группа, полка/консоль, текстиль, техника на поверхностях, плюш только в спальне/детской.
 - Электроника не на полу, провода скрыты.
 - Радиатор — за flush-решёткой или убрать.
-- Светильник строго в стиле/референсе, без generic-хрусталя.
+- Светильник соответствует выбранному стилю и художественному референсу, без generic-хрусталя.
 - Фото: editorial, 24–35 мм, natural/golden hour, film grain, не 3D/CGI.
 - Если мебель не учитываем — удалить всё, кроме архитектуры/встроенного/сантехники/электрики, и обставить заново.
 - Если каталог выключен — не добавлять товары/смету.
@@ -777,7 +785,7 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 
 ## Правки
 
-Edit-промт **не** использует полный base. Он короткий: «Image 1 — current render, Image 2 — reference, change only target, keep everything else». Правила `lighting/cleanup/...` к нему не применяются.
+Edit-промт **не** использует полный base. Он короткий: «Image 1 — current render, Image 2 — reference, change only target, keep everything else». Правила `lighting/cleanup/...` к нему не применяются. У товарной карточки игнорируются фон, студийный свет, ракурс и стейджинг. После товарной правки vision проверяет архитектуру, сходство с товаром, артефакты и качество кадра; при провале версия отклоняется.
 
 ## Как менять
 
@@ -1121,7 +1129,8 @@ Admin: заголовок `X-Admin-Key`.
   "status": "done",
   "photo_url": "/files/...",
   "render": {"id": "...", "image": "/renders/...", "analysis": {...}},
-  "items": [{"id": 1, "name": "...", "price": 0, "url": "/go/1?r=...", "direct_url": false, "link_label": "Найти похожие"}],
+  "notice": null,
+  "items": [{"id": 1, "name": "...", "category": "sofa", "price": 0, "presentation_status": "curated", "target": "sofa", "can_bind": true, "url": "/go/1?r=...", "direct_url": false, "link_label": "Найти похожие"}],
   "total": 0
 }
 ```
@@ -1133,6 +1142,8 @@ Admin: заголовок `X-Admin-Key`.
 - `product_id` — товар-референс.
 - `ref` — файл; `ref_url` — URL.
 - `parent_id` — версия для правки (по умолчанию последняя).
+
+Для `product_id` нужны активный товар, его изображение и совместимый `target`. При `keep_furniture=true` замена крупной мебели запрещена. После товарной правки vision сравнивает родителя, результат и карточку. Принятая версия получает `status=done`, а позиция — `presentation_status=verified`. При провале или недоступности QA дочерняя версия получает `status=rejected`, кредит возвращается, родитель остаётся активным, причина приходит в `GET /api/rooms/:id` → `notice`. В mock-режиме QA пропускается и товар остаётся `curated`. Безопасный результат проверки доступен в `render.product_qa`.
 
 ## Админ (`X-Admin-Key`)
 
@@ -1439,7 +1450,7 @@ tar czf appdata-$(date +%F).tar.gz /path/to/appdata
 ## Текущие ограничения
 
 - Нет реальных URL → нет заказов.
-- Нет двухстадийки и inpainting.
+- Нет автоматического выбора лучшего из 2–4 базовых вариантов и inpainting.
 - Один основной провайдер.
 - Нет автообновления цен/наличия.
 - Нет автоматических бэкапов/метрик.
@@ -1476,9 +1487,13 @@ tar czf appdata-$(date +%F).tar.gz /path/to/appdata
 
 Сумма в рублях не управляла подбором: модель не умеет в неё «жить», а смета всё равно собиралась из товаров. Ввели `start|comfort|premium|atelier` на комнате и товаре. Сумма осталась справочно.
 
-## ADR-002: curated-товары — источник истины
+## ADR-002: curated-товары — источник сметы, не доказательство изображения
 
-Для первого рендера смета строится из curated-товаров, которые мы реально просили нарисовать. Vision только добавляет недостающие категории и не подменяет выбранную инженерную доску на «похожий ламинат». Правка копирует смету родителя и заменяет только target.
+Для первого рендера смета строится из curated-товаров, но они имеют статус «подобран к дизайну». Vision добавляет недостающие категории со статусом «похожий по рендеру». Только отдельная товарная правка после обязательного QA получает `verified`. Правка копирует смету родителя и заменяет только target.
+
+## ADR-012: сначала дизайн, затем товар
+
+Базовый кадр не получает product refs: исходник отвечает за геометрию, один art ref — за свет/палитру/материалы/стайлинг. Hero-товар внедряется отдельной локальной правкой. QA сравнивает родителя, результат и карточку; ухудшение кадра или недоступная проверка означает `rejected` и возврат кредита.
 
 ## ADR-003: правила промта — в БД
 
@@ -1514,7 +1529,7 @@ OpenRouter WAF может блокировать IP VPS. Прокси храни
 
 ## ADR-011: габариты товара в промте
 
-`products.dimensions` передаются в промт как физический масштаб. Модель не измеряет, но не должна превращать диван 220 см в кресло. Для мебели без габаритов — предупреждение при импорте.
+В базовом дизайн-промте `products.dimensions` передаются только для текстовых материалов и фоновых товаров. Габариты hero-мебели применяются в отдельной product edit-правке, чтобы карточки не управляли исходной композицией. Модель не измеряет, но не должна превращать диван 220 см в кресло. Для мебели без габаритов — предупреждение при импорте.
 
 ## Связанные документы
 
@@ -1755,6 +1770,17 @@ export const MAX_REFERENCES; // 4
 - Два вызова модели (cleanup + design), но пока списывается 1 кредит; себестоимость выше. При ошибке очистки генерация продолжается с исходного фото, ошибка в `renders.meta.cleanup.error`.
 - FLUX 3 Image Klein принимает `resolution`; FLUX 2 Pro — нет. `modelcaps` теперь учитывает это по модели, не по семейству.
 - Тесты: 18/18.
+
+## 2026-10-28 — design-first и проверяемая привязка товаров
+
+- Базовый рендер больше не получает product refs: исходник + максимум один art ref. Каталог передаёт только текстовые ограничения отделки; hero-товары не управляют композицией.
+- Art ref ограничен светом, палитрой, материалами и стайлингом; product ref в правке описывает только товар, фон и свет карточки игнорируются. При `keep_furniture=true` убраны инструкции замены сохраняемой мебели.
+- В генераторе появились карточки 1–3 hero-товаров с последовательной привязкой через существующий `/iterate` за 1 кредит.
+- `assessProductEdit` сравнивает родителя, новый кадр и товар: архитектура, сходство, дефекты, визуальное качество. При любом отказе или ошибке QA render получает `rejected`, прежняя версия сохраняется, кредит возвращается, rejected скрыт из пользовательской истории.
+- Миграция 022: `render_items.presentation_status` (`curated|matched|verified`) и `rooms.notice`. Генератор и кабинет показывают честные статусы вместо обещания точного совпадения всей сметы.
+- Добавлен `src/productpipeline.js` для ролей товаров, target и ограничений keep mode. Тесты: 21/21.
+- Автоматические 2–4 базовых варианта не включены: им нужен отдельный выбор и биллинг. Live image/vision QA в этом изменении не запускался.
+
 ## Исправленные баги (важно помнить)
 
 - **Двойная генерация**: воркер не менял статус queued при старте — два слота брали одну задачу, каждый рендер оплачивался дважды. Лечится атомарным `UPDATE ... RETURNING` в `claimNextRender`.

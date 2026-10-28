@@ -1,15 +1,16 @@
 // Воркер: забирает рендеры со статусом queued и доводит до done.
 // Два режима:
-//   base — глубокое преображение по стилю + палитра товаров под класс материалов;
+//   base — глубокое преображение по стилю + текстовые материалы под класс материалов;
 //   edit — короткая правка одного объекта с референсом, без полного стилевого промта.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, parseRender, matchCatalog, snapAspect, supportsInputRefs, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
-import { curateProducts, referenceImagesDetailed, hasImage } from './curate.js';
+import { curateProducts, referenceImagesDetailed } from './curate.js';
+import { designProducts } from './productpipeline.js';
 import { roomTypeByName } from './roomtypes.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
@@ -98,6 +99,7 @@ async function processRender(renderId) {
     let imageMap = [];
     let meta = {
       mode: iteration ? 'edit' : 'base',
+      pipeline: iteration && render.ref_product_id ? 'design_product_binding_v1' : 'design_first_v1',
       room_type: roomType,
       price_tier: priceTier,
       keep_furniture: keepFurniture,
@@ -120,6 +122,7 @@ async function processRender(renderId) {
       if (parent) parentItems = await q.itemsForRender(parent.id);
       const ref = await editReference(render);
       editProduct = ref?.product || null;
+      if (render.ref_product_id && !editProduct) throw new Error('Не удалось загрузить изображение товара для привязки');
       if (ref) referenceImagesB64.push(ref.b64);
       imageMap = [
         { role: 'current interior render', label: 'edit only the target object' },
@@ -156,34 +159,27 @@ async function processRender(renderId) {
       }) : [];
 
       const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
-      // Один стилевой референс: оставляем 3 слота под товары/мебель.
       const chosenStyleRefs = styleRefs.refs.slice(0, 1);
       const styleRefUrls = [];
       for (const ref of chosenStyleRefs) styleRefUrls.push(await bufferToDataUrl(ref.buf));
 
-      const productLimit = useCatalog ? Math.max(0, 4 - styleRefUrls.length) : 0;
-      const productRefs = useCatalog && supportsInputRefs() ? await referenceImagesDetailed(curated.filter(hasImage), productLimit) : [];
-      const refIds = new Set(productRefs.map(r => Number(r.product.id)));
-
       const styleRole = kind => kind === 'material_board'
-        ? 'material board — exact finishes, colors and fixtures; do not copy layout'
+        ? 'art reference: material board — finishes, colors, light and styling only; never copy objects, layout or composition'
         : kind === 'user'
-          ? 'user style reference — primary target; follow its mood and materials'
+          ? 'user art reference — mood, palette, materials, light and styling only; never copy objects, layout or composition'
           : kind === 'cover'
-            ? 'style cover reference — mood and materials only'
-            : 'style reference — mood, furniture character, materials and lighting; do not copy layout';
+            ? 'art reference: style cover — mood, palette, materials and light only; never copy objects, layout or composition'
+            : 'art reference — atmosphere, palette, material character, light and styling only; never copy furniture, layout or composition';
       imageMap = [
-        { role: useCleanup ? 'source room or prepared empty shell' : 'source room', label: 'preserve architecture, camera and room proportions' },
+        { role: useCleanup ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' },
         ...chosenStyleRefs.map((ref) => ({ role: styleRole(ref.kind), label: ref.title || '' })),
-        ...productRefs.map(r => ({ role: 'product reference', label: `${r.product.name} — ${r.product.category}` })),
       ];
 
-      const productsForPrompt = curated.map(p => ({ ...p, has_ref: refIds.has(Number(p.id)) }));
       prompt = buildPrompt({
         style: room.style,
         priceTier,
         budget: room.budget,
-        products: productsForPrompt,
+        products: designProducts(curated),
         palette: room.palette || 'none',
         accent: room.accent || 'none',
         hasStyleRef: styleRefUrls.length > 0,
@@ -195,7 +191,7 @@ async function processRender(renderId) {
         imageMap,
       });
 
-      referenceImagesB64 = [...styleRefUrls, ...productRefs.map(r => r.b64)];
+      referenceImagesB64 = styleRefUrls;
       meta.product_ids = curated.map(p => Number(p.id));
       meta.style_id = styleInfo?.id || null;
       meta.budget = room.budget;
@@ -289,6 +285,45 @@ async function processRender(renderId) {
       out_px: [outSize.width, outSize.height],
     });
 
+    let productQa = null;
+    if (iteration && editProduct) {
+      stage = 'product_qa';
+      await q.setRoomStatus('matching', room.id);
+      if (MOCK_MODE) {
+        productQa = { status: 'skipped', accepted: false, checks: {}, issues: [], cost: null };
+      } else {
+        try {
+          const parentBuf = await getBuffer(sourceStored);
+          productQa = await assessProductEdit({
+            parentImageUrl: await bufferToDataUrl(parentBuf),
+            editedImageUrl: await bufferToDataUrl(bytes),
+            productImageUrl: referenceImagesB64[0],
+            productName: editProduct.name,
+            target: render.edit_target || editProduct.category,
+          });
+        } catch (e) {
+          productQa = { status: 'error', accepted: false, checks: {}, issues: [], cost: e.cost ?? null };
+          log({ event: 'product_qa_error', room_id: room.id, render_id: renderId, product_id: editProduct.id, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+      meta.product_qa = productQa;
+      if (!productQa.accepted && !MOCK_MODE) {
+        const reason = productQa.issues.join('; ').slice(0, 240);
+        const notice = productQa.status === 'error'
+          ? 'Не удалось проверить товарную правку. Прежняя версия сохранена, кредит возвращён.'
+          : `Товарная правка не прошла проверку${reason ? `: ${reason}` : '.'} Прежняя версия сохранена, кредит возвращён.`;
+        const qaParts = [cost, productQa.cost].filter(value => typeof value === 'number');
+        const qaTotalCost = qaParts.length ? qaParts.reduce((sum, value) => sum + value, 0) : null;
+        await q.setRenderMeta(renderId, { ...meta, model, cost_usd: cost ?? null, product_qa: productQa });
+        await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id);
+        await q.setRoomNotice(notice, room.id);
+        const restored = await restoreCreditForRender(renderId, 'product_qa_rejected');
+        log({ event: 'product_qa_rejected', room_id: room.id, render_id: renderId, product_id: editProduct.id, status: productQa.status, checks: productQa.checks, cost_usd: qaTotalCost, credit_restored: restored, ms: Date.now() - t0 });
+        return;
+      }
+      log({ event: 'product_qa_done', room_id: room.id, render_id: renderId, product_id: editProduct.id, status: productQa.status, checks: productQa.checks, cost_usd: productQa.cost ?? null });
+    }
+
     // Разбор готовой визуализации: материалы, поверхности → RAL, электрика, быстрые правки.
     stage = 'matching';
     await q.setRoomStatus('matching', room.id);
@@ -333,7 +368,7 @@ async function processRender(renderId) {
     if (iteration) {
       if (editProduct) {
         // Быстрая подсказка/товарный референс: фиксируем именно этот товар в смете.
-        await q.replaceItemByCategories(render.id, categoryGroup(editProduct.category), editProduct.id, 1);
+        await q.replaceItemByCategories(render.id, categoryGroup(editProduct.category), editProduct.id, 1, productQa?.accepted ? 'verified' : 'curated');
       } else if (render.edit_target) {
         const targetGroup = groupForTarget(render.edit_target);
         const match = matched.find(m => targetGroup.includes(m.product.category));
@@ -346,7 +381,7 @@ async function processRender(renderId) {
         }
       }
     } else {
-      // Первый рендер: curated — источник истины (его и просили нарисовать).
+      // Первый рендер: curated — источник сметы, но не доказательство точного совпадения.
       // Vision только добавляет то, чего не было в подборке, и не подменяет выбранный товар.
       for (const m of matched) {
         const group = categoryGroup(m.product.category).join('|');
@@ -377,15 +412,16 @@ async function processRender(renderId) {
       ...meta,
       model,
       cost_usd: cost ?? null,
+      product_qa_cost_usd: productQa?.cost ?? null,
       vision_cost_usd: visionCost ?? null,
       suggestion_targets: analysis.suggestions.map(s => s.target),
     });
 
-    const parts = [cost, visionCost].filter(c => typeof c === 'number');
+    const parts = [cost, productQa?.cost, visionCost].filter(c => typeof c === 'number');
     const totalCost = parts.length ? parts.reduce((a, b) => a + b, 0) : null;
     await q.setRenderDone(renderKey, totalCost, model, render.id);
     await q.setRoomStatus('done', room.id);
-    log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_image_usd: cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
+    log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
   } catch (e) {
     const msg = String(e.message || e).slice(0, 500);
     const errorCost = typeof e.cost === 'number' ? e.cost : null;

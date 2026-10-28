@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
-const { generateRender, parseRender, snapAspect } = await import('../src/openrouter.js');
+const { generateRender, assessProductEdit, parseRender, snapAspect } = await import('../src/openrouter.js');
 const { supportsResolution } = await import('../src/modelcaps.js');
 
 const SOURCE = 'data:image/jpeg;base64,SOURCE';
@@ -70,6 +70,53 @@ test('vision receives the real image MIME', async () => {
 
   await parseRender('abc', 'image/jpeg');
   assert.match(body.messages[1].content[1].image_url.url, /^data:image\/jpeg;base64,/);
+});
+
+test('product QA compares parent, edit and product and accepts only all checks', async () => {
+  let body;
+  globalThis.fetch = async (_url, opts) => {
+    body = JSON.parse(opts.body);
+    return json({
+      choices: [{ message: { content: JSON.stringify({
+        architecture_preserved: true,
+        product_match: true,
+        no_artifacts: true,
+        quality_not_worse: true,
+        issues: [],
+      }) } }],
+      usage: { cost: 0.01 },
+    });
+  };
+
+  const out = await assessProductEdit({
+    parentImageUrl: SOURCE,
+    editedImageUrl: REF,
+    productImageUrl: 'data:image/webp;base64,PRODUCT',
+    productName: 'Диван',
+    target: 'sofa',
+  });
+  const images = body.messages[1].content.filter(part => part.type === 'image_url');
+  assert.equal(images.length, 3);
+  assert.equal(images[0].image_url.url, SOURCE);
+  assert.equal(images[1].image_url.url, REF);
+  assert.equal(out.accepted, true);
+  assert.equal(out.status, 'accepted');
+  assert.equal(out.cost, 0.01);
+});
+
+test('product QA rejects when visual quality gets worse', async () => {
+  globalThis.fetch = async () => json({ choices: [{ message: { content: JSON.stringify({
+    architecture_preserved: true,
+    product_match: true,
+    no_artifacts: true,
+    quality_not_worse: false,
+    issues: ['Свет стал плоским'],
+  }) } }] });
+
+  const out = await assessProductEdit({ parentImageUrl: SOURCE, editedImageUrl: REF, productImageUrl: REF });
+  assert.equal(out.accepted, false);
+  assert.equal(out.status, 'rejected');
+  assert.deepEqual(out.issues, ['Свет стал плоским']);
 });
 
 test('FLUX does not receive resolution, Seedream does', () => {

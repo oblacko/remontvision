@@ -8,6 +8,7 @@ process.env.RENDER_MODEL = 'test/model';
 
 const { buildPrompt, buildEditPrompt } = await import('../src/openrouter.js');
 const { nearestRal } = await import('../src/analysis.js');
+const { designProducts, canBindProduct, canReplaceWithProduct } = await import('../src/productpipeline.js');
 
 const PRODUCT = {
   id: 1,
@@ -74,6 +75,28 @@ test('edit prompt is short, target-specific and reference-aware', () => {
   assert.match(prompt, /Keep everything else exactly as in Image 1/);
   assert.doesNotMatch(prompt, /MATERIAL PALETTE/);
   assert.doesNotMatch(prompt, /KEEP EXACTLY/);
+});
+
+test('design pass excludes hero products and keeps preserved furniture out of replacements', () => {
+  const sofa = { ...PRODUCT, id: 2, category: 'sofa', name: 'Диван «Тест»', image_url: '/catalog/sofa.webp' };
+  const light = { ...PRODUCT, id: 3, category: 'light', name: 'Свет «Тест»', image_url: '/catalog/light.webp' };
+  const materials = designProducts([sofa, PRODUCT, light]);
+  assert.deepEqual(materials.map(product => product.id), [PRODUCT.id]);
+
+  const prompt = buildPrompt({
+    style: 'Джапанди',
+    products: materials,
+    roomType: 'Спальня',
+    keepFurniture: true,
+    hasStyleRef: true,
+  });
+  assert.match(prompt, /NO PRODUCT IMAGES/);
+  assert.match(prompt, /Do not copy its furniture/);
+  assert.doesNotMatch(prompt, /Диван «Тест»|Свет «Тест»/);
+  assert.doesNotMatch(prompt, /replace or restyle the bed/i);
+  assert.equal(canBindProduct(sofa, true), false);
+  assert.equal(canBindProduct(light, true), true);
+  assert.equal(canReplaceWithProduct(sofa, false), true);
 });
 
 test('nearest RAL maps pure white to RAL 9010', () => {

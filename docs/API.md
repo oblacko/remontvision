@@ -75,7 +75,8 @@ Admin: заголовок `X-Admin-Key`.
   "status": "done",
   "photo_url": "/files/...",
   "render": {"id": "...", "image": "/renders/...", "analysis": {...}},
-  "items": [{"id": 1, "name": "...", "price": 0, "url": "/go/1?r=...", "direct_url": false, "link_label": "Найти похожие"}],
+  "notice": null,
+  "items": [{"id": 1, "name": "...", "category": "sofa", "price": 0, "presentation_status": "curated", "target": "sofa", "can_bind": true, "url": "/go/1?r=...", "direct_url": false, "link_label": "Найти похожие"}],
   "total": 0
 }
 ```
@@ -87,6 +88,8 @@ Admin: заголовок `X-Admin-Key`.
 - `product_id` — товар-референс.
 - `ref` — файл; `ref_url` — URL.
 - `parent_id` — версия для правки (по умолчанию последняя).
+
+Для `product_id` нужны активный товар, его изображение и совместимый `target`. При `keep_furniture=true` замена крупной мебели запрещена. После товарной правки vision сравнивает родителя, результат и карточку. Принятая версия получает `status=done`, а позиция — `presentation_status=verified`. При провале или недоступности QA дочерняя версия получает `status=rejected`, кредит возвращается, родитель остаётся активным, причина приходит в `GET /api/rooms/:id` → `notice`. В mock-режиме QA пропускается и товар остаётся `curated`. Безопасный результат проверки доступен в `render.product_qa`.
 
 ## Админ (`X-Admin-Key`)
 
