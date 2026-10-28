@@ -24,7 +24,8 @@ Last updated: 2026-10-28
 
 ## Current state (2026-10-28)
 
-- Generation: Seedream 5.0 Flash, 1K, aspect auto; vision Gemini 3 Flash.
+- Generation: FLUX 3 Image, 1K, aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash.
+- Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
 - 10 styles, 12 room types, 100 active demo products, **0 products with real URL**.
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`).
@@ -47,7 +48,7 @@ Last updated: 2026-10-28
 
 1. `POST /api/rooms` with photo, room type, style or reference, tier, flags.
 2. Credit + `render(status=queued)`.
-3. Worker: room/style/tier → style refs → curate products by slot → prompt → image → vision → estimate.
+3. Worker: room/style/tier → style refs → curate products by slot → prompt → cleanup (FLUX 3 Klein) when furniture off → design (FLUX 3 Image) → vision → estimate.
 4. `render_items` + `renders.analysis` + `done`.
 5. Edit: parent render + short edit prompt + target reference.
 6. Share/links: `/s/:token`, `/go/:id`.
@@ -83,7 +84,7 @@ docker compose up -d db  # local Postgres 127.0.0.1:5434
 - FLUX.2 Pro does not accept `resolution`; may be blocked by content moderation.
 - Seedream/FLUX are image-only: do not use chat fallback.
 - Demo catalog has no real URLs; do not claim real checkout works.
-- No two-stage generation or inpainting yet.
+- Cleanup two-pass exists only when furniture is off; no inpainting yet.
 - No automated backups/metrics yet.
 - `db.js` exits without `RV_DATABASE_URL`; avoid importing it in unit tests.
 

@@ -16,7 +16,7 @@ flowchart LR
   W --> P
   W --> F
   W --> O["OpenRouter"]
-  O --> S["Seedream 5.0 Flash"]
+  O --> S["FLUX 3 Image"]
   O --> G["Gemini 3 Flash"]
   E --> R["Resend"]
   E --> Y["ЮKassa"]
@@ -29,7 +29,8 @@ flowchart LR
 |---|---|---|
 | Nginx | TLS, HSTS, проксирование на `127.0.0.1:3000`, apex → www | конфиг на VPS |
 | Express API | auth, комнаты, рендеры, смета, админка, шаринг, платежи, статика | `src/server.js` |
-| Worker | забирает `renders` из Postgres, генерирует, анализирует, сохраняет | `src/jobs.js` |
+| Worker | забирает `renders` из Postgres, очищает/генерирует/анализирует | `src/jobs.js` |
+| Cleanup | пустой каркас перед дизайном при `keep_furniture=false` | `src/cleanupconfig.js`, `src/openrouter.js` |
 | Postgres | пользователи, комнаты, рендеры, товары, стили, кредиты, платежи, лайки | `src/db.js`, `migrations/` |
 | Storage | фото комнат, рендеры, картинки товаров/референсов | `src/storage.js` |
 | OpenRouter | image generation и vision | `src/openrouter.js` |

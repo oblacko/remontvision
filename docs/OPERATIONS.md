@@ -23,7 +23,7 @@ ADMIN_KEY=<admin-key>
 
 # OpenRouter
 OPENROUTER_API_KEY=<key>
-RENDER_MODEL=bytedance-seed/seedream-5-0-flash
+RENDER_MODEL=black-forest-labs/flux-3-image
 VISION_MODEL=google/gemini-3-flash-preview
 RENDER_RESOLUTION=1K
 RENDER_ASPECT_RATIO=auto
@@ -122,7 +122,8 @@ tar czf appdata-$(date +%F).tar.gz /path/to/appdata
 | `403 Access denied by security policy` | OpenRouter WAF блокирует IP VPS | проверить прокси, `HTTPS_PROXY` или админку |
 | `/images 400` | неподдерживаемый параметр/модель | проверить `modelcaps`, у FLUX нет resolution |
 | `chat/completions 404` | image-only модель + fallback | не использовать chat fallback для Seedream/FLUX |
-| content moderation | FLUX/BFL блокирует фото | переключить на Seedream или препроцессить фото |
+| content moderation | FLUX/BFL блокирует фото | переключить на другую модель или препроцессить фото |
+| cleanup_error | очистка не удалась | дизайн продолжится с исходника; проверить модель/промт очистки |
 | нет сметы | каталог отключён/пуст | проверить `use_catalog`, товары, curated |
 | нет approved refs | стиль без approved | админка → стили → approve |
 | 402 | нет кредитов | пополнить |

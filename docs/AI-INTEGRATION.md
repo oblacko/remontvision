@@ -6,7 +6,8 @@
 
 ## Текущая конфигурация
 
-- Render: `bytedance-seed/seedream-5-0-flash`, 1K, aspect auto.
+- Render: `black-forest-labs/flux-3-image`, 1K, aspect auto (значение из админки).
+- Cleanup: `black-forest-labs/flux-3-image-klein`, 1K, auto (только при `keep_furniture=false`).
 - Vision: `google/gemini-3-flash-preview` (в проде `google/gemini-3-flash-preview`).
 - Модели хранятся в `app_settings` и меняются в админке «Модели».
 - Прокси — `src/proxy.js`, применяется без рестарта.
@@ -22,6 +23,7 @@ export function buildPrompt({ style, priceTier, products, roomType, imageMap, ke
 export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabel, refDimensions });
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 export async function generateFromText({ prompt, aspectRatio }); // shells для style refs
+export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect });
 export async function parseRender(renderB64, mime);
 export function matchCatalog(items, products);
 export function snapAspect(width, height, allowed);
@@ -33,9 +35,10 @@ export const MAX_REFERENCES; // 4
 `src/modelcaps.js`:
 
 - Seedream: `resolution` 1K/2K, aspect.
+- FLUX 3 Image/Klein: `resolution` 768/1K/1.5K/2K/4K, aspect.
 - FLUX: aspect; **resolution не отправляется**; content moderation возможен.
 - Gemini: resolution не отправляется; aspect из безопасного списка.
-- `supportsResolution()` true только для Seedream.
+- `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; у FLUX 2 Pro resolution нет.
 - Для Seedream/FLUX нет chat-fallback: это image-only модели.
 
 ## Провайдерские грабли

@@ -7,11 +7,11 @@
 | Режим | Что делает | Флаги комнаты |
 |---|---|---|
 | Обычный редизайн | меняет отделку, свет, текстиль; крупная мебель сохраняется/двигается | `keep_furniture=true` |
-| Свободный дизайн | убирает/заменяет свободно стоящую мебель, обставляет заново | `keep_furniture=false` |
+| Свободный дизайн | очищает комнату до пустого каркаса, затем обставляет заново | `keep_furniture=false` + очистка включена |
 | С каталогом | подбирает товары, строит смету, ссылки | `use_catalog=true` |
 | Без каталога | свободный дизайн без товаров и сметы | `use_catalog=false` |
 
-Важно: «мебель не учитываем» — это **один проход** с явным удалением/заменой. Настоящей двухстадийки «пустой каркас → дизайн» пока нет.
+Важно: при выключенной мебели работает **два прохода**: очистка (пустой каркас) → дизайн. Очистка настраивается в админке «Очистка» и по умолчанию включена. Если мебель сохраняем — очистка не применяется, один проход.
 
 ## Путь первого рендера
 
@@ -24,7 +24,8 @@ flowchart LR
   E --> F["style refs: user > approved hero > cover"]
   F --> G["curate: room slots × tier × style"]
   G --> H["prompt: roles, keep/change, light, styling, catalog, dimensions"]
-  H --> I["Seedream 5.0 Flash"]
+  H --> C1["cleanup: FLUX 3 Klein → empty shell"] 
+  C1 --> I["design: FLUX 3 Image"]
   I --> J["fitAspect + storage"]
   J --> K["Gemini vision"]
   K --> L["items + surfaces + RAL + electrical + suggestions"]
@@ -93,11 +94,14 @@ flowchart LR
 
 Правила `lighting`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` редактируются в админке («Промт») и хранятся в `app_settings.prompt.rules.v1`. Дефолты — в `src/promptconfig.js`.
 
-### 6. Image generation
+### 6. Очистка и image generation
 
+- Если `keep_furniture=false` и очистка включена: первый вызов — FLUX 3 Image Klein 1K auto с промтом очистки. Он убирает мебель/декор/старые предметы, оставляя архитектуру, окно, размеры и перспективу. Результат — `shell_path`.
+- Второй вызов — дизайн: FLUX 3 Image (модель из app_settings), 1K, aspect auto, source = пустой каркас.
+- Если очистка выключена/упала — дизайн идёт с исходного фото, ошибка в `renders.meta.cleanup.error`.
+- Очистка стоит ещё один вызов, но кредит пока списывается один.
 - Основной провайдер: OpenRouter Image API `/images`.
-- Текущая модель: `bytedance-seed/seedream-5-0-flash`, 1K, aspect auto.
-- Для Seedream отправляются `resolution` и `aspect_ratio`.
+- Для FLUX 3 Image/Klein и Seedream отправляются `resolution` и `aspect_ratio`; FLUX 2 Pro resolution не принимает.
 - Для FLUX/Gemini `resolution` не отправляется.
 - FLUX.2 Pro: не принимает `resolution`; возможна блокировка content moderation на спальнях/кроватях.
 - Исходник и референсы идут как `input_references`.
@@ -167,8 +171,9 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 
 ## Текущие ограничения
 
-- Нет двухстадийной генерации.
+- Очистка + дизайн работают только при выключенной мебели; при включённой — один проход.
 - Нет inpainting для люстр/розеток.
+- Очистка добавляет второй вызов, но биллинг пока 1 кредит.
 - Один основной провайдер.
 - Каталог демонстрационный, 0 URL.
 - Vision может ошибаться в мелких предметах; curated защищает смету.

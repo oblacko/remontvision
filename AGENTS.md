@@ -11,8 +11,8 @@
 ## Главное, что нужно знать до изменений
 
 1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
-2. **Текущая модель генерации** — `bytedance-seed/seedream-5-0-flash`, vision — `google/gemini-3-flash-preview`, 1K, aspect auto. Настройки в `app_settings`, меняются через админку.
-3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true только для Seedream. У FLUX также возможна блокировка content moderation на спальнях/кроватях — не включайте его без проверки.
+2. **Текущая модель генерации** — `black-forest-labs/flux-3-image`, очистка — `black-forest-labs/flux-3-image-klein`, vision — `google/gemini-3-flash-preview`, 1K, aspect auto. Модели хранятся в `app_settings` и меняются через админку; проверяйте фактическое значение перед выводами.
+3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; FLUX 2 Pro resolution не принимает. У FLUX возможна блокировка content moderation на спальнях/кроватях — проверяйте.
 4. **Промт состоит из двух слоёв:**
    - код: `src/openrouter.js`, `src/roomtypes.js`;
    - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
@@ -68,6 +68,7 @@ node --check src/openrouter.js
 | Импорт товаров | `src/productimport.js`, `src/remoteimage.js` |
 | Стилевые референсы | `scripts/generate-style-references.mjs`, `style-refs/`, `src/stylerefseed.js` |
 | Модели/прокси | `src/modelconfig.js`, `src/modelcaps.js`, `src/proxy.js` |
+| Очистка комнаты | `src/cleanupconfig.js`, `src/jobs.js`, `src/openrouter.js`, админка «Очистка» |
 | UI генератора | `web/src/components/GenerationPanel.tsx` |
 | Кабинет | `web/src/pages/Cabinet.tsx` |
 | Админка | `web/src/pages/Admin.tsx` |
@@ -94,7 +95,7 @@ node --check src/openrouter.js
 ## Известные ограничения (на 2026-10-28)
 
 - Нет реального каталога с URL → нет реальных заказов.
-- Нет двухстадийной генерации «пустой каркас → дизайн» (обсуждается; 2 вызова/кредиты).
+- Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
 - Нет inpainting для люстр/розеток; позиции могут плавать.
 - Нет автоматического обновления цен/наличия и фидов.
 - Нет автоматических бэкапов, метрик и алертов.

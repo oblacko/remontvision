@@ -98,11 +98,11 @@
 <rect x="1144" y="384" width="6" height="250" rx="3" fill="#BE6A4A"/>
 <text x="1166" y="418" font-family="DejaVu Sans, Arial, sans-serif" font-size="11" font-weight="700" fill="#6E736D" text-anchor="start" letter-spacing="1.6" opacity="1">AI</text>
 <text x="1166" y="442" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0" opacity="1">OpenRouter</text>
-<text x="1166" y="468" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Seedream 5.0 Flash — картинка</text>
+<text x="1166" y="468" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">FLUX 3 Image — картинка</text>
 <text x="1166" y="489" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Gemini 3 Flash — vision-разбор</text>
 <text x="1166" y="510" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">промт + source + refs → image</text>
 <rect x="1164" y="544" width="384" height="34" rx="8" fill="#FFF4EE" stroke="none" stroke-width="1" opacity="1"/>
-<text x="1180" y="566" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#BE6A4A" text-anchor="start" letter-spacing="0" opacity="1">Seedream: рендер интерьера</text>
+<text x="1180" y="566" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#BE6A4A" text-anchor="start" letter-spacing="0" opacity="1">FLUX 3 Image: рендер</text>
 <rect x="1164" y="586" width="384" height="34" rx="8" fill="#FFF4EE" stroke="none" stroke-width="1" opacity="1"/>
 <text x="1180" y="608" font-family="DejaVu Sans, Arial, sans-serif" font-size="12" font-weight="600" fill="#BE6A4A" text-anchor="start" letter-spacing="0" opacity="1">Gemini: items + surfaces + electrical</text>
 <rect x="1144" y="658" width="424" height="110" rx="14" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="1" filter="url(#shadow)"/>
@@ -191,7 +191,7 @@
 <circle cx="514" cy="1768" r="18" fill="#5E6F4F" opacity="0.14"/>
 <text x="514" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="700" fill="#5E6F4F" text-anchor="middle" letter-spacing="0" opacity="1">06</text>
 <text x="546" y="1774" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" fill="#232826" text-anchor="start" letter-spacing="0.8" opacity="1">RENDER</text>
-<text x="502" y="1812" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">Seedream 5.0 Flash</text>
+<text x="502" y="1812" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">FLUX 3 Image</text>
 <text x="502" y="1832" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">source + 1 hero + 3 товара</text>
 <text x="502" y="1852" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">глубокое преображение</text>
 <text x="502" y="1872" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#6E736D" text-anchor="start" letter-spacing="0" opacity="1">без изменения архитектуры</text>
