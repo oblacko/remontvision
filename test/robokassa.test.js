@@ -9,6 +9,7 @@ const {
   parseOpState,
   buildRefundToken,
   buildPaymentUrl,
+  encodeReceipt,
   safeEqual,
 } = await import('../src/robokassa.js');
 
@@ -22,6 +23,7 @@ const config = {
   culture: 'ru',
   paymentMethod: '',
   noFreeSale: false,
+  receiptEnabled: true,
 };
 
 test('payment signature matches Robokassa formula', () => {
@@ -66,6 +68,32 @@ test('payment URL carries test flag and signed fields', () => {
   assert.equal(url.searchParams.get('SignatureValue'), paymentSignature({
     login: 'demo', outSum: '99.00', invId: 42, password1: 'password_1',
   }));
+});
+
+test('payment URL includes Receipt and signs its URL-encoded value', () => {
+  const receipt = {
+    items: [{
+      name: 'Пакет кредитов, 2 шт.',
+      quantity: 1,
+      sum: 99,
+      payment_method: 'full_payment',
+      payment_object: 'service',
+      tax: 'none',
+    }],
+  };
+  const url = new URL(buildPaymentUrl({
+    invId: 42,
+    amountKopecks: 9900,
+    description: 'тест',
+    receipt,
+    config,
+  }));
+  const receiptValue = url.searchParams.get('Receipt');
+  assert.equal(receiptValue, encodeReceipt(receipt));
+  assert.equal(url.search.startsWith('?') && new URLSearchParams(url.search).get('Receipt'), receiptValue);
+  assert.match(url.search, /Receipt=%257B/);
+  assert.deepEqual(JSON.parse(decodeURIComponent(receiptValue.replace(/\+/g, ' '))), receipt);
+  assert.equal(url.searchParams.get('SignatureValue'), '6acd0ddb84116e901635b9aff671d858');
 });
 
 test('OpStateExt XML is parsed without external dependencies', () => {

@@ -97,6 +97,19 @@ async function createYukassaPayment({ userId, pack, returnUrl }) {
   return { ...payment, local_payment_id: local?.id || null };
 }
 
+function robokassaReceipt(pack) {
+  return {
+    items: [{
+      name: `Пакет кредитов на генерацию дизайна интерьера, ${pack.credits} шт.`,
+      quantity: 1,
+      sum: Number((pack.price_kopecks / 100).toFixed(2)),
+      payment_method: 'full_payment',
+      payment_object: 'service',
+      tax: 'none',
+    }],
+  };
+}
+
 async function createRobokassaPayment({ userId, pack, email }) {
   if (!robokassaConfigured()) {
     const e = new Error('Robokassa не настроена (ROBOKASSA_LOGIN/ROBOKASSA_PASSWORD_1/ROBOKASSA_PASSWORD_2)');
@@ -118,6 +131,7 @@ async function createRobokassaPayment({ userId, pack, email }) {
     amountKopecks: pack.price_kopecks,
     description: `ремонтвижн: ${pack.title}`,
     email,
+    receipt: robokassaReceipt(pack),
   });
   log({ event: 'payment_created', user_id: userId, pack: pack.id, provider: 'robokassa', provider_payment_id: local.provider_payment_id });
   return {

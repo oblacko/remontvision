@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-28T11:20:23.025Z
+Generated: 2026-10-28T11:45:54.229Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -207,7 +207,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 28 тестов
+npm test                    # node:test, 29 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -269,7 +269,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 28 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa.
+- `npm test` — 29 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -333,7 +333,7 @@ Last updated: 2026-10-28
 - Catalog import by URL and bulk list; drafts only, manual activation.
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
-- Payments on (Robokassa default, YooKassa fallback), refunds off.
+- Payments on (Robokassa default, YooKassa fallback), refunds off. Robokassa sends fiscal `Receipt` (service, tax none) for Roboчеки СМЗ.
 - Main launch blocker: no real product URLs → no real orders.
 
 ## Architecture (short)
@@ -373,7 +373,7 @@ Last updated: 2026-10-28
 
 ```bash
 npm install
-npm test                 # 28 tests
+npm test                 # 29 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -1279,6 +1279,7 @@ ROBOKASSA_PASSWORD_2=<password-2>
 ROBOKASSA_PASSWORD_3=<password-3>
 ROBOKASSA_TEST=0
 ROBOKASSA_HASH_ALGO=md5
+ROBOKASSA_RECEIPT_ENABLED=1
 # YUKASSA_SHOP_ID=<id>
 # YUKASSA_SECRET_KEY=<key>
 
@@ -1313,6 +1314,8 @@ ResultURL — только серверное уведомление Robokassa (
 - Алгоритм подписи в кабинете должен совпадать с `ROBOKASSA_HASH_ALGO` (по умолчанию `md5`).
 - `ROBOKASSA_PASSWORD_1` — подпись платежа и SuccessURL, `ROBOKASSA_PASSWORD_2` — ResultURL и OpStateExt, `ROBOKASSA_PASSWORD_3` — возвраты.
 - `ROBOKASSA_TEST=1` включает `IsTest=1`; используйте тестовую пару паролей, иначе Robokassa вернёт ошибку подписи. В тестовом режиме OpStateExt недоступен — подтверждение приходит только на ResultURL.
+- `ROBOKASSA_RECEIPT_ENABLED=1` (по умолчанию) передаёт `Receipt` с номенклатурой: одна услуга, `quantity=1`, `sum=цена пакета`, `payment_method=full_payment`, `payment_object=service`, `tax=none`. Это нужно для Робочеков СМЗ и требований 54-ФЗ. `Receipt` участвует в подписи и передаётся дважды URL-кодированным, как в официальном SDK. Если фискализация ещё не подключена и Robokassa отклоняет чек, временно поставьте `0`.
+- Отдельный `RECEIPTS_WEBHOOK_URL` — альтернативный путь чеков. Не включайте его одновременно с Робочеками, иначе будут дубли.
 - `PAYMENT_PROVIDER=robokassa` принудительно выбирает провайдера; без переменной Robokassa выбирается автоматически, если заданы её ключи.
 - `InvId` = локальный `payments.id`; `provider_payment_id` хранит его же строкой. Начисление кредитов идемпотентно по ResultURL/синхронизации.
 - Автоматический возврат Robokassa использует `OpKey` из OpStateExt (миграций не требует). Без `OpKey`/`ROBOKASSA_PASSWORD_3` доступен только ручной возврат.
@@ -1665,7 +1668,8 @@ export const MAX_REFERENCES; // 4
 - Реализованы ResultURL с проверкой подписи `Password#2` и ответом `OK{InvId}`, возврат пользователя прямо на страницы `/cabinet/paid` / `/cabinet/fail` без query-параметров (GET-параметры Robokassa не конфликтуют), синхронизация через `OpStateExt` (кроме тестового режима).
 - Начисление кредитов идемпотентно, как у ЮKassa: повторный ResultURL не дублирует `credit_txn`; `provider_payment_id` заполняется в той же транзакции.
 - Добавлены возвраты Robokassa через Refund API (JWT HS256, `ROBOKASSA_PASSWORD_3`, `OpKey` из `OpStateExt`); без них остаётся ручной способ. Возвраты по-прежнему выключены флагом.
-- Добавлены `src/robokassa.js` и 7 unit-тестов подписей/URL/XML/refund JWT (`npm test` — 28 тестов). Живой платёж не проверялся — нужен canary в тестовом кабинете Robokassa.
+- Добавлены `src/robokassa.js` и 8 unit-тестов подписей/URL/XML/refund JWT/receipt (`npm test` — 29 тестов). Тестовый платёж на проде прошёл: ResultURL начислил кредиты; боевой платёж ещё не проверялся.
+- Добавлен `Receipt` для фискализации: одна услуга на пакет, `tax=none`, `payment_object=service`, `payment_method=full_payment`. Подпись и URL повторяют официальный SDK: одиночное URL-кодирование в подписи, двойное — в query. Включается `ROBOKASSA_RECEIPT_ENABLED` (по умолчанию).
 - `/api/payments/robokassa/` и `/success` оставлены как fallback-редиректы; кабинет показывает успех, если ResultURL уже начислил кредиты до возврата пользователя.
 - Документация: `.env.example`, `docs/OPERATIONS.md` (настройка кабинетов), `docs/API.md`, `docs/ARCHITECTURE.md`, README/llms.
 

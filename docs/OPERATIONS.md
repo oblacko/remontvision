@@ -47,6 +47,7 @@ ROBOKASSA_PASSWORD_2=<password-2>
 ROBOKASSA_PASSWORD_3=<password-3>
 ROBOKASSA_TEST=0
 ROBOKASSA_HASH_ALGO=md5
+ROBOKASSA_RECEIPT_ENABLED=1
 # YUKASSA_SHOP_ID=<id>
 # YUKASSA_SECRET_KEY=<key>
 
@@ -81,6 +82,8 @@ ResultURL — только серверное уведомление Robokassa (
 - Алгоритм подписи в кабинете должен совпадать с `ROBOKASSA_HASH_ALGO` (по умолчанию `md5`).
 - `ROBOKASSA_PASSWORD_1` — подпись платежа и SuccessURL, `ROBOKASSA_PASSWORD_2` — ResultURL и OpStateExt, `ROBOKASSA_PASSWORD_3` — возвраты.
 - `ROBOKASSA_TEST=1` включает `IsTest=1`; используйте тестовую пару паролей, иначе Robokassa вернёт ошибку подписи. В тестовом режиме OpStateExt недоступен — подтверждение приходит только на ResultURL.
+- `ROBOKASSA_RECEIPT_ENABLED=1` (по умолчанию) передаёт `Receipt` с номенклатурой: одна услуга, `quantity=1`, `sum=цена пакета`, `payment_method=full_payment`, `payment_object=service`, `tax=none`. Это нужно для Робочеков СМЗ и требований 54-ФЗ. `Receipt` участвует в подписи и передаётся дважды URL-кодированным, как в официальном SDK. Если фискализация ещё не подключена и Robokassa отклоняет чек, временно поставьте `0`.
+- Отдельный `RECEIPTS_WEBHOOK_URL` — альтернативный путь чеков. Не включайте его одновременно с Робочеками, иначе будут дубли.
 - `PAYMENT_PROVIDER=robokassa` принудительно выбирает провайдера; без переменной Robokassa выбирается автоматически, если заданы её ключи.
 - `InvId` = локальный `payments.id`; `provider_payment_id` хранит его же строкой. Начисление кредитов идемпотентно по ResultURL/синхронизации.
 - Автоматический возврат Robokassa использует `OpKey` из OpStateExt (миграций не требует). Без `OpKey`/`ROBOKASSA_PASSWORD_3` доступен только ручной возврат.

@@ -15,6 +15,7 @@ export function getConfig() {
     culture: process.env.ROBOKASSA_CULTURE || 'ru',
     paymentMethod: process.env.ROBOKASSA_PAYMENT_METHOD || '',
     noFreeSale: /^(1|true|yes)$/i.test(process.env.ROBOKASSA_NO_FREE_SALE || ''),
+    receiptEnabled: !/^(0|false|no)$/i.test(process.env.ROBOKASSA_RECEIPT_ENABLED || ''),
   };
 }
 
@@ -38,8 +39,15 @@ export function shpSuffix(params = {}) {
   return entries.length ? ':' + entries.map(([key, value]) => `${key}=${value}`).join(':') : '';
 }
 
-export function paymentSignature({ login, outSum, invId, password1, hash = 'md5', params = {} }) {
-  return hashValue(`${login}:${outSum}:${invId}:${password1}${shpSuffix(params)}`, hash);
+export function encodeReceipt(receipt) {
+  const json = typeof receipt === 'string' ? receipt : JSON.stringify(receipt);
+  return new URLSearchParams({ Receipt: json }).toString().slice('Receipt='.length);
+}
+
+export function paymentSignature({ login, outSum, invId, password1, hash = 'md5', params = {}, receipt = null }) {
+  const encodedReceipt = receipt ? encodeReceipt(receipt) : null;
+  const receiptPart = encodedReceipt ? `:${encodedReceipt}` : '';
+  return hashValue(`${login}:${outSum}:${invId}${receiptPart}:${password1}${shpSuffix(params)}`, hash);
 }
 
 export function resultSignature({ outSum, invId, password2, hash = 'md5', params = {} }) {
@@ -66,14 +74,17 @@ export function kopecksToOutSum(kopecks) {
   return (Number(kopecks) / 100).toFixed(2);
 }
 
-export function buildPaymentUrl({ invId, amountKopecks, description, email = null, config = getConfig() }) {
+export function buildPaymentUrl({ invId, amountKopecks, description, email = null, receipt = null, config = getConfig() }) {
   const outSum = kopecksToOutSum(amountKopecks);
+  const receiptJson = config.receiptEnabled && receipt ? JSON.stringify(receipt) : null;
+  const encodedReceipt = receiptJson ? encodeReceipt(receiptJson) : null;
   const signature = paymentSignature({
     login: config.login,
     outSum,
     invId,
     password1: config.password1,
     hash: config.hash,
+    receipt: receiptJson,
   });
   const query = new URLSearchParams({
     MerchantLogin: config.login,
@@ -84,6 +95,7 @@ export function buildPaymentUrl({ invId, amountKopecks, description, email = nul
     Encoding: 'utf-8',
     Culture: config.culture,
   });
+  if (encodedReceipt) query.set('Receipt', encodedReceipt);
   if (email) query.set('Email', email);
   if (config.paymentMethod) query.set('IncCurrLabel', config.paymentMethod);
   if (config.test) query.set('IsTest', '1');

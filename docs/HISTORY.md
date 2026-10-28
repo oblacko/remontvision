@@ -10,7 +10,8 @@
 - Реализованы ResultURL с проверкой подписи `Password#2` и ответом `OK{InvId}`, возврат пользователя прямо на страницы `/cabinet/paid` / `/cabinet/fail` без query-параметров (GET-параметры Robokassa не конфликтуют), синхронизация через `OpStateExt` (кроме тестового режима).
 - Начисление кредитов идемпотентно, как у ЮKassa: повторный ResultURL не дублирует `credit_txn`; `provider_payment_id` заполняется в той же транзакции.
 - Добавлены возвраты Robokassa через Refund API (JWT HS256, `ROBOKASSA_PASSWORD_3`, `OpKey` из `OpStateExt`); без них остаётся ручной способ. Возвраты по-прежнему выключены флагом.
-- Добавлены `src/robokassa.js` и 7 unit-тестов подписей/URL/XML/refund JWT (`npm test` — 28 тестов). Живой платёж не проверялся — нужен canary в тестовом кабинете Robokassa.
+- Добавлены `src/robokassa.js` и 8 unit-тестов подписей/URL/XML/refund JWT/receipt (`npm test` — 29 тестов). Тестовый платёж на проде прошёл: ResultURL начислил кредиты; боевой платёж ещё не проверялся.
+- Добавлен `Receipt` для фискализации: одна услуга на пакет, `tax=none`, `payment_object=service`, `payment_method=full_payment`. Подпись и URL повторяют официальный SDK: одиночное URL-кодирование в подписи, двойное — в query. Включается `ROBOKASSA_RECEIPT_ENABLED` (по умолчанию).
 - `/api/payments/robokassa/` и `/success` оставлены как fallback-редиректы; кабинет показывает успех, если ResultURL уже начислил кредиты до возврата пользователя.
 - Документация: `.env.example`, `docs/OPERATIONS.md` (настройка кабинетов), `docs/API.md`, `docs/ARCHITECTURE.md`, README/llms.
 

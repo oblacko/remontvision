@@ -25,7 +25,7 @@
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 28 тестов
+npm test                    # node:test, 29 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -87,7 +87,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 28 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa.
+- `npm test` — 29 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
