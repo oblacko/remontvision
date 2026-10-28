@@ -54,7 +54,7 @@ test('prompt modes can drop furniture and catalog', () => {
     imageMap: [{ role: 'style reference' }],
   });
   assert.match(prompt, /FURNITURE MODE/);
-  assert.match(prompt, /Do not preserve the existing freestanding furniture/);
+  assert.match(prompt, /Do not preserve any existing furniture/);
   assert.match(prompt, /CATALOG DISABLED/);
   assert.doesNotMatch(prompt, /Инженерная доска/);
 });

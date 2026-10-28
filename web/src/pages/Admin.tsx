@@ -743,6 +743,7 @@ export default function Admin() {
                     ['cleanup', 'Уборка и техника', 'Что убрать или спрятать: радиатор, ТВ, провода, старые вещи.'],
                     ['window', 'Окна и текстиль', 'Шторы, жалюзи, карнизы, тюль.'],
                     ['pinterest', 'Pinterest-стайлинг', 'Арт, полки, мелочи, техника, плюш, 3–5 сцен.'],
+                    ['photo', 'Фотография', 'Камера, свет, плёнка, color grading, запрет CGI.'],
                   ] as const).map(([key, label, help]) => (
                     <label key={key} className="block">
                       <span className="flex flex-wrap items-baseline justify-between gap-2"><span className="eyebrow">{label}</span><span className="text-[11px] text-muted-foreground">{help}</span></span>

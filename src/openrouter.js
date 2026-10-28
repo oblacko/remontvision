@@ -269,7 +269,7 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected products already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-Photorealistic interior photograph with editorial magazine quality: natural but polished lighting, believable materials, correct proportions, rich detail, layered styling, cozy and inviting atmosphere. ${rules.avoid}`;
+${rules.photo} ${rules.avoid}`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.
