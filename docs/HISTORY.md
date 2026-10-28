@@ -1,3 +1,5 @@
+> **Chronological changelog.** Current state is in README/llms.txt; early sections may be outdated.
+
 # История работ (что сделано)
 
 Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
@@ -129,6 +131,13 @@
 - Для Seedream/FLUX отключён chat-fallback: это image-only модели, fallback только прятал реальную ошибку `/images` 404-кой.
 - Ошибки `/images` теперь логируются с телом ответа; в админке для FLUX поле разрешения показывает «Задаётся моделью».
 - Тесты: 15/15.
+## 2026-10-28 — документация для людей и LLM
+
+- Добавлены `llms.txt` (карта проекта для LLM), `llms-full.txt` (полный контекст), `AGENTS.md` (правила для агентов).
+- Новые документы: `ARCHITECTURE.md`, `GENERATION.md`, `PROMPT-RULES.md`, `CATALOG.md`, `ADMIN.md`, `API.md`, `OPERATIONS.md`, `ROADMAP.md`, `DECISIONS.md`.
+- README переписан под текущее состояние; в docs зафиксировано главное ограничение: 100 демо-товаров, 0 реальных URL.
+- `npm run docs:llms` собирает `llms-full.txt` из README/AGENTS/docs.
+- Исторические `PLAN-3H.md` и `AUDIT-2026-10-26.md` помечены как архив.
 ## Исправленные баги (важно помнить)
 
 - **Двойная генерация**: воркер не менял статус queued при старте — два слота брали одну задачу, каждый рендер оплачивался дважды. Лечится атомарным `UPDATE ... RETURNING` в `claimNextRender`.

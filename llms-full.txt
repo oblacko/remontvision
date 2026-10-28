@@ -1,0 +1,1737 @@
+# Remontvision — full LLM context
+
+Generated: 2026-10-28T07:20:22.079Z
+
+This file concatenates the project documentation for LLM ingestion.
+The canonical source is the repository; if this file is stale, read the linked files.
+
+
+---
+
+<!-- source: README.md -->
+
+# ремонтвижн
+
+AI-сервис редизайна интерьера по фото: визуализация комнаты, подбор материалов и товаров, смета и ссылки на товары.
+
+**Прод:** https://www.remontvision.ru  
+**Репозиторий:** https://github.com/oblacko/remontvision (private)  
+**Документация для LLM:** [llms.txt](llms.txt) · [llms-full.txt](llms-full.txt) · [AGENTS.md](AGENTS.md)
+
+---
+
+## Статус на 2026-10-28
+
+| Блок | Состояние |
+|---|---|
+| Генерация по фото | Работает: Seedream 5.0 Flash, 1K, aspect auto |
+| Vision-разбор | Работает: Gemini 3 Flash |
+| Стили и room types | 10 стилей, 12 типов комнат |
+| Hero-референсы стилей | 120 сгенерировано, 26 approved (пилот 5 стилей × 6 комнат) |
+| Каталог | **Демо-каталог**: 100 активных товаров, **0 с реальным URL** |
+| Импорт товаров | По одному URL и списком до 20 ссылок, с quality checks |
+| Смета и RAL | Работают; RAL только для окрашиваемых поверхностей |
+| Правки | Точечные, с референсом товара/файла/URL |
+| Шаринг | `/s/:token`, лайки, комментарии |
+| Платежи | ЮKassa включена, возвраты выключены |
+| Админка | Пользователи, кредиты, пакеты, стили, промт, логи, модели, прокси, каталог |
+| Мобильный редактор `/app` | Старый монолитный интерфейс, не в новом стиле |
+
+> **Главное ограничение запуска:** реальные заказы пока невозможны, потому что у товаров нет реальных URL. Демо-товары нужны для проверки дизайна, стилей и сметы. Пока не импортированы реальные товары с URL, кнопка ведёт в поиск, а не на страницу товара.
+
+---
+
+## Что умеет
+
+1. Пользователь загружает фото комнаты, выбирает тип комнаты, стиль или свой референс, класс материалов.
+2. AI генерирует новую визуализацию с сохранением архитектуры, камеры и пропорций.
+3. Vision-разбор достаёт материалы, поверхности, электрику и подсказки для правок.
+4. Смета собирается из товаров каталога, подобранных под комнату, класс и стиль.
+5. Пользователь может точечно править дизайн: заменить люстру, пол, светильник, текстиль — с референсом.
+6. Результат можно скачать, открыть в кабинете или поделиться публичной ссылкой.
+
+Подробно: [docs/GENERATION.md](docs/GENERATION.md).
+
+---
+
+## Быстрый старт
+
+Требуется Node.js ≥ 20.6.
+
+```bash
+cp .env.example .env          # заполните OPENROUTER_API_KEY и ADMIN_KEY
+docker compose up -d db       # Postgres на 127.0.0.1:5434
+npm install
+npm start                     # http://localhost:3000
+```
+
+Без `OPENROUTER_API_KEY` приложение стартует в **mock-режиме**: рендер заменяется демо-картинкой, расходов нет.
+
+Сборка нового фронтенда:
+
+```bash
+cd web
+npm install
+npm run build                 # web/dist → раздаётся Express
+```
+
+Тесты:
+
+```bash
+npm test
+```
+
+Подробно: [AGENTS.md](AGENTS.md), [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
+---
+
+## Архитектура
+
+![Карта системы](docs/architecture.png)
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — компоненты, данные, деплой.
+- [docs/GENERATION.md](docs/GENERATION.md) — путь генерации, промт, правки.
+- [docs/CATALOG.md](docs/CATALOG.md) — каталог, товары, стили, импорт.
+- [docs/ADMIN.md](docs/ADMIN.md) — админка.
+- [docs/PROMPT-RULES.md](docs/PROMPT-RULES.md) — правила промта.
+- [docs/API.md](docs/API.md) — API.
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — прод, деплой, эксплуатация.
+- [docs/ROADMAP.md](docs/ROADMAP.md) — планы и запуск.
+- [docs/DECISIONS.md](docs/DECISIONS.md) — ключевые решения и почему так.
+- [docs/HISTORY.md](docs/HISTORY.md) — хронология изменений.
+
+---
+
+## Стек
+
+| Слой | Технологии |
+|---|---|
+| Backend | Node 20, Express, pg, multer, sharp |
+| Frontend | React 19, Vite, TypeScript, Tailwind-подобные классы |
+| БД | PostgreSQL 16 |
+| Очередь | Postgres + воркер `src/jobs.js` |
+| Файлы | диск или S3 (`src/storage.js`) |
+| AI | OpenRouter: Seedream 5.0 Flash, Gemini 3 Flash |
+| Почта | Resend / SMTP |
+| Платежи | ЮKassa |
+| Инфраструктура | Docker Compose, Nginx, Let's Encrypt, GitHub Actions |
+
+---
+
+## Структура
+
+```text
+app/
+  src/
+    server.js          HTTP API, статика, auth, admin, share, payments
+    jobs.js            воркер генерации
+    openrouter.js      image/vision провайдер, промт, матчинг
+    promptconfig.js    редактируемые правила промта (админка)
+    roomtypes.js       типы комнат, слоты, keep/change, электрика
+    curate.js          подбор товаров, референсы
+    catalogseed.js     идемпотентный сид каталога
+    stylerefseed.js    идемпотентный сид hero-референсов
+    db.js              pg pool, миграции, SQL-запросы
+    modelconfig.js     выбранные модели/разрешение/aspect
+    modelcaps.js       возможности моделей
+    productimport.js   импорт товара по URL
+    remoteimage.js     безопасная загрузка картинок по URL
+    proxy.js           прокси для OpenRouter
+    storage.js         диск/S3
+    payments.js        ЮKassa, кредиты
+    receipts.js        чеки
+    legal.js           документы/акцепты
+  web/src/             React-приложение
+  catalog/seed.json    демо-каталог
+  public/catalog/      картинки демо-каталога
+  public/style-refs/   hero-референсы стилей
+  style-refs/seed.json сид референсов стилей
+  migrations/          SQL-миграции 001–020
+  docs/                документация
+  test/                node:test
+```
+
+---
+
+## Для LLM и агентов
+
+- [llms.txt](llms.txt) — короткая карта проекта для LLM.
+- [llms-full.txt](llms-full.txt) — полный контекст одним файлом.
+- [AGENTS.md](AGENTS.md) — правила работы с репозиторием, команды, подводные камни.
+- [docs/HISTORY.md](docs/HISTORY.md) — что и когда менялось.
+
+При изменении кода обновляйте:
+1. `docs/HISTORY.md` — что сделано.
+2. Соответствующий документ в `docs/`.
+3. `llms.txt` / `llms-full.txt` при изменении архитектуры или статуса.
+
+---
+
+## Лицензия и данные
+
+Репозиторий private. Секреты (`.env`, ключи OpenRouter, ЮKassa, Resend, пароль прокси, `ADMIN_KEY`) **не коммитятся**. В документации используются только placeholder-значения.
+
+
+---
+
+<!-- source: AGENTS.md -->
+
+# AGENTS.md
+
+Инструкции для LLM-агентов и разработчиков, которые меняют этот репозиторий.
+
+## Что это за проект
+
+`ремонтвижн` — AI-редизайн интерьера по фото. Пользователь загружает фото, выбирает комнату/стиль/класс материалов, получает визуализацию, смету товаров, RAL и рекомендации по электрике. Есть кабинет, публичный шаринг, админка, импорт товаров, кредиты и платежи.
+
+Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt).
+
+## Главное, что нужно знать до изменений
+
+1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
+2. **Текущая модель генерации** — `bytedance-seed/seedream-5-0-flash`, vision — `google/gemini-3-flash-preview`, 1K, aspect auto. Настройки в `app_settings`, меняются через админку.
+3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true только для Seedream. У FLUX также возможна блокировка content moderation на спальнях/кроватях — не включайте его без проверки.
+4. **Промт состоит из двух слоёв:**
+   - код: `src/openrouter.js`, `src/roomtypes.js`;
+   - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
+   Не дублируйте правила в разных местах: меняйте defaults в `promptconfig.js` и/или через админку.
+5. **Смета первого рендера:** curated-товары — источник истины, vision только добавляет недостающие категории. Правка копирует смету родителя и заменяет только target.
+6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/ЮKassa/Resend, пароль прокси — только на сервере/локально.
+
+## Команды
+
+```bash
+# Backend
+npm install
+npm test                    # node:test, 15 тестов
+npm start                   # Node 20.6+, .env через node --env-file
+
+# Frontend
+cd web
+npm install
+npm run build               # tsc -b + vite build → web/dist
+
+# Локальная БД
+docker compose up -d db     # Postgres 127.0.0.1:5434
+```
+
+Проверка синтаксиса:
+
+```bash
+node --check src/server.js
+node --check src/jobs.js
+node --check src/openrouter.js
+```
+
+## Деплой
+
+- Пуш в `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH на VPS → `git pull` + `docker compose up -d --build` + smoke.
+- Smoke проверяет `/api/health`, наличие `id="root"` на `/`, доступность `/app`.
+- Миграции накатываются при старте контейнера из `migrations/*.sql` (append-only, учёт в `_migrations`).
+- `.env` на VPS деплоем не перезаписывается.
+- После изменений обновляйте `docs/HISTORY.md` и relevant docs.
+
+## Где что менять
+
+| Задача | Файлы |
+|---|---|
+| Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
+| Правила комнат, слоты, запреты | `src/roomtypes.js` |
+| Подбор товаров | `src/curate.js` |
+| Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
+| Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
+| API, auth, admin, share | `src/server.js` |
+| SQL/данные | `src/db.js`, `migrations/` |
+| Каталог | `catalog/seed.json`, `public/catalog/`, `src/catalogseed.js` |
+| Импорт товаров | `src/productimport.js`, `src/remoteimage.js` |
+| Стилевые референсы | `scripts/generate-style-references.mjs`, `style-refs/`, `src/stylerefseed.js` |
+| Модели/прокси | `src/modelconfig.js`, `src/modelcaps.js`, `src/proxy.js` |
+| UI генератора | `web/src/components/GenerationPanel.tsx` |
+| Кабинет | `web/src/pages/Cabinet.tsx` |
+| Админка | `web/src/pages/Admin.tsx` |
+| Публичный шаринг | `web/src/pages/Share.tsx`, `web/src/components/ShareDialog.tsx` |
+
+## Конвенции
+
+- Backend — ESM, Node 20, без TypeScript.
+- SQL-миграции только добавлять новыми файлами; не редактировать уже применённые.
+- `db.js` при импорте без `RV_DATABASE_URL` делает `process.exit(1)`. В unit-тестах не импортируйте `db.js` напрямую; в `modelconfig.js`/`promptconfig.js` используйте динамический импорт.
+- Промт-правила по умолчанию — в `promptconfig.js`; `buildPrompt` берёт их из `getPromptConfig()`.
+- Для асинхронных route-обработчиков использовать `h()`.
+- Внешние изображения по URL — только через `fetchRemoteImage` (SSRF-защита).
+- Секреты/URL прокси маскировать в API (`maskProxy`).
+- Не запускать долгоживущий локальный сервер в фоне; для проверок — `timeout`/`curl`/скрипт.
+
+## Тесты и проверка
+
+- `npm test` — 15 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps.
+- `cd web && npm run build` — TypeScript + Vite.
+- Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
+- При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
+
+## Известные ограничения (на 2026-10-28)
+
+- Нет реального каталога с URL → нет реальных заказов.
+- Нет двухстадийной генерации «пустой каркас → дизайн» (обсуждается; 2 вызова/кредиты).
+- Нет inpainting для люстр/розеток; позиции могут плавать.
+- Нет автоматического обновления цен/наличия и фидов.
+- Нет автоматических бэкапов, метрик и алертов.
+- Старый редактор `/app` не переделан в новый стиль.
+- Возвраты выключены (`REFUNDS_ENABLED=false`), чеки — вручную.
+
+## Definition of done
+
+1. `npm test` зелёный.
+2. `web` собирается.
+3. Обновлён `docs/HISTORY.md`.
+4. Обновлены relevant docs и, если менялась архитектура/статус, `llms.txt`/`llms-full.txt`.
+5. Нет секретов в diff.
+6. `npm run docs:llms` при изменении документации.
+7. Деплой прошёл, smoke зелёный.
+
+
+---
+
+<!-- source: llms.txt -->
+
+# Remontvision (ремонтвижн)
+
+> AI-сервис редизайна интерьера по фото: генерация визуализации, подбор материалов и товаров, смета, RAL, электрика, точечные правки, кабинет, публичный шаринг и админка.
+
+Repo: https://github.com/oblacko/remontvision (private)  
+Prod: https://www.remontvision.ru  
+Last updated: 2026-10-28
+
+## Start here
+
+- [README](https://github.com/oblacko/remontvision/blob/main/README.md) — human overview, status, quick start.
+- [AGENTS.md](https://github.com/oblacko/remontvision/blob/main/AGENTS.md) — rules and commands for coding agents.
+- [docs/ARCHITECTURE.md](https://github.com/oblacko/remontvision/blob/main/docs/ARCHITECTURE.md) — components, data model, deploy.
+- [docs/GENERATION.md](https://github.com/oblacko/remontvision/blob/main/docs/GENERATION.md) — generation pipeline and prompt.
+- [docs/CATALOG.md](https://github.com/oblacko/remontvision/blob/main/docs/CATALOG.md) — products, styles, import, orders.
+- [docs/ADMIN.md](https://github.com/oblacko/remontvision/blob/main/docs/ADMIN.md) — admin tabs.
+- [docs/PROMPT-RULES.md](https://github.com/oblacko/remontvision/blob/main/docs/PROMPT-RULES.md) — editable prompt rules.
+- [docs/API.md](https://github.com/oblacko/remontvision/blob/main/docs/API.md) — API reference.
+- [docs/OPERATIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/OPERATIONS.md) — prod, deploy, TLS, proxy, backups.
+- [docs/ROADMAP.md](https://github.com/oblacko/remontvision/blob/main/docs/ROADMAP.md) — launch plan.
+- [docs/DECISIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/DECISIONS.md) — key decisions.
+- [docs/HISTORY.md](https://github.com/oblacko/remontvision/blob/main/docs/HISTORY.md) — chronological changelog.
+- [llms-full.txt](https://github.com/oblacko/remontvision/blob/main/llms-full.txt) — full docs in one file.
+
+## Current state (2026-10-28)
+
+- Generation: Seedream 5.0 Flash, 1K, aspect auto; vision Gemini 3 Flash.
+- 10 styles, 12 room types, 100 active demo products, **0 products with real URL**.
+- 120 style references, 26 approved (pilot 5 styles × 6 rooms).
+- Prompt rules editable in admin (`app_settings.prompt.rules.v1`).
+- Catalog import by URL and bulk list; drafts only, manual activation.
+- Order links use `/go/:productId?r=renderId`; demo products fall back to search.
+- Share page `/s/:token` with likes/comments.
+- Payments on (YooKassa), refunds off.
+- Main launch blocker: no real product URLs → no real orders.
+
+## Architecture (short)
+
+- Node 20 + Express + PostgreSQL 16 + worker in `src/jobs.js`.
+- React/Vite frontend in `web/`.
+- Nginx + Let's Encrypt; apex → 301 → www.
+- OpenRouter for image + vision; optional proxy for WAF.
+- Storage: disk or S3.
+- Deploy: push `main` → GitHub Actions → VPS Docker Compose + smoke.
+
+## Generation flow (short)
+
+1. `POST /api/rooms` with photo, room type, style or reference, tier, flags.
+2. Credit + `render(status=queued)`.
+3. Worker: room/style/tier → style refs → curate products by slot → prompt → image → vision → estimate.
+4. `render_items` + `renders.analysis` + `done`.
+5. Edit: parent render + short edit prompt + target reference.
+6. Share/links: `/s/:token`, `/go/:id`.
+
+## Key files
+
+- `src/server.js` — HTTP API/auth/admin/share/payments.
+- `src/jobs.js` — worker.
+- `src/openrouter.js` — provider, prompt, vision, matching.
+- `src/promptconfig.js` — prompt defaults/config.
+- `src/roomtypes.js` — room slots/keep/change/styling.
+- `src/curate.js` — product selection + refs.
+- `src/productimport.js` — URL import.
+- `src/modelcaps.js` — model capabilities.
+- `src/db.js` + `migrations/` — data.
+- `web/src/components/GenerationPanel.tsx` — generator UI.
+- `web/src/pages/Admin.tsx`, `Cabinet.tsx`, `Share.tsx`.
+
+## Commands
+
+```bash
+npm install
+npm test                 # 15 tests
+npm start                # Node >=20.6, --env-file
+cd web && npm run build  # tsc + vite
+docker compose up -d db  # local Postgres 127.0.0.1:5434
+```
+
+## Constraints / gotchas
+
+- `.env` secrets are not committed.
+- DB env is `RV_DATABASE_URL`, not `DATABASE_URL`.
+- FLUX.2 Pro does not accept `resolution`; may be blocked by content moderation.
+- Seedream/FLUX are image-only: do not use chat fallback.
+- Demo catalog has no real URLs; do not claim real checkout works.
+- No two-stage generation or inpainting yet.
+- No automated backups/metrics yet.
+- `db.js` exits without `RV_DATABASE_URL`; avoid importing it in unit tests.
+
+## Next priorities
+
+1. Import 20–50 real products with URLs for one style/room.
+2. Build a style kit from real products, re-generate hero refs.
+3. Validate `/go` and real order links.
+4. Add two-stage generation (empty shell → design) and inpainting.
+5. Add feeds/CPA, price/availability sync, backups/monitoring.
+
+
+---
+
+<!-- source: docs/ARCHITECTURE.md -->
+
+# Архитектура
+
+Карта системы: [architecture.png](architecture.png) · [architecture.svg](architecture.svg).
+
+## Верхнеуровневая схема
+
+```mermaid
+flowchart LR
+  U["Пользователь"] --> N["Nginx + TLS"]
+  A["Админ"] --> N
+  N --> E["Express API"]
+  E --> P[("Postgres")]
+  E --> F[("Storage: диск / S3")]
+  E --> Q["Очередь renders"]
+  Q --> W["Worker"]
+  W --> P
+  W --> F
+  W --> O["OpenRouter"]
+  O --> S["Seedream 5.0 Flash"]
+  O --> G["Gemini 3 Flash"]
+  E --> R["Resend"]
+  E --> Y["ЮKassa"]
+  E --> X["Прокси (опционально)"]
+```
+
+## Компоненты
+
+| Компонент | Ответственность | Код |
+|---|---|---|
+| Nginx | TLS, HSTS, проксирование на `127.0.0.1:3000`, apex → www | конфиг на VPS |
+| Express API | auth, комнаты, рендеры, смета, админка, шаринг, платежи, статика | `src/server.js` |
+| Worker | забирает `renders` из Postgres, генерирует, анализирует, сохраняет | `src/jobs.js` |
+| Postgres | пользователи, комнаты, рендеры, товары, стили, кредиты, платежи, лайки | `src/db.js`, `migrations/` |
+| Storage | фото комнат, рендеры, картинки товаров/референсов | `src/storage.js` |
+| OpenRouter | image generation и vision | `src/openrouter.js` |
+| Resend/SMTP | OTP-коды и письма | `src/auth.js` |
+| ЮKassa | платежи и вебхуки | `src/payments.js` |
+| Proxy | обход WAF OpenRouter с VPS | `src/proxy.js` |
+| React | лендинг/генератор, кабинет, админка, публичный шаринг | `web/src/` |
+
+## Потоки
+
+### Создание генерации
+
+1. `POST /api/rooms` (multipart) принимает фото, стиль/референс, room type, класс, флаги.
+2. Проверяются auth, кредит, rate limit.
+3. Создаётся `rooms` + `renders(status=queued)`, списывается кредит (атомарно).
+4. Worker забирает render, собирает контекст и вызывает OpenRouter.
+5. Результат сохраняется в Storage, смета — в `render_items`, анализ — в `renders.analysis`.
+6. UI поллит `GET /api/rooms/:id` до `done`/`error`.
+
+### Правка
+
+`POST /api/rooms/:id/iterate` создаёт дочерний render с `parent_render_id`, коротким edit-промтом и референсом (товар/файл/URL). Смета копируется у родителя, заменяется только target.
+
+### Публичный шаринг
+
+`POST /api/renders/:id/share` создаёт/возвращает `share_token`. Публичная страница `/s/:token` отдаёт только картинку, стиль, комнату, лайки и комментарии. Смета и фото комнаты не публикуются.
+
+## Данные
+
+| Таблица | Назначение |
+|---|---|
+| `users`, `sessions`, `auth_identities` | аккаунты и вход |
+| `rooms` | комната: фото, стиль, room type, tier, флаги, style ref |
+| `renders` | версия: prompt, model, cost, image, analysis, share_token, edit refs |
+| `render_items` | смета конкретного рендера |
+| `products` | каталог: категория, цена, tier, room_types, dimensions, URL, картинка |
+| `styles` | стили: prompt_description, обложка |
+| `style_references` | hero/board/upload референсы, room_type, approved, score |
+| `style_products` | избранные товары стиля/комнаты |
+| `credit_txn`, `payments` | кредиты и платежи |
+| `render_likes`, `render_comments` | публичный шаринг |
+| `product_clicks` | клики из сметы через `/go/:id` |
+| `app_settings` | модели, прокси, правила промта |
+| `legal_docs`, `legal_acceptances` | оферта/ПДн/акцепты |
+| `_migrations` | применённые SQL-миграции |
+
+## Деплой
+
+```mermaid
+flowchart LR
+  Dev["git push main"] --> GH["GitHub Actions"]
+  GH --> VPS["VPS: git pull + docker compose up -d --build"]
+  VPS --> Migr["migrations при старте"]
+  VPS --> Smoke["smoke: /api/health, /, /app"]
+```
+
+- VPS: Docker Compose, Postgres 16, app-контейнер, том `appdata`, `pgdata`.
+- Nginx и Let's Encrypt — на хосте.
+- `.env` на VPS не перезаписывается деплоем.
+- S3 включается переменными; иначе диск.
+
+## Безопасность
+
+- httpOnly cookie `rv_sid`, OTP, сессии 365 дней.
+- Owner-check на комнаты, файлы, рендеры.
+- Админка по `X-Admin-Key` (`ADMIN_KEY`).
+- SSRF-защита при загрузке картинок по URL.
+- Санитайз изображений (EXIF/GPS) через sharp.
+- Секреты только в env, не в git.
+- Прокси-пароль маскируется в API.
+
+## Текущие ограничения
+
+- Один основной провайдер (OpenRouter).
+- Нет двухстадийной генерации и inpainting.
+- Каталог демонстрационный, 0 URL.
+- Нет автоматических бэкапов/метрик.
+- Старый `/app` не в новом стиле.
+
+## Связанные документы
+
+- [GENERATION.md](GENERATION.md)
+- [CATALOG.md](CATALOG.md)
+- [ADMIN.md](ADMIN.md)
+- [API.md](API.md)
+- [OPERATIONS.md](OPERATIONS.md)
+- [ROADMAP.md](ROADMAP.md)
+
+
+---
+
+<!-- source: docs/GENERATION.md -->
+
+# Генерация
+
+Как фото превращается в дизайн, смету, RAL и правки.
+
+## Режимы
+
+| Режим | Что делает | Флаги комнаты |
+|---|---|---|
+| Обычный редизайн | меняет отделку, свет, текстиль; крупная мебель сохраняется/двигается | `keep_furniture=true` |
+| Свободный дизайн | убирает/заменяет свободно стоящую мебель, обставляет заново | `keep_furniture=false` |
+| С каталогом | подбирает товары, строит смету, ссылки | `use_catalog=true` |
+| Без каталога | свободный дизайн без товаров и сметы | `use_catalog=false` |
+
+Важно: «мебель не учитываем» — это **один проход** с явным удалением/заменой. Настоящей двухстадийки «пустой каркас → дизайн» пока нет.
+
+## Путь первого рендера
+
+```mermaid
+flowchart LR
+  A["Фото + комната + стиль/ref + класс"] --> B["POST /api/rooms"]
+  B --> C["credit + room + render queued"]
+  C --> D["Worker"]
+  D --> E["room types + style + tier"]
+  E --> F["style refs: user > approved hero > cover"]
+  F --> G["curate: room slots × tier × style"]
+  G --> H["prompt: roles, keep/change, light, styling, catalog, dimensions"]
+  H --> I["Seedream 5.0 Flash"]
+  I --> J["fitAspect + storage"]
+  J --> K["Gemini vision"]
+  K --> L["items + surfaces + RAL + electrical + suggestions"]
+  L --> M["render_items + analysis + done"]
+```
+
+### 1. Ввод
+
+`POST /api/rooms` (multipart):
+
+- `photo` — фото комнаты;
+- `room_type` — один из 12 типов;
+- `style` — название стиля или пусто, если есть референс;
+- `style_ref` / `style_ref_url` — пользовательский референс;
+- `price_tier` — `start|comfort|premium|atelier`;
+- `keep_furniture` — `1/0`;
+- `use_catalog` — `1/0`;
+- `palette`, `accent`.
+
+Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`.
+
+### 2. Очередь и кредит
+
+- Создаётся `rooms` + `renders(status=queued)`.
+- Один кредит списывается атомарно; при ошибке/таймауте возвращается.
+- Worker держит до 2 параллельных рендеров.
+
+### 3. Стиль и референсы
+
+Приоритет:
+
+1. пользовательский `style_ref_path` — переопределяет админские/обложку;
+2. approved `style_references` для стиля + комнаты (hero, затем board/upload);
+3. статическая обложка стиля.
+
+В генерацию уходит **один** style ref + до 3 product refs (всего до 4 refs + исходник).
+
+### 4. Curate
+
+`src/curate.js`:
+
+- тип комнаты задаёт слоты (`src/roomtypes.js`);
+- класс материала (`price_tier`) задаёт уровень;
+- стиль — точный тег 1.0, синоним 0.6;
+- `style_products` (избранные) имеют приоритет;
+- товары с реальным URL используются в style kit; для обычной генерации берутся активные товары;
+- каждому товару присваивается `slot` (bed, floor, wall, light, …).
+
+### 5. Prompt
+
+Собирается в `src/openrouter.js`:
+
+- карта изображений: 1 — исходник, 2 — style ref, далее product refs;
+- `KEEP EXACTLY` — архитектура, камера, окна/двери, мебель (если включено);
+- `FURNITURE MODE` — сохранить/убрать;
+- `CHANGE / DEEP TRANSFORMATION`;
+- `COMPOSITION`;
+- `LIGHTING DESIGN` — главный wow-инструмент;
+- `CLEANUP / REALISM` — ТВ, провода, радиатор, старые зеркала/люстры;
+- `WINDOW STYLING` — шторы/жалюзи;
+- `LIFE & STYLING` + `PINTEREST-LEVEL STYLING` — арт, полки, техника, плюш, декор;
+- `CATALOG / MATERIALS` — список товаров, габариты, класс;
+- `STYLE`, `MATERIAL CLASS`;
+- `OUTPUT` — фото-язык (24–35 мм, golden hour, film grain, не CGI);
+- `AVOID` — негативный список.
+
+Правила `lighting`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` редактируются в админке («Промт») и хранятся в `app_settings.prompt.rules.v1`. Дефолты — в `src/promptconfig.js`.
+
+### 6. Image generation
+
+- Основной провайдер: OpenRouter Image API `/images`.
+- Текущая модель: `bytedance-seed/seedream-5-0-flash`, 1K, aspect auto.
+- Для Seedream отправляются `resolution` и `aspect_ratio`.
+- Для FLUX/Gemini `resolution` не отправляется.
+- FLUX.2 Pro: не принимает `resolution`; возможна блокировка content moderation на спальнях/кроватях.
+- Исходник и референсы идут как `input_references`.
+- Выход прогоняется через `fitAspect` к пропорции исходника.
+- Стоимость (`usage.cost`) пишется в `renders.cost_usd`.
+
+### 7. Vision analysis
+
+`parseRender` (Gemini) возвращает:
+
+```json
+{
+  "items": [{"category": "floor", "description": "...", "keywords": ["..."]}],
+  "surfaces": [{"surface": "walls", "hex": "#E8DCCB", "description": "..."}],
+  "visible": ["bed", "pendant light", "..."],
+  "electrical": [{"title": "...", "text": "..."}]
+}
+```
+
+- `surfaces` → `nearestRal` только для стен/потолка/фасадов; дерево/плитка не переводятся в RAL.
+- `electrical` — vision + шаблон комнаты.
+- `suggestions` — 4 быстрые правки по слотам и альтернативным товарам.
+- Анализ хранится в `renders.analysis`.
+
+### 8. Смета
+
+- Первый рендер: curated-товары — источник истины; vision только добавляет недостающие группы.
+- Правка: копируется смета родителя, заменяется только target (товар из подсказки фиксируется).
+- Стены `paint`/`wallpaper` — одна группа.
+- Для товаров с URL ссылка идёт через `/go/:productId?r=renderId`; для демо — поиск.
+- `/go` логирует клик в `product_clicks`.
+
+## Правки
+
+`POST /api/rooms/:id/iterate`:
+
+- `text` — инструкция;
+- `target` — `light`, `floor`, `wall`, `tile`, `faucet`, …;
+- `product_id` — товар из быстрой подсказки;
+- `ref` — файл;
+- `ref_url` — ссылка;
+- `parent_id` — версия, от которой правим.
+
+Edit-промт короткий:
+
+```text
+Image 1 — current render.
+Image 2 — reference for the new pendant.
+Change only the pendant. Keep everything else exactly as in Image 1.
+```
+
+Это лучше, чем полный стилевой промт: модель не перерисовывает комнату.
+
+## Ошибки и кредиты
+
+- Ошибка generation/vision → `render.error`, `room.error`, кредит возвращается.
+- Таймаут 24 часа → ошибка + возврат кредита.
+- 402 → UI открывает пополнение.
+- 401 → требуется вход.
+- 409 → комната ещё генерируется.
+
+## Логи
+
+- JSON-логи в stdout: `render_start`, `render_endpoint`, `render_image_ok`, `render_analysis`, `render_matched`, `render_done`, `render_error`.
+- Полный промт хранится в `renders.prompt`, метаданные (refs, model, tier, flags) — в `renders.meta`.
+- В админке «Логи» видно промт, модель, стоимость, референсы.
+
+## Текущие ограничения
+
+- Нет двухстадийной генерации.
+- Нет inpainting для люстр/розеток.
+- Один основной провайдер.
+- Каталог демонстрационный, 0 URL.
+- Vision может ошибаться в мелких предметах; curated защищает смету.
+
+## Связанные документы
+
+- [CATALOG.md](CATALOG.md)
+- [PROMPT-RULES.md](PROMPT-RULES.md) — если добавлен отдельный файл; иначе раздел в ADMIN.md
+- [OPS.md](OPERATIONS.md)
+- [HISTORY.md](HISTORY.md)
+
+
+---
+
+<!-- source: docs/PROMPT-RULES.md -->
+
+# Правила промта
+
+Промт = **код** + **редактируемые правила**.
+
+- Код: `src/openrouter.js` (структура, KEEP/CHANGE, product palette, output), `src/roomtypes.js` (комнаты, слоты, стиль).
+- Правила: `src/promptconfig.js` (дефолты) + `app_settings.prompt.rules.v1` (админка «Промт»).
+
+## Поля
+
+| Ключ | Что задаёт |
+|---|---|
+| `lighting` | тёплый многослойный свет, cove, лампы, запрет плоского света |
+| `cleanup` | убрать/спрятать ТВ, провода, радиатор, старые зеркала/люстры, мусор |
+| `window` | шторы, тюль, римские/рулонные, скрытый карниз |
+| `pinterest` | арт, полки, мелочи, техника, плюш, 3–5 сцен |
+| `photo` | 24–35 мм, golden hour, film grain, color grading, не CGI |
+| `furnitureOn` | правило «Оставить мебель» |
+| `furnitureOff` | правило «Мебель не учитывать» — удалить всё и обставить заново |
+| `catalogOn` | как использовать товары и смету |
+| `catalogOff` | свободный дизайн без товаров |
+| `extra` | свободный текст в конец art direction |
+| `avoid` | негативный список |
+
+## Структура base-промта
+
+1. `IMAGE ROLES` — исходник, style ref, product refs.
+2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум.
+3. `KEEP EXACTLY` — архитектура/камера/мебель.
+4. `FURNITURE MODE`.
+5. `CHANGE / DEEP TRANSFORMATION`.
+6. `COMPOSITION`.
+7. `LIGHTING DESIGN`.
+8. `CLEANUP / REALISM`.
+9. `WINDOW STYLING`.
+10. `ROOM RULES` — guidance/forbid комнаты.
+11. `LIFE & STYLING` + `PINTEREST-LEVEL STYLING`.
+12. `CATALOG / MATERIALS` + product list.
+13. `STYLE` — style ref/text/palette/accent.
+14. `MATERIAL CLASS`.
+15. `OUTPUT` + `AVOID`.
+
+## Правила по умолчанию (смысл)
+
+- Свет важнее мебели: cove/подсветка/лампы, без одной плоской люстры.
+- Убрать визуальный мусор: ТВ, провода, радиатор, старые зеркала/люстры/жалюзи.
+- Окна: новые шторы/жалюзи, без пластиковых старых.
+- Pinterest: арт-группа, полка/консоль, текстиль, техника на поверхностях, плюш только в спальне/детской.
+- Электроника не на полу, провода скрыты.
+- Радиатор — за flush-решёткой или убрать.
+- Светильник строго в стиле/референсе, без generic-хрусталя.
+- Фото: editorial, 24–35 мм, natural/golden hour, film grain, не 3D/CGI.
+- Если мебель не учитываем — удалить всё, кроме архитектуры/встроенного/сантехники/электрики, и обставить заново.
+- Если каталог выключен — не добавлять товары/смету.
+
+## Правки
+
+Edit-промт **не** использует полный base. Он короткий: «Image 1 — current render, Image 2 — reference, change only target, keep everything else». Правила `lighting/cleanup/...` к нему не применяются.
+
+## Как менять
+
+1. Малые изменения — в админке «Промт», сохранить, сделать тестовую генерацию.
+2. Если правило должно стать дефолтом — обновить `DEFAULT_PROMPT_CONFIG` в `src/promptconfig.js`.
+3. Не дублировать один и тот же текст в `openrouter.js` и `promptconfig.js`.
+4. После изменения — `npm test`, canary, `docs/HISTORY.md`.
+
+## Связанные документы
+
+- [GENERATION.md](GENERATION.md)
+- [ADMIN.md](ADMIN.md)
+- [HISTORY.md](HISTORY.md)
+
+
+---
+
+<!-- source: docs/CATALOG.md -->
+
+# Каталог, товары и стили
+
+## Текущее состояние (важно)
+
+На 2026-10-28:
+
+- **110 товаров всего, 100 активных.**
+- **0 товаров с реальным URL.**
+- 120 style references, 26 approved.
+- 1 закреплённый товар стиля (`style_products`).
+
+Это **демонстрационный каталог**. Он нужен, чтобы проверять дизайн, стили, смету, референсы и UI. Реальные заказы по нему невозможны: ссылки ведут в поиск, а не на карточку товара.
+
+Чтобы включить реальные заказы:
+
+1. Импортировать 20–50 реальных товаров с URL под один стиль/комнату.
+2. Закрепить их за стилем (`style_products`) через «Генератор комплекта».
+3. Проверить смету и `/go/:id`.
+4. Только потом масштабировать на остальные стили.
+
+## Модель товара
+
+`products`:
+
+| Поле | Смысл |
+|---|---|
+| `category` | `floor`, `paint`, `wallpaper`, `tile`, `skirting`, `countertop`, `cabinet`, `faucet`, `sink`, `toilet`, `shower`, `bathtub`, `light`, `outlets`, `appliance`, `textile`, `bed`, `wardrobe`, `sofa`, `armchair`, `coffee_table`, `dining_table`, `dining_chair`, `sideboard`, `desk`, `office_chair`, `storage`, `bench`, `rug` |
+| `surface` | поверхность/слот: floor, walls, cabinet, … |
+| `price` | цена |
+| `unit`, `qty` | единица и типовое количество для сметы |
+| `price_tier` | `start`, `comfort`, `premium`, `atelier` |
+| `room_types` | допустимые комнаты, через запятую; пусто = все |
+| `style_tags` | теги стилей через запятую |
+| `url` | **реальная страница товара** или партнёрская ссылка |
+| `image_path` / `image_url` | картинка-референс |
+| `dimensions` | JSON: `width_cm`, `depth_cm`, `height_cm`, `diameter_cm`, `text` |
+| `keywords`, `attrs` | поиск и свойства |
+| `active`, `seed_key` | активность и идемпотентный сид |
+
+## Классы материалов
+
+| Класс | Название | Смысл |
+|---|---|---|
+| `start` | Старт | ламинат, керамика, painted MDF, базовые fixtures |
+| `comfort` | Комфорт | инженерная доска, кварц, качественные фасады |
+| `premium` | Премиум | камень, массив, дизайнерский свет |
+| `atelier` | Ателье | редкие фактуры, кастом |
+
+Класс влияет на подбор товаров и промт. Сумма бюджета больше не управляет подбором.
+
+## Комнаты и слоты
+
+`src/roomtypes.js` задаёт для каждого типа:
+
+- `categories` — что допустимо;
+- `slots` — что реально выбираем (bed, floor, wall, light, …);
+- `keep` / `change` — что сохранять/менять;
+- `styling` — Pinterest-детали;
+- `forbid` — что запрещено;
+- `electrical` — рекомендации.
+
+Примеры:
+
+- **Спальня** — bed, floor, wall, light, wardrobe, rug, skirting, outlets, textile.
+- **Гостиная** — sofa, floor, wall, coffee_table, armchair, light, rug, skirting, outlets, textile.
+- **Кухня** — floor, backsplash, countertop, cabinet, wall, faucet, sink, light, appliance, outlets.
+- **Санузел** — floor, tile, cabinet, countertop, faucet, sink, toilet, light, outlets.
+- **Столовая** — dining_table, floor, wall, dining_chair, sideboard, rug, light, textile.
+- **Кабинет** — desk, floor, wall, office_chair, storage, rug, light.
+- **Прихожая** — storage, floor, wall, bench, cabinet, light.
+- **Гардеробная** — wardrobe, floor, wall, cabinet, light.
+
+## Подбор товаров
+
+`src/curate.js`:
+
+- фильтр по комнате (`room_types`);
+- фильтр по слоту/категории;
+- `price_tier` — точный класс, затем ближайший;
+- стиль — точный тег 1.0, синоним 0.6, нейтральный 0.5;
+- `style_products` (избранные) — приоритет;
+- `requireUrl` — режим style kit, только товары с URL.
+
+## Стилевые комплекты
+
+Два уровня:
+
+1. **Style references** — hero-сцены/муды, сгенерированные из товаров. Хранят `product_ids`, комнату, score, approved.
+2. **Style products** — явно закреплённые товары стиля/комнаты. Влияют на подбор.
+
+«Админка → Стили → Генератор комплекта»:
+
+- выбираешь комнату и класс;
+- система собирает товары по слотам **только с реальным URL**;
+- показывает недостающие слоты;
+- «Добавить всё в стиль» → `style_products`.
+
+Hero-референсы: `scripts/generate-style-references.mjs` (shells → 3 hero-варианта → vision score → seed JSON). Approved идут в генерацию.
+
+## Импорт товара по URL
+
+`POST /api/admin/products/import`:
+
+- allowlist доменов (`PRODUCT_IMPORT_DOMAINS`, по умолчанию 10 магазинов);
+- JSON-LD / OpenGraph / HTML;
+- название, бренд, цена, картинка, рейтинг, отзывы, артикул;
+- габариты из JSON-LD/additionalProperty/описания (мм/см/м/дюймы → см);
+- категория, класс, комнаты, стили по ключевым словам;
+- quality score и issues: домен, цена, картинка, б/у/уценка, рейтинг, дубли;
+- картинка скачивается с SSRF-защитой, чистится EXIF;
+- товар создаётся **черновиком** (`active=false`).
+
+Массовый импорт в админке: до 20 URL, каждый разбирается отдельно, добавляется вручную.
+
+## Заказ
+
+Смета:
+
+- если у товара есть `url`, ссылка идёт через `/go/:productId?r=renderId`, label «Заказать»;
+- если URL нет — на поиск, label «Найти похожие»;
+- `/go` логирует клик в `product_clicks` и делает 302.
+
+Партнёрские ссылки: можно сохранять в `url`; позже — subid/CPA.
+
+## Yandex Market
+
+- OAuth-токен реферальной программы валиден, но API ссылок/заказов требует `clid`/`place_id` и активную площадку.
+- Публичного поиска товаров у Yandex Market нет.
+- Для каталога нужны CPA/фид или ручной импорт URL.
+- Текущий импорт по URL — ручной мост; массовый импорт — следующий шаг.
+
+## Что делать дальше
+
+1. Выбрать 1 стиль + 1 комнату.
+2. Импортировать 20–50 реальных товаров с URL.
+3. Собрать комплект и закрепить.
+4. Перегенерировать hero под реальные товары.
+5. Проверить смету и переходы.
+6. Только потом расширять.
+
+## Связанные документы
+
+- [GENERATION.md](GENERATION.md)
+- [ADMIN.md](ADMIN.md)
+- [ROADMAP.md](ROADMAP.md)
+
+
+---
+
+<!-- source: docs/ADMIN.md -->
+
+# Админка
+
+URL: `/admin`  
+Доступ: заголовок `X-Admin-Key` = `ADMIN_KEY`; в браузере ключ хранится в `localStorage`. Ссылки в футере нет, `robots.txt` закрывает `/admin`.
+
+## Вкладки
+
+| Вкладка | Что делает |
+|---|---|
+| Пользователи | баланс, начисление/списание кредитов, ledger, история генераций |
+| Пакеты кредитов | CRUD пакетов, цены, активность |
+| Стили | стили, prompt description, референсы, approve, товары стиля, генератор комплекта |
+| Промт | редактируемые правила промта |
+| Логи | фактические промты рендеров, модель, стоимость, референсы |
+| Модели | render/vision модель, resolution/aspect, проверка input refs |
+| Прокси | URL прокси, сохранение, health-check, маска пароля |
+| Каталог | импорт по URL, массовый импорт, таблица товаров, цена/класс/статус |
+
+## Промт
+
+Правила хранятся в `app_settings.prompt.rules.v1`, дефолты — `src/promptconfig.js`.
+
+Поля:
+
+- **Свет** — cove, подсветка, лампы, запреты.
+- **Уборка и техника** — радиатор, ТВ, провода, зеркала, люстры.
+- **Окна и текстиль** — шторы, жалюзи, карнизы.
+- **Pinterest-стайлинг** — арт, полки, техника, плюш, сцены.
+- **Фотография** — камера, свет, плёнка, grading, запрет CGI.
+- **Мебель: оставить / не учитывать.**
+- **Каталог: включён / выключен.**
+- **Дополнительно** — свободный текст в конец art direction.
+- **Запреты** — негативный список.
+
+Сохранение применяется к новым генерациям без деплоя. Старые рендеры не меняются. «Сбросить» возвращает дефолты.
+
+## Стили
+
+- Создание/редактирование стиля, ключ, название, prompt description, обложка.
+- **Референсы**: hero/board/upload, комната, score, approved. В генерацию идут только approved; hero — приоритет.
+- **Товары стиля**: избранные товары, комната, sort.
+- **Генератор комплекта**: комната + класс → товары только с URL → недостающие слоты → «Добавить всё в стиль».
+
+## Модели
+
+- Render-модель выбирается из image-моделей OpenRouter.
+- Vision-модель — строка (обычно Gemini).
+- Seedream: 1K/2K, aspect.
+- FLUX.2 Pro: **resolution не отправляется**, поле «Задаётся моделью»; возможна блокировка content moderation.
+- Gemini: resolution не отправляется, используется пропорция исходника.
+- При сохранении проверяется доступность модели; warning пишется в лог.
+
+## Прокси
+
+- URL хранится в `app_settings.proxy.url`, применяется без рестарта.
+- Health-check: `POST /api/admin/settings/proxy/test` (HTTP-код, мс, ошибка).
+- Пароль маскируется в API/UI.
+- Пустое значение отключает env-прокси.
+
+## Каталог
+
+- Импорт по URL: allowlist, JSON-LD/OpenGraph, качество, габариты, дубли.
+- Массовый импорт до 20 URL.
+- Таблица: поиск, цена, класс, комнаты, URL/клики, включение/выключение, удаление.
+- Новые товары создаются черновиками (`active=false`).
+
+## Безопасность
+
+- Не храните `ADMIN_KEY` в репозитории.
+- Не выводите пароль прокси в ответах.
+- Импорт URL скачивает картинки только с публичных адресов (SSRF-защита).
+- Проверяйте домены, allowlist и quality score перед включением товара.
+
+## Связанные документы
+
+- [CATALOG.md](CATALOG.md)
+- [GENERATION.md](GENERATION.md)
+- [PROMPT-RULES.md](PROMPT-RULES.md)
+- [API.md](API.md)
+
+
+---
+
+<!-- source: docs/API.md -->
+
+# API
+
+Базовый URL: `https://www.remontvision.ru`.  
+Auth: cookie `rv_sid` (httpOnly).  
+Admin: заголовок `X-Admin-Key`.
+
+Ошибки — JSON `{ "error": "..." }` с HTTP-статусом.
+
+## Публичные
+
+| Метод | Путь | Описание |
+|---|---|---|
+| GET | `/api/health` | статус, `mock`, `payments_enabled`, `refunds_enabled` |
+| GET | `/api/models` | image-модели OpenRouter |
+| GET | `/api/legal` | версии и ссылки юридических документов |
+| GET | `/api/styles` | активные стили |
+| GET | `/api/room-types` | 12 типов комнат |
+| GET | `/api/packs` | пакеты кредитов |
+| POST | `/api/auth/request-code` | `{email}` → OTP |
+| POST | `/api/auth/verify` | `{email, code}` → cookie |
+| POST | `/api/auth/logout` | выход |
+| GET | `/go/:id?r=renderId` | 302 на товар/поиск, лог клика |
+| GET | `/s/:token` | SPA публичного шаринга |
+| GET | `/s/:token/image` | публичная картинка дизайна |
+| GET | `/api/share/:token` | данные шаринга: стиль, комната, лайки, комментарии |
+| POST | `/api/share/:token/like` | toggle лайк |
+| POST | `/api/share/:token/comments` | `{name?, text}` |
+
+## Авторизованные
+
+| Метод | Путь | Описание |
+|---|---|---|
+| GET | `/api/me` | email, баланс |
+| GET | `/api/my/rooms` | комнаты пользователя |
+| GET | `/api/my/generations` | все рендеры пользователя |
+| GET | `/api/credits` | баланс/ledger |
+| POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url}` |
+| POST | `/api/payments/sync` | синхронизация платежа |
+| POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
+| GET | `/api/rooms/:id` | комната + последний/выбранный render |
+| POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `ref`, `ref_url`, `parent_id` |
+| DELETE | `/api/rooms/:id` | удалить комнату и файлы (owner) |
+| POST | `/api/renders/:id/share` | создать/вернуть share token (owner) |
+
+### `POST /api/rooms`
+
+`multipart/form-data`:
+
+| Поле | Обяз. | Значение |
+|---|---|---|
+| `photo` | да | JPG/PNG/WebP ≤ 15 МБ |
+| `room_type` | нет | один из 12, иначе `Другое` |
+| `style` | нет* | название стиля |
+| `style_ref` | нет* | файл референса |
+| `style_ref_url` | нет* | URL референса |
+| `price_tier` | нет | `start|comfort|premium|atelier` |
+| `keep_furniture` | нет | `1/0`, default `1` |
+| `use_catalog` | нет | `1/0`, default `1` |
+| `palette`, `accent` | нет | цветовая схема/акцент |
+
+\* Нужен стиль или референс. Если есть только референс — стиль `Референс пользователя`.
+
+### `GET /api/rooms/:id`
+
+Возвращает:
+
+```json
+{
+  "id": "...",
+  "style": "...",
+  "room_type": "Спальня",
+  "price_tier": "comfort",
+  "keep_furniture": true,
+  "use_catalog": true,
+  "status": "done",
+  "photo_url": "/files/...",
+  "render": {"id": "...", "image": "/renders/...", "analysis": {...}},
+  "items": [{"id": 1, "name": "...", "price": 0, "url": "/go/1?r=...", "direct_url": false, "link_label": "Найти похожие"}],
+  "total": 0
+}
+```
+
+### `POST /api/rooms/:id/iterate`
+
+- `text` (обяз.) — что изменить.
+- `target` — `light`, `floor`, `wall`, `backsplash`, `tile`, `cabinet`, `countertop`, `faucet`, `sink`, `toilet`, `shower`, `bathtub`, `appliance`, `outlets`, `textile`, `skirting`, `bed`, `sofa`, ….
+- `product_id` — товар-референс.
+- `ref` — файл; `ref_url` — URL.
+- `parent_id` — версия для правки (по умолчанию последняя).
+
+## Админ (`X-Admin-Key`)
+
+### Каталог
+
+| Метод | Путь | Описание |
+|---|---|---|
+| GET | `/api/admin/products` | все товары + clicks |
+| POST | `/api/admin/products/import` | `{url}` → preview |
+| POST | `/api/admin/products` | JSON/multipart, создать товар |
+| PUT | `/api/admin/products/:id` | обновить |
+| DELETE | `/api/admin/products/:id` | удалить |
+
+### Пользователи/кредиты
+
+| Метод | Путь |
+|---|---|
+| GET | `/api/admin/users` |
+| GET | `/api/admin/users/:id` |
+| POST | `/api/admin/users/:id/credits` `{delta, reason, note}` |
+
+### Пакеты
+
+| Метод | Путь |
+|---|---|
+| GET/POST | `/api/admin/packs` |
+| PUT/DELETE | `/api/admin/packs/:id` |
+
+### Стили и референсы
+
+| Метод | Путь |
+|---|---|
+| GET/POST | `/api/admin/styles` |
+| GET/PUT/DELETE | `/api/admin/styles/:id` |
+| POST | `/api/admin/styles/:id/references` (multipart `images`) |
+| PATCH/DELETE | `/api/admin/styles/:id/references/:refId` |
+| POST/DELETE | `/api/admin/styles/:id/products`, `/:productId` |
+| POST | `/api/admin/styles/:id/products/bulk` `{product_ids, room_type}` |
+| POST | `/api/admin/styles/:id/kit` `{room_type, price_tier}` |
+
+### Настройки
+
+| Метод | Путь | Описание |
+|---|---|---|
+| GET/PUT | `/api/admin/settings/models` | render/vision/resolution/aspect |
+| GET/PUT | `/api/admin/settings/prompt` | правила промта |
+| POST | `/api/admin/settings/prompt/reset` | сброс |
+| GET/PUT | `/api/admin/settings/proxy` | прокси |
+| POST | `/api/admin/settings/proxy/test` | health-check |
+
+### Логи/платежи
+
+| Метод | Путь |
+|---|---|
+| GET | `/api/admin/renders` |
+| GET | `/api/admin/renders/:file` |
+| GET | `/api/admin/payments` |
+| GET | `/api/admin/refunds/quote` |
+| POST | `/api/admin/refunds` |
+
+## Коды
+
+- `401` — нет авторизации.
+- `402` — нет кредитов.
+- `403` — нет админ-доступа.
+- `404` — не найдено.
+- `409` — комната ещё генерируется.
+- `400` — неверные данные/модель.
+- `500` — внутренняя ошибка.
+
+## Связанные документы
+
+- [GENERATION.md](GENERATION.md)
+- [CATALOG.md](CATALOG.md)
+- [ADMIN.md](ADMIN.md)
+
+
+---
+
+<!-- source: docs/OPERATIONS.md -->
+
+# Эксплуатация
+
+## Окружения
+
+| | Local | Prod |
+|---|---|---|
+| URL | `http://localhost:3000` | `https://www.remontvision.ru` |
+| БД | Docker Postgres `127.0.0.1:5434` | Docker Postgres, том `pgdata` |
+| Файлы | `data/` | том `appdata` или S3 |
+| Модели | `.env` / mock | `app_settings` |
+| Секреты | `.env` | `/root/remontvision/.env` |
+
+## Переменные окружения
+
+Значения — только placeholder; реальные секреты не коммитить.
+
+```bash
+# Core
+PORT=3000
+APP_URL=https://www.remontvision.ru
+RV_DATABASE_URL=postgres://user:pass@host:5432/db
+ADMIN_KEY=<admin-key>
+
+# OpenRouter
+OPENROUTER_API_KEY=<key>
+RENDER_MODEL=bytedance-seed/seedream-5-0-flash
+VISION_MODEL=google/gemini-3-flash-preview
+RENDER_RESOLUTION=1K
+RENDER_ASPECT_RATIO=auto
+OPENROUTER_TIMEOUT_MS=120000
+HTTPS_PROXY=<optional-proxy-url>
+
+# Auth/mail
+RESEND_API_KEY=<key>
+RESEND_TEMPLATE_ID=<id>
+MAIL_FROM=<from>
+MAIL_REPLY_TO=support@remontvision.ru
+SESSION_DAYS=365
+
+# Payments
+PAYMENTS_ENABLED=true
+REFUNDS_ENABLED=false
+YUKASSA_SHOP_ID=<id>
+YUKASSA_SECRET_KEY=<key>
+
+# Catalog import
+PRODUCT_IMPORT_DOMAINS=market.yandex.ru,leroymerlin.ru,...
+
+# Storage (optional)
+S3_BUCKET=
+S3_ACCESS_KEY=
+S3_SECRET_KEY=
+S3_ENDPOINT=
+```
+
+Особенности:
+
+- `RV_DATABASE_URL`, не `DATABASE_URL` — стандартная переменная может быть занята другим проектом.
+- `APP_URL` нужен для платёжных return/webhook и share-ссылок.
+- Прокси нужен, если OpenRouter блокирует IP VPS; настраивается и в админке.
+
+## Деплой
+
+1. Пуш в `main`.
+2. GitHub Actions: SSH на VPS, `git pull`, `docker compose up -d --build`, prune.
+3. При старте: миграции → сид каталога → сид style refs → загрузка моделей → прокси → prompt rules → listen.
+4. Smoke: `/api/health`, `/`, `/app`.
+
+Откат: `git revert`/предыдущий коммит + пуш; миграции append-only, не удалять.
+
+## Миграции
+
+- Файлы `migrations/NNN_name.sql`, применяются по порядку, учёт в `_migrations`.
+- Не редактировать применённые миграции; добавлять новую.
+- Перед рискованными изменениями — `pg_dump` на VPS.
+
+## Домен и TLS
+
+- `www.remontvision.ru` — основной, `remontvision.ru` → 301 → www.
+- Сертификат Let's Encrypt на оба домена, автопродление `certbot.timer`.
+- Nginx: HTTP/2, HSTS, security headers, proxy на `127.0.0.1:3000`.
+- Проверка: `certbot renew --dry-run`, `curl -I` apex/www.
+
+## Файлы
+
+- `uploads/` — фото комнат и референсы.
+- `renders/` — результаты.
+- `products/` — картинки товаров.
+- `style-images/` — hero/board.
+- S3 включается переменными; иначе диск.
+- EXIF/GPS удаляются при загрузке.
+
+## Бэкапы
+
+Сейчас автоматических бэкапов нет. Минимум:
+
+```bash
+# на VPS
+docker compose exec -T db pg_dump -U remont -d remontvision | gzip > backup-$(date +%F).sql.gz
+# файлы
+tar czf appdata-$(date +%F).tar.gz /path/to/appdata
+```
+
+Хранить вне VPS. Восстановление — в отдельную БД, проверить `_migrations` и ключевые таблицы.
+
+## Мониторинг
+
+Сейчас: Docker logs + `/api/health`. Нет Prometheus/алертов.
+
+Проверять:
+
+- `docker compose ps`
+- `docker compose logs app --tail=200`
+- `/api/health`
+- `render_error`/`config_warning` в логах
+- стоимость рендеров (`renders.cost_usd`)
+
+## Типовые проблемы
+
+| Симптом | Причина | Что делать |
+|---|---|---|
+| `403 Access denied by security policy` | OpenRouter WAF блокирует IP VPS | проверить прокси, `HTTPS_PROXY` или админку |
+| `/images 400` | неподдерживаемый параметр/модель | проверить `modelcaps`, у FLUX нет resolution |
+| `chat/completions 404` | image-only модель + fallback | не использовать chat fallback для Seedream/FLUX |
+| content moderation | FLUX/BFL блокирует фото | переключить на Seedream или препроцессить фото |
+| нет сметы | каталог отключён/пуст | проверить `use_catalog`, товары, curated |
+| нет approved refs | стиль без approved | админка → стили → approve |
+| 402 | нет кредитов | пополнить |
+| 409 | рендер ещё идёт | подождать |
+| сайт не открывается | DNS/прокси клиента | проверить apex/www, сертификат, локальный DNS |
+
+## Безопасность
+
+- Не логировать ключи/пароли/прокси.
+- `ADMIN_KEY` только в заголовке; не в URL.
+- Owner-check на комнаты/файлы.
+- SSRF-защита в `remoteimage.js`.
+- Rate limit на OTP, комнаты, share.
+- Не включать возвраты без state machine.
+
+## Связанные документы
+
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [API.md](API.md)
+- [ROADMAP.md](ROADMAP.md)
+
+
+---
+
+<!-- source: docs/ROADMAP.md -->
+
+# Планы и запуск
+
+## Где мы сейчас
+
+Технически сервис работает: генерация, смета, правки, кабинет, шаринг, админка, платежи, импорт.  
+Но **публичный запуск блокирует отсутствие реального каталога**: 100 демо-товаров, 0 URL.
+
+## P0 — до публичного запуска
+
+1. **Реальный каталог**
+   - 1 стиль × 1–3 комнаты;
+   - 20–50 реальных товаров с URL, ценой, картинкой, габаритами;
+   - импорт через админку (URL/список) или CPA/фид.
+2. **Style kit из реальных товаров**
+   - закрепить товары в `style_products`;
+   - собрать комплект в админке;
+   - перегенерировать hero-референсы под реальный набор.
+3. **Заказ**
+   - `/go/:productId` уже есть;
+   - проверить реальные URL и клики;
+   - позже — партнёрские ссылки/CPA.
+4. **QA**
+   - 10–20 реальных фото: спальня/гостиная/кухня/санузел;
+   - проверить геометрию, комнату, свет, декор, смету, ссылки.
+5. **Эксплуатация**
+   - бэкапы БД/файлов;
+   - мониторинг и алерты;
+   - поддержка/возвраты/чеки;
+   - проверить платежи живым платежом.
+
+## P1 — качество генерации
+
+1. **Двухстадийная генерация**
+   - проход 1: пустой каркас (только архитектура);
+   - проход 2: дизайн с нуля по стилю/товарам;
+   - 2 вызова модели, дольше и дороже;
+   - нужно решение: 2 кредита или 1.
+2. **Inpainting для света/розеток**
+   - vision находит зону;
+   - маска/локальная правка;
+   - не полагаться на текст «повесь люстру».
+3. **A/B моделей**
+   - Seedream Flash vs Pro vs FLUX.2 Pro / Nano Banana 2;
+   - 10 фото × 3 модели, слепая оценка;
+   - выбрать по качеству/цене/стабильности.
+4. **Upscale**
+   - 1K/2K → финальный 4K.
+
+## P2 — каталог и рефералка
+
+1. **Product Scout**
+   - фид/allowlist → кандидаты → AI-разметка → score → approve.
+2. **Yandex Market CPA**
+   - нужен `clid`/`place_id` и активная площадка;
+   - API умеет ссылки/заказы, но не поиск товаров.
+3. **Массовый импорт/фиды**
+   - CSV/XML, обновление цен/наличия, скрытие устаревших.
+4. **Реферальные переходы**
+   - subid на пользователя/рендер;
+   - учёт кликов и заказов;
+   - выплаты после подтверждения партнёра.
+
+## P3 — продукт/маркетинг
+
+- SEO/лендинг, кейсы до/после, соцдоказательства.
+- Публичные страницы стилей/комплектов.
+- PDF-смета с фото и товарами.
+- Аналитика воронки: фото → генерация → правка → клик → покупка.
+- A/B тарифов/пакетов.
+- Мобильный редактор `/app` в новом стиле.
+
+## Текущие ограничения
+
+- Нет реальных URL → нет заказов.
+- Нет двухстадийки и inpainting.
+- Один основной провайдер.
+- Нет автообновления цен/наличия.
+- Нет автоматических бэкапов/метрик.
+- FLUX.2 Pro: resolution не поддерживается + content moderation.
+- Возвраты выключены, чеки вручную.
+
+## Что нужно решить владельцу
+
+1. Источник реального каталога: ручной импорт, фид, CPA.
+2. 2 кредита за двухстадийку или 1.
+3. Какие стили/комнаты первые.
+4. Когда включать возвраты и автоматические чеки.
+
+## Definition of launch
+
+- 20+ реальных товаров с URL в одном стиле/комнате.
+- Смета ведёт на реальные карточки.
+- 10 успешных canary-генераций.
+- Платежи и возврат кредита при ошибке проверены.
+- Бэкап БД и файлов сделан.
+- Поддержка отвечает на письма.
+- Маркетинговая главная готова.
+
+
+---
+
+<!-- source: docs/DECISIONS.md -->
+
+# Решения (ADR-lite)
+
+Короткие ответы на «почему так».
+
+## ADR-001: класс материала вместо суммы бюджета
+
+Сумма в рублях не управляла подбором: модель не умеет в неё «жить», а смета всё равно собиралась из товаров. Ввели `start|comfort|premium|atelier` на комнате и товаре. Сумма осталась справочно.
+
+## ADR-002: curated-товары — источник истины
+
+Для первого рендера смета строится из curated-товаров, которые мы реально просили нарисовать. Vision только добавляет недостающие категории и не подменяет выбранную инженерную доску на «похожий ламинат». Правка копирует смету родителя и заменяет только target.
+
+## ADR-003: правила промта — в БД
+
+`lighting`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` вынесены в `app_settings.prompt.rules.v1` и админку. Деплой не нужен, можно крутить качество и откатывать. Дефолты — `src/promptconfig.js`.
+
+## ADR-004: свои hero-референсы, а не Pinterest-скрейпинг
+
+Hero-сцены генерируются из наших товаров, проходят vision-скор и approve. Это даёт контроль, отсутствие проблем с правами и консистентность с каталогом. Внешние референсы — только через разрешённые API/фиды.
+
+## ADR-005: пока один проход, двухстадийка — следующий этап
+
+Сейчас base = img2img с явным keep/remove. Двухстадийка «пустой каркас → дизайн» лучше убирает старые объекты, но это 2 вызова модели, дольше и дороже. Нужен режим и решение по кредитам.
+
+## ADR-006: демо-каталог отделён от реального
+
+100 демо-товаров нужны для проверки дизайна, стилей и сметы. Реальные заказы невозможны, пока у товаров нет URL. Импорт по URL создаёт черновики, включение — вручную.
+
+## ADR-007: Seedream по умолчанию, FLUX — осторожно
+
+Seedream Flash стабилен, поддерживает refs/resolution, дешевле. FLUX.2 Pro не принимает `resolution`, возможна content moderation на спальнях. Поэтому default — Seedream; FLUX можно тестировать, но не делать основным без QA.
+
+## ADR-008: прокси управляется из админки
+
+OpenRouter WAF может блокировать IP VPS. Прокси хранится в `app_settings`, применяется без рестарта, есть health-check. Пароль маскируется в API/UI.
+
+## ADR-009: публичный шаринг без сметы
+
+`/s/:token` показывает только визуализацию, стиль, комнату, лайки и комментарии. Фото комнаты и смета не публикуются. Токен случайный, `noindex`.
+
+## ADR-010: смета и заказ через `/go`
+
+Ссылки из сметы идут через `/go/:productId?r=renderId`: лог клика + 302 на URL товара или поиск. Это база для партнёрских ссылок и аналитики.
+
+## ADR-011: габариты товара в промте
+
+`products.dimensions` передаются в промт как физический масштаб. Модель не измеряет, но не должна превращать диван 220 см в кресло. Для мебели без габаритов — предупреждение при импорте.
+
+## Связанные документы
+
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [GENERATION.md](GENERATION.md)
+- [CATALOG.md](CATALOG.md)
+- [ROADMAP.md](ROADMAP.md)
+
+
+---
+
+<!-- source: docs/AI-INTEGRATION.md -->
+
+# AI-интеграция
+
+Провайдер генерации и vision изолирован в `src/openrouter.js`. Остальной код общается с ним через экспорты.
+
+Актуальный пайплайн: [GENERATION.md](GENERATION.md). Правила промта: [PROMPT-RULES.md](PROMPT-RULES.md).
+
+## Текущая конфигурация
+
+- Render: `bytedance-seed/seedream-5-0-flash`, 1K, aspect auto.
+- Vision: `google/gemini-3-flash-preview` (в проде `google/gemini-3-flash-preview`).
+- Модели хранятся в `app_settings` и меняются в админке «Модели».
+- Прокси — `src/proxy.js`, применяется без рестарта.
+
+## Контракт модуля
+
+```js
+export const MOCK_MODE;
+export function log(obj);
+export async function assertConfig();
+export async function listImageModels();
+export function buildPrompt({ style, priceTier, products, roomType, imageMap, keepFurniture, useCatalog, ... });
+export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabel, refDimensions });
+export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio });
+export async function generateFromText({ prompt, aspectRatio }); // shells для style refs
+export async function parseRender(renderB64, mime);
+export function matchCatalog(items, products);
+export function snapAspect(width, height, allowed);
+export const MAX_REFERENCES; // 4
+```
+
+## Возможности моделей
+
+`src/modelcaps.js`:
+
+- Seedream: `resolution` 1K/2K, aspect.
+- FLUX: aspect; **resolution не отправляется**; content moderation возможен.
+- Gemini: resolution не отправляется; aspect из безопасного списка.
+- `supportsResolution()` true только для Seedream.
+- Для Seedream/FLUX нет chat-fallback: это image-only модели.
+
+## Провайдерские грабли
+
+- `/images` 400 → смотреть тело ошибки; не маскировать chat-fallback.
+- FLUX.2 Pro: не поддерживает `resolution`; BFL может блокировать спальни/кровати.
+- Формат выхода может быть JPEG/WebP/PNG — определять по сигнатуре (`detectImageExt`).
+- Стоимость суммировать по `usage.cost`.
+- Референсы дорожают: следить за `refs` и `MAX_REFERENCES`.
+- Прокси: OpenRouter WAF может блокировать IP VPS; `HTTPS_PROXY`/`proxy.url`.
+
+## Добавить провайдера
+
+1. Создать `src/provider-<name>.js` с контрактом выше.
+2. Переключить импорты в `src/server.js` и `src/jobs.js` (или фабрику по env).
+3. Добавить ключи в env.
+4. Проверить `assertConfig`, `/api/models`, один живой рендер, итерацию, вертикальное фото.
+5. Обновить `modelcaps.js` и docs.
+
+## Не входит в провайдера
+
+- Эмбеддинг-матчинг товаров (pgvector/CLIP) — отдельный слой.
+- Metric depth/размеры комнаты — отдельный сервис.
+- Inpainting/маски — следующий этап.
+- Двухстадийная генерация — orchestration в `jobs.js`, не провайдер.
+
+## Связанные документы
+
+- [GENERATION.md](GENERATION.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [OPERATIONS.md](OPERATIONS.md)
+
+
+---
+
+<!-- source: docs/HISTORY.md -->
+
+> **Chronological changelog.** Current state is in README/llms.txt; early sections may be outdated.
+
+# История работ (что сделано)
+
+Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
+
+## Инфраструктура
+
+- **Репозиторий**: https://github.com/oblacko/remontvision (private), автор коммитов `Oblacko`.
+- **VPS**: `root@77.222.38.7` (Ubuntu 24.04, Docker 29.9 + compose v5.6). Проект: `/root/remontvision`. Доступ по ключу `~/.ssh/rv_vps` (локально у разработчика и в секретах GitHub Actions), git pull — read-only deploy-key `rv_deploy`.
+- **Автодеплой**: пуш в `main` → GitHub Actions (`.github/workflows/deploy.yml`) → SSH → `git pull` + `docker compose up -d --build` + `docker image prune -f`. Секреты репо: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`. `.env` на сервере деплоем не трогается.
+- **Postgres 16** в compose (том `pgdata`), миграции из `migrations/*.sql` накатываются при старте app-контейнера (учёт в `_migrations`). Файлы (загрузки/рендеры/фото товаров) — в томе `appdata`, есть слой S3 (`src/storage.js`, reg.cloud `https://s3.regru.cloud`), включается переменными `S3_BUCKET/S3_ACCESS_KEY/S3_SECRET_KEY` в `.env`.
+- **Важно про окружение**: переменная БД называется `RV_DATABASE_URL`, не `DATABASE_URL` — стандартное имя глобально экспортировано в `~/.bashrc` другим проектом (paperclip) и перебивает `--env-file`. На машине разработчика чужой `DATABASE_URL` указывает на Postgres проекта paperclip — никогда не использовать.
+- **Прокси**: OpenRouter WAF блокирует диапазон IP хостера VPS (`403 Access denied by security policy`). На сервере в `.env` задан `HTTPS_PROXY=http://<user>:<pass>@95.164.203.249:9367` (тот же хост принимает и socks5). Код читает его в `src/openrouter.js` через undici ProxyAgent (undici v6 — v7 требует Node 22+).
+- **Прод-доступ**: `https://www.remontvision.ru` — nginx (HTTP/2, gzip, HSTS, security-заголовки) проксирует на `127.0.0.1:3000`; TLS — Let's Encrypt, автопродление `certbot.timer` (дважды в сутки, dry-run проверен). `APP_URL` на сервере — `https://www.remontvision.ru`. Порт приложения наружу закрыт (`127.0.0.1:3000` в compose).
+- **SEO**: title/description/keywords, canonical, Open Graph/Twitter, JSON-LD (`WebSite`, `Organization`, `WebApplication`, `FAQPage`), видимый блок «О сервисе» с FAQ, `robots.txt`, `sitemap.xml`, SVG-favicon.
+- **Юридические страницы для ЮKassa**: `/prices`, `/offer`, `/delivery`, `/contacts`, `/privacy`; цены и описания услуг, цифровое получение заказа, оферта с AI-дисклеймерами и возвратами по закону, контакты и реквизиты самозанятого. Ссылки — в футере и окнах входа/оплаты.
+- **Версии и акцепты**: `legal_docs` + `legal_acceptances` (пользователь, документ, редакция, время, IP, контекст регистрации/входа/оплаты). Текущая редакция — `2026-10-26.3`.
+- **Кредиты и возвраты**: списание привязано к рендеру, при сбое/таймауте 24 часа кредит восстанавливается; история в `credit_txn`; API возвратов (`/api/admin/refunds*`) с расчётом неиспользованной части и ручным способом при недоступности ЮKassa.
+- **Почта**: Resend API (домен `remontvision.ru`, шаблон Resend) с фолбэком на SMTP/dev-лог. **Файлы**: EXIF/GPS удаляются через sharp при загрузке. **Логи**: ротация Docker 10 МБ × 3.
+
+## Функциональность (сделано)
+
+- Рендер ремонта по фото через OpenRouter: основной `/images` с исходником в `input_references`, chat-фолбэк; максимум 2 внешних вызова, без retry-каскада и fallback-модели, с суммированием известных `usage.cost`.
+- Валидация slug'ов моделей при старте (`assertConfig`) — падение до приёма трафика при неверном `RENDER_MODEL`; `input_references` отправляются только при поддержке модели.
+- **Каталог и подборка**: товары отбираются до генерации (`src/curate.js`, бюджет × стиль), до 4 фото товаров — референсы; после рендера vision-разбор + матчинг по ключевым словам/цвету. Если vision пуст/упал — fallback на curated (первый рендер) или смету родителя (итерация).
+- Aspect ratio рендера = реальные пропорции фото; `fitAspect` доводит выход модели до точной пропорции исходника.
+- Полное логирование себестоимости: `cost_image_usd` + `cost_vision_usd` = `cost_usd` в json-логе и в `renders`; ошибки сохраняют известную стоимость.
+- Аутентификация по e-mail (OTP 6 цифр, 10 мин, 5 попыток, атомарное списание попытки). Отправка через Resend (домен `remontvision.ru`, шаблон), фолбэк SMTP; в production dev-лог запрещён. Сессии httpOnly, 365 дней.
+- Оплата ЮKassa: пакеты `2×99₽ / 5×229₽ / 15×599₽`, кредиты-ledger, атомарное списание, идемпотентный webhook, локальные `pack_id/credits` не перезаписываются remote-payload. Регистрация даёт 2 кредита. Любая генерация — 1 кредит; при сбое возвращается.
+- Админка: каталог товаров; аккаунты с балансом, начислением/списанием кредитов, кредитным ledger и историей генераций.
+- UI: вход/регистрация, баланс, история генераций с превью, честная «подборка товаров», ссылки «в магазин/поиск», пример до/после WebP. Покупка кредитов включена; возвраты отключены.
+- **Редизайн**: новый React/Vite-лендинг на `/` и генератор-панель Kimi Agent: 10 стилей с превью, загрузка референса стиля, цветовая схема/акцент, бюджет, реальная генерация/правки через API, история версий, реальные товары и стоимость; RAL и разметка розеток — ориентировочные рекомендации. Старый полнофункциональный кабинет — `/app` (`?room=…`, `?buy=1`, история/админка). Сборка — `web/`, статика — `web/dist`; бюджет до 1000 тыс. ₽; SEO/OG нового лендинга.
+- **Backend под новый генератор**: `rooms.palette/accent/style_ref_path` (миграция 007), style_ref уходит в `input_references`, схема/акцент влияют на промпт, 10+ стилей разрешены на `/api/rooms`.
+- **Админка `/admin`** (React, стиль сайта): пользователи с балансом, корректировкой кредитов, историей генераций и ledger пополнений/списаний; пакеты кредитов (CRUD, активность, цены); стили (CRUD, обложка, prompt description, несколько референсов общего дизайна, привязка избранных товаров). Пакеты и стили теперь из БД (миграция 008); стиль-референсы и товары участвуют в генерации, `/api/packs` и панель стилей читают БД.
+- **Кабинет пользователя `/cabinet`** (React, стиль сайта): история комнат с версиями, фильтры/поиск, карточки с превью, детальный просмотр версии (визуализация, товары, смета, дата цен), скачивание, переход в редактор `/app?room=…`, удаление комнаты; кредиты, ledger пополнений/списаний, покупка пакетов с возвратом на `/cabinet?paid=…`, OTP-вход/выход. Сервер: `DELETE /api/rooms/:id` с owner-check и очисткой файлов, `return_path` для платежа.
+
+- **Тип комнаты и промты**: 12 типов (гостиная/зал, спальня, детская, кухня, санузел, кладовка, прихожая, столовая, кабинет, балкон/лоджия, гардеробная, другое) в миграции 009 и UI генератора; тип ограничивает категории товаров и явно запрещает чужие предметы в промпте (например, умывальник в спальне). Промт хранится в `renders.prompt`; в админке вкладка «Промты» и промт в истории пользователя показывают тип, стиль, бюджет, товары, модель и стоимость. Бюджет теперь задаёт целевую сумму в промпте, влияет на подбор в рамках типа и показывается в результате как «в бюджете/выше». Стиль подтягивает референсы (БД + статическая обложка) и избранные товары; до 2 референсов стиля и 2 товарных референса.
+- **Настройки моделей**: `app_settings` (миграция 010) и вкладка «Модели» в `/admin`: выбор render-модели из image-моделей OpenRouter, vision-модель текстом, проверка `input_refs`, применение к новым генерациям без рестарта. Текущая по умолчанию — Gemini 3.1 Flash Image; Seedream 5.0 Flash (`bytedance-seed/seedream-5-0-flash`) доступен в списке и поддерживает референсы. Логи промтов показывают, какая модель использовалась.
+- Rate limit in-memory: 300 запросов/час/IP, `trust proxy=1`; OTP resend 10 с, 100 кодов/сутки; `support@`/`366079@` без OTP-cooldown.
+
+## Стабилизация 2026-10-26 (пилот)
+
+- Rollback point: `d3d8d08`.
+- P0: исходное фото в основном `/images`; owner checks на комнату и `/files`/`/renders`; атомарная транзакция render+кредит+queued; параллельная итерация → `409`; максимум два render-вызова.
+- P1: mock без списания, пустой vision сохраняет curated/родителя, реальный MIME в vision, refs только при поддержке, атомарный OTP, advisory lock миграций, webhook 5xx, локальные credits/payload.
+- UX: retry/новая комната, polling timeout, in-flight guard правок, OTP autocomplete/focus, видимая ссылка, `цена × qty`, CTA `/prices`, контраст, заголовок/OG.
+- По решению владельца платежи оставлены включёнными (`PAYMENTS_ENABLED=true`), возвраты — выключены (`REFUNDS_ENABLED=false`) до полной state machine.
+- Тесты: `npm test` (5 contract-тестов), post-deploy smoke в GitHub Actions.
+
+### Live-canary 2026-10-26
+
+- Комната `61c48ba8-f2fa-4104-a485-ad44de8b50dc`, пользователь `support@remontvision.ru`; исходник `583×1280` (0.455), результат `627×1376` (0.456) — пропорции совпадают.
+- Основной `/images`, attempt 1, `aspect_ratio=9:16`, refs=5 (исходник + 4 товара), без chat-фолбэка: один render-вызов.
+- Время 18.1 с; стоимость `$0.0723625` (image `$0.0699325` + vision `$0.00243`); списан 1 кредит, баланс `support@` стал 1.
+- Подборка: 6 товаров, ориентировочно `114 600 ₽`; vision распознал 8 позиций, сматчил 6. Отдельная vision-проверка подтвердила сохранение ракурса, стен, окна и основной геометрии.
+- Первый canary с `9:21` получил 400 `invalid_value`; исправлено ограничением поддерживаемых провайдером пропорций, кредит восстановлен, неудачная комната удалена.
+- Не проверено живым платежом: создание/вебхук/`/api/payments/sync` ЮKassa. Backup/restore, apex-домен и чеки — по-прежнему в очереди.
+
+## 2026-10-27 — качество генерации: классы материалов, каталог, base/edit-промты
+
+- **Класс материалов вместо суммы бюджета**: `start/comfort/premium/atelier` («Старт/Комфорт/Премиум/Ателье») на комнате и товаре (миграции 012). Сумма больше не управляет подбором; смета собирается из фактически выбранных товаров. Старый `budget` оставлен для совместимости.
+- **Каталог 54 позиции с картинками**: `catalog/seed.json` + `public/catalog/*.webp`, идемпотентный сид при старте (`src/catalogseed.js`). Категории: floor, paint, wallpaper, tile, skirting, countertop, cabinet, faucet, sink, toilet, shower, bathtub, light, outlets, appliance, textile; `price_tier`, `room_types`, `surface`, `style_tags`, `seed_key`, `active`.
+- **Профили комнат**: у каждого типа комнаты появились слоты материалов, `keep`/`change`, запреты и рекомендации по электрике (`src/roomtypes.js`). Спальня больше не может получить керамогранит на пол: в её слотах только wood/laminate/vinyl, плюс в промте явное «если пол не передан — сохрани существующий».
+- **Промт первого рендера переписан**: карта изображений (комната → стиль → товары), `KEEP EXACTLY`/`CHANGE / DEEP TRANSFORMATION`, материал-палитра, класс материалов, negative-ограничения. Товары — палитра, а не «нарисуй все шесть»; для крупных поверхностей точное совпадение, для мелких — форма/финиш, если видно.
+- **Правки стали точечными**: отдельный `buildEditPrompt` (без полного стилевого промта), target + референс, «не меняй всё остальное». В итерации теперь передаются референсы: товар из быстрой подсказки, загруженный файл или картинка по URL (SSRF-защита в `src/remoteimage.js`). Можно править выбранную версию (`parent_id`), а не только последнюю.
+- **Быстрые подсказки после рендера**: vision возвращает `surfaces` (hex), `visible`, `electrical`; сервер строит 4 подсказки по слотам комнаты и альтернативным товарам, UI показывает кнопки с превью товара. Кнопка прикрепляет референс и меняет только target.
+- **RAL и электрика больше не фейковые**: убраны захардкоженные RAL/розетки/точки на фото. RAL считается по hex только для окрашиваемых поверхностей (стены/потолок/фасады), плитка/дерево не переводятся в RAL; электрика — vision + шаблон комнаты, без разметки поверх картинки.
+- **Смета устойчивее**: для первого рендера curated-товары — источник истины, vision только добавляет недостающие группы и не подменяет выбранный товар (иначе в спальне появлялся «ламинат» вместо инженерной доски). Правка копирует смету родителя и заменяет только target; товар из быстрой подсказки фиксируется в смете. Для стен paint/wallpaper считаются одной группой.
+- **Модель/aspect**: при `aspect_ratio=auto` в настройках теперь отправляется пропорция исходника, чтобы `fitAspect` не резал края.
+- Тесты: 9 (`npm test`), включая структуру base/edit-промта, RAL и наличие всех картинок каталога.
+
+## 2026-10-27 — мебель, свои hero-референсы стилей, approve в админке
+
+- **Мебель в каталоге**: +39 позиций (кровати, шкафы, диваны, кресла, журнальные/обеденные столы, стулья, комоды, столы, офисные кресла, стеллажи, банкетки, ковры) и 7 премиальных нейтральных материалов. Всего 100 товаров, у всех есть AI-референс, `price_tier`, `room_types`, `style_tags`.
+- **Слоты комнат** дополнены мебелью: спальня — кровать/шкаф/ковёр, гостиная — диван/кресло/журнальный стол/ковёр, столовая — стол/стулья/комод/ковёр, кабинет — стол/кресло/стеллаж/ковёр, прихожая — хранение/банкетка, гардеробная — шкаф. Промт сохраняет габариты и положение мебели, но разрешает заменить/переобить её по списку.
+- **Свои референсы стилей**: `scripts/generate-style-references.mjs` генерирует нейтральные room shells, hero-сцены из наших товаров (3 варианта), vision-скор и material boards. Результат — `public/style-refs/*.webp` + `style-refs/seed.json`; миграция 015 и `src/stylerefseed.js` идемпотентно раскладывают их в storage.
+- **Пилот 5 стилей × 6 комнат**: 90 hero + 30 board + 6 shells. Авто-approve только при `total ≥ 7.5` и `style_score ≥ 7`; слабые варианты остаются в админке как альтернативы. В генерацию уходит один approved hero (не два), чтобы осталось 3 слота под товары/мебель.
+- **Админка**: референсы стиля показывают комнату, тип (hero/board/фото), score, статус; можно одобрить/скрыть/удалить, есть фильтр по комнате. В генерацию идут только approved.
+- **Скоринг**: `scoreStyleReference` оценивает стиль, комнату, красоту и материалы; одновременно служит «не пускать хлам» в референсы.
+- **Точный стиль важнее синонимов**: `styleScore` теперь даёт 1 за точный тег стиля и 0.6 за синоним — премиальная спальня в джапанди больше не получает графитовый шкаф вместо дуба.
+## 2026-10-27 — кабинет → новый редактор, шаринг, paste/URL референсов, прокси в админке
+
+- **Редактирование из кабинета** теперь ведёт на `/?panel=1&room=...` (новый генератор), а не на старый `/app`. Генератор подгружает комнату, фото, стиль, класс, последнюю версию и смету; «Изменить стиль» создаёт новую базовую генерацию.
+- **Публичные ссылки на дизайн**: `POST /api/renders/:id/share`, страница `/s/:token`, публичная картинка `/s/:token/image`. На странице только визуализация, лайки и комментарии; `noindex`. Токен 144-бит, лайк — по IP+UA, комментарии до 500 символов. В генераторе и кабинете — кнопка «Поделиться» с Telegram/VK/WhatsApp/копированием.
+- **Референс из буфера или ссылки**: в блоке стиля можно вставить файл из clipboard, выбрать файл или вставить URL (`style_ref_url`). В правке — прикрепить файл или ссылку (`ref_url`); сервер скачивает картинку с SSRF-защитой и прикрепляет как reference.
+- **Прокси в админке**: вкладка «Прокси», URL хранится в `app_settings` и применяется без рестарта, есть проверка `POST /api/admin/settings/proxy/test` (HTTP-статус, мс, ошибка) и отображение статуса. Пустое значение отключает env-прокси.
+## 2026-10-27 — импорт товаров по ссылке в админке
+
+- Новая вкладка **«Каталог»**: вставить URL товара → разобрать → проверить quality score и дубли → добавить черновиком → включить в каталог.
+- `src/productimport.js`: JSON-LD/OpenGraph/HTML-фолбэки, цена, бренд, артикул, рейтинг/отзывы, картинка; скачивание картинки с SSRF-защитой, EXIF-очисткой и проверкой размера; категория/класс/комнаты/стили по ключевым словам.
+- Allowlist доменов (`PRODUCT_IMPORT_DOMAINS`, по умолчанию 10 магазинов), quality checks: домен, цена, картинка, б/у/уценка, рейтинг, дубли по названию. Импорт не попадает в каталог автоматически — только черновик + ручное включение.
+- В таблице каталога: поиск, цена, класс, комнаты, статус, включение/выключение, удаление. `POST /api/admin/products/import` возвращает превью, `POST /api/admin/products` сохраняет черновик.
+- Тесты парсера JSON-LD/OG и категорий — 12/12.
+## 2026-10-27 — габариты товаров в импорте и промте
+
+- Добавлено поле `products.dimensions` (JSONB): `width_cm`, `depth_cm`, `height_cm`, `diameter_cm`, `text`, `raw`.
+- Импорт по ссылке извлекает габариты из JSON-LD (`width`/`depth`/`height`), `additionalProperty`, описания и карточки: мм/см/м/дюймы → см. В админке их можно поправить перед добавлением.
+- Для мебели без габаритов импорт даёт предупреждение и снижает quality score; аномальные ширина/высота тоже помечаются.
+- Габариты уходят в промт: `[dimensions: 180×200×120 см]`, плюс инструкция держать реальный масштаб — не превращать диван 220 см в кресло и не делать мозаику из плитки 60×120.
+- В правке с товарным референсом габариты передаются в `buildEditPrompt` (`refDimensions`).
+- Для существующей мебели каталога добавлены реальные габариты (миграция 018).
+- Тесты: 13/13, включая извлечение габаритов из JSON-LD/additionalProperty/описания.
+## 2026-10-27 — заказ товаров, генератор комплекта, массовый импорт
+
+- **Заказ товара**: ссылки из сметы теперь идут через `GET /go/:productId?r=renderId`. Сервер логирует клик в `product_clicks`, затем 302 на реальный URL товара или на поиск, если URL нет. Для товаров с URL кнопка называется «Заказать», для демо — «Найти похожие» (`direct_url`).
+- **Генератор комплекта в админке**: «Стили → Генератор комплекта» — выбираешь комнату и класс, система собирает по слотам только товары с реальным URL, показывает недостающие слоты и позволяет добавить весь комплект в `style_products`. Это и есть упрощённый style kit.
+- **Массовый импорт**: в «Каталоге» можно вставить до 20 URL, разобрать каждый, увидеть score/категорию/цену/allowlist и добавить нужные черновиками.
+- **Каталог**: клики по товарам и URL-статус видны в админке; URL можно поправить.
+- **Схема системы**: `docs/architecture.svg` + `docs/architecture.png` — карта клиента, сервера, внешних сервисов и путь генерации.
+## 2026-10-27 — режимы «мебель / каталог», стиль по референсу, единая зона референса
+
+- **Стиль по референсу без выбора стиля**: если стиль не выбран, но загружен файл/ссылка референса, комната создаётся со стилем «Референс пользователя», промт строится от референса. Если нет ни стиля, ни референса — API возвращает 400, UI не даёт запустить.
+- **Оставить мебель**: переключатель в шаге стиля. Вкл — сохраняем существующую мебель, можно двигать/переобивать. Выкл — AI может убрать/заменить свободно стоящую мебель; встроенное, сантехника и электрика остаются. Флаг `rooms.keep_furniture`, влияет на `KEEP` и добавляет `FURNITURE MODE`.
+- **Использовать каталог**: переключатель в шаге стиля. Вкл — подбор товаров, референсы, смета. Выкл — свободный дизайн без товаров и сметы (`rooms.use_catalog`), в промте `CATALOG DISABLED`, `render_items` не заполняется.
+- **Единая зона референса при правке**: вместо кнопки + отдельного URL-поля — dropzone. Можно кликнуть и выбрать файл, перетащить файл/ссылку, вставить из буфера файл или URL. Поддерживаются JPG/PNG/WebP и http(s)-ссылки; после выбора показывается превью или URL-chip с удалением.
+- **Смета без каталога**: в результате и кабинете показывается, что каталог был отключён и смета не формировалась.
+- Тесты: 14/14, включая режим без мебели и без каталога.
+## 2026-10-28 — редактируемые правила промта в админке
+
+- Новый раздел **Админка → Промт**: редактируются свет, уборка/техника, окна, Pinterest-стайлинг, правила мебели, каталога, дополнительный art direction и запреты.
+- Правила хранятся в `app_settings` (`prompt.rules.v1`), применяются к новым генерациям без деплоя. Есть сброс к заводским значениям.
+- `src/promptconfig.js` — дефолты и валидация; `buildPrompt` берёт art direction из конфига, а комнаты/стили/товары остаются в коде и БД.
+- В логах промтов по-прежнему видно фактический промт каждого рендера.
+- Добавлено поле «Фотография» (камера/свет/плёнка/grading, запрет CGI) и усилен режим «мебель не учитываем»: удалить мебель, зеркало, ТВ, люстру, шторы, декор и полностью обставить комнату с нуля.
+- Тесты: 14/14.
+## 2026-10-28 — FLUX.2 Pro: убран неподдерживаемый resolution
+
+- OpenRouter FLUX.2 Pro принимает aspect_ratio/input_references, но **не принимает `resolution`**. Мы отправляли `resolution: 2K` всем advanced-моделям → `/images` 400, затем бесполезный chat-fallback 404.
+- `supportsResolution()` теперь true только для Seedream; FLUX и Gemini resolution не получают.
+- Для Seedream/FLUX отключён chat-fallback: это image-only модели, fallback только прятал реальную ошибку `/images` 404-кой.
+- Ошибки `/images` теперь логируются с телом ответа; в админке для FLUX поле разрешения показывает «Задаётся моделью».
+- Тесты: 15/15.
+## 2026-10-28 — документация для людей и LLM
+
+- Добавлены `llms.txt` (карта проекта для LLM), `llms-full.txt` (полный контекст), `AGENTS.md` (правила для агентов).
+- Новые документы: `ARCHITECTURE.md`, `GENERATION.md`, `PROMPT-RULES.md`, `CATALOG.md`, `ADMIN.md`, `API.md`, `OPERATIONS.md`, `ROADMAP.md`, `DECISIONS.md`.
+- README переписан под текущее состояние; в docs зафиксировано главное ограничение: 100 демо-товаров, 0 реальных URL.
+- `npm run docs:llms` собирает `llms-full.txt` из README/AGENTS/docs.
+- Исторические `PLAN-3H.md` и `AUDIT-2026-10-26.md` помечены как архив.
+## Исправленные баги (важно помнить)
+
+- **Двойная генерация**: воркер не менял статус queued при старте — два слота брали одну задачу, каждый рендер оплачивался дважды. Лечится атомарным `UPDATE ... RETURNING` в `claimNextRender`.
+- Модель возвращала JPEG, сохранялся как `.png` — теперь расширение определяется по сигнатуре байтов (`detectImageExt`).
+- `npm start` игнорировал `.env` (нет dotenv) — исправлено через `--env-file` (Node ≥ 20.6).
+- `spendCredit`: `FOR UPDATE` с агрегатом невалиден в Postgres — блокируем строку `users`.
+
+## Не сделано (очередь)
+
+- Вотермарка на бесплатных рендерах (sharp, вшивать в файл на сервере).
+- Импорт каталога с сайтов поставщиков (таблица `suppliers` готова; LLM-нормализация; правило свежести цен: ответ LLM > сайт > старое, с датой и источником; фильтр по сайтам в матчинге).
+- Матчинг на эмбеддингах (SigLIP/CLIP) вместо пересечения ключевых слов.
+- Оценка размеров комнаты (metric depth — отдельный GPU-сервис).
+- PDF-смета (pdfkit/puppeteer), переключатель версий рендера в UI (`parent_render_id` уже пишется), TTL-чистка `data/`, аналитика воронки, рефералка.
+- Прод-конфиг VPS: `YUKASSA_SHOP_ID/SECRET` заданы, `PAYMENTS_ENABLED=true`, `REFUNDS_ENABLED=false`; осталось `RECEIPTS_WEBHOOK_URL` (чеки самозанятого), HTTP-уведомления ЮKassa, live-canary, backup/restore, apex-домен, опционально отключить SSH по паролю.
+

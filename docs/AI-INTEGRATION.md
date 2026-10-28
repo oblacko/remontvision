@@ -1,99 +1,69 @@
-# Как подключить другой ИИ (провайдера генерации)
+# AI-интеграция
 
-Генерация сейчас завязана на один модуль — `src/openrouter.js`. Остальной код общается с ИИ
-только через его экспорты, поэтому подключение другого провайдера (Replicate, fal.ai, Stability,
-собственный ComfyUI/SD-инстанс, другой gateway) = написать модуль с тем же контрактом
-и переключить импорты.
+Провайдер генерации и vision изолирован в `src/openrouter.js`. Остальной код общается с ним через экспорты.
 
-## Контракт модуля генерации (что реализовать)
+Актуальный пайплайн: [GENERATION.md](GENERATION.md). Правила промта: [PROMPT-RULES.md](PROMPT-RULES.md).
+
+## Текущая конфигурация
+
+- Render: `bytedance-seed/seedream-5-0-flash`, 1K, aspect auto.
+- Vision: `google/gemini-3-flash-preview` (в проде `google/gemini-3-flash-preview`).
+- Модели хранятся в `app_settings` и меняются в админке «Модели».
+- Прокси — `src/proxy.js`, применяется без рестарта.
+
+## Контракт модуля
 
 ```js
-export const MOCK_MODE;                    // true, если ключ не задан — демо-режим без расходов
-export function log(obj);                  // json-строка в stdout (ts, event, ...)
-export async function assertConfig();      // проверка конфига ДО старта; бросить Error с понятным текстом
-export async function listImageModels();   // [{ id: string, input_refs: bool }] → GET /api/models
-export function buildPrompt({ style, budget, requestText, iteration, products }); // → string
+export const MOCK_MODE;
+export function log(obj);
+export async function assertConfig();
+export async function listImageModels();
+export function buildPrompt({ style, priceTier, products, roomType, imageMap, keepFurniture, useCatalog, ... });
+export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabel, refDimensions });
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio });
-                                           // → { b64: string, cost: number|null, model: string|null }
-export async function parseRender(renderB64); // → { items: [{category, description, keywords}], cost: number|null }
-export function matchCatalog(items, products); // → [{ product, score }] (словесный черновик; см. план на эмбеддинги)
-export function snapAspect(width, height); // → "3:2" | "2:3" | ... — ближайшая поддерживаемая пропорция
-export const MAX_REFERENCES;               // сколько фото товаров передаём референсами (сейчас 4)
+export async function generateFromText({ prompt, aspectRatio }); // shells для style refs
+export async function parseRender(renderB64, mime);
+export function matchCatalog(items, products);
+export function snapAspect(width, height, allowed);
+export const MAX_REFERENCES; // 4
 ```
 
-Кто что потребляет:
+## Возможности моделей
 
-- `src/server.js` — `listImageModels` (`/api/models`), `assertConfig` (в `main()` до listen), `MOCK_MODE` (`/api/health`).
-- `src/jobs.js` (воркер) — `buildPrompt` (промпт со списком отобранных товаров), `generateRender`
-  (исходное фото + до 4 референсов + aspect), `parseRender`/`matchCatalog` (только фолбэк,
-  когда каталог пуст), `log`.
-- `src/curate.js` — не трогает провайдера; готовит `referenceImagesB64` (data URL base64) сам.
+`src/modelcaps.js`:
 
-## Требования к возможностям провайдера
+- Seedream: `resolution` 1K/2K, aspect.
+- FLUX: aspect; **resolution не отправляется**; content moderation возможен.
+- Gemini: resolution не отправляется; aspect из безопасного списка.
+- `supportsResolution()` true только для Seedream.
+- Для Seedream/FLUX нет chat-fallback: это image-only модели.
 
-Обязательно:
+## Провайдерские грабли
 
-1. **Image-to-image редактирование**: принимает исходное фото + текстовый промпт, возвращает
-   новое изображение (base64 или URL — URL докачать и отдать b64). Наш промпт построен на
-   инструкции «keep camera/walls» — провайдер должен уметь сохранять геометрию исходника.
-2. **Стоимость в ответе** или прайс-таблица для расчёта `cost` (юнит-экономика в БД/логах).
-3. **Таймауты/ретраи**: пример в `fetchWithRetry` (текущий модуль) — перенести или оставить
-   общий хелпер.
+- `/images` 400 → смотреть тело ошибки; не маскировать chat-fallback.
+- FLUX.2 Pro: не поддерживает `resolution`; BFL может блокировать спальни/кровати.
+- Формат выхода может быть JPEG/WebP/PNG — определять по сигнатуре (`detectImageExt`).
+- Стоимость суммировать по `usage.cost`.
+- Референсы дорожают: следить за `refs` и `MAX_REFERENCES`.
+- Прокси: OpenRouter WAF может блокировать IP VPS; `HTTPS_PROXY`/`proxy.url`.
 
-Желательно (есть фолбэки, если нет):
+## Добавить провайдера
 
-- `input_references` (до 4 картинок товаров) — без них новое ядро каталога деградирует к
-  «сгенерировали → подогнали», качество сметы падает. Если референсов нет — передавать пустой
-  массив, `generateRender` это допускает.
-- Управление пропорциями (`aspect_ratio`): без него используем `snapAspect` только для
-  валидации, выходное соотношение определяется провайдером (проверить на вертикальных фото).
-- Vision-разбор рендера в JSON (`parseRender`): если у нового провайдера нет подходящей
-  vision-модели, можно оставить OpenRouter vision как фолбэк-зависимость, либо вернуть
-  `{ items: [], cost: null }` — тогда при пустом каталоге смета будет пустой (см. «Подводные камни»).
+1. Создать `src/provider-<name>.js` с контрактом выше.
+2. Переключить импорты в `src/server.js` и `src/jobs.js` (или фабрику по env).
+3. Добавить ключи в env.
+4. Проверить `assertConfig`, `/api/models`, один живой рендер, итерацию, вертикальное фото.
+5. Обновить `modelcaps.js` и docs.
 
-## Шаги подключения
+## Не входит в провайдера
 
-1. Создать `src/provider-<name>.js` с контрактом выше (образец — `src/openrouter.js`:
-   два эндпоинта, retry/backoff, фолбэк-модель, накопление стоимости по попыткам).
-2. Переключить импорты: в `src/server.js` и `src/jobs.js` заменить
-   `from './openrouter.js'` на новый модуль (либо ввести `AI_PROVIDER` в env и фабрику-импорт —
-   тогда переключение без правки кода).
-3. `.env` (локально и на сервере, на сервере отдельно — деплой его не трогает):
-   ключи провайдера (`<NAME>_API_KEY`), `RENDER_MODEL`, `VISION_MODEL`, `RENDER_MODEL_FALLBACK`.
-4. Если у провайдера свой список моделей — адаптировать `assertConfig`/`listImageModels`
-   (сейчас сверяются со списками OpenRouter: `/images/models` и `/models`).
-5. Проверка (локально, одна машина):
-   - без ключа: `/api/health` → `mock:true`, полный флоу на демо-картинке;
-   - с ключом: `/api/models` отдаёт список, `assertConfig` не падает;
-   - один живой рендер: в логе `render_image_ok` (model, aspect, refs, cost_usd) и `render_done`;
-   - итерация `POST /api/rooms/:id/iterate` — рендер обновился, смета сохранилась;
-   - вертикальное фото не портится (пропорции на выходе).
-6. Коммит в `main` → автодеплой на VPS (`docs/HISTORY.md`).
+- Эмбеддинг-матчинг товаров (pgvector/CLIP) — отдельный слой.
+- Metric depth/размеры комнаты — отдельный сервис.
+- Inpainting/маски — следующий этап.
+- Двухстадийная генерация — orchestration в `jobs.js`, не провайдер.
 
-## Подводные камни (по опыту)
+## Связанные документы
 
-- **WAF/геоблоки**: OpenRouter блокировал диапазон IP хостера VPS (`403 security policy`),
-  лечится `HTTPS_PROXY` в env (undici ProxyAgent, поддержка уже в коде). У нового провайдера
-  проверьте доступность с IP сервера заранее (`curl` с VPS).
-- **Формат выхода**: модель может вернуть JPEG вместо PNG — расширение определяется
-  сигнатурой байтов (`detectImageExt`), не доверяйте заголовкам ответа.
-- **Референсы дорожают**: каждая картинка в запросе добавляет токены/деньги — замерьте
-  `cost_usd` с `refs:4` и без; при необходимости уменьшите `MAX_REFERENCES` (в `curate.js`
-  выборка тоже идёт по этой константе).
-- **Мок-режим**: `MOCK_MODE` должен включаться отсутствием ключа, чтобы демо работало
-  без расходов и регрессии гонялись бесплатно.
-- **Стоимость vs качество**: текущая связка gemini-3.1-flash-image ≈ $0.069/рендер; при
-  смене провайдера пересчитайте прайсинг кредитов (`src/payments.js`, пакеты 99/229/599 ₽).
-- **Rate limits провайдера**: воркер держит 2 параллельных слота; провайдер должен это выдерживать
-  либо уменьшите слоты в `startWorker`.
-
-## Связанные будущие ИИ-интеграции (не провайдер рендера)
-
-- **Эмбеддинг-матчинг** (п.9): SigLIP/CLIP — сервис эмбеддингов товаров и описаний рендера,
-  косинусная близость вместо `matchCatalog`. Точка входа — замена `matchCatalog` на вызов
-  эмбеддинг-сервиса; схема `products` уже имеет поля под это.
-- **Metric depth** (п.12): оценка размеров комнаты (DepthPro/Metric3D v2) — отдельный
-  GPU-микросервис; в OpenRouter нет. После него считать `qty` сметы из площади вместо
-  захардкоженных значений.
-- **LLM-нормализация каталога** (импорт с сайтов поставщиков): отдельный воркер,
-  приводящий сырые карточки к таксономии категорий; та же обвязка retry/proxy пригодится.
+- [GENERATION.md](GENERATION.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [OPERATIONS.md](OPERATIONS.md)

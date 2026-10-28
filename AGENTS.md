@@ -1,0 +1,112 @@
+# AGENTS.md
+
+Инструкции для LLM-агентов и разработчиков, которые меняют этот репозиторий.
+
+## Что это за проект
+
+`ремонтвижн` — AI-редизайн интерьера по фото. Пользователь загружает фото, выбирает комнату/стиль/класс материалов, получает визуализацию, смету товаров, RAL и рекомендации по электрике. Есть кабинет, публичный шаринг, админка, импорт товаров, кредиты и платежи.
+
+Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt).
+
+## Главное, что нужно знать до изменений
+
+1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
+2. **Текущая модель генерации** — `bytedance-seed/seedream-5-0-flash`, vision — `google/gemini-3-flash-preview`, 1K, aspect auto. Настройки в `app_settings`, меняются через админку.
+3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true только для Seedream. У FLUX также возможна блокировка content moderation на спальнях/кроватях — не включайте его без проверки.
+4. **Промт состоит из двух слоёв:**
+   - код: `src/openrouter.js`, `src/roomtypes.js`;
+   - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
+   Не дублируйте правила в разных местах: меняйте defaults в `promptconfig.js` и/или через админку.
+5. **Смета первого рендера:** curated-товары — источник истины, vision только добавляет недостающие категории. Правка копирует смету родителя и заменяет только target.
+6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/ЮKassa/Resend, пароль прокси — только на сервере/локально.
+
+## Команды
+
+```bash
+# Backend
+npm install
+npm test                    # node:test, 15 тестов
+npm start                   # Node 20.6+, .env через node --env-file
+
+# Frontend
+cd web
+npm install
+npm run build               # tsc -b + vite build → web/dist
+
+# Локальная БД
+docker compose up -d db     # Postgres 127.0.0.1:5434
+```
+
+Проверка синтаксиса:
+
+```bash
+node --check src/server.js
+node --check src/jobs.js
+node --check src/openrouter.js
+```
+
+## Деплой
+
+- Пуш в `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH на VPS → `git pull` + `docker compose up -d --build` + smoke.
+- Smoke проверяет `/api/health`, наличие `id="root"` на `/`, доступность `/app`.
+- Миграции накатываются при старте контейнера из `migrations/*.sql` (append-only, учёт в `_migrations`).
+- `.env` на VPS деплоем не перезаписывается.
+- После изменений обновляйте `docs/HISTORY.md` и relevant docs.
+
+## Где что менять
+
+| Задача | Файлы |
+|---|---|
+| Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
+| Правила комнат, слоты, запреты | `src/roomtypes.js` |
+| Подбор товаров | `src/curate.js` |
+| Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
+| Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
+| API, auth, admin, share | `src/server.js` |
+| SQL/данные | `src/db.js`, `migrations/` |
+| Каталог | `catalog/seed.json`, `public/catalog/`, `src/catalogseed.js` |
+| Импорт товаров | `src/productimport.js`, `src/remoteimage.js` |
+| Стилевые референсы | `scripts/generate-style-references.mjs`, `style-refs/`, `src/stylerefseed.js` |
+| Модели/прокси | `src/modelconfig.js`, `src/modelcaps.js`, `src/proxy.js` |
+| UI генератора | `web/src/components/GenerationPanel.tsx` |
+| Кабинет | `web/src/pages/Cabinet.tsx` |
+| Админка | `web/src/pages/Admin.tsx` |
+| Публичный шаринг | `web/src/pages/Share.tsx`, `web/src/components/ShareDialog.tsx` |
+
+## Конвенции
+
+- Backend — ESM, Node 20, без TypeScript.
+- SQL-миграции только добавлять новыми файлами; не редактировать уже применённые.
+- `db.js` при импорте без `RV_DATABASE_URL` делает `process.exit(1)`. В unit-тестах не импортируйте `db.js` напрямую; в `modelconfig.js`/`promptconfig.js` используйте динамический импорт.
+- Промт-правила по умолчанию — в `promptconfig.js`; `buildPrompt` берёт их из `getPromptConfig()`.
+- Для асинхронных route-обработчиков использовать `h()`.
+- Внешние изображения по URL — только через `fetchRemoteImage` (SSRF-защита).
+- Секреты/URL прокси маскировать в API (`maskProxy`).
+- Не запускать долгоживущий локальный сервер в фоне; для проверок — `timeout`/`curl`/скрипт.
+
+## Тесты и проверка
+
+- `npm test` — 15 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps.
+- `cd web && npm run build` — TypeScript + Vite.
+- Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
+- При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
+
+## Известные ограничения (на 2026-10-28)
+
+- Нет реального каталога с URL → нет реальных заказов.
+- Нет двухстадийной генерации «пустой каркас → дизайн» (обсуждается; 2 вызова/кредиты).
+- Нет inpainting для люстр/розеток; позиции могут плавать.
+- Нет автоматического обновления цен/наличия и фидов.
+- Нет автоматических бэкапов, метрик и алертов.
+- Старый редактор `/app` не переделан в новый стиль.
+- Возвраты выключены (`REFUNDS_ENABLED=false`), чеки — вручную.
+
+## Definition of done
+
+1. `npm test` зелёный.
+2. `web` собирается.
+3. Обновлён `docs/HISTORY.md`.
+4. Обновлены relevant docs и, если менялась архитектура/статус, `llms.txt`/`llms-full.txt`.
+5. Нет секретов в diff.
+6. `npm run docs:llms` при изменении документации.
+7. Деплой прошёл, smoke зелёный.

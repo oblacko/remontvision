@@ -1,3 +1,5 @@
+> **Historical plan (2026-10-26).** Current roadmap: [ROADMAP.md](ROADMAP.md).
+
 # План стабилизации «ремонтвижн» на 3 часа
 
 Связанный отчет: `docs/AUDIT-2026-10-26.md`.

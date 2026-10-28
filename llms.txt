@@ -1,0 +1,96 @@
+# Remontvision (ремонтвижн)
+
+> AI-сервис редизайна интерьера по фото: генерация визуализации, подбор материалов и товаров, смета, RAL, электрика, точечные правки, кабинет, публичный шаринг и админка.
+
+Repo: https://github.com/oblacko/remontvision (private)  
+Prod: https://www.remontvision.ru  
+Last updated: 2026-10-28
+
+## Start here
+
+- [README](https://github.com/oblacko/remontvision/blob/main/README.md) — human overview, status, quick start.
+- [AGENTS.md](https://github.com/oblacko/remontvision/blob/main/AGENTS.md) — rules and commands for coding agents.
+- [docs/ARCHITECTURE.md](https://github.com/oblacko/remontvision/blob/main/docs/ARCHITECTURE.md) — components, data model, deploy.
+- [docs/GENERATION.md](https://github.com/oblacko/remontvision/blob/main/docs/GENERATION.md) — generation pipeline and prompt.
+- [docs/CATALOG.md](https://github.com/oblacko/remontvision/blob/main/docs/CATALOG.md) — products, styles, import, orders.
+- [docs/ADMIN.md](https://github.com/oblacko/remontvision/blob/main/docs/ADMIN.md) — admin tabs.
+- [docs/PROMPT-RULES.md](https://github.com/oblacko/remontvision/blob/main/docs/PROMPT-RULES.md) — editable prompt rules.
+- [docs/API.md](https://github.com/oblacko/remontvision/blob/main/docs/API.md) — API reference.
+- [docs/OPERATIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/OPERATIONS.md) — prod, deploy, TLS, proxy, backups.
+- [docs/ROADMAP.md](https://github.com/oblacko/remontvision/blob/main/docs/ROADMAP.md) — launch plan.
+- [docs/DECISIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/DECISIONS.md) — key decisions.
+- [docs/HISTORY.md](https://github.com/oblacko/remontvision/blob/main/docs/HISTORY.md) — chronological changelog.
+- [llms-full.txt](https://github.com/oblacko/remontvision/blob/main/llms-full.txt) — full docs in one file.
+
+## Current state (2026-10-28)
+
+- Generation: Seedream 5.0 Flash, 1K, aspect auto; vision Gemini 3 Flash.
+- 10 styles, 12 room types, 100 active demo products, **0 products with real URL**.
+- 120 style references, 26 approved (pilot 5 styles × 6 rooms).
+- Prompt rules editable in admin (`app_settings.prompt.rules.v1`).
+- Catalog import by URL and bulk list; drafts only, manual activation.
+- Order links use `/go/:productId?r=renderId`; demo products fall back to search.
+- Share page `/s/:token` with likes/comments.
+- Payments on (YooKassa), refunds off.
+- Main launch blocker: no real product URLs → no real orders.
+
+## Architecture (short)
+
+- Node 20 + Express + PostgreSQL 16 + worker in `src/jobs.js`.
+- React/Vite frontend in `web/`.
+- Nginx + Let's Encrypt; apex → 301 → www.
+- OpenRouter for image + vision; optional proxy for WAF.
+- Storage: disk or S3.
+- Deploy: push `main` → GitHub Actions → VPS Docker Compose + smoke.
+
+## Generation flow (short)
+
+1. `POST /api/rooms` with photo, room type, style or reference, tier, flags.
+2. Credit + `render(status=queued)`.
+3. Worker: room/style/tier → style refs → curate products by slot → prompt → image → vision → estimate.
+4. `render_items` + `renders.analysis` + `done`.
+5. Edit: parent render + short edit prompt + target reference.
+6. Share/links: `/s/:token`, `/go/:id`.
+
+## Key files
+
+- `src/server.js` — HTTP API/auth/admin/share/payments.
+- `src/jobs.js` — worker.
+- `src/openrouter.js` — provider, prompt, vision, matching.
+- `src/promptconfig.js` — prompt defaults/config.
+- `src/roomtypes.js` — room slots/keep/change/styling.
+- `src/curate.js` — product selection + refs.
+- `src/productimport.js` — URL import.
+- `src/modelcaps.js` — model capabilities.
+- `src/db.js` + `migrations/` — data.
+- `web/src/components/GenerationPanel.tsx` — generator UI.
+- `web/src/pages/Admin.tsx`, `Cabinet.tsx`, `Share.tsx`.
+
+## Commands
+
+```bash
+npm install
+npm test                 # 15 tests
+npm start                # Node >=20.6, --env-file
+cd web && npm run build  # tsc + vite
+docker compose up -d db  # local Postgres 127.0.0.1:5434
+```
+
+## Constraints / gotchas
+
+- `.env` secrets are not committed.
+- DB env is `RV_DATABASE_URL`, not `DATABASE_URL`.
+- FLUX.2 Pro does not accept `resolution`; may be blocked by content moderation.
+- Seedream/FLUX are image-only: do not use chat fallback.
+- Demo catalog has no real URLs; do not claim real checkout works.
+- No two-stage generation or inpainting yet.
+- No automated backups/metrics yet.
+- `db.js` exits without `RV_DATABASE_URL`; avoid importing it in unit tests.
+
+## Next priorities
+
+1. Import 20–50 real products with URLs for one style/room.
+2. Build a style kit from real products, re-generate hero refs.
+3. Validate `/go` and real order links.
+4. Add two-stage generation (empty shell → design) and inpainting.
+5. Add feeds/CPA, price/availability sync, backups/monitoring.
