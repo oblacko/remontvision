@@ -75,8 +75,8 @@ export const q = {
                 WHERE r.image_path = $1 OR r.image_path LIKE '%/' || $1 LIMIT 1`, [key])
       .then(r => r.rows[0] || null),
   renderPathsForRoom: roomId =>
-    pool.query(`SELECT image_path FROM renders WHERE room_id = $1 AND image_path IS NOT NULL`, [roomId])
-      .then(r => r.rows.map(row => row.image_path)),
+    pool.query(`SELECT image_path, shell_path FROM renders WHERE room_id = $1 AND (image_path IS NOT NULL OR shell_path IS NOT NULL)`, [roomId])
+      .then(r => r.rows.flatMap(row => [row.image_path, row.shell_path]).filter(Boolean)),
   setRoomStatus: (status, id) =>
     pool.query(`UPDATE rooms SET status = $1, error = NULL, updated_at = now() WHERE id = $2`, [status, id]),
   setRoomError: (error, id) =>
@@ -92,6 +92,8 @@ export const q = {
     pool.query(`INSERT INTO renders (id, room_id, parent_render_id, request_text, prompt) VALUES ($1,$2,$3,$4,$5)`,
       [id, roomId, parentRenderId, requestText, prompt]),
   getRender: id => pool.query(`SELECT * FROM renders WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  setRenderShellPath: (id, shellPath) =>
+    pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),
   setRenderDone: (imagePath, costUsd, model, id) =>
     pool.query(`UPDATE renders SET status='done', image_path = $1, cost_usd = $2, model = $3,
                 finished_at = now(),

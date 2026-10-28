@@ -24,6 +24,7 @@ import { validateModelOptions } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
+import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig } from './cleanupconfig.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -641,6 +642,40 @@ app.get('/api/admin/settings/models', h(async (req, res) => {
   res.json({ render_model: config.render, vision_model: config.vision, resolution: config.resolution, aspect_ratio: config.aspectRatio, image_models: imageModels });
 }));
 
+app.get('/api/admin/settings/cleanup', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ config: getCleanupConfig(), defaults: getCleanupDefaults() });
+}));
+
+app.put('/api/admin/settings/cleanup', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const cfg = req.body?.config || req.body || {};
+  try {
+    if (!cfg.model) return res.status(400).json({ error: 'Нужна модель очистки' });
+    const optionsError = validateModelOptions(String(cfg.model), String(cfg.resolution || '1K'), String(cfg.aspect_ratio || 'auto'));
+    if (optionsError) return res.status(400).json({ error: optionsError });
+    const listed = await listImageModels();
+    const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
+    if (!imageModels.find(m => m.id === String(cfg.model))) return res.status(400).json({ error: 'Модель очистки не найдена среди image-моделей' });
+    const config = await saveCleanupConfig(cfg);
+    log({ event: 'cleanup_config_saved', model: config.model, resolution: config.resolution, aspect_ratio: config.aspect_ratio, enabled: config.enabled });
+    res.json({ config, defaults: getCleanupDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/settings/cleanup/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const config = await resetCleanupConfig();
+    log({ event: 'cleanup_config_reset' });
+    res.json({ config, defaults: getCleanupDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
 app.get('/api/admin/settings/prompt', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json({ config: getPromptConfig(), defaults: getPromptDefaults() });
@@ -1117,6 +1152,7 @@ async function main() {
   await loadModelConfig();  // модели из app_settings / env
   await loadProxyConfig();  // прокси из app_settings / env
   await loadPromptConfig(); // редактируемые правила промта из app_settings
+  await loadCleanupConfig(); // очистка комнаты: модель/промт из app_settings
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }

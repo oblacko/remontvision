@@ -10,6 +10,17 @@ export const MODEL_CAPS = {
   other: { resolutions: ['1K', '2K'], aspects: SAFE_ASPECTS },
 };
 
+// У FLUX разные возможности по моделям: FLUX 3 Klein принимает resolution,
+// FLUX 2 Pro — нет (см. OpenRouter model docs).
+export function modelCaps(id) {
+  const s = String(id || '');
+  if (/^bytedance-seed\/seedream/.test(s)) return MODEL_CAPS.seedream;
+  if (/^black-forest-labs\/flux-3-image/.test(s)) return { resolutions: ['768', '1K', '1.5K', '2K', '4K'], aspects: FLUX_ASPECTS };
+  if (/^black-forest-labs\/flux/.test(s)) return MODEL_CAPS.flux;
+  if (/^google\//.test(s)) return MODEL_CAPS.google;
+  return MODEL_CAPS.other;
+}
+
 export function modelFamily(id) {
   const s = String(id || '');
   if (/^bytedance-seed\/seedream/.test(s)) return 'seedream';
@@ -24,12 +35,12 @@ export function supportsAdvancedOptions(id) {
 }
 
 export function supportsResolution(id) {
-  return modelFamily(id) === 'seedream';
+  return supportsAdvancedOptions(id) && modelCaps(id).resolutions.length > 0;
 }
 
 export function validateModelOptions(id, resolution, aspectRatio) {
   const family = modelFamily(id);
-  const caps = MODEL_CAPS[family];
+  const caps = modelCaps(id);
   if (!caps) return null;
   if (supportsAdvancedOptions(id)) {
     // FLUX 2 Pro (и текущее семейство FLUX в OpenRouter Image API) не принимает resolution:

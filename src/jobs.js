@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, parseRender, matchCatalog, snapAspect, supportsInputRefs, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, parseRender, matchCatalog, snapAspect, supportsInputRefs, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { curateProducts, referenceImagesDetailed, hasImage } from './curate.js';
@@ -14,7 +14,8 @@ import { roomTypeByName } from './roomtypes.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
-import { modelFamily, MODEL_CAPS } from './modelcaps.js';
+import { modelCaps } from './modelcaps.js';
+import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -82,6 +83,8 @@ async function processRender(renderId) {
   const priceTier = normalizeTier(room.price_tier || 'comfort');
   const keepFurniture = room.keep_furniture !== false;
   const useCatalog = room.use_catalog !== false;
+  const cleanupCfg = getCleanupConfig();
+  const useCleanup = !iteration && !keepFurniture && cleanupCfg.enabled;
   let stage = 'start';
 
   try {
@@ -99,6 +102,7 @@ async function processRender(renderId) {
       price_tier: priceTier,
       keep_furniture: keepFurniture,
       use_catalog: useCatalog,
+      cleanup_enabled: useCleanup,
       style: room.style,
       target: render.edit_target || null,
       product_ids: [],
@@ -169,7 +173,7 @@ async function processRender(renderId) {
             ? 'style cover reference — mood and materials only'
             : 'style reference — mood, furniture character, materials and lighting; do not copy layout';
       imageMap = [
-        { role: 'source room', label: 'preserve architecture, camera and room proportions' },
+        { role: useCleanup ? 'source room or prepared empty shell' : 'source room', label: 'preserve architecture, camera and room proportions' },
         ...chosenStyleRefs.map((ref) => ({ role: styleRole(ref.kind), label: ref.title || '' })),
         ...productRefs.map(r => ({ role: 'product reference', label: `${r.product.name} — ${r.product.category}` })),
       ];
@@ -210,21 +214,62 @@ async function processRender(renderId) {
     } else {
       stage = 'rendering';
       await q.setRoomStatus('rendering', room.id);
-      const srcBuf = await getBuffer(sourceStored);
-      const { width, height } = imageSize(srcBuf);
+      const originalBuf = await getBuffer(sourceStored);
+      const { width, height } = imageSize(originalBuf);
       targetRatio = width / height;
-      const family = modelFamily(getModelConfig().render);
-      const allowedAspects = MODEL_CAPS[family]?.aspects || null;
-      const aspectRatio = snapAspect(width, height, allowedAspects);
-      const srcB64 = await bufferToDataUrl(srcBuf);
+      const renderModel = getModelConfig().render;
+      const aspectRatio = snapAspect(width, height, modelCaps(renderModel).aspects);
+      let designBuf = originalBuf;
+      let cleanupCost = 0;
+
+      if (useCleanup) {
+        const cleanupStart = Date.now();
+        try {
+          const cleanupPrompt = buildCleanupPrompt(roomType);
+          const cleanupAspect = cleanupCfg.aspect_ratio === 'auto'
+            ? snapAspect(width, height, modelCaps(cleanupCfg.model).aspects)
+            : cleanupCfg.aspect_ratio;
+          const cleanupOut = await generateCleanupRender({
+            prompt: cleanupPrompt,
+            sourceImageB64: await bufferToDataUrl(originalBuf),
+            aspectRatio: cleanupAspect,
+            model: cleanupCfg.model,
+            resolution: cleanupCfg.resolution,
+            aspect: cleanupCfg.aspect_ratio,
+          });
+          let shellBytes = Buffer.from(cleanupOut.b64, 'base64');
+          shellBytes = await fitAspect(shellBytes, targetRatio);
+          const shellExt = detectImageExt(shellBytes);
+          const shellKey = `shells/${render.id}.${shellExt}`;
+          await putBuffer(shellKey, shellBytes, MIME_BY_EXT[shellExt] || 'image/png');
+          await q.setRenderShellPath(render.id, shellKey);
+          designBuf = shellBytes;
+          cleanupCost = cleanupOut.cost || 0;
+          meta.cleanup = {
+            model: cleanupCfg.model,
+            resolution: cleanupCfg.resolution,
+            aspect_ratio: cleanupAspect,
+            cost_usd: cleanupOut.cost ?? null,
+            ms: Date.now() - cleanupStart,
+            shell_path: shellKey,
+            prompt: cleanupPrompt,
+          };
+          log({ event: 'cleanup_done', room_id: room.id, render_id: renderId, model: cleanupCfg.model, aspect: cleanupAspect, cost_usd: cleanupOut.cost ?? null, ms: Date.now() - cleanupStart });
+        } catch (e) {
+          meta.cleanup = { model: cleanupCfg.model, error: String(e.message || e).slice(0, 500), ms: Date.now() - cleanupStart };
+          log({ event: 'cleanup_error', room_id: room.id, render_id: renderId, model: cleanupCfg.model, error: String(e.message || e).slice(0, 500) });
+        }
+      }
+
+      const srcB64 = await bufferToDataUrl(designBuf);
       const out = await generateRender({
         prompt,
         sourceImageB64: srcB64,
         referenceImagesB64,
         aspectRatio,
       });
-      imageB64 = out.b64; cost = out.cost; model = out.model || null;
-      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cost_usd: cost, ms: Date.now() - t0 });
+      imageB64 = out.b64; cost = (cleanupCost || 0) + (out.cost || 0); model = out.model || null;
+      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
     }
 
     const rawBytes = Buffer.from(imageB64, 'base64');

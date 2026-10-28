@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles' | 'rules' | 'prompts' | 'models' | 'proxy' | 'catalog'
+type Tab = 'users' | 'packs' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'proxy' | 'catalog'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -22,7 +22,7 @@ type PromptRow = {
   request_text: string | null; prompt: string | null; model: string | null;
   cost_usd: number | null; duration_ms: number | null; credits_spent: number | null;
   image_url: string | null; photo_url: string | null;
-  meta?: { mode?: string; target?: string | null; refs?: Array<{ index: number; role: string; label?: string }> } | null;
+  meta?: { mode?: string; target?: string | null; refs?: Array<{ index: number; role: string; label?: string }>; cleanup?: { model?: string; resolution?: string; cost_usd?: number | null; shell_path?: string; error?: string } | null } | null;
 }
 type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
@@ -47,6 +47,7 @@ type Product = {
 }
 type KitSlot = { key: string; label: string; product: { id: number; name: string; price: number; unit: string; price_tier: string; url: string | null; image_url: string | null; dimensions?: { text?: string } | null } | null };
 type KitResult = { style_id: number; style: string; room_type: string; price_tier: string; slots: KitSlot[]; missing: string[]; product_ids: number[] };
+type CleanupConfig = { enabled: boolean; model: string; resolution: string; aspect_ratio: string; prompt: string };
 type ImportPreview = {
   url: string; domain: string; allowed_domain: boolean;
   name: string; brand: string; description: string; price: number; currency: string;
@@ -77,13 +78,18 @@ const modelFamily = (id: string) =>
   /^bytedance-seed\/seedream/.test(id) ? 'seedream'
     : /^black-forest-labs\/flux/.test(id) ? 'flux'
       : /^google\//.test(id) ? 'google' : 'other'
+const fluxAspects = ['auto','21:9','2:1','16:9','3:2','7:5','4:3','5:4','1:1','4:5','3:4','5:7','2:3','9:16','1:2','9:21']
 const modelCaps: Record<string, { resolutions: string[]; aspects: string[] }> = {
   seedream: { resolutions: ['1K', '2K'], aspects: ['auto','1:1','1:2','2:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9','9:19.5','19.5:9','9:20','20:9','9:21','21:9'] },
   flux: { resolutions: [], aspects: ['auto','21:9','2:1','16:9','3:2','7:5','4:3','5:4','1:1','4:5','3:4','5:7','2:3','9:16','1:2','9:21'] },
   google: { resolutions: ['1K'], aspects: ['auto','1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9'] },
   other: { resolutions: ['1K', '2K'], aspects: ['auto','1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9'] },
 }
-const capsFor = (id: string) => modelCaps[modelFamily(id)] || modelCaps.other
+const capsFor = (id: string) => {
+  if (id.includes('flux-3-image')) return { resolutions: ['768', '1K', '1.5K', '2K', '4K'], aspects: fluxAspects }
+  if (id.includes('flux.2-pro')) return { resolutions: [], aspects: fluxAspects }
+  return modelCaps[modelFamily(id)] || modelCaps.other
+}
 
 const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
@@ -164,6 +170,9 @@ export default function Admin() {
   const [promptConfig, setPromptConfig] = useState<Record<string, string> | null>(null)
   const [promptRulesBusy, setPromptRulesBusy] = useState(false)
   const [promptRulesNotice, setPromptRulesNotice] = useState('')
+  const [cleanupConfig, setCleanupConfig] = useState<CleanupConfig | null>(null)
+  const [cleanupBusy, setCleanupBusy] = useState(false)
+  const [cleanupNotice, setCleanupNotice] = useState('')
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -304,6 +313,32 @@ export default function Admin() {
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
     finally { setCatalogBusy(false) }
   }
+  const loadCleanup = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/cleanup'))
+      setCleanupConfig(d.config || null); setCleanupNotice('')
+      if (!modelSettings) await loadModels()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const saveCleanup = async () => {
+    if (!cleanupConfig) return
+    setCleanupBusy(true); setCleanupNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/cleanup', { method: 'PUT', body: JSON.stringify({ config: cleanupConfig }) }))
+      setCleanupConfig(d.config || null)
+      setCleanupNotice('Настройки очистки сохранены')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setCleanupBusy(false) }
+  }
+  const resetCleanup = async () => {
+    setCleanupBusy(true); setCleanupNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/cleanup/reset', { method: 'POST' }))
+      setCleanupConfig(d.config || null)
+      setCleanupNotice('Возвращены заводские настройки очистки')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setCleanupBusy(false) }
+  }
   const loadPromptRules = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/prompt'))
@@ -382,7 +417,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -571,7 +606,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -794,6 +829,7 @@ export default function Admin() {
                         <p className="mt-1 text-muted-foreground">{p.style}{p.room_type ? ` · ${p.room_type}` : ''} · класс {p.price_tier || 'comfort'} · {p.credits_spent ?? '—'} кр.</p>
                         {p.meta?.refs?.length ? <p className="mt-1 text-muted-foreground">Референсы: {p.meta.refs.map(r => `${r.index}. ${r.role}${r.label ? ` (${r.label})` : ''}`).join(' · ')}</p> : null}
                         {p.meta?.mode === 'edit' && p.meta.target ? <p className="mt-1 text-muted-foreground">Правка: {p.meta.target}</p> : null}
+                        {p.meta?.cleanup ? <p className="mt-1 text-muted-foreground">Очистка: {p.meta.cleanup.model || '—'} {p.meta.cleanup.resolution || ''}{p.meta.cleanup.error ? ` · ошибка: ${p.meta.cleanup.error}` : p.meta.cleanup.cost_usd != null ? ` · $${p.meta.cleanup.cost_usd}` : ''}</p> : null}
                         <p className="mt-1 text-muted-foreground">{p.model || '—'} · {p.cost_usd != null ? `$${p.cost_usd}` : '—'}{p.duration_ms ? ` · ${(p.duration_ms / 1000).toFixed(1)} с` : ''}</p>
                         <p className="mt-1">{p.request_text || 'Базовый дизайн'}</p>
                       </div>
@@ -932,6 +968,28 @@ export default function Admin() {
                   </table>
                 </div>
               </section>
+            </div>
+          )}
+
+          {tab === 'cleanup' && (
+            <div className="mt-8 max-w-4xl">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div><p className="eyebrow">Очистка комнаты перед дизайном</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Первый проход оставляет только архитектуру: стены, пол, потолок, окно, дверь и перспективу. Применяется только когда пользователь выключил «Оставить мебель». Если «Оставить мебель» включено — очистка не запускается. По умолчанию включена.</p></div>
+                <div className="flex gap-2"><button type="button" disabled={cleanupBusy} onClick={() => void resetCleanup()} className="action-secondary">Сбросить</button><button type="button" disabled={cleanupBusy} onClick={() => void saveCleanup()} className="action-primary">{cleanupBusy ? 'Сохраняем…' : 'Сохранить'}</button></div>
+              </div>
+              {cleanupNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{cleanupNotice}</p>}
+              {cleanupConfig ? (
+                <div className="mt-6 space-y-5">
+                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={cleanupConfig.enabled} onChange={e => setCleanupConfig({ ...cleanupConfig, enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Очистка включена</span><span className="mt-1 block text-xs text-muted-foreground">Если выключить, при «Оставить мебель = выкл» сразу пойдёт обычный дизайн без пустого каркаса.</span></span></label>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="sm:col-span-2"><label className="eyebrow mb-2 block">Модель очистки</label><select value={cleanupConfig.model} onChange={e => { const value = e.target.value; const caps = capsFor(value); const nextRes = caps.resolutions.length ? (caps.resolutions.includes(cleanupConfig.resolution) ? cleanupConfig.resolution : caps.resolutions[0]) : ''; const nextAspect = caps.aspects.includes(cleanupConfig.aspect_ratio) ? cleanupConfig.aspect_ratio : (caps.aspects.includes('auto') ? 'auto' : caps.aspects[0]); setCleanupConfig({ ...cleanupConfig, model: value, resolution: nextRes, aspect_ratio: nextAspect }) }} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">{modelSettings?.image_models?.some(m => m.id === cleanupConfig.model) ? null : <option value={cleanupConfig.model}>{cleanupConfig.model}</option>}{modelSettings?.image_models?.map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}</select></div>
+                    <div><label className="eyebrow mb-2 block">Разрешение</label>{capsFor(cleanupConfig.model).resolutions.length ? <select value={cleanupConfig.resolution} onChange={e => setCleanupConfig({ ...cleanupConfig, resolution: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(cleanupConfig.model).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select> : <div className="flex h-11 items-center border bg-muted px-3 text-sm text-muted-foreground">Задаётся моделью</div>}</div>
+                    <div><label className="eyebrow mb-2 block">Aspect ratio</label><select value={cleanupConfig.aspect_ratio} onChange={e => setCleanupConfig({ ...cleanupConfig, aspect_ratio: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(cleanupConfig.model).aspects.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                  </div>
+                  <label className="block"><span className="eyebrow mb-2 block">Промт очистки</span><textarea value={cleanupConfig.prompt} onChange={e => setCleanupConfig({ ...cleanupConfig, prompt: e.target.value })} rows={8} maxLength={8000} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /><span className="mt-2 block text-xs text-muted-foreground">Плейсхолдеры: <code>{'{room}'}</code> — тип комнаты, <code>{'{keep}'}</code> — что сохранить, <code>{'{remove}'}</code> — что удалить. Для кухни/санузла сохраняются встроенные элементы и технические точки.</span></label>
+                  <p className="text-xs text-muted-foreground">Рекомендуем FLUX 3 Image Klein, 1K, auto. Очистка добавляет второй вызов модели и увеличивает время генерации.</p>
+                </div>
+              ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
             </div>
           )}
 

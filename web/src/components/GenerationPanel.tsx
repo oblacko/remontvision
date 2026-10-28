@@ -663,13 +663,14 @@ export function GenerationPanel({
             <div className="mt-8 grid gap-px border bg-border sm:grid-cols-2">
               <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${keepFurniture ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
                 <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
-                <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Сохраняем существующую мебель и планировку. Можно двигать и переобивать.' : 'Мебель не учитываем: AI может убрать или заменить свободно стоящую мебель. Встроенное, сантехника и электрика остаются.'}</span></span>
+                <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Очистка не применяется: сохраняем существующую мебель и планировку. Можно двигать и переобивать.' : 'Очистка включена: сначала уберём мебель, декор и старые предметы, оставим архитектуру, затем сделаем дизайн с нуля. Дольше, но чище.'}</span></span>
               </button>
               <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${useCatalog ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
                 <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
                 <span><span className="block text-sm font-medium">Использовать каталог</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'Подбираем реальные товары, показываем смету и ссылки.' : 'AI свободно придумывает интерьер. Смета и товары не собираются.'}</span></span>
               </button>
             </div>
+            <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Очистка комнаты включена по умолчанию в админке. Она применяется только когда «Оставить мебель» выключено.</p>
 
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 

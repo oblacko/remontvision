@@ -313,7 +313,20 @@ export async function generateRender({ prompt, sourceImageB64, referenceImagesB6
   return generateWithModel(getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 }
 
-async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio }) {
+// Пустой каркас: отдельная модель/промт/разрешение из админки, только исходник, без style/product refs.
+export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect }) {
+  return generateWithModel(model, {
+    prompt,
+    sourceImageB64,
+    referenceImagesB64: [],
+    aspectRatio,
+    resolutionOverride: resolution,
+    aspectOverride: aspect,
+    allowChatFallback: false,
+  });
+}
+
+async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, resolutionOverride = null, aspectOverride = null, allowChatFallback = null }) {
   const productRefs = INPUT_REFS_OK ? referenceImagesB64 : [];
   const refs = [
     { type: 'image_url', image_url: { url: sourceImageB64 } },
@@ -321,11 +334,12 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   ];
   const cfg = getModelConfig();
   const advanced = supportsAdvancedOptions(model);
+  const configAspect = aspectOverride || cfg.aspectRatio;
   // auto из настроек — это «подстройся под источник»; конкретную пропорцию всё равно
   // считаем по исходнику, чтобы не потерять края при финальном fitAspect.
-  const aspect = advanced ? (cfg.aspectRatio === 'auto' ? (aspectRatio || 'auto') : cfg.aspectRatio) : (aspectRatio || '3:2');
-  // resolution поддерживает Seedream; FLUX 2 Pro не принимает этот параметр.
-  const resolution = advanced && supportsResolution(model) ? (cfg.resolution || '1K') : null;
+  const aspect = advanced ? (configAspect === 'auto' ? (aspectRatio || 'auto') : configAspect) : (aspectRatio || '3:2');
+  // resolution поддерживают Seedream и FLUX 3 Image Klein; FLUX 2 Pro — нет.
+  const resolution = advanced && supportsResolution(model) ? (resolutionOverride || cfg.resolution || '1K') : null;
   const body = {
     model,
     prompt,
@@ -350,7 +364,8 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   const attempts = [[`${BASE}/images`, body]];
   // chat-completions как fallback имеет смысл только для моделей с image-output в чате.
   // Seedream/FLUX — image-only, их fallback всегда даёт 404 и прячет реальную ошибку /images.
-  if (!['seedream', 'flux'].includes(modelFamily(model))) attempts.push([`${BASE}/chat/completions`, chatBody]);
+  const allowChat = allowChatFallback === null ? !['seedream', 'flux'].includes(modelFamily(model)) : allowChatFallback;
+  if (allowChat) attempts.push([`${BASE}/chat/completions`, chatBody]);
   for (const [attempt, [endpoint, payload]] of attempts.entries()) {
     try {
       const r = await fetch(endpoint, {
