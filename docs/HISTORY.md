@@ -4,6 +4,15 @@
 
 Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
 
+## 2026-10-28 — Robokassa
+
+- Добавлен провайдер Robokassa: создание платежа через `Merchant/Index.aspx`, `InvId` = локальный `payments.id`, `PAYMENT_PROVIDER=robokassa` (или автовыбор при заданных `ROBOKASSA_*`).
+- Реализованы ResultURL с проверкой подписи `Password#2` и ответом `OK{InvId}`, SuccessURL/FailURL с редиректом в кабинет, синхронизация через `OpStateExt` (кроме тестового режима).
+- Начисление кредитов идемпотентно, как у ЮKassa: повторный ResultURL не дублирует `credit_txn`; `provider_payment_id` заполняется в той же транзакции.
+- Добавлены возвраты Robokassa через Refund API (JWT HS256, `ROBOKASSA_PASSWORD_3`, `OpKey` из `OpStateExt`); без них остаётся ручной способ. Возвраты по-прежнему выключены флагом.
+- Добавлены `src/robokassa.js` и 7 unit-тестов подписей/URL/XML/refund JWT (`npm test` — 28 тестов). Живой платёж не проверялся — нужен canary в тестовом кабинете Robokassa.
+- Документация: `.env.example`, `docs/OPERATIONS.md` (настройка кабинетов), `docs/API.md`, `docs/ARCHITECTURE.md`, README/llms.
+
 ## Инфраструктура
 
 - **Репозиторий**: https://github.com/oblacko/remontvision (private), автор коммитов `Oblacko`.

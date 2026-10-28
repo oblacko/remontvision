@@ -16,6 +16,9 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/styles` | активные стили |
 | GET | `/api/room-types` | 12 типов комнат |
 | GET | `/api/packs` | пакеты кредитов |
+| GET/POST | `/api/payments/robokassa/result` | ResultURL Robokassa: проверка `Password#2`, ответ `OK{InvId}` |
+| GET/POST | `/api/payments/robokassa/success` | редирект в кабинет после оплаты |
+| GET/POST | `/api/payments/robokassa/fail` | редирект в кабинет после отказа |
 | POST | `/api/auth/request-code` | `{email}` → OTP |
 | POST | `/api/auth/verify` | `{email, code}` → cookie |
 | POST | `/api/auth/logout` | выход |
@@ -34,8 +37,8 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/my/rooms` | комнаты пользователя |
 | GET | `/api/my/generations` | все рендеры пользователя |
 | GET | `/api/credits` | баланс/ledger |
-| POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url}` |
-| POST | `/api/payments/sync` | синхронизация платежа |
+| POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
+| POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний/выбранный render |
 | POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `ref`, `ref_url`, `parent_id` |

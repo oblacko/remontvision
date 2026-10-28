@@ -18,14 +18,14 @@
    - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
    Не дублируйте правила в разных местах: меняйте defaults в `promptconfig.js` и/или через админку.
 5. **Design-first и смета:** базовый рендер получает только исходник + один art ref и текстовые материалы, без product refs. Curated-товары — подборка, не обещание точного совпадения. Товарная правка использует один product ref и обязательное vision QA; при отказе версия отклоняется, кредит возвращается.
-6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/ЮKassa/Resend, пароль прокси — только на сервере/локально.
+6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
 ## Команды
 
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 21 тест
+npm test                    # node:test, 28 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -87,7 +87,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 21 тест: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps.
+- `npm test` — 28 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.

@@ -1,4 +1,4 @@
-// Оплата через ЮKassa + кредиты.
+// Оплата через ЮKassa/Robokassa + кредиты.
 // Кредиты — ledger (credit_txn): баланс = SUM(delta), списание атомарно (FOR UPDATE).
 // Начисление за оплату идемпотентно: у payments UNIQUE(provider_payment_id),
 // выдача кредитов только при переходе в succeeded.
@@ -7,6 +7,13 @@ import { Agent } from 'undici';
 import { q, withTransaction } from './db.js';
 import { log } from './openrouter.js';
 import { issueReceipt } from './receipts.js';
+import {
+  isConfigured as robokassaIsConfigured,
+  buildPaymentUrl,
+  fetchOpState,
+  amountToKopecks,
+  createRefundRequest,
+} from './robokassa.js';
 
 const SHOP_ID = process.env.YUKASSA_SHOP_ID || '';
 const SECRET_KEY = process.env.YUKASSA_SECRET_KEY || '';
@@ -24,6 +31,18 @@ export const PACKS = [
 export const packById = id => PACKS.find(p => p.id === id);
 
 export const yukassaConfigured = () => Boolean(SHOP_ID && SECRET_KEY);
+export const robokassaConfigured = () => robokassaIsConfigured();
+
+export function paymentProvider() {
+  const forced = String(process.env.PAYMENT_PROVIDER || '').toLowerCase();
+  if (forced === 'robokassa' || forced === 'yukassa') return forced;
+  if (robokassaConfigured()) return 'robokassa';
+  return 'yukassa';
+}
+
+export function paymentConfigured(provider = paymentProvider()) {
+  return provider === 'robokassa' ? robokassaConfigured() : yukassaConfigured();
+}
 
 async function yukassa(pathname, method, body) {
   const auth = Buffer.from(`${SHOP_ID}:${SECRET_KEY}`).toString('base64');
@@ -59,8 +78,7 @@ async function yukassa(pathname, method, body) {
   throw lastErr;
 }
 
-// создание платежа: юзер уходит на confirmation_url, потом webhook донесёт результат
-export async function createPayment({ userId, pack, returnUrl }) {
+async function createYukassaPayment({ userId, pack, returnUrl }) {
   if (!yukassaConfigured()) {
     const e = new Error('ЮKassa не настроена (YUKASSA_SHOP_ID/YUKASSA_SECRET_KEY)');
     e.status = 503;
@@ -75,12 +93,48 @@ export async function createPayment({ userId, pack, returnUrl }) {
   });
   const local = await q.createPaymentRow(userId, 'yukassa', payment.id, pack.price_kopecks,
     { pack_id: pack.id, credits: pack.credits });
-  log({ event: 'payment_created', user_id: userId, pack: pack.id, provider_payment_id: payment.id });
+  log({ event: 'payment_created', user_id: userId, pack: pack.id, provider: 'yukassa', provider_payment_id: payment.id });
   return { ...payment, local_payment_id: local?.id || null };
 }
 
-// подтверждение по webhook: не доверяем телу, спрашиваем у ЮKassa; начисление идемпотентно
-export async function syncPayment(providerPaymentId) {
+async function createRobokassaPayment({ userId, pack, email }) {
+  if (!robokassaConfigured()) {
+    const e = new Error('Robokassa не настроена (ROBOKASSA_LOGIN/ROBOKASSA_PASSWORD_1/ROBOKASSA_PASSWORD_2)');
+    e.status = 503;
+    throw e;
+  }
+  const local = await withTransaction(async client => {
+    const inserted = await client.query(
+      `INSERT INTO payments (user_id, provider, provider_payment_id, amount_kopecks, payload)
+       VALUES ($1, 'robokassa', NULL, $2, $3) RETURNING *`,
+      [userId, pack.price_kopecks, JSON.stringify({ pack_id: pack.id, credits: pack.credits })]);
+    const row = inserted.rows[0];
+    const invId = String(row.id);
+    await client.query(`UPDATE payments SET provider_payment_id = $2 WHERE id = $1`, [row.id, invId]);
+    return { ...row, provider_payment_id: invId };
+  });
+  const confirmationUrl = buildPaymentUrl({
+    invId: local.id,
+    amountKopecks: pack.price_kopecks,
+    description: `ремонтвижн: ${pack.title}`,
+    email,
+  });
+  log({ event: 'payment_created', user_id: userId, pack: pack.id, provider: 'robokassa', provider_payment_id: local.provider_payment_id });
+  return {
+    id: local.provider_payment_id,
+    local_payment_id: local.id,
+    status: 'pending',
+    confirmation: { confirmation_url: confirmationUrl },
+  };
+}
+
+export async function createPayment({ userId, pack, returnUrl, email = null }) {
+  return paymentProvider() === 'robokassa'
+    ? createRobokassaPayment({ userId, pack, email })
+    : createYukassaPayment({ userId, pack, returnUrl });
+}
+
+async function syncYukassaPayment(providerPaymentId) {
   const remote = await yukassa(`/payments/${encodeURIComponent(providerPaymentId)}`, 'GET');
   if (remote.status !== 'succeeded') return { granted: false, status: remote.status };
 
@@ -105,7 +159,7 @@ export async function syncPayment(providerPaymentId) {
       await client.query(`INSERT INTO credit_txn (user_id, delta, reason, payment_id) VALUES ($1,$2,'purchase',$3)`,
         [userId, credits, local.id]);
     }
-    log({ event: 'payment_succeeded', user_id: userId, credits, provider_payment_id: providerPaymentId });
+    log({ event: 'payment_succeeded', user_id: userId, credits, provider: 'yukassa', provider_payment_id: providerPaymentId });
     return { granted: true, credits, user_id: userId, local_payment_id: local.id };
   });
 
@@ -114,6 +168,76 @@ export async function syncPayment(providerPaymentId) {
     catch (e) { log({ event: 'receipt_hook_error', payment_id: out.local_payment_id, error: String(e.message || e).slice(0, 300) }); }
   }
   return out;
+}
+
+async function syncRobokassaPayment(local, { amountKopecks = null } = {}) {
+  let remoteKopecks = amountKopecks;
+  let opKey = local.payload?.robokassa_op_key || null;
+  let stateCode = null;
+
+  try {
+    const state = await fetchOpState(local.provider_payment_id, { dispatcher: DIRECT });
+    if (state) {
+      stateCode = state.stateCode;
+      opKey = opKey || state.opKey;
+      if (remoteKopecks === null) remoteKopecks = amountToKopecks(state.outSum);
+      if (state.stateCode === 10 || state.stateCode === 60) {
+        await withTransaction(async client => {
+          const { rows } = await client.query(`SELECT status FROM payments WHERE id = $1 FOR UPDATE`, [local.id]);
+          if (rows[0]?.status === 'succeeded') return;
+          await client.query(
+            `UPDATE payments SET status = 'canceled', payload = payload || $2::jsonb WHERE id = $1`,
+            [local.id, JSON.stringify({ robokassa_state: state.stateCode })]);
+        });
+        log({ event: 'payment_canceled', provider: 'robokassa', payment_id: local.id, state: state.stateCode });
+        return { granted: false, status: 'canceled', local_payment_id: local.id };
+      }
+    }
+  } catch (e) {
+    log({ event: 'robokassa_state_error', payment_id: local.id, error: String(e.message || e).slice(0, 300) });
+  }
+
+  if (remoteKopecks === null) return { granted: false, status: 'pending', local_payment_id: local.id };
+  if (remoteKopecks !== local.amount_kopecks) {
+    log({ event: 'payment_amount_mismatch', provider: 'robokassa', payment_id: local.id, local_kopecks: local.amount_kopecks, remote_kopecks: remoteKopecks });
+    return { granted: false, status: 'amount_mismatch', local_payment_id: local.id };
+  }
+
+  const out = await withTransaction(async client => {
+    const { rows } = await client.query(`SELECT * FROM payments WHERE id = $1 FOR UPDATE`, [local.id]);
+    const payment = rows[0];
+    if (!payment) return { granted: false, status: 'unknown_local' };
+    if (payment.status === 'succeeded') return { granted: false, status: 'already', local_payment_id: payment.id };
+
+    const credits = Number(payment.payload?.credits || 0);
+    await client.query(`UPDATE payments SET status = 'succeeded', paid_at = now(),
+                        payload = payload || $2::jsonb WHERE id = $1`,
+      [payment.id, JSON.stringify({
+        amount: { value: (remoteKopecks / 100).toFixed(2), currency: 'RUB' },
+        robokassa_op_key: opKey,
+        robokassa_state: stateCode,
+      })]);
+    if (credits > 0) {
+      await client.query(`INSERT INTO credit_txn (user_id, delta, reason, payment_id) VALUES ($1,$2,'purchase',$3)`,
+        [payment.user_id, credits, payment.id]);
+    }
+    log({ event: 'payment_succeeded', user_id: payment.user_id, credits, provider: 'robokassa', provider_payment_id: payment.provider_payment_id });
+    return { granted: true, credits, user_id: payment.user_id, local_payment_id: payment.id };
+  });
+
+  if (out.granted) {
+    try { await issueReceipt(out.local_payment_id); }
+    catch (e) { log({ event: 'receipt_hook_error', payment_id: out.local_payment_id, error: String(e.message || e).slice(0, 300) }); }
+  }
+  return out;
+}
+
+export async function syncPayment(providerPaymentId, options = {}) {
+  const local = await q.paymentByProviderId(String(providerPaymentId));
+  if (!local) return { granted: false, status: 'unknown_local' };
+  return local.provider === 'robokassa'
+    ? syncRobokassaPayment(local, options)
+    : syncYukassaPayment(providerPaymentId);
 }
 
 // ---------- кредиты ----------
@@ -281,6 +405,7 @@ export async function refundQuote(paymentId) {
   return {
     payment_id: payment.id,
     user_id: payment.user_id,
+    provider: payment.provider,
     provider_payment_id: payment.provider_payment_id,
     amount_kopecks: payment.amount_kopecks,
     credits,
@@ -290,10 +415,12 @@ export async function refundQuote(paymentId) {
     gross_refund_kopecks: gross,
     already_refunded_kopecks: already,
     refundable_kopecks: refundable,
+    yukassa_configured: yukassaConfigured(),
+    robokassa_configured: robokassaConfigured(),
   };
 }
 
-export async function createRefund({ paymentId, amountKopecks, method = 'yukassa', reason = '' }) {
+export async function createRefund({ paymentId, amountKopecks, method = null, reason = '' }) {
   const payment = await q.paymentById(paymentId);
   if (!payment) { const e = new Error('Платёж не найден'); e.status = 404; throw e; }
   if (payment.status !== 'succeeded') { const e = new Error('Платёж ещё не подтверждён'); e.status = 409; throw e; }
@@ -303,7 +430,11 @@ export async function createRefund({ paymentId, amountKopecks, method = 'yukassa
   if (amount > quote.refundable_kopecks) {
     const e = new Error(`Сумма возврата больше доступной: ${quote.refundable_kopecks} коп.`); e.status = 400; throw e;
   }
-  if (!['yukassa', 'manual'].includes(method)) { const e = new Error('Неизвестный способ возврата'); e.status = 400; throw e; }
+  method = method || (payment.provider === 'robokassa' ? 'robokassa' : 'yukassa');
+  if (!['yukassa', 'robokassa', 'manual'].includes(method)) { const e = new Error('Неизвестный способ возврата'); e.status = 400; throw e; }
+  if (method !== 'manual' && method !== payment.provider) {
+    const e = new Error('Способ возврата не совпадает с провайдером платежа'); e.status = 400; throw e;
+  }
 
   let providerRefundId = null;
   let status = 'manual';
@@ -318,6 +449,18 @@ export async function createRefund({ paymentId, amountKopecks, method = 'yukassa
     providerRefundId = remote.id || null;
     status = remote.status === 'succeeded' ? 'succeeded' : 'pending';
     payload = remote;
+  } else if (method === 'robokassa') {
+    if (!robokassaConfigured()) { const e = new Error('Robokassa не настроена'); e.status = 503; throw e; }
+    try {
+      const remote = await createRefundRequest({ payment, amountKopecks: amount, dispatcher: DIRECT });
+      providerRefundId = remote.id;
+      status = remote.status;
+      payload = remote.payload;
+    } catch (e) {
+      const err = new Error(e.message || 'Robokassa: не удалось создать возврат');
+      err.status = 502;
+      throw err;
+    }
   }
 
   const creditsToRemove = quote.price_per_credit_kopecks

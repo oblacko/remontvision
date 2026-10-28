@@ -8,7 +8,8 @@ import { startWorker, enqueueRender } from './jobs.js';
 import { listImageModels, MOCK_MODE, assertConfig, log } from './openrouter.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
-import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured } from './payments.js';
+import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
+import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
@@ -221,6 +222,8 @@ app.get('/api/health', (_req, res) => res.json({
   ok: true,
   mock: MOCK_MODE,
   payments_enabled: PAYMENTS_ENABLED,
+  payment_provider: paymentProvider(),
+  robokassa_configured: robokassaConfigured(),
   refunds_enabled: REFUNDS_ENABLED,
 }));
 app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
@@ -295,7 +298,7 @@ app.post('/api/payments/create', h(async (req, res) => {
   const base = (process.env.APP_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
   const returnPath = req.body?.return_path === '/cabinet' ? '/cabinet' : '/';
   const returnUrl = `${base}${returnPath}${returnPath.includes('?') ? '&' : '?'}paid=${pack.id}`;
-  const payment = await createPayment({ userId: req.user.id, pack, returnUrl });
+  const payment = await createPayment({ userId: req.user.id, pack, returnUrl, email: req.user.email });
   await recordAcceptances({
     userId: req.user.id,
     context: 'payment',
@@ -303,7 +306,11 @@ app.post('/api/payments/create', h(async (req, res) => {
     paymentId: payment.local_payment_id,
     documents: ['offer'],
   });
-  res.json({ confirmation_url: payment.confirmation?.confirmation_url, payment_id: payment.id });
+  res.json({
+    confirmation_url: payment.confirmation?.confirmation_url,
+    payment_id: payment.id,
+    provider: paymentProvider(),
+  });
 }));
 
 // fallback на случай задержки/отсутствия webhook: сверяем последний pending-платёж пользователя
@@ -337,6 +344,38 @@ app.post('/api/payments/webhook', h(async (req, res) => {
   }
   res.json({ ok: true });
 }));
+
+// ResultURL Robokassa: подпись Password#2, ответ строго OK{InvId}
+app.all('/api/payments/robokassa/result', express.urlencoded({ extended: false }), h(async (req, res) => {
+  const params = { ...req.query, ...req.body };
+  const verified = verifyRobokassaResult(params);
+  if (!verified.ok) {
+    log({ event: 'robokassa_result_bad_signature', inv_id: verified.invId || null });
+    return res.status(400).type('text/plain').send('bad signature');
+  }
+  const localId = Number(verified.invId);
+  if (!Number.isSafeInteger(localId) || localId <= 0) return res.status(400).type('text/plain').send('bad inv id');
+  const local = await q.paymentById(localId);
+  if (!local || local.provider !== 'robokassa') {
+    log({ event: 'robokassa_result_unknown_payment', inv_id: verified.invId });
+    return res.status(404).type('text/plain').send('unknown payment');
+  }
+  const out = await syncPayment(verified.invId, { amountKopecks: verified.amountKopecks });
+  if (out.granted || out.status === 'already') {
+    return res.type('text/plain').send(`OK${verified.invId}`);
+  }
+  log({ event: 'robokassa_result_not_confirmed', inv_id: verified.invId, result: out });
+  const status = out.status === 'amount_mismatch' ? 400 : 409;
+  return res.status(status).type('text/plain').send('not confirmed');
+}));
+
+app.all('/api/payments/robokassa/success', (_req, res) => {
+  res.redirect(302, `${APP_URL}/cabinet?paid=robokassa`);
+});
+
+app.all('/api/payments/robokassa/fail', (_req, res) => {
+  res.redirect(302, `${APP_URL}/cabinet?payment=failed`);
+});
 
 // ---------- каталог: админ ----------
 app.get('/api/admin/products', h(async (req, res) => {
@@ -802,7 +841,7 @@ app.post('/api/admin/refunds', h(async (req, res) => {
   const out = await createRefund({
     paymentId: Number(payment_id),
     amountKopecks: Number(amount_kopecks),
-    method: method || 'yukassa',
+    method: method || null,
     reason: reason || '',
   });
   res.status(201).json(out);

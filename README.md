@@ -22,7 +22,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Правки | Точечные, с референсом товара/файла/URL |
 | Очистка комнаты | При выключенной мебели: FLUX 3 Image Klein, 1K, auto; настройки в админке |
 | Шаринг | `/s/:token`, лайки, комментарии |
-| Платежи | ЮKassa включена, возвраты выключены |
+| Платежи | Robokassa (по умолчанию), ЮKassa как альтернатива; возвраты выключены |
 | Админка | Пользователи, кредиты, пакеты, стили, промт, логи, модели, прокси, каталог |
 | Мобильный редактор `/app` | Старый монолитный интерфейс, не в новом стиле |
 
@@ -103,7 +103,7 @@ npm test
 | Файлы | диск или S3 (`src/storage.js`) |
 | AI | OpenRouter: FLUX 3 Image, FLUX 3 Image Klein (cleanup), Gemini 3 Flash |
 | Почта | Resend / SMTP |
-| Платежи | ЮKassa |
+| Платежи | Robokassa / ЮKassa |
 | Инфраструктура | Docker Compose, Nginx, Let's Encrypt, GitHub Actions |
 
 ---
@@ -129,7 +129,8 @@ app/
     remoteimage.js     безопасная загрузка картинок по URL
     proxy.js           прокси для OpenRouter
     storage.js         диск/S3
-    payments.js        ЮKassa, кредиты
+    payments.js        Robokassa/ЮKassa, кредиты
+    robokassa.js       подписи, URL, ResultURL, возвраты
     receipts.js        чеки
     legal.js           документы/акцепты
   web/src/             React-приложение
@@ -160,4 +161,4 @@ app/
 
 ## Лицензия и данные
 
-Репозиторий private. Секреты (`.env`, ключи OpenRouter, ЮKassa, Resend, пароль прокси, `ADMIN_KEY`) **не коммитятся**. В документации используются только placeholder-значения.
+Репозиторий private. Секреты (`.env`, ключи OpenRouter, Robokassa, ЮKassa, Resend, пароль прокси, `ADMIN_KEY`) **не коммитятся**. В документации используются только placeholder-значения.

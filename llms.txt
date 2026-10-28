@@ -32,7 +32,7 @@ Last updated: 2026-10-28
 - Catalog import by URL and bulk list; drafts only, manual activation.
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
-- Payments on (YooKassa), refunds off.
+- Payments on (Robokassa default, YooKassa fallback), refunds off.
 - Main launch blocker: no real product URLs → no real orders.
 
 ## Architecture (short)
@@ -63,6 +63,7 @@ Last updated: 2026-10-28
 - `src/curate.js` — product selection + refs.
 - `src/productimport.js` — URL import.
 - `src/modelcaps.js` — model capabilities.
+- `src/payments.js`, `src/robokassa.js` — credits, Robokassa/YooKassa, refunds.
 - `src/db.js` + `migrations/` — data.
 - `web/src/components/GenerationPanel.tsx` — generator UI.
 - `web/src/pages/Admin.tsx`, `Cabinet.tsx`, `Share.tsx`.
@@ -71,7 +72,7 @@ Last updated: 2026-10-28
 
 ```bash
 npm install
-npm test                 # 21 tests
+npm test                 # 28 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434

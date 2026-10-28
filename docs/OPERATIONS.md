@@ -40,8 +40,15 @@ SESSION_DAYS=365
 # Payments
 PAYMENTS_ENABLED=true
 REFUNDS_ENABLED=false
-YUKASSA_SHOP_ID=<id>
-YUKASSA_SECRET_KEY=<key>
+PAYMENT_PROVIDER=robokassa
+ROBOKASSA_LOGIN=<merchant-login>
+ROBOKASSA_PASSWORD_1=<password-1>
+ROBOKASSA_PASSWORD_2=<password-2>
+ROBOKASSA_PASSWORD_3=<password-3>
+ROBOKASSA_TEST=0
+ROBOKASSA_HASH_ALGO=md5
+# YUKASSA_SHOP_ID=<id>
+# YUKASSA_SECRET_KEY=<key>
 
 # Catalog import
 PRODUCT_IMPORT_DOMAINS=market.yandex.ru,leroymerlin.ru,...
@@ -57,6 +64,24 @@ S3_ENDPOINT=
 
 - `RV_DATABASE_URL`, не `DATABASE_URL` — стандартная переменная может быть занята другим проектом.
 - `APP_URL` нужен для платёжных return/webhook и share-ссылок.
+
+## Robokassa
+
+В кабинете Robokassa → «Технические настройки» укажите:
+
+| Поле | Значение |
+|---|---|
+| ResultURL | `${APP_URL}/api/payments/robokassa/result` |
+| SuccessURL | `${APP_URL}/api/payments/robokassa/success` |
+| FailURL | `${APP_URL}/api/payments/robokassa/fail` |
+| Метод | GET или POST (обрабатываются оба) |
+
+- Алгоритм подписи в кабинете должен совпадать с `ROBOKASSA_HASH_ALGO` (по умолчанию `md5`).
+- `ROBOKASSA_PASSWORD_1` — подпись платежа и SuccessURL, `ROBOKASSA_PASSWORD_2` — ResultURL и OpStateExt, `ROBOKASSA_PASSWORD_3` — возвраты.
+- `ROBOKASSA_TEST=1` включает `IsTest=1`; используйте тестовую пару паролей, иначе Robokassa вернёт ошибку подписи. В тестовом режиме OpStateExt недоступен — подтверждение приходит только на ResultURL.
+- `PAYMENT_PROVIDER=robokassa` принудительно выбирает провайдера; без переменной Robokassa выбирается автоматически, если заданы её ключи.
+- `InvId` = локальный `payments.id`; `provider_payment_id` хранит его же строкой. Начисление кредитов идемпотентно по ResultURL/синхронизации.
+- Автоматический возврат Robokassa использует `OpKey` из OpStateExt (миграций не требует). Без `OpKey`/`ROBOKASSA_PASSWORD_3` доступен только ручной возврат.
 - Прокси нужен, если OpenRouter блокирует IP VPS; настраивается и в админке.
 
 ## Деплой

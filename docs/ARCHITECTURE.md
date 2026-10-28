@@ -19,7 +19,7 @@ flowchart LR
   O --> S["FLUX 3 Image"]
   O --> G["Gemini 3 Flash"]
   E --> R["Resend"]
-  E --> Y["ЮKassa"]
+  E --> Y["Robokassa / ЮKassa"]
   E --> X["Прокси (опционально)"]
 ```
 
@@ -35,7 +35,7 @@ flowchart LR
 | Storage | фото комнат, рендеры, картинки товаров/референсов | `src/storage.js` |
 | OpenRouter | image generation и vision | `src/openrouter.js` |
 | Resend/SMTP | OTP-коды и письма | `src/auth.js` |
-| ЮKassa | платежи и вебхуки | `src/payments.js` |
+| Robokassa / ЮKassa | платежи, ResultURL/вебхуки, возвраты | `src/payments.js`, `src/robokassa.js` |
 | Proxy | обход WAF OpenRouter с VPS | `src/proxy.js` |
 | React | лендинг/генератор, кабинет, админка, публичный шаринг | `web/src/` |
 

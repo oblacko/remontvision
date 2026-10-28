@@ -291,6 +291,8 @@ export const q = {
       [userId, provider, providerPaymentId, amountKopecks, JSON.stringify(payload)])
       .then(r => r.rows[0] || null),
   paymentById: id => pool.query(`SELECT * FROM payments WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  paymentByProviderId: providerPaymentId =>
+    pool.query(`SELECT * FROM payments WHERE provider_payment_id = $1`, [providerPaymentId]).then(r => r.rows[0] || null),
   latestPendingPayment: userId =>
     pool.query(`SELECT * FROM payments WHERE user_id = $1 AND status IN ('created','pending')
                 ORDER BY created_at DESC LIMIT 1`, [userId]).then(r => r.rows[0] || null),

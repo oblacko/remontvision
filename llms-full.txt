@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-28T09:08:00.163Z
+Generated: 2026-10-28T10:23:53.061Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -34,7 +34,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Правки | Точечные, с референсом товара/файла/URL |
 | Очистка комнаты | При выключенной мебели: FLUX 3 Image Klein, 1K, auto; настройки в админке |
 | Шаринг | `/s/:token`, лайки, комментарии |
-| Платежи | ЮKassa включена, возвраты выключены |
+| Платежи | Robokassa (по умолчанию), ЮKassa как альтернатива; возвраты выключены |
 | Админка | Пользователи, кредиты, пакеты, стили, промт, логи, модели, прокси, каталог |
 | Мобильный редактор `/app` | Старый монолитный интерфейс, не в новом стиле |
 
@@ -115,7 +115,7 @@ npm test
 | Файлы | диск или S3 (`src/storage.js`) |
 | AI | OpenRouter: FLUX 3 Image, FLUX 3 Image Klein (cleanup), Gemini 3 Flash |
 | Почта | Resend / SMTP |
-| Платежи | ЮKassa |
+| Платежи | Robokassa / ЮKassa |
 | Инфраструктура | Docker Compose, Nginx, Let's Encrypt, GitHub Actions |
 
 ---
@@ -141,7 +141,8 @@ app/
     remoteimage.js     безопасная загрузка картинок по URL
     proxy.js           прокси для OpenRouter
     storage.js         диск/S3
-    payments.js        ЮKassa, кредиты
+    payments.js        Robokassa/ЮKassa, кредиты
+    robokassa.js       подписи, URL, ResultURL, возвраты
     receipts.js        чеки
     legal.js           документы/акцепты
   web/src/             React-приложение
@@ -172,7 +173,7 @@ app/
 
 ## Лицензия и данные
 
-Репозиторий private. Секреты (`.env`, ключи OpenRouter, ЮKassa, Resend, пароль прокси, `ADMIN_KEY`) **не коммитятся**. В документации используются только placeholder-значения.
+Репозиторий private. Секреты (`.env`, ключи OpenRouter, Robokassa, ЮKassa, Resend, пароль прокси, `ADMIN_KEY`) **не коммитятся**. В документации используются только placeholder-значения.
 
 
 ---
@@ -199,14 +200,14 @@ app/
    - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
    Не дублируйте правила в разных местах: меняйте defaults в `promptconfig.js` и/или через админку.
 5. **Design-first и смета:** базовый рендер получает только исходник + один art ref и текстовые материалы, без product refs. Curated-товары — подборка, не обещание точного совпадения. Товарная правка использует один product ref и обязательное vision QA; при отказе версия отклоняется, кредит возвращается.
-6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/ЮKassa/Resend, пароль прокси — только на сервере/локально.
+6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
 ## Команды
 
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 21 тест
+npm test                    # node:test, 28 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -268,7 +269,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 21 тест: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps.
+- `npm test` — 28 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -332,7 +333,7 @@ Last updated: 2026-10-28
 - Catalog import by URL and bulk list; drafts only, manual activation.
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
-- Payments on (YooKassa), refunds off.
+- Payments on (Robokassa default, YooKassa fallback), refunds off.
 - Main launch blocker: no real product URLs → no real orders.
 
 ## Architecture (short)
@@ -363,6 +364,7 @@ Last updated: 2026-10-28
 - `src/curate.js` — product selection + refs.
 - `src/productimport.js` — URL import.
 - `src/modelcaps.js` — model capabilities.
+- `src/payments.js`, `src/robokassa.js` — credits, Robokassa/YooKassa, refunds.
 - `src/db.js` + `migrations/` — data.
 - `web/src/components/GenerationPanel.tsx` — generator UI.
 - `web/src/pages/Admin.tsx`, `Cabinet.tsx`, `Share.tsx`.
@@ -371,7 +373,7 @@ Last updated: 2026-10-28
 
 ```bash
 npm install
-npm test                 # 21 tests
+npm test                 # 28 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -422,7 +424,7 @@ flowchart LR
   O --> S["FLUX 3 Image"]
   O --> G["Gemini 3 Flash"]
   E --> R["Resend"]
-  E --> Y["ЮKassa"]
+  E --> Y["Robokassa / ЮKassa"]
   E --> X["Прокси (опционально)"]
 ```
 
@@ -438,7 +440,7 @@ flowchart LR
 | Storage | фото комнат, рендеры, картинки товаров/референсов | `src/storage.js` |
 | OpenRouter | image generation и vision | `src/openrouter.js` |
 | Resend/SMTP | OTP-коды и письма | `src/auth.js` |
-| ЮKassa | платежи и вебхуки | `src/payments.js` |
+| Robokassa / ЮKassa | платежи, ResultURL/вебхуки, возвраты | `src/payments.js`, `src/robokassa.js` |
 | Proxy | обход WAF OpenRouter с VPS | `src/proxy.js` |
 | React | лендинг/генератор, кабинет, админка, публичный шаринг | `web/src/` |
 
@@ -1070,6 +1072,9 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/styles` | активные стили |
 | GET | `/api/room-types` | 12 типов комнат |
 | GET | `/api/packs` | пакеты кредитов |
+| GET/POST | `/api/payments/robokassa/result` | ResultURL Robokassa: проверка `Password#2`, ответ `OK{InvId}` |
+| GET/POST | `/api/payments/robokassa/success` | редирект в кабинет после оплаты |
+| GET/POST | `/api/payments/robokassa/fail` | редирект в кабинет после отказа |
 | POST | `/api/auth/request-code` | `{email}` → OTP |
 | POST | `/api/auth/verify` | `{email, code}` → cookie |
 | POST | `/api/auth/logout` | выход |
@@ -1088,8 +1093,8 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/my/rooms` | комнаты пользователя |
 | GET | `/api/my/generations` | все рендеры пользователя |
 | GET | `/api/credits` | баланс/ledger |
-| POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url}` |
-| POST | `/api/payments/sync` | синхронизация платежа |
+| POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
+| POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний/выбранный render |
 | POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `ref`, `ref_url`, `parent_id` |
@@ -1267,8 +1272,15 @@ SESSION_DAYS=365
 # Payments
 PAYMENTS_ENABLED=true
 REFUNDS_ENABLED=false
-YUKASSA_SHOP_ID=<id>
-YUKASSA_SECRET_KEY=<key>
+PAYMENT_PROVIDER=robokassa
+ROBOKASSA_LOGIN=<merchant-login>
+ROBOKASSA_PASSWORD_1=<password-1>
+ROBOKASSA_PASSWORD_2=<password-2>
+ROBOKASSA_PASSWORD_3=<password-3>
+ROBOKASSA_TEST=0
+ROBOKASSA_HASH_ALGO=md5
+# YUKASSA_SHOP_ID=<id>
+# YUKASSA_SECRET_KEY=<key>
 
 # Catalog import
 PRODUCT_IMPORT_DOMAINS=market.yandex.ru,leroymerlin.ru,...
@@ -1284,6 +1296,24 @@ S3_ENDPOINT=
 
 - `RV_DATABASE_URL`, не `DATABASE_URL` — стандартная переменная может быть занята другим проектом.
 - `APP_URL` нужен для платёжных return/webhook и share-ссылок.
+
+## Robokassa
+
+В кабинете Robokassa → «Технические настройки» укажите:
+
+| Поле | Значение |
+|---|---|
+| ResultURL | `${APP_URL}/api/payments/robokassa/result` |
+| SuccessURL | `${APP_URL}/api/payments/robokassa/success` |
+| FailURL | `${APP_URL}/api/payments/robokassa/fail` |
+| Метод | GET или POST (обрабатываются оба) |
+
+- Алгоритм подписи в кабинете должен совпадать с `ROBOKASSA_HASH_ALGO` (по умолчанию `md5`).
+- `ROBOKASSA_PASSWORD_1` — подпись платежа и SuccessURL, `ROBOKASSA_PASSWORD_2` — ResultURL и OpStateExt, `ROBOKASSA_PASSWORD_3` — возвраты.
+- `ROBOKASSA_TEST=1` включает `IsTest=1`; используйте тестовую пару паролей, иначе Robokassa вернёт ошибку подписи. В тестовом режиме OpStateExt недоступен — подтверждение приходит только на ResultURL.
+- `PAYMENT_PROVIDER=robokassa` принудительно выбирает провайдера; без переменной Robokassa выбирается автоматически, если заданы её ключи.
+- `InvId` = локальный `payments.id`; `provider_payment_id` хранит его же строкой. Начисление кредитов идемпотентно по ResultURL/синхронизации.
+- Автоматический возврат Robokassa использует `OpKey` из OpStateExt (миграций не требует). Без `OpKey`/`ROBOKASSA_PASSWORD_3` доступен только ручной возврат.
 - Прокси нужен, если OpenRouter блокирует IP VPS; настраивается и в админке.
 
 ## Деплой
@@ -1626,6 +1656,15 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
+
+## 2026-10-28 — Robokassa
+
+- Добавлен провайдер Robokassa: создание платежа через `Merchant/Index.aspx`, `InvId` = локальный `payments.id`, `PAYMENT_PROVIDER=robokassa` (или автовыбор при заданных `ROBOKASSA_*`).
+- Реализованы ResultURL с проверкой подписи `Password#2` и ответом `OK{InvId}`, SuccessURL/FailURL с редиректом в кабинет, синхронизация через `OpStateExt` (кроме тестового режима).
+- Начисление кредитов идемпотентно, как у ЮKassa: повторный ResultURL не дублирует `credit_txn`; `provider_payment_id` заполняется в той же транзакции.
+- Добавлены возвраты Robokassa через Refund API (JWT HS256, `ROBOKASSA_PASSWORD_3`, `OpKey` из `OpStateExt`); без них остаётся ручной способ. Возвраты по-прежнему выключены флагом.
+- Добавлены `src/robokassa.js` и 7 unit-тестов подписей/URL/XML/refund JWT (`npm test` — 28 тестов). Живой платёж не проверялся — нужен canary в тестовом кабинете Robokassa.
+- Документация: `.env.example`, `docs/OPERATIONS.md` (настройка кабинетов), `docs/API.md`, `docs/ARCHITECTURE.md`, README/llms.
 
 ## Инфраструктура
 
