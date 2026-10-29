@@ -396,16 +396,28 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   const attempts = [[`${BASE}/images`, body]];
   // chat-completions как fallback имеет смысл только для моделей с image-output в чате.
   // Seedream/FLUX — image-only, их fallback всегда даёт 404 и прячет реальную ошибку /images.
-  const allowChat = allowChatFallback === null ? !['seedream', 'flux'].includes(modelFamily(model)) : allowChatFallback;
+  const allowChat = allowChatFallback === null
+    ? !/^(?:bytedance-seed\/seedream|black-forest-labs\/flux|openai\/gpt-image|krea\/)/.test(model)
+    : allowChatFallback;
   if (allowChat) attempts.push([`${BASE}/chat/completions`, chatBody]);
   for (const [attempt, [endpoint, payload]] of attempts.entries()) {
     try {
-      const r = await fetch(endpoint, {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(150_000),
-      });
+      let r;
+      for (let tryNo = 0; tryNo < 2; tryNo++) {
+        r = await fetch(endpoint, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(150_000),
+        });
+        if (r.status === 429 && tryNo === 0) {
+          const wait = Math.max(5, Math.min(30, Number(r.headers.get('retry-after') || 10)));
+          log({ event: 'render_rate_limited', model, endpoint, wait_s: wait });
+          await sleep(wait * 1000);
+          continue;
+        }
+        break;
+      }
       const data = await r.json().catch(() => ({}));
       const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
       spent += cost;
