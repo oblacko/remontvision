@@ -10,6 +10,8 @@ export const DEFAULT_IMPORT_DOMAINS = [
   'market.yandex.ru', 'leroymerlin.ru', 'obi.ru', 'hoff.ru', 'askona.ru',
   'divan.ru', 'stoolgroup.ru', 'divanboss.ru', 'mnogomebeli.ru',
   'petrovich.ru', 'vseinstrumenti.ru', 'lazurit.com',
+  'sonum.ru', 'wooden-world.ru', 'mebelion.ru', 'mnogosna.ru',
+  'leoparquet.ru', 'poli24.ru', 'profiplitka.ru', 'sanok.ru',
 ];
 
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
@@ -290,7 +292,7 @@ async function fetchPage(rawUrl) {
   for (let i = 0; i <= 3; i++) {
     const r = await fetch(url, {
       redirect: 'manual',
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(25_000),
       headers: {
         'user-agent': 'Mozilla/5.0 (compatible; remontvision-import/1.0; +https://www.remontvision.ru)',
         accept: 'text/html,application/xhtml+xml',

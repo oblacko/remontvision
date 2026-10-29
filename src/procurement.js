@@ -19,6 +19,16 @@ import {
 
 const MIME_BY_EXT = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
 const LAYER_ORDER = { hero: 0, finish: 1, builtin: 2, textile: 3, completeness: 4 };
+const HERO_DOMAINS = ['divan.ru', 'askona.ru', 'stoolgroup.ru', 'divanboss.ru', 'sonum.ru', 'wooden-world.ru', 'mebelion.ru', 'mnogosna.ru'];
+const DOMAINS_BY_CATEGORY = {
+  floor: ['leoparquet.ru', 'poli24.ru'],
+  tile: ['profiplitka.ru'],
+  faucet: ['sanok.ru'],
+  sink: ['sanok.ru'],
+  toilet: ['sanok.ru'],
+  shower: ['sanok.ru'],
+  bathtub: ['sanok.ru'],
+};
 const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 const tokens = s => [...new Set(norm(s).split(/[^a-zа-я0-9]+/i).filter(w => w.length >= 3))];
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -169,14 +179,39 @@ function buildItemContext(key, seen, surfaces, style) {
   };
 }
 
-function buildQuery(key, context) {
-  const base = categoryQuery(key, context);
-  return context.style && context.style.length > 2 ? `${base} ${context.style}` : base;
+function firstTerm(value) {
+  return String(value || '').split(/[,/;]/)[0].trim();
 }
 
-function broadQuery(key, context) {
+function compactWords(parts) {
+  const words = [];
+  for (const part of parts.filter(Boolean)) {
+    for (const word of String(part).split(/\s+/)) {
+      const clean = word.replace(/[^\p{L}\p{N}-]/gu, '');
+      if (clean.length < 2) continue;
+      const key = norm(clean);
+      if (words.some(existing => norm(existing) === key)) continue;
+      words.push(clean);
+    }
+  }
+  return words.slice(0, 8).join(' ');
+}
+
+function buildQuery(key, context) {
   const meta = categoryMeta(key);
-  return `${meta?.label || key} купить`;
+  const label = (meta?.label || key).split(/\s+или\s+/)[0];
+  const parts = [label, firstTerm(context.subtype), firstTerm(context.color), firstTerm(context.material)];
+  return `${compactWords(parts)} купить`;
+}
+
+function broadQuery(key) {
+  const meta = categoryMeta(key);
+  return `${(meta?.label || key).split(/\s+или\s+/)[0]} купить`;
+}
+
+function preferredDomains(item, config) {
+  const preferred = DOMAINS_BY_CATEGORY[item.category] || (item.layer === 'hero' || item.layer === 'textile' ? HERO_DOMAINS : []);
+  return preferred.filter(domain => config.domains.includes(domain)).slice(0, 2);
 }
 
 async function createItemsForRun(run, template, vision) {
@@ -252,10 +287,12 @@ async function createItemsForRun(run, template, vision) {
 
 async function searchItem(run, item, config, reference) {
   const attrs = item.attributes || {};
-  const queries = [item.query || buildQuery(item.category, attrs)];
-  if (attrs.color || attrs.material) queries.push(broadQuery(item.category, attrs));
+  const baseQuery = item.query || buildQuery(item.category, attrs);
+  const queries = preferredDomains(item, config).map(domain => `site:${domain} ${baseQuery}`);
+  queries.push(baseQuery);
+  if (attrs.color || attrs.material) queries.push(broadQuery(item.category));
   const savedByUrl = new Map();
-  for (let round = 0; round < queries.length && round < 2; round++) {
+  for (let round = 0; round < queries.length && round < 3; round++) {
     const query = queries[round];
     await q.setProcurementStage(run.id, `search:${query}`.slice(0, 120));
     let search;
@@ -269,7 +306,7 @@ async function searchItem(run, item, config, reference) {
     const roundRow = await q.createProcurementRound({
       item_id: item.id,
       round_no: round + 1,
-      kind: round === 0 ? 'exact' : 'broad',
+      kind: round < queries.length - 1 ? 'exact' : 'broad',
       query,
       results_count: filtered.length,
       latency_ms: search.latency_ms,
@@ -521,6 +558,7 @@ export async function procurementDto(runId, userId) {
       status: item.status,
       note: item.attributes?.note || null,
       query: item.query,
+      search_url: `https://market.yandex.ru/search?text=${encodeURIComponent(item.query || item.label)}`,
       candidates: (byItem.get(item.id) || []).map(candidate => ({
         id: candidate.id,
         title: candidate.title,

@@ -4,15 +4,17 @@ const ENDPOINT = 'https://searchapi.api.cloud.yandex.net/v2/web/search';
 
 export const DEFAULT_PROCUREMENT_DOMAINS = [
   'divan.ru',
+  'askona.ru',
   'stoolgroup.ru',
   'divanboss.ru',
-  'askona.ru',
-  'hoff.ru',
-  'leroymerlin.ru',
-  'vseinstrumenti.ru',
-  'petrovich.ru',
-  'mnogomebeli.ru',
-  'lazurit.com',
+  'sonum.ru',
+  'wooden-world.ru',
+  'mebelion.ru',
+  'mnogosna.ru',
+  'leoparquet.ru',
+  'poli24.ru',
+  'profiplitka.ru',
+  'sanok.ru',
 ];
 
 const parser = new XMLParser({

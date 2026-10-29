@@ -22,6 +22,7 @@ type ProcurementItem = {
   search_mode: string
   status: string
   note: string | null
+  search_url: string | null
   candidates: Candidate[]
 }
 
@@ -197,7 +198,7 @@ export function ProcurementPanel({
                           ))}
                         </div>
                       )}
-                      {!item.candidates.length && item.status === 'unresolved' && <p className="mt-2 text-xs text-muted-foreground">Подходящий товар не найден. Можно попробовать позже или искать вручную.</p>}
+                      {!item.candidates.length && item.status === 'unresolved' && <p className="mt-2 text-xs text-muted-foreground">Подходящий товар не найден. <a href={item.search_url || '#'} target="_blank" rel="noopener nofollow" className="underline underline-offset-2">Найти похожее в Маркете</a>.</p>}
                     </div>
                   ))}
                 </div>

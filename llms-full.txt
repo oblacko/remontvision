@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-29T12:36:02.598Z
+Generated: 2026-10-29T12:42:09.650Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -1432,7 +1432,7 @@ PROCUREMENT_ENABLED=1
 PROCUREMENT_REGION=213
 YANDEX_SEARCH_API_KEY=<key>
 YANDEX_FOLDER_ID=<folder-id>
-PROCUREMENT_DOMAINS=divan.ru,stoolgroup.ru,divanboss.ru,askona.ru,hoff.ru,leroymerlin.ru,vseinstrumenti.ru,petrovich.ru,mnogomebeli.ru,lazurit.com
+PROCUREMENT_DOMAINS=divan.ru,askona.ru,stoolgroup.ru,divanboss.ru,sonum.ru,wooden-world.ru,mebelion.ru,mnogosna.ru,leoparquet.ru,poli24.ru,profiplitka.ru,sanok.ru
 PROCUREMENT_MIN_SCORE=80
 PROCUREMENT_ALT_SCORE=70
 PROCUREMENT_MAX_RUN_COST_USD=0.5
