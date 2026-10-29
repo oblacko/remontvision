@@ -47,13 +47,15 @@ const rub = (value: number | null) => value === null
   ? 'Цена не найдена'
   : new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
+const variantWord = (n: number) => n % 10 === 1 && n % 100 !== 11 ? 'вариант' : [2, 3, 4].includes(n % 10) && !(n % 100 >= 12 && n % 100 <= 14) ? 'варианта' : 'вариантов'
+
 const itemStatus = (item: ProcurementItem) => {
   if (item.status === 'rule_based') return 'нужно уточнить'
   if (item.status === 'needs_input') return 'нужно уточнить'
   if (item.status === 'unresolved') return 'не найдено'
   if (item.status === 'error') return 'ошибка'
   if (item.status === 'skipped') return 'пропущено'
-  if (item.candidates.length) return `${item.candidates.length} ${item.candidates.length === 1 ? 'вариант' : 'варианта'}`
+  if (item.candidates.length) return `${item.candidates.length} ${variantWord(item.candidates.length)}`
   return 'ищем…'
 }
 

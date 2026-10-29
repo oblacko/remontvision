@@ -186,7 +186,7 @@ YANDEX_SEARCH_API_KEY=<key>
 YANDEX_FOLDER_ID=<folder-id>
 PROCUREMENT_DOMAINS=divan.ru,askona.ru,stoolgroup.ru,divanboss.ru,sonum.ru,wooden-world.ru,mebelion.ru,mnogosna.ru,leoparquet.ru,poli24.ru,profiplitka.ru,sanok.ru
 PROCUREMENT_MIN_SCORE=80
-PROCUREMENT_ALT_SCORE=65
+PROCUREMENT_ALT_SCORE=60
 PROCUREMENT_MAX_RUN_COST_USD=0.5
 ```
 
