@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, assessArchitecture, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { curateProducts, referenceImagesDetailed } from './curate.js';
@@ -211,6 +211,7 @@ async function processRender(renderId) {
       stage = 'rendering';
       await q.setRoomStatus('rendering', room.id);
       const originalBuf = await getBuffer(sourceStored);
+      const originalDataUrl = await bufferToDataUrl(originalBuf);
       const { width, height } = imageSize(originalBuf);
       targetRatio = width / height;
       const renderModel = getModelConfig().render;
@@ -258,13 +259,58 @@ async function processRender(renderId) {
       }
 
       const srcB64 = await bufferToDataUrl(designBuf);
-      const out = await generateRender({
+      let out = await generateRender({
         prompt,
         sourceImageB64: srcB64,
         referenceImagesB64,
         aspectRatio,
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (out.cost || 0); model = out.model || null;
+      let architectureQa = null;
+      if (!iteration) {
+        try {
+          const outBuf = Buffer.from(out.b64, 'base64');
+          const outExt = detectImageExt(outBuf);
+          const outMime = MIME_BY_EXT[outExt] || 'image/png';
+          architectureQa = await assessArchitecture({
+            sourceImageUrl: originalDataUrl,
+            renderImageUrl: `data:${outMime};base64,${out.b64}`,
+          });
+          cost += architectureQa.cost || 0;
+          log({ event: 'architecture_qa', room_id: room.id, render_id: renderId, accepted: architectureQa.accepted, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: architectureQa.cost ?? null });
+          if (!architectureQa.accepted) {
+            const retryPrompt = `${prompt}
+
+ARCHITECTURE CORRECTION — HARD REQUIREMENT
+The previous attempt failed architecture QA: ${architectureQa.issues.join('; ') || 'the room geometry changed'}.
+Regenerate the SAME room with the exact source architecture. Do not add, remove, move or resize any window, door, wall, ceiling, niche, beam, column, skylight, built-in or room volume. Keep the same camera, proportions and functional zones. This correction overrides any conflicting styling instruction.`;
+            out = await generateRender({
+              prompt: retryPrompt,
+              sourceImageB64: srcB64,
+              referenceImagesB64,
+              aspectRatio,
+              model: 'openai/gpt-image-2',
+            });
+            imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
+            const retryBuf = Buffer.from(out.b64, 'base64');
+            const retryExt = detectImageExt(retryBuf);
+            const retryMime = MIME_BY_EXT[retryExt] || 'image/png';
+            architectureQa = await assessArchitecture({
+              sourceImageUrl: originalDataUrl,
+              renderImageUrl: `data:${retryMime};base64,${out.b64}`,
+            });
+            cost += architectureQa.cost || 0;
+            log({ event: 'architecture_qa_retry', room_id: room.id, render_id: renderId, accepted: architectureQa.accepted, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: architectureQa.cost ?? null });
+            if (!architectureQa.accepted) {
+              throw new Error(`Не удалось сохранить архитектуру комнаты: ${architectureQa.issues.slice(0, 3).join('; ') || 'геометрия изменилась'}`);
+            }
+          }
+        } catch (e) {
+          if (String(e.message || '').startsWith('Не удалось сохранить архитектуру')) throw e;
+          log({ event: 'architecture_qa_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+      meta.architecture_qa = architectureQa;
       log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
     }
 

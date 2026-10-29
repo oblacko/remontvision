@@ -1,7 +1,7 @@
 // Текущие модели хранятся в app_settings, с фолбэком на переменные окружения.
 // Админка может переключать render-модель без рестарта; следующая генерация уже использует новую.
 const DEFAULTS = {
-  render: process.env.RENDER_MODEL || 'black-forest-labs/flux-3-image',
+  render: process.env.RENDER_MODEL || 'openai/gpt-image-2',
   vision: process.env.VISION_MODEL || 'google/gemini-3-flash-preview',
   resolution: process.env.RENDER_RESOLUTION || '1K',
   aspectRatio: process.env.RENDER_ASPECT_RATIO || 'auto',

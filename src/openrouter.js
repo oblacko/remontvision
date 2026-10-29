@@ -792,3 +792,60 @@ score — общее визуальное сходство именно тип/�
     cost: data.usage?.cost ?? null,
   };
 }
+
+// Architecture QA: сравниваем исходное фото и результат, чтобы не отдавать "другую комнату".
+export async function assessArchitecture({ sourceImageUrl, renderImageUrl }) {
+  const sys = `Ты проверяешь, сохранил ли сгенерированный интерьер архитектуру исходной комнаты.
+Image 1 — исходное фото. Image 2 — сгенерированный рендер.
+Верни строго JSON:
+{"architecture_preserved":true|false,"camera_preserved":true|false,"windows_preserved":true|false,"doors_preserved":true|false,"room_proportions_preserved":true|false,"builtins_preserved":true|false,"ceiling_preserved":true|false,"issues":["..."]}
+Проверяй ТОЛЬКО архитектуру, не мебель, не отделку, не декор, не свет и не цвет.
+- camera_preserved: та же камера, ракурс, высота глаз, фокусное расстояние, кадрирование.
+- windows_preserved: то же количество, размер и положение окон.
+- doors_preserved: то же количество, размер и положение дверей/проёмов.
+- room_proportions_preserved: та же ширина, глубина, высота потолка и пропорции комнаты; комната не расширена и не сужена.
+- builtins_preserved: те же встроенные шкафы, стеллажи, ниши, зеркальные панели, радиаторы и розетки.
+- ceiling_preserved: плоскость потолка не изменена; допускаются существующие швы, стыки панелей и отражения света.
+Если добавлено/убрано/перемещено окно, дверь, проём, мансардное окно, ниша, балка, колонна, или изменены пропорции комнаты/ракурс — architecture_preserved=false.
+Игнорируй новые швы на потолке, отражения, покраску, мебель, шторы, декор и освещение. Только JSON.`;
+  const r = await fetchWithRetry(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      model: process.env.ARCHITECTURE_QA_MODEL || 'google/gemini-3.1-pro-preview',
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: [
+          { type: 'text', text: 'Проверь архитектуру комнаты.' },
+          { type: 'image_url', image_url: { url: sourceImageUrl } },
+          { type: 'image_url', image_url: { url: renderImageUrl } },
+        ] },
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try { parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
+  const checks = {
+    architecture_preserved: parsed.architecture_preserved === true,
+    camera_preserved: parsed.camera_preserved === true,
+    windows_preserved: parsed.windows_preserved === true,
+    doors_preserved: parsed.doors_preserved === true,
+    room_proportions_preserved: parsed.room_proportions_preserved === true,
+    builtins_preserved: parsed.builtins_preserved === true,
+    ceiling_preserved: parsed.ceiling_preserved === true,
+  };
+  const accepted = checks.camera_preserved &&
+    checks.windows_preserved &&
+    checks.doors_preserved &&
+    checks.room_proportions_preserved &&
+    checks.ceiling_preserved;
+  return {
+    accepted,
+    checks,
+    issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 8) : [],
+    cost: data.usage?.cost ?? null,
+  };
+}

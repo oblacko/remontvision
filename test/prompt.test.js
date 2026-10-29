@@ -116,3 +116,29 @@ test('catalog seed has unique keys and generated images', () => {
     assert.ok(fs.existsSync(path.join(process.cwd(), 'public', 'catalog', item.image)), `missing ${item.image}`);
   }
 });
+
+test('base prompt locks architecture and avoids structural additions', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    keepFurniture: false,
+    useCatalog: false,
+    hasStyleRef: true,
+    imageMap: [{ role: 'source room' }, { role: 'art reference' }],
+  });
+  assert.match(prompt, /ARCHITECTURE LOCK/);
+  assert.match(prompt, /LOCKED INVARIANTS/);
+  assert.match(prompt, /Built-ins are architecture, not furniture/);
+  assert.match(prompt, /Do not add a second window/);
+  assert.match(prompt, /Ignore all architecture in the reference/);
+  assert.match(prompt, /cosmetic renovation/);
+  assert.doesNotMatch(prompt, /deep renovation/);
+  assert.doesNotMatch(prompt, /warm cove or wall wash|headboard ledge|hide the cornice/);
+});
+
+test('edit prompt preserves built-ins and room geometry', () => {
+  const prompt = buildEditPrompt({ roomType: 'Спальня', target: 'light', instruction: 'replace pendant', hasRef: true });
+  assert.match(prompt, /LOCKED INVARIANTS/);
+  assert.match(prompt, /Built-in shelving/);
+  assert.match(prompt, /Do not move objects/);
+});

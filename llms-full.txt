@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-29T13:48:15.840Z
+Generated: 2026-10-29T14:04:18.756Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -212,7 +212,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 35 тестов
+npm test                    # node:test, 37 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -276,7 +276,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 35 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
+- `npm test` — 37 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -287,7 +287,7 @@ node --check src/openrouter.js
 - Подбор товаров использует Yandex Search API и allowlist магазинов; Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он не используется как основной магазин.
 - Смета по площади и количествам пока не считается: только список товаров.
 - Покрытие подбора неполное: hero-предметы, свет, ковры, пол и часть текстиля находятся; стены/потолок/плинтус и часть магазинов пока дают fallback-ссылку. Расширять через новые адаптеры и category-page extraction.
-- Очистка комнаты по умолчанию выключена: design pass идёт по исходному фото, чтобы сохранить планировку. FLUX 3 Image — основная модель; Seedream/Gemini могут добавлять архитектуру, нужен architecture QA.
+- Очистка комнаты по умолчанию выключена: design pass идёт по исходному фото, чтобы сохранить планировку. GPT Image 2 — основная модель; после генерации работает architecture QA и один retry при изменении геометрии.
 - Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
 - Нет inpainting для люстр/розеток; позиции могут плавать.
 - Нет автоматического обновления цен/наличия и фидов.
@@ -387,7 +387,7 @@ Last updated: 2026-10-29
 
 ```bash
 npm install
-npm test                 # 35 tests
+npm test                 # 37 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -2214,7 +2214,8 @@ export const MAX_REFERENCES; // 4
 - Найдены причины в промте: разрешённое перемещение мебели, `cove/wall wash`, скрытие карниза, новые полки/ниши, свободная трактовка радиатора и утечка архитектуры из art reference. Дополнительно design pass получал только shell без мебели, поэтому модель не знала исходных зон.
 - Добавлен жёсткий `ARCHITECTURE LOCK`: камера, размеры, окна, двери, потолок, розетки и встроенные элементы зафиксированы; встроенные шкафы/стеллажи/кухни названы архитектурой, а не мебелью. Запрещены новые окна, двери, ниши, балки, колонны, ковры-потолки и вторые световые точки. Art reference теперь влияет только на палитру/материалы/свет.
 - Очистка отключена по умолчанию: дизайн идёт по исходному фото, чтобы сохранить планировку. FLUX 3 Image выбран основной моделью: тест с новым промтом сохранил узкую комнату, одно окно, зеркальный шкаф и дверь. Seedream/Gemini всё ещё могут добавлять архитектуру — следующий шаг architecture QA.
-- Обновлены `src/promptconfig.js`, `src/openrouter.js`, `src/cleanupconfig.js`, `src/modelconfig.js`, UI-текст режима мебели, тесты и документация.
+- Добавлена architecture QA: после генерации сильная vision-модель сравнивает исходник и результат; при изменении камеры/окон/дверей/пропорций/потолка запускается один retry, затем ошибка и возврат кредита. GPT Image 2 выбран основной моделью: на тесте сохранил узкую комнату, окно, зеркальный шкаф и дверь.
+- Обновлены `src/promptconfig.js`, `src/openrouter.js`, `src/cleanupconfig.js`, `src/modelconfig.js`, `src/jobs.js`, UI-текст режима мебели, тесты и документация; тестов теперь 37.
 
 ## 2026-10-29 — план «Воплотить дизайн»
 

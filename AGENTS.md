@@ -25,7 +25,7 @@
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 35 тестов
+npm test                    # node:test, 37 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -89,7 +89,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 35 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
+- `npm test` — 37 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -100,7 +100,7 @@ node --check src/openrouter.js
 - Подбор товаров использует Yandex Search API и allowlist магазинов; Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он не используется как основной магазин.
 - Смета по площади и количествам пока не считается: только список товаров.
 - Покрытие подбора неполное: hero-предметы, свет, ковры, пол и часть текстиля находятся; стены/потолок/плинтус и часть магазинов пока дают fallback-ссылку. Расширять через новые адаптеры и category-page extraction.
-- Очистка комнаты по умолчанию выключена: design pass идёт по исходному фото, чтобы сохранить планировку. FLUX 3 Image — основная модель; Seedream/Gemini могут добавлять архитектуру, нужен architecture QA.
+- Очистка комнаты по умолчанию выключена: design pass идёт по исходному фото, чтобы сохранить планировку. GPT Image 2 — основная модель; после генерации работает architecture QA и один retry при изменении геометрии.
 - Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
 - Нет inpainting для люстр/розеток; позиции могут плавать.
 - Нет автоматического обновления цен/наличия и фидов.
