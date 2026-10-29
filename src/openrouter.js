@@ -52,6 +52,10 @@ async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = TIME
       const body = (await r.text()).slice(0, 300);
       lastErr = new Error(`${url}: ${r.status} ${body}`);
       if (r.status !== 429 && r.status < 500) break;
+      if (r.status === 429) {
+        const retryAfter = Number(r.headers.get('retry-after') || 0);
+        if (retryAfter > 0) await sleep(Math.min(20_000, retryAfter * 1000));
+      }
     } catch (e) {
       lastErr = e.name === 'AbortError' ? new Error(`${url}: timeout ${timeoutMs}ms`) : e;
     } finally {

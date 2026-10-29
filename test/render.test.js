@@ -5,7 +5,7 @@ process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
 const { generateRender, assessProductEdit, parseRender, snapAspect } = await import('../src/openrouter.js');
-const { supportsResolution } = await import('../src/modelcaps.js');
+const { supportsResolution, modelCaps } = await import('../src/modelcaps.js');
 
 const SOURCE = 'data:image/jpeg;base64,SOURCE';
 const REF = 'data:image/png;base64,REF';
@@ -128,4 +128,5 @@ test('FLUX does not receive resolution, Seedream does', () => {
 test('portrait source keeps a portrait aspect request', () => {
   assert.equal(snapAspect(583, 1280), '9:16');
   assert.equal(snapAspect(1536, 1024), '3:2');
+  assert.equal(snapAspect(1280, 593, modelCaps('openai/gpt-image-2').aspects), '21:9');
 });
