@@ -182,11 +182,12 @@ export function buildPrompt({
     ? String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '')
     : 'the architecture, camera, perspective, walls, windows, doors, ceiling height, room proportions, built-ins, plumbing and electrical points';
   const fullChange = String(room?.change || 'finishes, lighting, textiles, decor and styling that match the chosen style').replace(/\.+$/, '');
-  const change = keepFurniture
-    ? fullChange.split(/(?<=[.!?])\s+/).filter(sentence => !/\b(replace|restyle|rearrange)\b/i.test(sentence)).join(' ')
-    : fullChange;
+  const change = fullChange
+    .split(/(?<=[.!?])\s+/)
+    .filter(sentence => !(keepFurniture ? /\b(replace|restyle|rearrange|reposition|move)\b/i : /\b(rearrange|reposition|move)\b/i).test(sentence))
+    .join(' ') || 'Update surface finishes, textiles, lighting and decor without changing the room layout.';
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
-  const styling = room?.styling || 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.';
+  const styling = 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use only existing shelves, ledges and niches; never add a new built-in, ledge, cove or wall panel.';
   const rules = getPromptConfig();
   const furnitureRule = keepFurniture ? rules.furnitureOn : rules.furnitureOff;
   const catalogText = useCatalog
@@ -194,10 +195,24 @@ export function buildPrompt({
     : 'No catalog products are used for this render. Choose materials, lighting and furniture that best fit the style and the room. Do not add a product list or estimate.';
   const catalogRule = useCatalog ? rules.catalogOn : rules.catalogOff;
   const roles = imageRolesText(imageMap);
+  const architectureLock = `ARCHITECTURE LOCK — HIGHEST PRIORITY
+This is the SAME physical room, not a new room. This is a cosmetic renovation only. The source image is a photograph of the actual room; do not redesign its architecture.
+LOCKED INVARIANTS — do not violate any of these:
+- Camera: same position, eye height, focal length, perspective, horizon, framing, crop and aspect ratio. Same left/right and top/bottom composition. No zoom, pan, tilt, room widening or narrowing.
+- Room volume: same width, depth, ceiling height, wall planes, floor plane, soffits, beams, columns, niches and arches. Do not add, remove, move, resize, open or close any wall, window, door, niche, beam, column, arch, cove, ceiling recess, skylight or room volume.
+- Windows: same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Do not add a second window. Do not widen, raise, lower or move the window.
+- Doors: same count, size, position, frame, handle and swing. Do not add a doorway, hallway or second room.
+- Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobe, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Preserve their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves, add niches, change the ceiling line, add beams or columns.
+- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights may use only existing points; do not add new recessed, cove, track or wall lights.
+- Mirrors and reflections are reflections, not openings: do not turn a mirrored wardrobe or mirror reflection into a window, door or new room.
+- If a design idea conflicts with any locked invariant, keep the architecture and change the finish or decor instead.`;
 
   if (iteration) {
     return `${roles}
-This is a ${roomName}. Apply ONLY this change to the interior: "${requestText}".
+
+${architectureLock}
+
+Apply ONLY this change to the interior: "${requestText}".
 Keep everything else exactly as in the source image: camera, geometry, architecture, large furniture, floor, walls, lighting and decor.
 Do not restyle the room. Do not move objects. Photorealistic result.`;
   }
@@ -215,10 +230,12 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
   return `${roles}
 
 TASK
-Create a photorealistic, aspirational editorial photograph of this ${roomName} after a deep renovation in ${styleDesc} style.
+Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a cosmetic renovation in ${styleDesc} style.
+This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.
 The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
-Deeply transform the finishes, lighting, textiles, decor and styling while keeping the architecture believable and buildable.
 This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
+
+${architectureLock}
 
 KEEP EXACTLY
 ${keep}.
@@ -227,9 +244,12 @@ Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical
 FURNITURE MODE
 ${furnitureRule}
 
+FURNITURE PLACEMENT
+Keep the existing functional zones and furniture positions. The bed stays on the same wall, desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.
+
 CHANGE / DEEP TRANSFORMATION
 ${change}.
-If a floor product is listed below, replace the floor finish with it. If no floor product is listed, preserve the existing floor. The same applies to walls: change only when a wall finish is listed.
+If a floor product is listed below, change only its surface finish; do not change the floor plane or geometry. If no floor product is listed, preserve the existing floor. Style words such as "light oak" refer to furniture and joinery only, not to replacing the floor unless a floor product is explicitly listed. The same applies to walls: change only the surface finish when a wall finish is listed.
 Keep the result functional, keep realistic dimensions, and do not block doors or windows.
 
 COMPOSITION
@@ -249,7 +269,7 @@ ${roomRules}
 
 LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
 ${styling}
-Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
+Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. All decor must sit inside the existing room volume; do not alter wall, floor or ceiling planes, corners, perspective, plinth or room proportions. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
 
 PINTEREST-LEVEL STYLING
 ${rules.pinterest}
@@ -266,6 +286,7 @@ Use these text descriptions only as constraints for finishes, colors, formats an
 
 STYLE
 ${styleRefText}
+The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Do not transfer any architectural feature from the reference.
 ${colors}
 
 MATERIAL CLASS
@@ -290,6 +311,12 @@ This is a ${roomName}.
 Change only the ${targetLabel}. ${instruction}
 Match the reference's shape, color, material and finish${hasRef ? '' : ' from the described material'}${refDimensions ? ` and its real dimensions (${refDimensions})` : ''}. Keep the size and realistic position appropriate for the room.
 The product reference describes only the product. Ignore its background, studio lighting, camera angle, staging and photographic style; preserve the interior's own light and composition.
+LOCKED INVARIANTS — HIGHEST PRIORITY:
+- The same physical room, camera position, eye height, focal length, perspective, framing and aspect ratio.
+- Preserve room layout, ceiling height, window placement and size, wall positions, doorways, plinth, floor plane, built-ins, niches, columns and beams.
+- Built-in shelving, wardrobe, kitchen cabinets, niches and wall panels are architecture, not furniture: preserve footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves or add niches.
+- Preserve existing electrical points: outlets, switches and ceiling light positions. Do not add new light points, coves, tracks or recesses.
+- If a design idea conflicts with a locked invariant, keep the architecture and change only the target object.
 Keep everything else exactly as in Image 1: camera, geometry, walls, floor, furniture, decor and lighting. Do not restyle the room. Do not move objects. Do not add extra furniture or fixtures.
 Photorealistic result, no text, no watermarks, no people.`;
 }
@@ -314,8 +341,8 @@ export function snapAspect(width, height, allowed = null) {
   return best;
 }
 
-export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio }) {
-  return generateWithModel(getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
+export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio, model = null }) {
+  return generateWithModel(model || getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 }
 
 // Пустой каркас: отдельная модель/промт/разрешение из админки, только исходник, без style/product refs.
