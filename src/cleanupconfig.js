@@ -5,7 +5,7 @@ import { roomTypeByName } from './roomtypes.js';
 export const CLEANUP_KEY = 'cleanup.config.v1';
 
 export const DEFAULT_CLEANUP_CONFIG = {
-  enabled: true,
+  enabled: false,
   model: 'black-forest-labs/flux-3-image-klein',
   resolution: '1K',
   aspect_ratio: 'auto',

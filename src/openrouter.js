@@ -245,7 +245,7 @@ FURNITURE MODE
 ${furnitureRule}
 
 FURNITURE PLACEMENT
-Keep the existing functional zones and furniture positions. The bed stays on the same wall, desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.
+Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation; do not center it under the window if it was not there. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.
 
 CHANGE / DEEP TRANSFORMATION
 ${change}.
