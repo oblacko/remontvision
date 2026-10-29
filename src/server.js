@@ -5,13 +5,13 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { q, migrate } from './db.js';
 import { startWorker, enqueueRender } from './jobs.js';
-import { listImageModels, MOCK_MODE, assertConfig, log } from './openrouter.js';
+import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect } from './openrouter.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
 import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
-import { sanitizeImage } from './media.js';
+import { sanitizeImage, fitAspect } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES } from './roomtypes.js';
 import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
@@ -21,16 +21,17 @@ import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedCatalog } from './catalogseed.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
-import { validateModelOptions } from './modelcaps.js';
+import { validateModelOptions, modelCaps } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
-import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig } from './cleanupconfig.js';
+import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
 import { startProcurementWorker } from './procurementjobs.js';
 import { getProcurementConfig, getProcurementDefaults, saveProcurementConfig, resetProcurementConfig, loadProcurementConfig } from './procurementconfig.js';
 import { getStyleConfig, getStyleDefaults, saveStyleConfig, resetStyleConfig, loadStyleConfig } from './styleconfig.js';
+import { imageSize, detectImageExt } from './imagesize.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -889,13 +890,45 @@ app.post('/api/admin/refunds', h(async (req, res) => {
 }));
 
 // ---------- комнаты ----------
+app.post('/api/cleanup', rateLimit, upload.single('photo'), h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const photo = req.file;
+  if (!photo) return res.status(400).json({ error: 'Нет фото' });
+  const roomType = ROOM_TYPE_NAMES.includes(String(req.body?.room_type || '')) ? String(req.body.room_type) : 'Другое';
+  if (MOCK_MODE) {
+    return res.json({ image: `data:${photo.mimetype};base64,${photo.buffer.toString('base64')}`, model: 'mock' });
+  }
+  const cleanupCfg = getCleanupConfig();
+  const clean = await sanitizeImage(photo.buffer);
+  const { width, height } = imageSize(clean);
+  const cleanupAspect = cleanupCfg.aspect_ratio === 'auto'
+    ? snapAspect(width, height, modelCaps(cleanupCfg.model).aspects)
+    : cleanupCfg.aspect_ratio;
+  const out = await generateCleanupRender({
+    prompt: buildCleanupPrompt(roomType),
+    sourceImageB64: `data:${photo.mimetype};base64,${clean.toString('base64')}`,
+    aspectRatio: cleanupAspect,
+    model: cleanupCfg.model,
+    resolution: cleanupCfg.resolution,
+    aspect: cleanupCfg.aspect_ratio,
+  });
+  let shell = Buffer.from(out.b64, 'base64');
+  shell = await fitAspect(shell, width / height);
+  const ext = detectImageExt(shell);
+  const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  log({ event: 'cleanup_api_done', model: cleanupCfg.model, room_type: roomType, cost_usd: out.cost ?? null });
+  res.json({ image: `data:${mime};base64,${shell.toString('base64')}`, model: out.model || cleanupCfg.model, cost_usd: out.cost ?? null });
+}));
+
 app.post('/api/rooms', rateLimit, upload.fields([
   { name: 'photo', maxCount: 1 },
   { name: 'style_ref', maxCount: 1 },
+  { name: 'cleanup_photo', maxCount: 1 },
 ]), h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const photo = req.files?.photo?.[0];
   const styleRef = req.files?.style_ref?.[0];
+  const cleanupPhoto = req.files?.cleanup_photo?.[0];
   const styleRefUrl = String(req.body?.style_ref_url || '').trim();
   if (!photo) return res.status(400).json({ error: 'Нет фото' });
   if (!MOCK_MODE) {
@@ -935,6 +968,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const keepFurniture = bool(req.body.keep_furniture, true);
   const useCatalog = bool(req.body.use_catalog, true);
   const photoKey = await saveUpload(photo, 'uploads');
+  let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
   let styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
   if (!styleRefKey && styleRefUrl) {
     try {
@@ -942,16 +976,18 @@ app.post('/api/rooms', rateLimit, upload.fields([
       styleRefKey = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
     } catch (e) {
       await remove(photoKey);
+      if (cleanupKey) await remove(cleanupKey);
       return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}` });
     }
   }
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog, cleanupKey);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
     if (e.status === 402) {
       await q.deleteRoom(id);
       await remove(photoKey);
+      if (cleanupKey) await remove(cleanupKey);
       if (styleRefKey) await remove(styleRefKey);
       return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: await q.creditBalance(req.user.id) });
     }

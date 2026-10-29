@@ -40,6 +40,7 @@ Admin: заголовок `X-Admin-Key`.
 | POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
 | POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
 | POST | `/api/renders/:id/procurement` | запуск подбора товаров, списывает 1 кредит; повторный вызов отдаёт существующий запуск |
+| POST | `/api/cleanup` | очистка комнаты по загруженному фото; возвращает data URL пустой комнаты |
 | GET | `/api/procurement/:id` | статус, позиции и найденные товары |
 | GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |

@@ -63,6 +63,7 @@ node --check src/openrouter.js
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
 | Настройки поиска в админке | `web/src/pages/Admin.tsx`, `src/procurementconfig.js` |
 | Источник стиля и свотчи | `src/styleconfig.js`, `src/styleswatch.js`, `migrations/024_style_briefs.sql` |
+| Очистка комнаты кнопкой | `web/src/components/GenerationPanel.tsx`, `POST /api/cleanup`, `rooms.precleaned_shell_path` |
 | Панель подбора | `web/src/components/ProcurementPanel.tsx` |
 | Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |

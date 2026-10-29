@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-29T15:41:20.106Z
+Generated: 2026-10-29T16:22:43.036Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -250,6 +250,7 @@ node --check src/openrouter.js
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
 | Настройки поиска в админке | `web/src/pages/Admin.tsx`, `src/procurementconfig.js` |
 | Источник стиля и свотчи | `src/styleconfig.js`, `src/styleswatch.js`, `migrations/024_style_briefs.sql` |
+| Очистка комнаты кнопкой | `web/src/components/GenerationPanel.tsx`, `POST /api/cleanup`, `rooms.precleaned_shell_path` |
 | Панель подбора | `web/src/components/ProcurementPanel.tsx` |
 | Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
@@ -1113,6 +1114,7 @@ Admin: заголовок `X-Admin-Key`.
 | POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
 | POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
 | POST | `/api/renders/:id/procurement` | запуск подбора товаров, списывает 1 кредит; повторный вызов отдаёт существующий запуск |
+| POST | `/api/cleanup` | очистка комнаты по загруженному фото; возвращает data URL пустой комнаты |
 | GET | `/api/procurement/:id` | статус, позиции и найденные товары |
 | GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
@@ -1449,6 +1451,7 @@ PROCUREMENT_VISION_MODEL=google/gemini-3.1-pro-preview
 - Цены и наличие сохраняются на момент проверки. Это список товаров, не смета: количества и итог появятся отдельным этапом.
 - Если нужно временно выключить: `PROCUREMENT_ENABLED=0` и пересоздать контейнер.
 - `IMAGE_MIN_GAP_MS` (по умолчанию 10000) сериализует вызовы image-модели и снижает риск 429 от OpenRouter. При 429 код делает до 4 попыток с паузами 10/20/40 секунд.
+- Кнопка «Очистить комнату» после загрузки фото вызывает `/api/cleanup` и показывает shell. Если пользователь оставляет «Очищенная», shell загружается в `/api/rooms` как `cleanup_photo`; генерация использует его без повторной очистки. Очистка в админке (`cleanup.config.v1`) на ручную кнопку не влияет.
 - Источник стиля переключается в админке → «Стили»: текст, референс или свотчи. По умолчанию текст; фото-референс в этом режиме не отправляется. Активны только «Скандинавский» и «Джапанди».
 - В админке → «Поиск» настраиваются включение, слои (по умолчанию только мебель/свет/декор и текстиль), регион, домены, пороги score и лимиты. Выключенные слои не создают позиции и не тратят запросы. Настройки хранятся в `app_settings` (`procurement.settings.v1`).
 
@@ -2212,6 +2215,14 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
+
+## 2026-10-29 — кнопка очистки комнаты
+
+- После загрузки фото появилась кнопка «Очистить комнату»: `/api/cleanup` прогоняет cleanup-модель и возвращает пустую комнату.
+- Пользователь видит переключатель «Оригинал / Очищенная»; если оставляет очищенную, `/api/rooms` сохраняет shell в `rooms.precleaned_shell_path`, а генерация использует его как source без повторной очистки.
+- Если очистка не удалась, показывается ошибка; оригинал не подменяется молча.
+- Shell не сохраняется на сервере до запуска генерации, чтобы не плодить мусор. Кредит за очистку отдельно не списывается.
+- Миграция `025_precleaned_shell.sql`.
 
 ## 2026-10-29 — защита от 429 OpenRouter
 

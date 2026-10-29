@@ -89,7 +89,8 @@ async function processRender(renderId) {
   const keepFurniture = room.keep_furniture !== false;
   const useCatalog = room.use_catalog !== false;
   const cleanupCfg = getCleanupConfig();
-  const useCleanup = !iteration && !keepFurniture && cleanupCfg.enabled;
+  const precleanedShell = room.precleaned_shell_path || null;
+  const useCleanup = !iteration && !keepFurniture && !precleanedShell && cleanupCfg.enabled;
   let stage = 'start';
 
   try {
@@ -109,6 +110,8 @@ async function processRender(renderId) {
       keep_furniture: keepFurniture,
       use_catalog: useCatalog,
       cleanup_enabled: useCleanup,
+      precleaned_shell_path: precleanedShell,
+      source_used: precleanedShell ? 'precleaned' : useCleanup ? 'cleanup' : 'original',
       style: room.style,
       target: render.edit_target || null,
       product_ids: [],
@@ -117,12 +120,13 @@ async function processRender(renderId) {
     };
     let parentItems = [];
     let editProduct = null;
-    let sourceStored = room.photo_path;
+    let sourceStored = precleanedShell || room.photo_path;
     let referenceImagesB64 = [];
 
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
       if (parent?.image_path) sourceStored = parent.image_path;
+      meta.source_used = 'parent';
       if (parent) parentItems = await q.itemsForRender(parent.id);
       const ref = await editReference(render);
       editProduct = ref?.product || null;
@@ -164,7 +168,7 @@ async function processRender(renderId) {
 
       let styleUserRef = false;
       const styleRefUrls = [];
-      imageMap = [{ role: useCleanup ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
+      imageMap = [{ role: (useCleanup || precleanedShell) ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
       if (styleMode === 'reference') {
         const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
         const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
@@ -255,6 +259,7 @@ async function processRender(renderId) {
           await putBuffer(shellKey, shellBytes, MIME_BY_EXT[shellExt] || 'image/png');
           await q.setRenderShellPath(render.id, shellKey);
           designBuf = shellBytes;
+          meta.source_used = 'cleanup';
           cleanupCost = cleanupOut.cost || 0;
           meta.cleanup = {
             model: cleanupCfg.model,
@@ -267,6 +272,7 @@ async function processRender(renderId) {
           };
           log({ event: 'cleanup_done', room_id: room.id, render_id: renderId, model: cleanupCfg.model, aspect: cleanupAspect, cost_usd: cleanupOut.cost ?? null, ms: Date.now() - cleanupStart });
         } catch (e) {
+          meta.source_used = 'original';
           meta.cleanup = { model: cleanupCfg.model, error: String(e.message || e).slice(0, 500), ms: Date.now() - cleanupStart };
           log({ event: 'cleanup_error', room_id: room.id, render_id: renderId, model: cleanupCfg.model, error: String(e.message || e).slice(0, 500) });
         }

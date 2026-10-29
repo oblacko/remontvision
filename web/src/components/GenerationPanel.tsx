@@ -145,6 +145,10 @@ export function GenerationPanel({
   const [photoName, setPhotoName] = useState('')
   const [photoRatio, setPhotoRatio] = useState(4 / 3)
   const [photoError, setPhotoError] = useState('')
+  const [cleaned, setCleaned] = useState<{ file: File; url: string; model?: string } | null>(null)
+  const [useCleaned, setUseCleaned] = useState(true)
+  const [cleanupBusy, setCleanupBusy] = useState(false)
+  const [cleanupError, setCleanupError] = useState('')
   const [style, setStyle] = useState<string | null>(null)
   const [accent, setAccent] = useState('none')
   const [scheme, setScheme] = useState('none')
@@ -302,9 +306,32 @@ export function GenerationPanel({
     setPhotoRatio(4 / 3)
     setPhotoName(nextFile.name)
     setPhotoError(''); setGenError('')
+    setCleaned(null); setUseCleaned(true); setCleanupError('')
     setRoomType(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
     setKeepFurniture(true); setUseCatalog(true)
+  }
+
+  const cleanupRoom = async () => {
+    if (!file || cleanupBusy) return
+    setCleanupBusy(true); setCleanupError('')
+    try {
+      const fd = new FormData()
+      fd.append('photo', file)
+      fd.append('room_type', roomType || 'Другое')
+      const r = await fetch('/api/cleanup', { method: 'POST', body: fd })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { onRequireLogin(); return }
+      if (!r.ok || !d.image) throw new Error(d.error || 'Не удалось очистить комнату')
+      const blob = await (await fetch(d.image)).blob()
+      const shellFile = new File([blob], 'cleaned-room.jpg', { type: blob.type || 'image/jpeg' })
+      setCleaned({ file: shellFile, url: d.image, model: d.model })
+      setUseCleaned(true)
+    } catch (e) {
+      setCleanupError(e instanceof Error ? e.message : 'Не удалось очистить комнату')
+    } finally {
+      setCleanupBusy(false)
+    }
   }
 
   const acceptRef = (nextFile?: File) => {
@@ -413,8 +440,9 @@ export function GenerationPanel({
         fd.append('style', styleName)
         fd.append('room_type', roomType)
         fd.append('price_tier', priceTier)
-        fd.append('keep_furniture', keepFurniture ? '1' : '0')
+        fd.append('keep_furniture', cleaned && useCleaned ? '0' : (keepFurniture ? '1' : '0'))
         fd.append('use_catalog', useCatalog ? '1' : '0')
+        if (cleaned && useCleaned) fd.append('cleanup_photo', cleaned.file)
         fd.append('palette', scheme)
         fd.append('accent', accent)
         if (refFile) fd.append('style_ref', refFile)
@@ -534,10 +562,10 @@ export function GenerationPanel({
               <input ref={photoInput} id="gen-photo" type="file" accept="image/jpeg,image/png,image/webp" className="peer sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptPhoto(event.target.files?.[0])} />
               {photo ? (
                 <div className="gen-photo-preview relative mx-auto border border-foreground bg-foreground" style={{ '--photo-ratio': photoRatio } as PanelStyle}>
-                  <img src={photo} alt="Загруженное фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
+                  <img src={cleaned && useCleaned ? cleaned.url : photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
                     <span className="truncate text-xs">{photoName}</span>
-                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); if (photoInput.current) photoInput.current.value = '' }} className="flex size-11 shrink-0 items-center justify-center hover:bg-background/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Удалить фото"><X className="size-4" /></button>
+                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setCleaned(null); setUseCleaned(true); setCleanupError(''); if (photoInput.current) photoInput.current.value = '' }} className="flex size-11 shrink-0 items-center justify-center hover:bg-background/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Удалить фото"><X className="size-4" /></button>
                   </div>
                 </div>
               ) : (
@@ -548,11 +576,27 @@ export function GenerationPanel({
                 </label>
               )}
               {photo && (
+                <div className="mt-5 border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><p className="eyebrow">Очистка комнаты</p><p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Уберём мебель, технику, декор и свет. Оставим стены, окна, двери и пропорции помещения.</p></div>
+                    <button type="button" disabled={cleanupBusy} onClick={() => void cleanupRoom()} className="action-secondary min-h-11 px-4">{cleanupBusy ? 'Очищаем…' : cleaned ? 'Очистить заново' : 'Очистить комнату'}</button>
+                  </div>
+                  {cleaned && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={() => setUseCleaned(false)} className={`min-h-9 border px-3 text-xs ${!useCleaned ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted'}`}>Оригинал</button>
+                      <button type="button" onClick={() => setUseCleaned(true)} className={`min-h-9 border px-3 text-xs ${useCleaned ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted'}`}>Очищенная</button>
+                      <span className="text-[11px] text-muted-foreground">Готово · можно перегенерировать дизайн по очищенной</span>
+                    </div>
+                  )}
+                  {cleanupError && <p className="mt-3 text-sm text-destructive" role="alert">{cleanupError}</p>}
+                </div>
+              )}
+              {photo && (
                 <div className="mt-5">
                   <p className="eyebrow">Тип комнаты</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">Чтобы в дизайне не появились предметы из другого помещения.</p>
                   <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => setRoomType(type)} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
+                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setCleaned(null); setUseCleaned(true); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
                   </div>
                 </div>
               )}
