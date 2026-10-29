@@ -29,6 +29,21 @@ export function log(obj) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+let imageChain = Promise.resolve();
+let lastImageStart = 0;
+const IMAGE_MIN_GAP_MS = Math.max(0, Number(process.env.IMAGE_MIN_GAP_MS || 10_000));
+
+function withImageSlot(fn) {
+  const run = imageChain.then(async () => {
+    const wait = Math.max(0, IMAGE_MIN_GAP_MS - (Date.now() - lastImageStart));
+    if (wait) await sleep(wait);
+    lastImageStart = Date.now();
+    return fn();
+  });
+  imageChain = run.catch(() => {});
+  return run;
+}
+
 
 function headers() {
   return {
@@ -410,16 +425,18 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
   for (const [attempt, [endpoint, payload]] of attempts.entries()) {
     try {
       let r;
-      for (let tryNo = 0; tryNo < 2; tryNo++) {
-        r = await fetch(endpoint, {
+      for (let tryNo = 0; tryNo < 4; tryNo++) {
+        const doFetch = () => fetch(endpoint, {
           method: 'POST',
           headers: headers(),
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(150_000),
         });
-        if (r.status === 429 && tryNo === 0) {
-          const wait = Math.max(5, Math.min(30, Number(r.headers.get('retry-after') || 10)));
-          log({ event: 'render_rate_limited', model, endpoint, wait_s: wait });
+        r = endpoint.endsWith('/images') ? await withImageSlot(doFetch) : await doFetch();
+        if (r.status === 429 && tryNo < 3) {
+          const retryAfter = Number(r.headers.get('retry-after') || 0);
+          const wait = Math.max(10, Math.min(60, retryAfter || (10 * 2 ** tryNo)));
+          log({ event: 'render_rate_limited', model, endpoint, attempt: tryNo + 1, wait_s: wait });
           await sleep(wait * 1000);
           continue;
         }

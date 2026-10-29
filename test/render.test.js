@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.OPENROUTER_API_KEY = 'test-key';
+process.env.IMAGE_MIN_GAP_MS = '0';
 process.env.RENDER_MODEL = 'test/model';
 
 const { generateRender, assessProductEdit, parseRender, snapAspect } = await import('../src/openrouter.js');
