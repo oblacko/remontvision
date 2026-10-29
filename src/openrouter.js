@@ -839,7 +839,7 @@ Image 1 — исходное фото. Image 2 — сгенерированны�
       ],
       response_format: { type: 'json_object' },
     }),
-  });
+  }, { retries: 4, timeoutMs: 30_000 });
   const data = await r.json();
   const txt = data.choices?.[0]?.message?.content || '{}';
   let parsed = {};

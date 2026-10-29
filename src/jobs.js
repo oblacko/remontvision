@@ -308,6 +308,7 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
         } catch (e) {
           if (String(e.message || '').startsWith('Не удалось сохранить архитектуру')) throw e;
           log({ event: 'architecture_qa_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+          throw new Error(`Не удалось проверить архитектуру комнаты: ${String(e.message || e).slice(0, 300)}`);
         }
       }
       meta.architecture_qa = architectureQa;
