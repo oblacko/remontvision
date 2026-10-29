@@ -19,6 +19,8 @@ import { modelCaps } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
+
+const ARCHITECTURE_QA_ENABLED = /^(1|true|yes|on)$/i.test(process.env.ARCHITECTURE_QA_ENABLED || '');
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -279,7 +281,7 @@ async function processRender(renderId) {
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (out.cost || 0); model = out.model || null;
       let architectureQa = null;
-      if (!iteration) {
+      if (ARCHITECTURE_QA_ENABLED && !iteration) {
         try {
           const outBuf = Buffer.from(out.b64, 'base64');
           const outExt = detectImageExt(outBuf);
