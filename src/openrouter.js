@@ -663,13 +663,16 @@ export async function parseProcurementImage(renderB64, mime = 'image/png', { roo
 - items — только предметы и отделка, которые реально помогут купить аналог. Без брендов, цен и выдуманных артикулов.
 - Не добавляй личные вещи, провода, скрытые коммуникации.
 - Для сантехники, техники и отделки указывай видимые признаки.
+- Для кровати описывай каркас, изголовье и ножки. Не описывай цвет постельного белья как цвет кровати.
+- Для светильника описывай форму плафона, материал, цвет и подвес. Не путай светильник с окном.
+- bbox — координаты всего предмета включая изголовье/ножки; не обрезай предмет.
 - visibility=seen для видимых, hidden для очевидно нужных, но скрытых (матрас, подложка), not_seen если не применимо.
 Только JSON.`;
   const r = await fetchWithRetry(`${BASE}/chat/completions`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
-      model: getModelConfig().vision,
+      model: process.env.PROCUREMENT_VISION_MODEL || 'google/gemini-3.1-pro-preview',
       messages: [
         { role: 'system', content: sys },
         { role: 'user', content: [
@@ -723,7 +726,7 @@ export async function parseProcurementImage(renderB64, mime = 'image/png', { roo
 // Сравнение фрагмента рендера с фото товара. Возвращает 0-100 и объяснение.
 export async function scoreProductMatch({ referenceImageUrl, candidateImageUrl, itemDescription = '', candidateName = '' }) {
   const sys = `Ты сравниваешь предмет на интерьерном рендере с фото товара из магазина.
-Верни строго JSON: {"score":0-100,"color":0-100,"material":0-100,"shape":0-100,"size":0-100,"reasons":["кратко по-русски"]}
+Верни строго JSON: {"score":0-100,"color":0-100,"material":0-100,"shape":0-100,"size":0-100,"reasons":["кратко по-русски"],"next_query":"если score<70 — короткий запрос на русском, который поможет найти более близкий товар"}
 score — общее визуальное сходство именно тип/форма/цвет/материал, не цена и не бренд.
 80+ — очень похожий товар; 70-79 — допустимая альтернатива; ниже — не тот товар.
 Карточка товара часто на белом фоне: не снижай оценку за фон, ракурс и освещение, сравнивай сам предмет.
@@ -732,7 +735,7 @@ score — общее визуальное сходство именно тип/�
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
-      model: getModelConfig().vision,
+      model: process.env.PROCUREMENT_VISION_MODEL || 'google/gemini-3.1-pro-preview',
       messages: [
         { role: 'system', content: sys },
         { role: 'user', content: [
@@ -758,6 +761,7 @@ score — общее визуальное сходство именно тип/�
       size: Math.max(0, Math.min(100, Number(parsed.size) || 0)),
     },
     reasons: Array.isArray(parsed.reasons) ? parsed.reasons.map(String).slice(0, 5) : [],
+    next_query: typeof parsed.next_query === 'string' ? parsed.next_query.slice(0, 160) : null,
     cost: data.usage?.cost ?? null,
   };
 }

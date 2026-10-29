@@ -317,11 +317,12 @@ async function createItemsForRun(run, template, vision) {
 async function searchItem(run, item, config, reference) {
   const attrs = item.attributes || {};
   const baseQuery = item.query || buildQuery(item.category, attrs);
-  const queries = preferredDomains(item, config).map(domain => `site:${domain} ${baseQuery}`);
+  const preferred = preferredDomains(item, config);
+  const queries = preferred.map(domain => `site:${domain} ${baseQuery}`);
   queries.push(baseQuery);
   if (attrs.color || attrs.material) queries.push(broadQuery(item.category));
   const savedByUrl = new Map();
-  for (let round = 0; round < queries.length && round < 3; round++) {
+  for (let round = 0; round < queries.length && round < 4; round++) {
     const query = queries[round];
     await q.setProcurementStage(run.id, `search:${query}`.slice(0, 120));
     let search;
@@ -359,6 +360,7 @@ async function searchItem(run, item, config, reference) {
     candidates.sort((a, b) => b.text_score - a.text_score);
     const visualLimit = item.search_mode === 'visual' ? config.max_visual_candidates : 0;
     const scored = [];
+    let rejectedNextQuery = null;
     for (let index = 0; index < candidates.length; index++) {
       const candidate = candidates[index];
       let finalScore = candidate.text_score;
@@ -375,25 +377,33 @@ async function searchItem(run, item, config, reference) {
           log({ event: 'procurement_image_error', run_id: run.id, item_id: item.id, url: candidate.inspected.image_url, error: String(e.message || e).slice(0, 200) });
         }
       }
+      let nextQuery = null;
+      let visualScore = null;
       if (visualLimit && index < visualLimit && reference?.dataUrl && imageBuffer) {
         try {
-          const candidateDataUrl = `data:image/jpeg;base64,${(await sharp(imageBuffer).resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer()).toString('base64')}`;
+          const candidateDataUrl = `data:image/jpeg;base64,${(await sharp(imageBuffer).resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 86 }).toBuffer()).toString('base64')}`;
           const visual = await scoreProductMatch({
             referenceImageUrl: reference.dataUrl,
             candidateImageUrl: candidateDataUrl,
-            itemDescription: [attrs.label, attrs.subtype, attrs.color, attrs.material, attrs.description].filter(Boolean).join(', '),
+            itemDescription: [attrs.label, attrs.subtype, attrs.color, attrs.material, attrs.shape, attrs.description].filter(Boolean).join(', '),
             candidateName: candidate.inspected.name,
           });
-          finalScore = Math.round(Math.max(candidate.text_score * 0.9, candidate.text_score * 0.5 + visual.score * 0.5));
+          visualScore = visual.score;
+          nextQuery = visual.next_query || null;
+          finalScore = Math.round(visual.score * 0.9 + candidate.text_score * 0.1);
           breakdown = { ...breakdown, visual: visual.score, ...visual.breakdown };
           reasons = visual.reasons;
         } catch (e) {
           log({ event: 'procurement_score_error', run_id: run.id, item_id: item.id, error: String(e.message || e).slice(0, 300) });
         }
       }
-      log({ event: 'procurement_candidate_scored', run_id: run.id, item_id: item.id, url: candidate.inspected.url, text_score: candidate.text_score, visual_score: breakdown.visual ?? null, final_score: finalScore });
+      if (nextQuery) rejectedNextQuery = rejectedNextQuery || nextQuery;
+      if (item.search_mode === 'visual' && visualScore === null) continue;
+      if (item.search_mode === 'visual' && visualScore < 55) continue;
+      if (item.search_mode !== 'visual') finalScore = candidate.text_score;
+      log({ event: 'procurement_candidate_scored', run_id: run.id, item_id: item.id, url: candidate.inspected.url, text_score: candidate.text_score, visual_score: visualScore, final_score: finalScore });
       if (finalScore < config.alt_score) continue;
-      scored.push({ ...candidate, final_score: finalScore, breakdown, reasons, imageKey });
+      scored.push({ ...candidate, final_score: finalScore, breakdown, reasons, imageKey, next_query: nextQuery });
     }
     scored.sort((a, b) => b.final_score - a.final_score);
     for (const candidate of scored) {
@@ -425,7 +435,14 @@ async function searchItem(run, item, config, reference) {
       decision: best >= config.min_score ? 'accepted' : best >= config.alt_score ? 'alternative' : 'unresolved',
       latency_ms: search.latency_ms,
     });
-    if (best >= config.min_score || round === queries.length - 1) break;
+    const nextQuery = scored.find(candidate => candidate.next_query)?.next_query || rejectedNextQuery;
+    if (item.search_mode === 'visual' && (best === null || best < config.min_score) && nextQuery && queries.length < 5) {
+      const domain = preferred[0];
+      if (domain) queries.push(`site:${domain} ${nextQuery}`);
+      if (!queries.includes(nextQuery)) queries.push(nextQuery);
+    }
+    if (best !== null && best >= config.min_score) break;
+    if (round >= queries.length - 1) break;
   }
   const saved = [...savedByUrl.values()];
   await q.setProcurementItemStatus(item.id, saved.length ? 'done' : 'unresolved', { candidateCount: saved.length });
@@ -513,7 +530,9 @@ export async function processProcurementRun(runId) {
     const room = await q.getRoom(render.room_id);
     const renderBuffer = await getBuffer(render.image_path);
     const mime = await mimeForImage(render.image_path);
-    const vision = await parseProcurementImage(renderBuffer.toString('base64'), mime, { roomType: room?.room_type || run.room_type });
+    const renderB64 = renderBuffer.toString('base64');
+    const vision = await parseProcurementImage(renderB64, mime, { roomType: room?.room_type || run.room_type });
+    const fullReference = { dataUrl: `data:${mime};base64,${renderB64}` };
     cost += Number(vision.cost || 0);
     await q.setProcurementAnalysis(run.id, { ...vision, cost: vision.cost ?? null });
     await q.setProcurementStage(run.id, 'items');
@@ -528,13 +547,8 @@ export async function processProcurementRun(runId) {
         await q.setProcurementItemStatus(item.id, 'skipped', { error: 'Превышен лимит стоимости' });
         continue;
       }
-      let reference = null;
-      if (item.bbox) {
-        reference = await cropReference(renderBuffer, item.bbox, item.id);
-        if (reference?.key) await q.setProcurementItemCrop(item.id, reference.key);
-      }
       try {
-        const saved = await searchItem(run, item, config, reference);
+        const saved = await searchItem(run, item, config, fullReference);
         candidateCount += saved.length;
       } catch (e) {
         await q.setProcurementItemStatus(item.id, 'error', { error: String(e.message || e).slice(0, 500) });

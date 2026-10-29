@@ -188,6 +188,7 @@ PROCUREMENT_DOMAINS=divan.ru,askona.ru,stoolgroup.ru,divanboss.ru,sonum.ru,woode
 PROCUREMENT_MIN_SCORE=80
 PROCUREMENT_ALT_SCORE=60
 PROCUREMENT_MAX_RUN_COST_USD=0.5
+PROCUREMENT_VISION_MODEL=google/gemini-3.1-pro-preview
 ```
 
 - Ключ должен иметь scope `yc.search-api.execute`; нужен активный платёжный аккаунт Yandex Cloud.
