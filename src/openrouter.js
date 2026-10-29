@@ -636,3 +636,127 @@ export function matchCatalog(items, products) {
   for (const r of results) if (!seen.has(r.product.id) || seen.get(r.product.id).score < r.score) seen.set(r.product.id, r);
   return [...seen.values()];
 }
+
+// Vision для «Найти товары»: подробная карточка видимых предметов и поверхностей.
+export async function parseProcurementImage(renderB64, mime = 'image/png', { roomType = '' } = {}) {
+  const sys = `Ты — аналитик интерьерного рендера для подбора товаров. Верни строго JSON без текста вокруг:
+{
+  "room_type": "тип комнаты по-русски",
+  "style": "кратко стиль",
+  "items": [{
+    "key": "bed|nightstand|wardrobe|sofa|armchair|coffee_table|dining_table|dining_chair|sideboard|desk|office_chair|storage|bench|rug|light|decor|floor|walls|ceiling|skirting|tile|paint|wallpaper|countertop|cabinet|faucet|sink|toilet|shower|bathtub|appliance|mirror|curtains|bedding|textile",
+    "label": "название предмета по-русски",
+    "subtype": "подтип: например прямой диван, подвесной светильник, ламинат",
+    "description": "краткое описание",
+    "color": "цвет",
+    "material": "материал/фактура",
+    "shape": "форма/силуэт",
+    "keywords": ["3-6 поисковых слов"],
+    "bbox": [x, y, w, h],
+    "confidence": 0.0,
+    "visibility": "seen|hidden|not_seen"
+  }],
+  "surfaces": [{"surface": "floor|walls|ceiling|backsplash|countertop|textile", "description": "кратко", "color": "цвет", "material": "материал", "hex": "#RRGGBB"}]
+}
+Правила:
+- bbox — нормализованные координаты [x,y,w,h] от 0 до 1 относительно всего кадра; если предмет не видно, null.
+- items — только предметы и отделка, которые реально помогут купить аналог. Без брендов, цен и выдуманных артикулов.
+- Не добавляй личные вещи, провода, скрытые коммуникации.
+- Для сантехники, техники и отделки указывай видимые признаки.
+- visibility=seen для видимых, hidden для очевидно нужных, но скрытых (матрас, подложка), not_seen если не применимо.
+Только JSON.`;
+  const r = await fetchWithRetry(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      model: getModelConfig().vision,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: [
+          { type: 'text', text: `Разбери рендер для подбора товаров. Тип комнаты: ${roomType || 'определи сам'}.` },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${renderB64}` } },
+        ] },
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try { parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
+  const num = v => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const clamp = v => (v === null ? null : Math.max(0, Math.min(1, v)));
+  const items = Array.isArray(parsed.items) ? parsed.items.map(item => {
+    const bbox = Array.isArray(item?.bbox) && item.bbox.length === 4
+      ? item.bbox.map(clamp)
+      : null;
+    return {
+      key: String(item?.key || '').toLowerCase().slice(0, 40),
+      label: String(item?.label || '').slice(0, 160),
+      subtype: String(item?.subtype || '').slice(0, 160),
+      description: String(item?.description || '').slice(0, 300),
+      color: String(item?.color || '').slice(0, 80),
+      material: String(item?.material || '').slice(0, 80),
+      shape: String(item?.shape || '').slice(0, 80),
+      keywords: Array.isArray(item?.keywords) ? item.keywords.map(String).slice(0, 6) : [],
+      bbox,
+      confidence: num(item?.confidence),
+      visibility: ['seen', 'hidden', 'not_seen'].includes(item?.visibility) ? item.visibility : 'seen',
+    };
+  }).filter(item => item.key && item.label).slice(0, 30) : [];
+  const surfaces = Array.isArray(parsed.surfaces) ? parsed.surfaces.map(s => ({
+    surface: String(s?.surface || '').toLowerCase().slice(0, 40),
+    description: String(s?.description || '').slice(0, 300),
+    color: String(s?.color || '').slice(0, 80),
+    material: String(s?.material || '').slice(0, 80),
+    hex: /^#[0-9a-f]{6}$/i.test(String(s?.hex || '')) ? String(s.hex) : null,
+  })).slice(0, 8) : [];
+  return {
+    room_type: String(parsed.room_type || roomType || '').slice(0, 80),
+    style: String(parsed.style || '').slice(0, 120),
+    items,
+    surfaces,
+    cost: data.usage?.cost ?? null,
+  };
+}
+
+// Сравнение фрагмента рендера с фото товара. Возвращает 0-100 и объяснение.
+export async function scoreProductMatch({ referenceImageUrl, candidateImageUrl, itemDescription = '', candidateName = '' }) {
+  const sys = `Ты сравниваешь предмет на интерьерном рендере с фото товара из магазина.
+Верни строго JSON: {"score":0-100,"color":0-100,"material":0-100,"shape":0-100,"size":0-100,"reasons":["кратко по-русски"]}
+score — общее визуальное сходство именно тип/форма/цвет/материал, не цена и не бренд.
+80+ — очень похожий товар; 70-79 — допустимая альтернатива; ниже — не тот товар.
+При сомнении снижай score. Только JSON.`;
+  const r = await fetchWithRetry(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      model: getModelConfig().vision,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: [
+          { type: 'text', text: `Предмет на рендере: ${itemDescription || 'без описания'}. Товар: ${candidateName || 'без названия'}.` },
+          { type: 'image_url', image_url: { url: referenceImageUrl } },
+          { type: 'image_url', image_url: { url: candidateImageUrl } },
+        ] },
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try { parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
+  const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
+  return {
+    score,
+    breakdown: {
+      color: Math.max(0, Math.min(100, Number(parsed.color) || 0)),
+      material: Math.max(0, Math.min(100, Number(parsed.material) || 0)),
+      shape: Math.max(0, Math.min(100, Number(parsed.shape) || 0)),
+      size: Math.max(0, Math.min(100, Number(parsed.size) || 0)),
+    },
+    reasons: Array.isArray(parsed.reasons) ? parsed.reasons.map(String).slice(0, 5) : [],
+    cost: data.usage?.cost ?? null,
+  };
+}

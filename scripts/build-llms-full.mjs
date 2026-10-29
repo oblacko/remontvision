@@ -16,6 +16,7 @@ const files = [
   'docs/API.md',
   'docs/OPERATIONS.md',
   'docs/ROADMAP.md',
+  'docs/PROCUREMENT.md',
   'docs/DECISIONS.md',
   'docs/AI-INTEGRATION.md',
   'docs/HISTORY.md',

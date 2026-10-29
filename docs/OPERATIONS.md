@@ -174,3 +174,24 @@ tar czf appdata-$(date +%F).tar.gz /path/to/appdata
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [API.md](API.md)
 - [ROADMAP.md](ROADMAP.md)
+
+## Подбор товаров
+
+Сервис «Найти товары» использует Yandex Search API и allowlist магазинов, а не демо-каталог.
+
+```bash
+PROCUREMENT_ENABLED=1
+PROCUREMENT_REGION=213
+YANDEX_SEARCH_API_KEY=<key>
+YANDEX_FOLDER_ID=<folder-id>
+PROCUREMENT_DOMAINS=divan.ru,stoolgroup.ru,divanboss.ru,askona.ru,hoff.ru,leroymerlin.ru,vseinstrumenti.ru,petrovich.ru,mnogomebeli.ru,lazurit.com
+PROCUREMENT_MIN_SCORE=80
+PROCUREMENT_ALT_SCORE=70
+PROCUREMENT_MAX_RUN_COST_USD=0.5
+```
+
+- Ключ должен иметь scope `yc.search-api.execute`; нужен активный платёжный аккаунт Yandex Cloud.
+- Один запуск стоит 1 кредит. Повторное открытие уже готового списка бесплатно. При ошибке или нуле проверенных товаров кредит возвращается.
+- Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он исключён из allowlist. Discovery идёт по обычной выдаче, карточки проверяются только в магазинах из allowlist.
+- Цены и наличие сохраняются на момент проверки. Это список товаров, не смета: количества и итог появятся отдельным этапом.
+- Если нужно временно выключить: `PROCUREMENT_ENABLED=0` и пересоздать контейнер.

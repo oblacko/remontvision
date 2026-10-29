@@ -39,6 +39,9 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/credits` | баланс/ledger |
 | POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
 | POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
+| POST | `/api/renders/:id/procurement` | запуск подбора товаров, списывает 1 кредит; повторный вызов отдаёт существующий запуск |
+| GET | `/api/procurement/:id` | статус, позиции и найденные товары |
+| GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний/выбранный render |
 | POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `ref`, `ref_url`, `parent_id` |

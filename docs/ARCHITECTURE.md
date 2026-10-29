@@ -36,6 +36,7 @@ flowchart LR
 | OpenRouter | image generation и vision | `src/openrouter.js` |
 | Resend/SMTP | OTP-коды и письма | `src/auth.js` |
 | Robokassa / ЮKassa | платежи, ResultURL/вебхуки, возвраты | `src/payments.js`, `src/robokassa.js` |
+| Yandex Search / procurement | подбор товаров по рендеру, allowlist, visual score | `src/procurement.js`, `src/yandexsearch.js` |
 | Proxy | обход WAF OpenRouter с VPS | `src/proxy.js` |
 | React | лендинг/генератор, кабинет, админка, публичный шаринг | `web/src/` |
 

@@ -382,6 +382,111 @@ export const q = {
   },
   deletePack: id => pool.query(`DELETE FROM credit_packs WHERE id = $1`, [id]).then(r => r.rowCount > 0),
 
+  // подбор товаров по рендеру
+  renderOwnedByUser: (renderId, userId) =>
+    pool.query(`SELECT r.* FROM renders r JOIN rooms rm ON rm.id = r.room_id
+                WHERE r.id = $1 AND rm.user_id = $2`, [renderId, userId]).then(r => r.rows[0] || null),
+  activeProcurementRun: (renderId, configHash) =>
+    pool.query(`SELECT * FROM procurement_runs
+                WHERE render_id = $1 AND config_hash = $2 AND status IN ('queued','processing','done')
+                ORDER BY created_at DESC LIMIT 1`, [renderId, configHash]).then(r => r.rows[0] || null),
+  latestDoneRender: () =>
+    pool.query(`SELECT * FROM renders WHERE status = 'done' AND image_path IS NOT NULL ORDER BY created_at DESC LIMIT 1`).then(r => r.rows[0] || null),
+  procurementRunById: id =>
+    pool.query(`SELECT * FROM procurement_runs WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  procurementRunForUser: (id, userId) =>
+    pool.query(`SELECT * FROM procurement_runs WHERE id = $1 AND user_id = $2`, [id, userId]).then(r => r.rows[0] || null),
+  createProcurementRun: f =>
+    pool.query(`INSERT INTO procurement_runs (id, render_id, user_id, room_type, mode, region, config, config_hash, status, credit_charged)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [f.id, f.render_id, f.user_id, f.room_type || null, f.mode || 'list', f.region || null,
+       JSON.stringify(f.config || {}), f.config_hash, f.status || 'queued', Boolean(f.credit_charged)])
+      .then(r => r.rows[0]),
+  setProcurementStage: (id, stage) =>
+    pool.query(`UPDATE procurement_runs SET stage = $2 WHERE id = $1`, [id, stage]),
+  setProcurementAnalysis: (id, analysis) =>
+    pool.query(`UPDATE procurement_runs SET analysis = $2 WHERE id = $1`, [id, JSON.stringify(analysis || {})]),
+  startProcurementRun: id =>
+    pool.query(`UPDATE procurement_runs SET status = 'processing', stage = 'vision', started_at = now()
+                WHERE id = $1 AND status = 'queued' RETURNING *`, [id]).then(r => r.rows[0] || null),
+  finishProcurementRun: (id, { costUsd = 0 } = {}) =>
+    pool.query(`UPDATE procurement_runs SET status = 'done', stage = 'done', cost_usd = $2, finished_at = now()
+                WHERE id = $1 RETURNING *`, [id, costUsd]).then(r => r.rows[0] || null),
+  failProcurementRun: (id, error, { costUsd = 0 } = {}) =>
+    pool.query(`UPDATE procurement_runs SET status = 'error', stage = 'error', error = $2, cost_usd = $3, finished_at = now()
+                WHERE id = $1 RETURNING *`, [id, String(error).slice(0, 1000), costUsd]).then(r => r.rows[0] || null),
+  claimNextProcurement: () =>
+    withTransaction(async client => {
+      const { rows } = await client.query(
+        `SELECT id FROM procurement_runs WHERE status = 'queued'
+         ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`);
+      const row = rows[0];
+      if (!row) return null;
+      const updated = await client.query(
+        `UPDATE procurement_runs SET status = 'processing', stage = 'vision', started_at = now()
+         WHERE id = $1 RETURNING *`, [row.id]);
+      return updated.rows[0] || null;
+    }),
+  requeueProcessingProcurements: () =>
+    pool.query(`UPDATE procurement_runs SET status = 'queued', stage = 'requeued', started_at = NULL
+                WHERE status = 'processing' RETURNING id`).then(r => r.rowCount),
+  staleProcurements: minutes =>
+    pool.query(`SELECT * FROM procurement_runs WHERE status IN ('queued','processing')
+                AND created_at < now() - ($1 || ' minutes')::interval`, [String(minutes)]).then(r => r.rows),
+  createProcurementItem: f =>
+    pool.query(`INSERT INTO procurement_items (run_id, layer, category, label, query, search_mode, status, sort, attributes, bbox, crop_path, visibility, confidence, quantity, unit, measurement_status)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      [f.run_id, f.layer, f.category, f.label, f.query || null, f.search_mode || 'text',
+       f.status || 'pending', f.sort || 0, JSON.stringify(f.attributes || {}),
+       f.bbox ? JSON.stringify(f.bbox) : null, f.crop_path || null, f.visibility || null,
+       f.confidence ?? null, f.quantity ?? null, f.unit || null, f.measurement_status || null])
+      .then(r => r.rows[0]),
+  procurementItemsForRun: runId =>
+    pool.query(`SELECT * FROM procurement_items WHERE run_id = $1 ORDER BY sort, id`, [runId]).then(r => r.rows),
+  setProcurementItemStatus: (id, status, { error = null, candidateCount = null } = {}) =>
+    pool.query(`UPDATE procurement_items SET status = $2, error = $3,
+                candidate_count = COALESCE($4, candidate_count) WHERE id = $1`, [id, status, error, candidateCount]),
+  setProcurementItemCrop: (id, cropPath) =>
+    pool.query(`UPDATE procurement_items SET crop_path = $2 WHERE id = $1`, [id, cropPath]),
+  createProcurementRound: f =>
+    pool.query(`INSERT INTO procurement_search_rounds (item_id, round_no, kind, provider, query, results_count, latency_ms, cost_usd)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [f.item_id, f.round_no || 1, f.kind || 'text', f.provider || 'yandex', f.query,
+       f.results_count || 0, f.latency_ms ?? null, f.cost_usd ?? null]).then(r => r.rows[0]),
+  finishProcurementRound: (id, f) =>
+    pool.query(`UPDATE procurement_search_rounds SET rejection_reasons = $2, results_count = $3,
+                best_score = $4, decision = $5, cost_usd = $6, latency_ms = $7 WHERE id = $1`,
+      [id, JSON.stringify(f.rejection_reasons || []), f.results_count || 0,
+       f.best_score ?? null, f.decision || null, f.cost_usd ?? null, f.latency_ms ?? null]),
+  upsertProcurementCandidate: f =>
+    pool.query(`INSERT INTO procurement_candidates (item_id, round_id, store, canonical_url, title, image_url, image_path, price, currency, availability, sku, dimensions, checked_at, match_score, score_breakdown, match_reasons, raw)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                ON CONFLICT (item_id, canonical_url) DO UPDATE SET
+                  title = EXCLUDED.title, image_url = EXCLUDED.image_url, image_path = EXCLUDED.image_path,
+                  price = EXCLUDED.price, currency = EXCLUDED.currency, availability = EXCLUDED.availability,
+                  sku = EXCLUDED.sku, dimensions = EXCLUDED.dimensions, checked_at = EXCLUDED.checked_at,
+                  match_score = EXCLUDED.match_score, score_breakdown = EXCLUDED.score_breakdown,
+                  match_reasons = EXCLUDED.match_reasons, raw = EXCLUDED.raw
+                RETURNING *`,
+      [f.item_id, f.round_id || null, f.store || null, f.canonical_url, f.title || '',
+       f.image_url || null, f.image_path || null, f.price ?? null, f.currency || 'RUB',
+       f.availability || null, f.sku || null, JSON.stringify(f.dimensions || {}),
+       f.checked_at || new Date(), f.match_score ?? null, JSON.stringify(f.score_breakdown || {}),
+       JSON.stringify(f.match_reasons || []), JSON.stringify(f.raw || {})]).then(r => r.rows[0]),
+  procurementCandidatesForItem: itemId =>
+    pool.query(`SELECT * FROM procurement_candidates WHERE item_id = $1 ORDER BY match_score DESC NULLS LAST, id`, [itemId]).then(r => r.rows),
+  procurementCandidatesForRun: runId =>
+    pool.query(`SELECT c.* FROM procurement_candidates c JOIN procurement_items i ON i.id = c.item_id
+                WHERE i.run_id = $1 ORDER BY i.sort, c.match_score DESC NULLS LAST, c.id`, [runId]).then(r => r.rows),
+  procurementCandidateById: id =>
+    pool.query(`SELECT * FROM procurement_candidates WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  procurementCandidateWithRun: id =>
+    pool.query(`SELECT c.*, i.run_id FROM procurement_candidates c
+                JOIN procurement_items i ON i.id = c.item_id WHERE c.id = $1`, [id]).then(r => r.rows[0] || null),
+  logProcurementClick: ({ runId, itemId = null, candidateId = null, userId = null, ipHash = null }) =>
+    pool.query(`INSERT INTO procurement_clicks (run_id, item_id, candidate_id, user_id, ip_hash)
+                VALUES ($1,$2,$3,$4,$5)`, [runId, itemId, candidateId, userId, ipHash]),
+
   // стили и их референсы/товары
   styles: activeOnly =>
     pool.query(`SELECT * FROM styles ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)

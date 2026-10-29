@@ -27,6 +27,9 @@ import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
 import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig } from './cleanupconfig.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
+import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
+import { startProcurementWorker } from './procurementjobs.js';
+import { getProcurementConfig } from './procurementconfig.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -224,6 +227,8 @@ app.get('/api/health', (_req, res) => res.json({
   payments_enabled: PAYMENTS_ENABLED,
   payment_provider: paymentProvider(),
   robokassa_configured: robokassaConfigured(),
+  procurement_enabled: getProcurementConfig().enabled,
+  procurement_configured: getProcurementConfig().configured,
   refunds_enabled: REFUNDS_ENABLED,
 }));
 app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
@@ -999,6 +1004,7 @@ async function serveStored(req, res, dir, name, ownerQuery = null) {
 app.get('/files/:name', h(async (req, res) => serveStored(req, res, 'uploads', req.params.name, q.roomByPhotoKey)));
 app.get('/renders/:file', h(async (req, res) => serveStored(req, res, 'renders', req.params.file, q.roomByRenderKey)));
 app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products', req.params.file)));
+app.get('/procurement/:file', h(async (req, res) => serveStored(req, res, 'procurement', req.params.file)));
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
 
 // Переход из сметы к товару: логируем клик и уводим на реальную страницу/поиск.
@@ -1018,6 +1024,31 @@ app.get('/go/:id', h(async (req, res) => {
   }
   res.set('Cache-Control', 'no-store');
   return res.redirect(302, productLink(product));
+}));
+
+// «Найти товары»: 1 кредит за запуск, повторное открытие бесплатно.
+app.post('/api/renders/:id/procurement', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const started = await startProcurement({ userId: req.user.id, renderId: req.params.id });
+  const dto = await procurementDto(started.run.id, req.user.id);
+  res.status(started.existing ? 200 : 201).json(dto);
+}));
+
+app.get('/api/procurement/:id', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const dto = await procurementDto(req.params.id, req.user.id);
+  if (!dto) return res.status(404).json({ error: 'Подбор не найден' });
+  res.json(dto);
+}));
+
+app.get('/buy/:id', h(async (req, res) => {
+  const candidateId = Number(req.params.id);
+  if (!Number.isSafeInteger(candidateId) || candidateId <= 0) return res.status(404).end();
+  const ipHash = crypto.createHash('sha256').update(clientIp(req)).digest('hex').slice(0, 32);
+  const candidate = await logProcurementClick({ candidateId, userId: req.user?.id || null, ipHash });
+  if (!candidate?.canonical_url) return res.status(404).end();
+  res.set('Cache-Control', 'no-store');
+  return res.redirect(302, candidate.canonical_url);
 }));
 
 // итерация: только для авторизованных, стоит 1 кредит
@@ -1217,6 +1248,7 @@ async function main() {
   app.listen(PORT, () => {
     log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
     startWorker();
+    startProcurementWorker();
   });
 }
 

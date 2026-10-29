@@ -8,7 +8,8 @@ import { putBuffer } from './storage.js';
 
 export const DEFAULT_IMPORT_DOMAINS = [
   'market.yandex.ru', 'leroymerlin.ru', 'obi.ru', 'hoff.ru', 'askona.ru',
-  'divan.ru', 'mnogomebeli.ru', 'petrovich.ru', 'vseinstrumenti.ru', 'lazurit.com',
+  'divan.ru', 'stoolgroup.ru', 'divanboss.ru', 'mnogomebeli.ru',
+  'petrovich.ru', 'vseinstrumenti.ru', 'lazurit.com',
 ];
 
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
@@ -341,6 +342,41 @@ export function parseProductHtml(html, pageUrl = '') {
     dimensions,
     rating: Number(rating.ratingValue) || 0,
     reviews: Number(rating.reviewCount || rating.ratingCount) || 0,
+  };
+}
+
+export async function inspectProductUrl(rawUrl) {
+  const { url, html } = await fetchPage(rawUrl);
+  const data = parseProductHtml(html, url);
+  const category = inferCategory(`${data.name} ${data.description} ${data.brand}`);
+  const host = new URL(url).hostname.replace(/^www\./, '');
+  const allowedDomains = String(process.env.PRODUCT_IMPORT_DOMAINS || DEFAULT_IMPORT_DOMAINS.join(','))
+    .split(',').map(s => s.trim().toLowerCase().replace(/^www\./, '')).filter(Boolean);
+  const allowedDomain = allowedDomains.some(d => host === d || host.endsWith(`.${d}`));
+  const issues = [];
+  if (!allowedDomain) issues.push(`Домен ${host} не в allowlist`);
+  if (!data.name) issues.push('Не удалось извлечь название');
+  if (!data.price) issues.push('Не удалось извлечь цену');
+  if (!data.image_url) issues.push('Не удалось найти картинку');
+  const bad = ['б/у', 'бу ', 'уценк', 'витрин', 'образец', 'распродаж', 'поврежд', 'царапин'];
+  const used = bad.some(w => norm(data.name + ' ' + data.description).includes(w));
+  if (used) issues.push('Похоже на б/у, уценку или витринный образец');
+  return {
+    url,
+    domain: host,
+    allowed_domain: allowedDomain,
+    name: data.name,
+    brand: data.brand,
+    description: data.description,
+    price: data.price,
+    currency: data.currency,
+    category,
+    image_url: data.image_url,
+    sku: data.sku,
+    availability: data.availability,
+    dimensions: data.dimensions,
+    used,
+    issues,
   };
 }
 

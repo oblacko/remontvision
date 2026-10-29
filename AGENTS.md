@@ -4,7 +4,7 @@
 
 ## Что это за проект
 
-`ремонтвижн` — AI-редизайн интерьера по фото. Пользователь загружает фото, выбирает комнату/стиль/класс материалов, получает визуализацию, смету товаров, RAL и рекомендации по электрике. Есть кабинет, публичный шаринг, админка, импорт товаров, кредиты и платежи.
+`ремонтвижн` — AI-редизайн интерьера по фото. Пользователь загружает фото, выбирает комнату/стиль/класс материалов, получает визуализацию, затем может запустить платный подбор реальных товаров по рендеру. Есть кабинет, публичный шаринг, админка, импорт товаров, кредиты и платежи.
 
 Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt).
 
@@ -25,7 +25,7 @@
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 29 тестов
+npm test                    # node:test, 35 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -59,7 +59,9 @@ node --check src/openrouter.js
 |---|---|
 | Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
 | Правила комнат, слоты, запреты | `src/roomtypes.js` |
-| Подбор товаров | `src/curate.js` |
+| Подбор товаров (старый каталог) | `src/curate.js` |
+| Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
+| Панель подбора | `web/src/components/ProcurementPanel.tsx` |
 | Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
 | API, auth, admin, share | `src/server.js` |
@@ -87,14 +89,16 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 29 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa.
+- `npm test` — 35 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
 
 ## Известные ограничения (на 2026-10-28)
 
-- Нет реального каталога с URL → нет реальных заказов.
+- Нет реального каталога с URL → нет заказов из старой сметы.
+- Подбор товаров использует Yandex Search API и allowlist магазинов; Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он не используется как основной магазин.
+- Смета по площади и количествам пока не считается: только список товаров.
 - Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
 - Нет inpainting для люстр/розеток; позиции могут плавать.
 - Нет автоматического обновления цен/наличия и фидов.

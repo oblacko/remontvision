@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpRight, Download, LoaderCircle, LogOut, Search, Share2, Trash2, X } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
+import { ProcurementPanel } from '@/components/ProcurementPanel'
 import '../App.css'
 
 type Me = { email: string; balance: number }
@@ -23,6 +24,7 @@ type RoomGroup = { roomId: string; style: string; versions: GenRow[]; latest: Ge
 const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
   render: 'создание дизайна', iterate: 'правка', iterate_refund: 'возврат кредита',
+  procurement: 'подбор товаров', procurement_refund: 'возврат за подбор товаров',
   refund: 'возврат', admin_adjust: 'корректировка администратором', admin_test: 'корректировка',
 }
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
@@ -53,6 +55,7 @@ export default function Cabinet() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [notice, setNotice] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
+  const [procurementRenderId, setProcurementRenderId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [buyConsent, setBuyConsent] = useState(false)
   const [buying, setBuying] = useState('')
@@ -348,14 +351,14 @@ export default function Cabinet() {
         ) : (
           <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_24rem]">
             <section>
-              <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="text-xs text-muted-foreground">1 кредит = 1 генерация или правка</span></div>
+              <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="text-xs text-muted-foreground">1 кредит = генерация, правка или подбор товаров</span></div>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {packs.map(pack => <div key={pack.id} className="border p-4"><div className="flex items-end justify-between gap-2"><span className="display-title text-4xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'}</span></div><p className="mt-4 text-xl font-light">{rub(pack.price_kopecks / 100)}</p><p className="mt-1 text-xs text-muted-foreground">{pack.title}</p><button type="button" onClick={() => buyPack(pack)} disabled={buying === pack.id} className="action-primary mt-4 w-full">{buying === pack.id ? 'Переходим…' : 'Купить'} <ArrowUpRight className="size-4" /></button></div>)}
               </div>
               <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-5"><input type="checkbox" checked={buyConsent} onChange={e => setBuyConsent(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-primary" /><span>Принимаю <a className="underline" href="/offer" target="_blank" rel="noopener">оферту</a> и <a className="underline" href="/prices" target="_blank" rel="noopener">условия и цены</a></span></label>
               <div className="mt-8"><div className="flex items-center justify-between border-b pb-3"><h2 className="eyebrow">История кредитов</h2><span className="text-xs text-muted-foreground">{credits.length} {plural(credits.length, 'операция', 'операции', 'операций')}</span></div><div className="divide-y">{credits.map(c => <div key={c.id} className="flex items-start justify-between gap-4 py-3 text-sm"><div><b className={c.delta > 0 ? 'text-primary-text' : ''}>{c.delta > 0 ? '+' : ''}{c.delta} кр.</b><p className="mt-1 text-xs text-muted-foreground">{reasonNames[c.reason] || c.reason}{c.note ? ` · ${c.note}` : ''}</p></div><span className="shrink-0 text-xs text-muted-foreground">{dateTime(c.created_at)}</span></div>)}{!credits.length && <p className="py-4 text-sm text-muted-foreground">Операций пока нет.</p>}</div></div>
             </section>
-            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — одна генерация или правка.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <ArrowUpRight className="ml-1 size-4" /></a></aside>
+            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — генерация, правка или подбор товаров.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <ArrowUpRight className="ml-1 size-4" /></a></aside>
           </div>
         )}
       </main>
@@ -370,6 +373,7 @@ export default function Cabinet() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   {roomData.render?.image && <a href={roomData.render.image} download="remontvision-design.jpg" className="action-secondary"><Download className="size-4" />Скачать</a>}
                   {roomData.render?.image && <button type="button" onClick={() => setShareOpen(true)} className="action-secondary"><Share2 className="size-4" />Поделиться</button>}
+                  {roomData.render?.id && <button type="button" onClick={() => setProcurementRenderId(roomData.render?.id || null)} className="action-primary"><Search className="size-4" />Найти товары · 1 кредит</button>}
                   <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
                 </div>
@@ -384,6 +388,7 @@ export default function Cabinet() {
         </div>
       )}
       <ShareDialog renderId={roomData?.render?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <ProcurementPanel renderId={procurementRenderId || ''} open={Boolean(procurementRenderId)} onClose={() => setProcurementRenderId(null)} onCreditsChanged={async () => { await loadMe(); await loadData() }} />
     </div>
   )
 }

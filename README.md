@@ -23,6 +23,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Очистка комнаты | При выключенной мебели: FLUX 3 Image Klein, 1K, auto; настройки в админке |
 | Шаринг | `/s/:token`, лайки, комментарии |
 | Платежи | Robokassa (по умолчанию), ЮKassa как альтернатива; возвраты выключены |
+| Подбор товаров | 1 кредит за запуск, Yandex Search API + allowlist магазинов, список без сметы |
 | Админка | Пользователи, кредиты, пакеты, стили, промт, логи, модели, прокси, каталог |
 | Мобильный редактор `/app` | Старый монолитный интерфейс, не в новом стиле |
 
@@ -87,6 +88,7 @@ npm test
 - [docs/API.md](docs/API.md) — API.
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — прод, деплой, эксплуатация.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — планы и запуск.
+- [docs/PROCUREMENT.md](docs/PROCUREMENT.md) — пилот и будущий поиск товаров по готовому дизайну.
 - [docs/DECISIONS.md](docs/DECISIONS.md) — ключевые решения и почему так.
 - [docs/HISTORY.md](docs/HISTORY.md) — хронология изменений.
 
@@ -131,6 +133,9 @@ app/
     storage.js         диск/S3
     payments.js        Robokassa/ЮKassa, кредиты
     robokassa.js       подписи, URL, ResultURL, возвраты
+    procurement.js     подбор товаров по рендеру
+    yandexsearch.js    Yandex Search API + XML
+    procurementtemplates.js  room templates
     receipts.js        чеки
     legal.js           документы/акцепты
   web/src/             React-приложение

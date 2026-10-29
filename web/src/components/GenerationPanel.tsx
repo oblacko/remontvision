@@ -18,6 +18,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
+import { ProcurementPanel } from '@/components/ProcurementPanel'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -175,6 +176,7 @@ export function GenerationPanel({
   const [productBinding, setProductBinding] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [procurementOpen, setProcurementOpen] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const refInput = useRef<HTMLInputElement>(null)
@@ -888,7 +890,7 @@ export function GenerationPanel({
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
                 <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
-                <button type="button" onClick={() => setStep('estimates')} className="action-primary min-h-14 px-8 text-base">Готово — собрать смету <ArrowUpRight className="size-5" /></button>
+                <button type="button" onClick={() => setProcurementOpen(true)} className="action-primary min-h-14 px-8 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
               </div>
             </div>
           </div>
@@ -986,6 +988,7 @@ export function GenerationPanel({
       )}
 
       <ShareDialog renderId={current?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <ProcurementPanel renderId={current?.id || ''} open={procurementOpen} onClose={() => setProcurementOpen(false)} onCreditsChanged={onRefreshUser} />
       {creditOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/80 p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
           <div className="w-full max-w-md border border-foreground bg-background p-6 shadow-[8px_8px_0_oklch(var(--foreground))]">
