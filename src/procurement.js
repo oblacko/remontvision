@@ -32,6 +32,19 @@ const DOMAINS_BY_CATEGORY = {
 const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 const tokens = s => [...new Set(norm(s).split(/[^a-zа-я0-9]+/i).filter(w => w.length >= 3))];
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, value));
+const COLOR_STEMS = {
+  'черн': 'black', 'бел': 'white', 'сер': 'gray', 'беж': 'beige', 'корич': 'brown',
+  'дуб': 'wood', 'дерев': 'wood', 'золот': 'gold', 'латун': 'brass', 'серебр': 'silver',
+  'хром': 'chrome', 'зелен': 'green', 'олив': 'olive', 'син': 'blue', 'красн': 'red',
+  'розов': 'pink', 'желт': 'yellow', 'светл': 'light', 'темн': 'dark', 'натуральн': 'natural',
+};
+
+function colorKeys(text) {
+  const value = norm(text);
+  return new Set(Object.entries(COLOR_STEMS)
+    .filter(([stem]) => value.includes(stem))
+    .map(([, key]) => key));
+}
 
 const ALIASES = {
   'bed': 'bed', 'кровать': 'bed',
@@ -116,6 +129,9 @@ function textScore(item, candidate) {
   let score = 55 + (terms.length ? 45 * (matched / terms.length) : 0);
   if (categoryCompatible(item.category, candidate.category)) score += 10;
   else score -= 20;
+  const wantedColors = colorKeys(`${item.attributes?.color || ''} ${item.attributes?.material || ''}`);
+  const foundColors = colorKeys(`${candidate.name || ''} ${candidate.description || ''}`);
+  if (wantedColors.size && foundColors.size && ![...wantedColors].some(color => foundColors.has(color))) score -= 20;
   if (candidate.used) score -= 50;
   if (!candidate.price) score -= 10;
   return clamp(score);
@@ -207,6 +223,19 @@ function buildQuery(key, context) {
 function broadQuery(key) {
   const meta = categoryMeta(key);
   return `${(meta?.label || key).split(/\s+или\s+/)[0]} купить`;
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      out[index] = await fn(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return out;
 }
 
 function preferredDomains(item, config) {
@@ -312,20 +341,21 @@ async function searchItem(run, item, config, reference) {
       latency_ms: search.latency_ms,
       cost_usd: null,
     });
-    const candidates = [];
-    for (const result of filtered) {
+    const inspectedRows = await mapLimit(filtered, 3, async result => {
       try {
         const inspected = await inspectProductUrl(result.url);
-        if (!inspected.name || !inspected.price || !inspected.allowed_domain) continue;
-        if (inspected.used) continue;
-        if (item.category && inspected.category && !categoryCompatible(item.category, inspected.category)) continue;
+        if (!inspected.name || !inspected.price || !inspected.allowed_domain || !inspected.is_product) return null;
+        if (inspected.used) return null;
+        if (item.category && inspected.category && !categoryCompatible(item.category, inspected.category)) return null;
         const score = textScore(item, inspected);
-        if (score < Math.max(45, config.alt_score - 10)) continue;
-        candidates.push({ inspected, result, text_score: score });
+        if (score < Math.max(45, config.alt_score - 10)) return null;
+        return { inspected, result, text_score: score };
       } catch (e) {
         log({ event: 'procurement_import_error', run_id: run.id, item_id: item.id, url: result.url, error: String(e.message || e).slice(0, 200) });
+        return null;
       }
-    }
+    });
+    const candidates = inspectedRows.filter(Boolean);
     candidates.sort((a, b) => b.text_score - a.text_score);
     const visualLimit = item.search_mode === 'visual' ? config.max_visual_candidates : 0;
     const scored = [];

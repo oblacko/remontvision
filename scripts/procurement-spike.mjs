@@ -28,7 +28,7 @@ const run = await q.createProcurementRun({
   mode: 'list',
   region: config.region,
   config,
-  config_hash: `${procurementConfigHash(config)}spike`.slice(0, 64),
+  config_hash: `${procurementConfigHash(config)}-${Date.now()}`.slice(0, 64),
   status: 'processing',
   credit_charged: false,
 });

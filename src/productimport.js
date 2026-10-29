@@ -344,6 +344,7 @@ export function parseProductHtml(html, pageUrl = '') {
     dimensions,
     rating: Number(rating.ratingValue) || 0,
     reviews: Number(rating.reviewCount || rating.ratingCount) || 0,
+    is_product: Boolean(ld),
   };
 }
 
@@ -378,6 +379,7 @@ export async function inspectProductUrl(rawUrl) {
     availability: data.availability,
     dimensions: data.dimensions,
     used,
+    is_product: data.is_product,
     issues,
   };
 }

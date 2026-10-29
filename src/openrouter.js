@@ -726,6 +726,7 @@ export async function scoreProductMatch({ referenceImageUrl, candidateImageUrl, 
 Верни строго JSON: {"score":0-100,"color":0-100,"material":0-100,"shape":0-100,"size":0-100,"reasons":["кратко по-русски"]}
 score — общее визуальное сходство именно тип/форма/цвет/материал, не цена и не бренд.
 80+ — очень похожий товар; 70-79 — допустимая альтернатива; ниже — не тот товар.
+Карточка товара часто на белом фоне: не снижай оценку за фон, ракурс и освещение, сравнивай сам предмет.
 При сомнении снижай score. Только JSON.`;
   const r = await fetchWithRetry(`${BASE}/chat/completions`, {
     method: 'POST',
