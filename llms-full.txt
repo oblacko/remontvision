@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-29T12:42:09.650Z
+Generated: 2026-10-29T12:48:24.691Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.

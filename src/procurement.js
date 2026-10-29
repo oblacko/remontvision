@@ -109,13 +109,13 @@ function textScore(item, candidate) {
     item.attributes?.subtype,
     item.attributes?.color,
     item.attributes?.material,
-    ...(item.attributes?.keywords || []),
+    ...(item.attributes?.keywords || []).slice(0, 3),
   ].filter(Boolean).join(' '));
   const hay = norm(`${candidate.name} ${candidate.description} ${candidate.category || ''} ${candidate.brand || ''}`);
   const matched = terms.filter(term => hay.includes(term)).length;
-  let score = 45 + (terms.length ? 55 * (matched / terms.length) : 0);
+  let score = 55 + (terms.length ? 45 * (matched / terms.length) : 0);
   if (categoryCompatible(item.category, candidate.category)) score += 10;
-  else score -= 25;
+  else score -= 20;
   if (candidate.used) score -= 50;
   if (!candidate.price) score -= 10;
   return clamp(score);
@@ -318,6 +318,7 @@ async function searchItem(run, item, config, reference) {
         const inspected = await inspectProductUrl(result.url);
         if (!inspected.name || !inspected.price || !inspected.allowed_domain) continue;
         if (inspected.used) continue;
+        if (item.category && inspected.category && !categoryCompatible(item.category, inspected.category)) continue;
         const score = textScore(item, inspected);
         if (score < Math.max(45, config.alt_score - 10)) continue;
         candidates.push({ inspected, result, text_score: score });
@@ -353,13 +354,14 @@ async function searchItem(run, item, config, reference) {
             itemDescription: [attrs.label, attrs.subtype, attrs.color, attrs.material, attrs.description].filter(Boolean).join(', '),
             candidateName: candidate.inspected.name,
           });
-          finalScore = Math.round(visual.score * 0.8 + candidate.text_score * 0.2);
+          finalScore = Math.round(Math.max(candidate.text_score * 0.9, candidate.text_score * 0.5 + visual.score * 0.5));
           breakdown = { ...breakdown, visual: visual.score, ...visual.breakdown };
           reasons = visual.reasons;
         } catch (e) {
           log({ event: 'procurement_score_error', run_id: run.id, item_id: item.id, error: String(e.message || e).slice(0, 300) });
         }
       }
+      log({ event: 'procurement_candidate_scored', run_id: run.id, item_id: item.id, url: candidate.inspected.url, text_score: candidate.text_score, visual_score: breakdown.visual ?? null, final_score: finalScore });
       if (finalScore < config.alt_score) continue;
       scored.push({ ...candidate, final_score: finalScore, breakdown, reasons, imageKey });
     }
