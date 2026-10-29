@@ -17,6 +17,8 @@ import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
 import { modelCaps } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
+import { getStyleConfig } from './styleconfig.js';
+import { getStyleSwatchDataUrl } from './styleswatch.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -140,7 +142,7 @@ async function processRender(renderId) {
       meta.parent_render_id = render.parent_render_id || null;
     } else {
       styleInfo = await q.styleByName(room.style);
-      const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
+      const styleMode = getStyleConfig().mode;
       const stylePreferred = styleInfo ? await q.styleProducts(styleInfo.id, roomType) : [];
       const allowed = new Set(roomTypeInfo?.categories || []);
       const preferred = useCatalog ? stylePreferred.filter(p => p.active !== false && (
@@ -158,22 +160,30 @@ async function processRender(renderId) {
         seed: room.id,
       }) : [];
 
-      const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
-      const chosenStyleRefs = styleRefs.refs.slice(0, 1);
+      let styleUserRef = false;
       const styleRefUrls = [];
-      for (const ref of chosenStyleRefs) styleRefUrls.push(await bufferToDataUrl(ref.buf));
-
-      const styleRole = kind => kind === 'material_board'
-        ? 'art reference: material board — finishes, colors, light and styling only; never copy objects, layout or composition'
-        : kind === 'user'
-          ? 'user art reference — mood, palette, materials, light and styling only; never copy objects, layout or composition'
-          : kind === 'cover'
-            ? 'art reference: style cover — mood, palette, materials and light only; never copy objects, layout or composition'
-            : 'art reference — atmosphere, palette, material character, light and styling only; never copy furniture, layout or composition';
-      imageMap = [
-        { role: useCleanup ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' },
-        ...chosenStyleRefs.map((ref) => ({ role: styleRole(ref.kind), label: ref.title || '' })),
-      ];
+      imageMap = [{ role: useCleanup ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
+      if (styleMode === 'reference') {
+        const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
+        const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
+        styleUserRef = styleRefs.user;
+        for (const ref of styleRefs.refs.slice(0, 1)) styleRefUrls.push(await bufferToDataUrl(ref.buf));
+        const styleRole = kind => kind === 'material_board'
+          ? 'art reference: material board — finishes, colors, light and styling only; never copy objects, layout or composition'
+          : kind === 'user'
+            ? 'user art reference — mood, palette, materials, light and styling only; never copy objects, layout or composition'
+            : kind === 'cover'
+              ? 'art reference: style cover — mood, palette, materials and light only; never copy objects, layout or composition'
+              : 'art reference — atmosphere, palette, material character, light and styling only; never copy furniture, layout or composition';
+        imageMap.push(...styleRefs.refs.slice(0, 1).map(ref => ({ role: styleRole(ref.kind), label: ref.title || '' })));
+      } else if (styleMode === 'swatches' && styleInfo) {
+        try {
+          styleRefUrls.push(await getStyleSwatchDataUrl(styleInfo));
+          imageMap.push({ role: 'style material board — palette, finishes and light temperature only; never copy architecture, windows, doors, layout or composition', label: `${styleInfo.name} · swatches` });
+        } catch (e) {
+          log({ event: 'style_swatch_error', room_id: room.id, render_id: renderId, style: room.style, error: String(e.message || e).slice(0, 300) });
+        }
+      }
 
       prompt = buildPrompt({
         style: room.style,
@@ -183,7 +193,7 @@ async function processRender(renderId) {
         palette: room.palette || 'none',
         accent: room.accent || 'none',
         hasStyleRef: styleRefUrls.length > 0,
-        userStyleRef: styleRefs.user,
+        userStyleRef: styleUserRef,
         styleDescription: styleInfo?.prompt_description || '',
         roomType,
         keepFurniture,
@@ -194,6 +204,8 @@ async function processRender(renderId) {
       referenceImagesB64 = styleRefUrls;
       meta.product_ids = curated.map(p => Number(p.id));
       meta.style_id = styleInfo?.id || null;
+      meta.style_reference_mode = styleMode;
+      meta.user_style_ref_ignored = Boolean(room.style_ref_path && styleMode !== 'reference');
       meta.budget = room.budget;
       meta.refs = imageMap.map((m, i) => ({ index: i + 1, ...m }));
     }

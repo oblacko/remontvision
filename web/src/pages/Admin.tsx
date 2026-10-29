@@ -48,6 +48,7 @@ type Product = {
 type KitSlot = { key: string; label: string; product: { id: number; name: string; price: number; unit: string; price_tier: string; url: string | null; image_url: string | null; dimensions?: { text?: string } | null } | null };
 type KitResult = { style_id: number; style: string; room_type: string; price_tier: string; slots: KitSlot[]; missing: string[]; product_ids: number[] };
 type CleanupConfig = { enabled: boolean; model: string; resolution: string; aspect_ratio: string; prompt: string };
+type StyleReferenceConfig = { mode: 'text' | 'reference' | 'swatches' };
 type ProcurementConfig = {
   enabled: boolean; enabled_layers: string[]; region: string; domains: string;
   search_limit: number; max_visual_items: number; max_text_items: number;
@@ -184,6 +185,9 @@ export default function Admin() {
   const [procurementConfig, setProcurementConfig] = useState<ProcurementConfig | null>(null)
   const [procurementBusy, setProcurementBusy] = useState(false)
   const [procurementNotice, setProcurementNotice] = useState('')
+  const [styleReferenceConfig, setStyleReferenceConfig] = useState<StyleReferenceConfig | null>(null)
+  const [styleReferenceBusy, setStyleReferenceBusy] = useState(false)
+  const [styleReferenceNotice, setStyleReferenceNotice] = useState('')
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -382,6 +386,34 @@ export default function Admin() {
     finally { setProcurementBusy(false) }
   }
 
+  const loadStyleReference = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/style'))
+      setStyleReferenceConfig(d.config || null); setStyleReferenceNotice('')
+    } catch { /* ignore */ }
+  }
+
+  const saveStyleReference = async () => {
+    if (!styleReferenceConfig) return
+    setStyleReferenceBusy(true); setStyleReferenceNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/style', { method: 'PUT', body: JSON.stringify({ config: styleReferenceConfig }) }))
+      setStyleReferenceConfig(d.config || null)
+      setStyleReferenceNotice('Источник стиля сохранён')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сохранить источник стиля') }
+    finally { setStyleReferenceBusy(false) }
+  }
+
+  const resetStyleReference = async () => {
+    setStyleReferenceBusy(true); setStyleReferenceNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/style/reset', { method: 'POST' }))
+      setStyleReferenceConfig(d.config || null)
+      setStyleReferenceNotice('Возвращён источник стиля по умолчанию')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сбросить источник стиля') }
+    finally { setStyleReferenceBusy(false) }
+  }
+
   const loadPromptRules = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/prompt'))
@@ -460,7 +492,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'procurement') loadProcurement() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'procurement') loadProcurement() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -728,6 +760,18 @@ export default function Admin() {
                 </div>
               </section>
               <section className="min-w-0">
+                <div className="mb-4 border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><p className="eyebrow">Источник стиля для генерации</p><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Что отправлять модели вместе с фото комнаты: текстовый бриф, фото-референс или свотчи палитры.</p></div>
+                    <div className="flex gap-2"><button type="button" disabled={styleReferenceBusy} onClick={() => void resetStyleReference()} className="action-secondary">Сбросить</button><button type="button" disabled={styleReferenceBusy} onClick={() => void saveStyleReference()} className="action-primary">{styleReferenceBusy ? 'Сохраняем…' : 'Сохранить'}</button></div>
+                  </div>
+                  {styleReferenceNotice && <p className="mt-3 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{styleReferenceNotice}</p>}
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                    {([['text', 'Текст', 'Текстовый бриф стиля'], ['reference', 'Референс', 'Фото-референс стиля'], ['swatches', 'Свотчи', 'Палитра и материалы']] as const).map(([mode, label, help]) => (
+                      <button key={mode} type="button" onClick={() => setStyleReferenceConfig({ mode })} className={`border p-3 text-left ${styleReferenceConfig?.mode === mode ? 'border-foreground bg-muted' : 'hover:bg-muted'}`}><span className="block text-sm font-medium">{label}</span><span className="mt-1 block text-xs text-muted-foreground">{help}</span></button>
+                    ))}
+                  </div>
+                </div>
                 <form onSubmit={saveStyle} className="border p-4">
                   <div className="flex items-center justify-between gap-2"><p className="eyebrow">{editStyleId ? 'Редактировать стиль' : 'Новый стиль'}</p>{editStyleId && <span className="font-mono text-xs text-muted-foreground">#{editStyleId}</span>}</div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">

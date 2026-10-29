@@ -234,7 +234,7 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
   return `${roles}
 
 TASK
-Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a cosmetic renovation in ${styleDesc} style.
+Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a cosmetic renovation in the selected style.
 This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.
 The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
 This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
@@ -288,7 +288,10 @@ MATERIAL CONSTRAINTS — TEXT ONLY, NO PRODUCT IMAGES
 ${catalogText}
 Use these text descriptions only as constraints for finishes, colors, formats and physical scale. Match large surfaces (floor, walls, countertop, cabinet fronts) to the listed material where visible. Tile/plank patterns must match the stated format. Do not force a material into the frame if it is not visible. Choose furniture, lighting, decor and composition for the strength of the design rather than trying to depict the estimate. Small decor, plants, textiles, art and books are encouraged to complete the styling.
 
-STYLE
+STYLE BRIEF
+${styleDesc}
+
+STYLE REFERENCE
 ${styleRefText}
 The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Do not transfer any architectural feature from the reference.
 ${colors}

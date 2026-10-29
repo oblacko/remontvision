@@ -25,7 +25,7 @@
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 38 тестов
+npm test                    # node:test, 39 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -62,6 +62,7 @@ node --check src/openrouter.js
 | Подбор товаров (старый каталог) | `src/curate.js` |
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
 | Настройки поиска в админке | `web/src/pages/Admin.tsx`, `src/procurementconfig.js` |
+| Источник стиля и свотчи | `src/styleconfig.js`, `src/styleswatch.js`, `migrations/024_style_briefs.sql` |
 | Панель подбора | `web/src/components/ProcurementPanel.tsx` |
 | Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
@@ -90,7 +91,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 38 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
+- `npm test` — 39 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.

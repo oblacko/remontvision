@@ -30,6 +30,7 @@ import { canBindProduct, canReplaceWithProduct, productTarget } from './productp
 import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
 import { startProcurementWorker } from './procurementjobs.js';
 import { getProcurementConfig, getProcurementDefaults, saveProcurementConfig, resetProcurementConfig, loadProcurementConfig } from './procurementconfig.js';
+import { getStyleConfig, getStyleDefaults, saveStyleConfig, resetStyleConfig, loadStyleConfig } from './styleconfig.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -748,7 +749,25 @@ app.post('/api/admin/settings/prompt/reset', h(async (req, res) => {
   }
 }));
 
+app.get('/api/admin/settings/style', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ config: getStyleConfig(), defaults: getStyleDefaults() });
+}));
+
+app.put('/api/admin/settings/style', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const config = await saveStyleConfig(req.body?.config || {});
+  res.json({ ok: true, config });
+}));
+
+app.post('/api/admin/settings/style/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const config = await resetStyleConfig();
+  res.json({ ok: true, config });
+}));
+
 app.get('/api/admin/settings/procurement', h(async (req, res) => {
+
   if (!requireAdmin(req, res)) return;
   res.json({ config: getProcurementConfig(), defaults: getProcurementDefaults() });
 }));
@@ -1258,6 +1277,7 @@ async function main() {
   await loadPromptConfig(); // редактируемые правила промта из app_settings
   await loadCleanupConfig(); // очистка комнаты: модель/промт из app_settings
   await loadProcurementConfig(); // подбор товаров: слои, лимиты, домены
+  await loadStyleConfig(); // источник стиля: текст/свотчи
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }

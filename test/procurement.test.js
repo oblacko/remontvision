@@ -45,3 +45,9 @@ test('procurement config hash is stable and region-sensitive', () => {
   assert.notEqual(base, procurementConfigHash({ ...config, region: '2' }));
   assert.equal(config.credit_cost, 1);
 });
+
+test('style source defaults to text and supports three modes', async () => {
+  const { getStyleConfig, STYLE_MODES } = await import('../src/styleconfig.js');
+  assert.deepEqual(STYLE_MODES, ['text', 'reference', 'swatches']);
+  assert.equal(getStyleConfig().mode, 'text');
+});

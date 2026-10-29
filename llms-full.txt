@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-29T14:58:59.251Z
+Generated: 2026-10-29T15:26:02.251Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -212,7 +212,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 38 тестов
+npm test                    # node:test, 39 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -249,6 +249,7 @@ node --check src/openrouter.js
 | Подбор товаров (старый каталог) | `src/curate.js` |
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
 | Настройки поиска в админке | `web/src/pages/Admin.tsx`, `src/procurementconfig.js` |
+| Источник стиля и свотчи | `src/styleconfig.js`, `src/styleswatch.js`, `migrations/024_style_briefs.sql` |
 | Панель подбора | `web/src/components/ProcurementPanel.tsx` |
 | Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
@@ -277,7 +278,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 38 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
+- `npm test` — 39 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -388,7 +389,7 @@ Last updated: 2026-10-29
 
 ```bash
 npm install
-npm test                 # 38 tests
+npm test                 # 39 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -1447,6 +1448,7 @@ PROCUREMENT_VISION_MODEL=google/gemini-3.1-pro-preview
 - Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он исключён из allowlist. Discovery идёт по обычной выдаче, карточки проверяются только в магазинах из allowlist.
 - Цены и наличие сохраняются на момент проверки. Это список товаров, не смета: количества и итог появятся отдельным этапом.
 - Если нужно временно выключить: `PROCUREMENT_ENABLED=0` и пересоздать контейнер.
+- Источник стиля переключается в админке → «Стили»: текст, референс или свотчи. По умолчанию текст; фото-референс в этом режиме не отправляется. Активны только «Скандинавский» и «Джапанди».
 - В админке → «Поиск» настраиваются включение, слои (по умолчанию только мебель/свет/декор и текстиль), регион, домены, пороги score и лимиты. Выключенные слои не создают позиции и не тратят запросы. Настройки хранятся в `app_settings` (`procurement.settings.v1`).
 
 
@@ -2209,6 +2211,15 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
+
+## 2026-10-29 — источник стиля: текст / референс / свотчи
+
+- В админке → «Стили» появился переключатель источника стиля: **Текст**, **Референс**, **Свотчи**. По умолчанию — текст.
+- В режиме «Текст» на генерацию уходит только исходное фото комнаты + текстовый style brief; фото-референс не отправляется.
+- В режиме «Свотчи» генерируется material board с палитрой и подписями, без архитектуры; он идёт вместо фото-референса.
+- В режиме «Референс» остаётся старое поведение с фото style reference.
+- Описаны два стиля: «Скандинавский» и «Джапанди». Остальные стили деактивированы; миграция `024_style_briefs.sql` также добавляет палитры свотчей.
+- Пользовательские фото-референсы в режимах «Текст»/«Свотчи» не отправляются; это фиксируется в `meta.user_style_ref_ignored`.
 
 ## 2026-10-29 — настройки поиска товаров в админке
 
