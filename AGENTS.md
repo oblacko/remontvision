@@ -6,12 +6,12 @@
 
 `ремонтвижн` — AI-редизайн интерьера по фото. Пользователь загружает фото, выбирает комнату/стиль/класс материалов, получает визуализацию, затем может запустить платный подбор реальных товаров по рендеру. Есть кабинет, публичный шаринг, админка, импорт товаров, кредиты и платежи.
 
-Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt).
+Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt). Рабочая память и текущие решения: [docs/MEMORY.md](docs/MEMORY.md).
 
 ## Главное, что нужно знать до изменений
 
 1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
-2. **Текущая модель генерации** — `black-forest-labs/flux-3-image`, очистка — `black-forest-labs/flux-3-image-klein`, vision — `google/gemini-3-flash-preview`, 1K, aspect auto. Модели хранятся в `app_settings` и меняются через админку; проверяйте фактическое значение перед выводами.
+2. **Текущая модель генерации** — `openai/gpt-image-2`, очистка — `black-forest-labs/flux-3-image-klein`, vision — `google/gemini-3-flash-preview`, 1K, aspect auto. Модели хранятся в `app_settings` и меняются через админку; проверяйте фактическое значение перед выводами. Architecture QA по умолчанию выключен.
 3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; FLUX 2 Pro resolution не принимает. У FLUX возможна блокировка content moderation на спальнях/кроватях — проверяйте.
 4. **Промт состоит из двух слоёв:**
    - код: `src/openrouter.js`, `src/roomtypes.js`;
