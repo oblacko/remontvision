@@ -33,6 +33,11 @@ test('category query includes attributes without inventing brands', () => {
   assert.equal(categoryQuery('floor', { color: 'светлый', material: 'дуб' }), 'Напольное покрытие светлый дуб купить');
 });
 
+test('default search layers exclude finishes and completeness', () => {
+  const config = getProcurementConfig();
+  assert.deepEqual(config.enabled_layers, ['hero', 'textile']);
+});
+
 test('procurement config hash is stable and region-sensitive', () => {
   const config = getProcurementConfig();
   const base = procurementConfigHash(config);

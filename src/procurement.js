@@ -243,7 +243,9 @@ function preferredDomains(item, config) {
   return preferred.filter(domain => config.domains.includes(domain)).slice(0, 2);
 }
 
-async function createItemsForRun(run, template, vision) {
+async function createItemsForRun(run, template, vision, config) {
+  await q.deleteProcurementItemsForRun(run.id);
+  const enabledLayers = new Set(Array.isArray(config.enabled_layers) && config.enabled_layers.length ? config.enabled_layers : ['hero', 'finish', 'builtin', 'textile', 'completeness']);
   const seenMap = new Map();
   for (const item of vision.items || []) {
     const key = normalizeKey(item.key || item.category || item.label);
@@ -256,7 +258,7 @@ async function createItemsForRun(run, template, vision) {
   let sort = 0;
   for (const { key, layer } of keys) {
     const meta = categoryMeta(key);
-    if (!meta) continue;
+    if (!meta || !enabledLayers.has(layer)) continue;
     const seen = seenMap.get(key) || null;
     const context = buildItemContext(key, seen, vision.surfaces || [], vision.style);
     const isRule = layer === 'completeness' || meta.mode === 'rule';
@@ -519,10 +521,10 @@ export async function startProcurement({ userId, renderId }) {
 }
 
 export async function processProcurementRun(runId) {
-  const config = getProcurementConfig();
   let run = await q.startProcurementRun(runId);
   if (!run) run = await q.procurementRunById(runId);
   if (!run || run.status !== 'processing') return;
+  const config = { ...getProcurementConfig(), ...(run.config || {}) };
   let cost = Number(run.cost_usd || 0);
   try {
     const render = await q.getRender(run.render_id);
@@ -537,7 +539,7 @@ export async function processProcurementRun(runId) {
     await q.setProcurementAnalysis(run.id, { ...vision, cost: vision.cost ?? null });
     await q.setProcurementStage(run.id, 'items');
     const template = getProcurementTemplate(room?.room_type || run.room_type);
-    const items = await createItemsForRun(run, template, vision);
+    const items = await createItemsForRun(run, template, vision, config);
     log({ event: 'procurement_vision_done', run_id: run.id, items: items.length, surfaces: vision.surfaces?.length || 0, cost_usd: vision.cost ?? null });
 
     let candidateCount = 0;

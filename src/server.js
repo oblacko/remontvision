@@ -29,7 +29,7 @@ import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupCo
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
 import { startProcurementWorker } from './procurementjobs.js';
-import { getProcurementConfig } from './procurementconfig.js';
+import { getProcurementConfig, getProcurementDefaults, saveProcurementConfig, resetProcurementConfig, loadProcurementConfig } from './procurementconfig.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
@@ -748,6 +748,23 @@ app.post('/api/admin/settings/prompt/reset', h(async (req, res) => {
   }
 }));
 
+app.get('/api/admin/settings/procurement', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ config: getProcurementConfig(), defaults: getProcurementDefaults() });
+}));
+
+app.put('/api/admin/settings/procurement', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const config = await saveProcurementConfig(req.body?.config || {});
+  res.json({ ok: true, config });
+}));
+
+app.post('/api/admin/settings/procurement/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const config = await resetProcurementConfig();
+  res.json({ ok: true, config });
+}));
+
 app.get('/api/admin/settings/proxy', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json(getProxyState({ masked: true }));
@@ -1240,6 +1257,7 @@ async function main() {
   await loadProxyConfig();  // прокси из app_settings / env
   await loadPromptConfig(); // редактируемые правила промта из app_settings
   await loadCleanupConfig(); // очистка комнаты: модель/промт из app_settings
+  await loadProcurementConfig(); // подбор товаров: слои, лимиты, домены
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }

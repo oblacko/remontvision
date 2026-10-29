@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-29T14:30:41.165Z
+Generated: 2026-10-29T14:58:59.251Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -212,7 +212,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 37 тестов
+npm test                    # node:test, 38 тестов
 npm start                   # Node 20.6+, .env через node --env-file
 
 # Frontend
@@ -248,6 +248,7 @@ node --check src/openrouter.js
 | Правила комнат, слоты, запреты | `src/roomtypes.js` |
 | Подбор товаров (старый каталог) | `src/curate.js` |
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
+| Настройки поиска в админке | `web/src/pages/Admin.tsx`, `src/procurementconfig.js` |
 | Панель подбора | `web/src/components/ProcurementPanel.tsx` |
 | Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
@@ -276,7 +277,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 37 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
+- `npm test` — 38 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
 - `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -387,7 +388,7 @@ Last updated: 2026-10-29
 
 ```bash
 npm install
-npm test                 # 37 tests
+npm test                 # 38 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -1446,6 +1447,7 @@ PROCUREMENT_VISION_MODEL=google/gemini-3.1-pro-preview
 - Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он исключён из allowlist. Discovery идёт по обычной выдаче, карточки проверяются только в магазинах из allowlist.
 - Цены и наличие сохраняются на момент проверки. Это список товаров, не смета: количества и итог появятся отдельным этапом.
 - Если нужно временно выключить: `PROCUREMENT_ENABLED=0` и пересоздать контейнер.
+- В админке → «Поиск» настраиваются включение, слои (по умолчанию только мебель/свет/декор и текстиль), регион, домены, пороги score и лимиты. Выключенные слои не создают позиции и не тратят запросы. Настройки хранятся в `app_settings` (`procurement.settings.v1`).
 
 
 ---
@@ -2207,6 +2209,14 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
+
+## 2026-10-29 — настройки поиска товаров в админке
+
+- В админке появился раздел «Поиск»: включение поиска, слои (мебель/свет/декор, отделка, техника/сантехника, текстиль, комплектующие), регион, домены магазинов, пороги score, лимиты кандидатов и стоимость запуска.
+- По умолчанию включены только `hero` и `textile`. Отделка, техника и комплектующие выключены, чтобы не искать крепёж, карниз и случайные карточки; включаются галочками.
+- Выключенный слой не создаёт позиции и не тратит поисковые запросы.
+- Исправлены дубликаты: перед созданием позиций run очищается от старых items, поэтому повторная обработка после рестарта больше не удваивает список.
+- Кредит за провальный запуск с дублями возвращён.
 
 ## 2026-10-29 — архитектурный lock в промте
 

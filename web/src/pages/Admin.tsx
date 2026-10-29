@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'proxy' | 'catalog'
+type Tab = 'users' | 'packs' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'procurement' | 'proxy' | 'catalog'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -48,6 +48,13 @@ type Product = {
 type KitSlot = { key: string; label: string; product: { id: number; name: string; price: number; unit: string; price_tier: string; url: string | null; image_url: string | null; dimensions?: { text?: string } | null } | null };
 type KitResult = { style_id: number; style: string; room_type: string; price_tier: string; slots: KitSlot[]; missing: string[]; product_ids: number[] };
 type CleanupConfig = { enabled: boolean; model: string; resolution: string; aspect_ratio: string; prompt: string };
+type ProcurementConfig = {
+  enabled: boolean; enabled_layers: string[]; region: string; domains: string;
+  search_limit: number; max_visual_items: number; max_text_items: number;
+  max_candidates_per_item: number; max_visual_candidates: number;
+  min_score: number; alt_score: number; max_run_cost_usd: number; credit_cost: number;
+};
+const procurementLayerLabels: Record<string, string> = { hero: 'Мебель, свет, декор', finish: 'Отделка: пол, стены, потолок', builtin: 'Техника и сантехника', textile: 'Текстиль: шторы, ковры, постель', completeness: 'Комплектующие: матрас, крепёж, карниз' };
 type ImportPreview = {
   url: string; domain: string; allowed_domain: boolean;
   name: string; brand: string; description: string; price: number; currency: string;
@@ -174,6 +181,9 @@ export default function Admin() {
   const [cleanupConfig, setCleanupConfig] = useState<CleanupConfig | null>(null)
   const [cleanupBusy, setCleanupBusy] = useState(false)
   const [cleanupNotice, setCleanupNotice] = useState('')
+  const [procurementConfig, setProcurementConfig] = useState<ProcurementConfig | null>(null)
+  const [procurementBusy, setProcurementBusy] = useState(false)
+  const [procurementNotice, setProcurementNotice] = useState('')
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
@@ -340,6 +350,38 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
     finally { setCleanupBusy(false) }
   }
+  const loadProcurement = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/procurement'))
+      const c = d.config || null
+      setProcurementConfig(c ? { ...c, domains: Array.isArray(c.domains) ? c.domains.join(', ') : String(c.domains || '') } : null)
+      setProcurementNotice('')
+    } catch { /* ignore */ }
+  }
+
+  const saveProcurement = async () => {
+    if (!procurementConfig) return
+    setProcurementBusy(true); setProcurementNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/procurement', { method: 'PUT', body: JSON.stringify({ config: procurementConfig }) }))
+      const c = d.config || null
+      setProcurementConfig(c ? { ...c, domains: Array.isArray(c.domains) ? c.domains.join(', ') : String(c.domains || '') } : null)
+      setProcurementNotice('Настройки поиска сохранены')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сохранить настройки поиска') }
+    finally { setProcurementBusy(false) }
+  }
+
+  const resetProcurement = async () => {
+    setProcurementBusy(true); setProcurementNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/procurement/reset', { method: 'POST' }))
+      const c = d.config || null
+      setProcurementConfig(c ? { ...c, domains: Array.isArray(c.domains) ? c.domains.join(', ') : String(c.domains || '') } : null)
+      setProcurementNotice('Возвращены заводские настройки поиска')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сбросить настройки поиска') }
+    finally { setProcurementBusy(false) }
+  }
+
   const loadPromptRules = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/prompt'))
@@ -418,7 +460,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') loadStyles(); if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'procurement') loadProcurement() }, [authed, tab])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -607,7 +649,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['procurement', 'Поиск'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -989,6 +1031,45 @@ export default function Admin() {
                   </div>
                   <label className="block"><span className="eyebrow mb-2 block">Промт очистки</span><textarea value={cleanupConfig.prompt} onChange={e => setCleanupConfig({ ...cleanupConfig, prompt: e.target.value })} rows={8} maxLength={8000} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /><span className="mt-2 block text-xs text-muted-foreground">Плейсхолдеры: <code>{'{room}'}</code> — тип комнаты, <code>{'{keep}'}</code> — что сохранить, <code>{'{remove}'}</code> — что удалить. Для кухни/санузла сохраняются встроенные элементы и технические точки.</span></label>
                   <p className="text-xs text-muted-foreground">Рекомендуем FLUX 3 Image Klein, 1K, auto. Очистка добавляет второй вызов модели и увеличивает время генерации.</p>
+                </div>
+              ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
+            </div>
+          )}
+
+          {tab === 'procurement' && (
+            <div className="mt-8 max-w-5xl">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div><p className="eyebrow">Поиск товаров</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Управляет тем, что ищется после нажатия «Найти товары». По умолчанию включены только мебель/свет/декор и текстиль; отделка, техника и комплектующие выключены, чтобы не искать крепёж и случайные карточки.</p></div>
+                <div className="flex gap-2"><button type="button" disabled={procurementBusy} onClick={() => void resetProcurement()} className="action-secondary">Сбросить</button><button type="button" disabled={procurementBusy} onClick={() => void saveProcurement()} className="action-primary">{procurementBusy ? 'Сохраняем…' : 'Сохранить'}</button></div>
+              </div>
+              {procurementNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{procurementNotice}</p>}
+              {procurementConfig ? (
+                <div className="mt-6 space-y-5">
+                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={procurementConfig.enabled} onChange={e => setProcurementConfig({ ...procurementConfig, enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Поиск товаров включён</span><span className="mt-1 block text-xs text-muted-foreground">Если выключить, кнопка «Найти товары» вернёт ошибку и кредит не спишется.</span></span></label>
+                  <div>
+                    <p className="eyebrow mb-2">Что искать</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {Object.entries(procurementLayerLabels).map(([layer, label]) => (
+                        <label key={layer} className="flex items-center gap-3 border p-3 text-sm">
+                          <input type="checkbox" checked={procurementConfig.enabled_layers.includes(layer)} onChange={e => setProcurementConfig({ ...procurementConfig, enabled_layers: e.target.checked ? [...procurementConfig.enabled_layers, layer] : procurementConfig.enabled_layers.filter(v => v !== layer) })} className="size-4 accent-primary" />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div><label className="eyebrow mb-2 block">Регион Яндекса</label><input value={procurementConfig.region} onChange={e => setProcurementConfig({ ...procurementConfig, region: e.target.value })} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" placeholder="213" /></div>
+                    <div><label className="eyebrow mb-2 block">Кредитов за запуск</label><input type="number" min={0} max={10} value={procurementConfig.credit_cost} onChange={e => setProcurementConfig({ ...procurementConfig, credit_cost: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                    <div><label className="eyebrow mb-2 block">Макс. стоимость run, $</label><input type="number" min={0.01} max={5} step={0.01} value={procurementConfig.max_run_cost_usd} onChange={e => setProcurementConfig({ ...procurementConfig, max_run_cost_usd: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <div><label className="eyebrow mb-2 block">Мин. score</label><input type="number" min={50} max={95} value={procurementConfig.min_score} onChange={e => setProcurementConfig({ ...procurementConfig, min_score: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                    <div><label className="eyebrow mb-2 block">Альтернатива</label><input type="number" min={40} max={90} value={procurementConfig.alt_score} onChange={e => setProcurementConfig({ ...procurementConfig, alt_score: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                    <div><label className="eyebrow mb-2 block">Кандидатов</label><input type="number" min={1} max={8} value={procurementConfig.max_candidates_per_item} onChange={e => setProcurementConfig({ ...procurementConfig, max_candidates_per_item: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                    <div><label className="eyebrow mb-2 block">Визуальных</label><input type="number" min={1} max={5} value={procurementConfig.max_visual_candidates} onChange={e => setProcurementConfig({ ...procurementConfig, max_visual_candidates: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                  </div>
+                  <label className="block"><span className="eyebrow mb-2 block">Магазины (через запятую)</span><textarea value={procurementConfig.domains} onChange={e => setProcurementConfig({ ...procurementConfig, domains: e.target.value })} rows={4} className="w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" /></label>
+                  <p className="text-xs text-muted-foreground">Если слой выключен, его позиции не создаются и не ищутся. Комплектующие (матрас, крепёж, карниз) лучше держать выключенными до этапа сметы.</p>
                 </div>
               ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
             </div>

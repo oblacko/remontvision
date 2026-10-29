@@ -75,7 +75,7 @@ Last updated: 2026-10-29
 
 ```bash
 npm install
-npm test                 # 37 tests
+npm test                 # 38 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434

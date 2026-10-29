@@ -357,6 +357,7 @@ export const q = {
   // настройки приложения
   settingsByKeys: keys =>
     pool.query(`SELECT key, value FROM app_settings WHERE key = ANY($1)`, [keys]).then(r => r.rows),
+  deleteSetting: key => pool.query(`DELETE FROM app_settings WHERE key = $1`, [key]),
   setSetting: (key, value) =>
     pool.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ($1,$2,now())
                 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now() RETURNING *`,
@@ -441,6 +442,8 @@ export const q = {
        f.bbox ? JSON.stringify(f.bbox) : null, f.crop_path || null, f.visibility || null,
        f.confidence ?? null, f.quantity ?? null, f.unit || null, f.measurement_status || null])
       .then(r => r.rows[0]),
+  deleteProcurementItemsForRun: runId =>
+    pool.query(`DELETE FROM procurement_items WHERE run_id = $1`, [runId]),
   procurementItemsForRun: runId =>
     pool.query(`SELECT * FROM procurement_items WHERE run_id = $1 ORDER BY sort, id`, [runId]).then(r => r.rows),
   setProcurementItemStatus: (id, status, { error = null, candidateCount = null } = {}) =>
