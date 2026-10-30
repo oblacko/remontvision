@@ -16,7 +16,7 @@ flowchart LR
   W --> P
   W --> F
   W --> O["OpenRouter"]
-  O --> S["FLUX 3 Image"]
+  O --> S["Design model (app_settings)"]
   O --> G["Gemini 3 Flash"]
   E --> R["Resend"]
   E --> Y["Robokassa / ЮKassa"]

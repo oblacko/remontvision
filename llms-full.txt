@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T13:48:37.075Z
+Generated: 2026-10-30T15:11:04.389Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -24,7 +24,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 | Блок | Состояние |
 |---|---|
-| Генерация по фото | Работает: FLUX 3 Image, 1K, aspect auto |
+| Генерация по фото | Работает: FLUX 3 Image 1K (app_settings/.env) |
 | Vision-разбор | Работает: Gemini 3 Flash |
 | Стили и room types | 17 стилей в БД (2 активных, 7 новых неактивны), 12 типов комнат; типы, размеры и радиаторы управляются в админке |
 | Hero-референсы стилей | 120 сгенерировано, 26 approved (пилот 5 стилей × 6 комнат) |
@@ -116,7 +116,7 @@ npm test
 | БД | PostgreSQL 16 |
 | Очередь | Postgres + воркер `src/jobs.js` |
 | Файлы | диск или S3 (`src/storage.js`) |
-| AI | OpenRouter: FLUX 3 Image, FLUX 3 Image Klein (cleanup), Gemini 3 Flash |
+| AI | OpenRouter: FLUX 3 Image 1K (app_settings/.env), FLUX 3 Image Klein (cleanup), Gemini 3 Flash (vision + арт-директор) |
 | Почта | Resend / SMTP |
 | Платежи | Robokassa / ЮKassa |
 | Инфраструктура | Docker Compose, Nginx, Let's Encrypt, GitHub Actions |
@@ -215,7 +215,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 53 теста, Postgres не нужен
+npm test                                      # node:test, 56 тестов, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -313,7 +313,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 53 теста: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 56 тестов: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -375,16 +375,17 @@ Last updated: 2026-10-30
 
 ## Current state (2026-10-30)
 
-- Generation: FLUX 3 Image, 1K, aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash.
+- Generation: FLUX 3 Image 1K (`app_settings`/`.env`; code default `black-forest-labs/flux-3-image`), aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash + art director.
 - Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
-- 17 styles in DB (2 active: Скандинавский, Джапанди; 7 new 2026 styles inactive), 12 default room types, 100 active demo products, **0 products with real URL**.
-- Production deployed at `afe13ad` (2026-10-30); migrations `001`–`027` applied.
+- 17 styles in DB, 8 active via migration 028 (scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean), 12 default room types, 100 active demo products, **0 products with real URL**.
+- Production deployed at `afe13ad` (2026-10-30); migrations `001`–`028` (028 applies on next deploy).
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
-- Room dimensions: user can enter width/length/height manually or click `POST /api/estimate-room` for a vision estimate; estimates prefill the form but must be confirmed. Bed length is only for bedroom/children rooms and defaults to 2.0 m.
+- Art director (`src/artdirector.js`): a vision pass reads the real photo and writes a bespoke `ART DIRECTION` block (palette, focal point, feature wall, materials, lighting, textiles, decor); injected after `ARCHITECTURE LOCK`. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
+- Room dimensions: user can enter width/length/height manually or use `POST /api/estimate-room`, which now also detects room type and suggests 2-3 styles. The brief runs automatically on photo upload (silent on 401) and prefills the form; the user confirms. Bed length is only for bedroom/children rooms and defaults to 2.0 m.
 - Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
 - Saved reference prompts are now wired in: `docs/prompts/scandinavian-bedroom-3x6.txt` blocks live in `promptconfig` (`dimensions`, `scalePlan`, `bed`, `radiators`) and room dimension fields; `docs/prompts/scandinavian-style-driven.txt` style blocks live in the Scandinavian `styles.prompt_description` (migration 026).
-- New reference `docs/prompts/interior-prompt-generator-2026.md`: deterministic scale planner in `src/scaleplan.js` (bed width, 60/80 cm walkways, kitchen by area, low ceilings, narrow/long rooms) and 7 trend styles added inactive in migration 027 (Wabi-Sabi, Organic Modern, Warm Minimalism, Biophilic, Modern Heritage, New Maximalism, Mediterranean Modern). Activate styles in admin.
+- New reference `docs/prompts/interior-prompt-generator-2026.md`: deterministic scale planner in `src/scaleplan.js` (bed width, 60/80 cm walkways, kitchen by area, low ceilings, narrow/long rooms) and 7 trend styles added in migration 027; migration 028 activates a curated set of 8 (Wabi-Sabi, Organic Modern, Warm Minimalism, Biophilic, Modern Heritage, Mediterranean Modern + Scandi, Japandi).
 - Catalog import by URL and bulk list; drafts only, manual activation.
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
@@ -478,7 +479,7 @@ flowchart LR
   W --> P
   W --> F
   W --> O["OpenRouter"]
-  O --> S["FLUX 3 Image"]
+  O --> S["Design model (app_settings)"]
   O --> G["Gemini 3 Flash"]
   E --> R["Resend"]
   E --> Y["Robokassa / ЮKassa"]
@@ -612,7 +613,8 @@ flowchart LR
   D --> E["room types + style + tier"]
   E --> F["style refs: user > approved hero > cover"]
   F --> G["curate: room slots × tier × style"]
-  G --> H["prompt: roles, keep/change, light, styling, catalog, dimensions"]
+  G --> AD["art director: vision → bespoke direction"]
+  AD --> H["prompt: roles, keep/change, light, styling, catalog, dimensions, ART DIRECTION"]
   H --> C1["cleanup: FLUX 3 Klein → empty shell"] 
   C1 --> I["design: FLUX 3 Image"]
   I --> J["fitAspect + storage"]
@@ -639,7 +641,7 @@ flowchart LR
 
 Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`. Размеры валидируются: комната 1–30 м, высота 2–10 м, кровать 1–4 м.
 
-Перед созданием комнаты пользователь может нажать «Определить по фото»: `POST /api/estimate-room` (multipart `photo`, `room_type`) вызывает vision-модель, оценивает ширину/длину/высоту по типовым ориентирам (дверь, кровать, шкафы, перспектива) и возвращает `width_m`, `length_m`, `height_m`, `bed_present`, `confidence`, `reasoning`. Значения только заполняют поля формы — пользователь обязан проверить и поправить их перед генерацией.
+Перед созданием комнаты пользователь может нажать «Определить по фото»: `POST /api/estimate-room` (multipart `photo`, `room_type`) вызывает `analyzeRoomBrief()` из `src/artdirector.js`. Vision оценивает ширину/длину/высоту по типовым ориентирам (дверь, кровать, шкафы, перспектива), определяет тип комнаты и предлагает 2–3 стиля. Ответ содержит `width_m`, `length_m`, `height_m`, `bed_present`, `confidence`, `reasoning`, `room_type_guess`, `style_suggestions`, `architecture`, `existing_furniture`. Бриф запускается автоматически при загрузке фото (401 не открывает логин) и по кнопке; тип, размеры и первый подходящий стиль подставляются в форму — пользователь только проверяет и правит.
 
 ### 2. Очередь и кредит
 
@@ -673,6 +675,7 @@ flowchart LR
 Собирается в `src/openrouter.js`:
 
 - карта изображений: 1 — исходник, 2 — необязательный art ref; product refs отсутствуют;
+- `ART DIRECTION — BESPOKE FOR THIS ROOM` — авторское направление, которое арт-директор написал по конкретному фото (палитра, focal point, feature wall, материалы, свет, текстиль, декор). Вставляется сразу после `ARCHITECTURE LOCK` и не может отменять архитектуру/масштаб;
 - `ROOM DIMENSIONS AND SCALE` — реальные ширина/длина/высота, если пользователь их указал;
 - `SCALE PLAN` — вычисленный `src/scaleplan.js` план: размер кровати по ширине комнаты, проходы, кухня по площади, низкие потолки, узкие и длинные комнаты;
 - `BED SIZE` — полная длина кровати с каркасом, если указана;
@@ -775,6 +778,8 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 ## Текущие ограничения
 
 - Очистка + дизайн работают только при выключенной мебели; при включённой — один проход.
+- Арт-директор добавляет один vision-вызов на базовый рендер (отключается `ART_DIRECTION_ENABLED=0`); его стоимость входит в `renders.cost_usd`.
+- Каталог/смета по умолчанию выключены (`use_catalog=false`), пока в каталоге нет реальных URL.
 - Нет автоматической генерации и выбора 2–4 дизайн-вариантов; нужны отдельные UI выбора и биллинг.
 - Нет inpainting для люстр/розеток; товарная привязка использует обычную edit-генерацию.
 - Очистка добавляет второй вызов, но биллинг пока 1 кредит.
@@ -2206,7 +2211,7 @@ Hero-сцены генерируются из наших товаров, про�
 
 ## ADR-007: модель выбирается в админке, FLUX 2 Pro — осторожно
 
-Текущая модель дизайна — FLUX 3 Image, очистки — FLUX 3 Image Klein. Seedream остаётся дешёвым фолбэком. FLUX.2 Pro не принимает `resolution`, возможна content moderation на спальнях; не делать основным без QA.
+Модель дизайна берётся из `app_settings`/`RENDER_MODEL` (текущая: FLUX 3 Image 1K, код-дефолт `black-forest-labs/flux-3-image`); очистка — FLUX 3 Image Klein. Seedream остаётся дешёвым фолбэком. FLUX.2 Pro не принимает `resolution`, возможна content moderation на спальнях; не делать основным без QA.
 
 ## ADR-008: прокси управляется из админки
 
@@ -2248,9 +2253,9 @@ OpenRouter WAF может блокировать IP VPS. Прокси храни
 
 ## Текущая конфигурация
 
-- Render: `black-forest-labs/flux-3-image`, 1K, aspect auto (значение из админки).
+- Render: FLUX 3 Image 1K (значение из `app_settings`/`.env`; код-дефолт `black-forest-labs/flux-3-image`).
 - Cleanup: `black-forest-labs/flux-3-image-klein`, 1K, auto (только при `keep_furniture=false`).
-- Vision: `google/gemini-3-flash-preview` (в проде `google/gemini-3-flash-preview`).
+- Vision: `google/gemini-3-flash-preview`; он же пишет авторский art direction по фото (`src/artdirector.js`).
 - Модели хранятся в `app_settings` и меняются в админке «Модели».
 - Прокси — `src/proxy.js`, применяется без рестарта.
 
@@ -2266,11 +2271,22 @@ export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabe
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 export async function generateFromText({ prompt, aspectRatio }); // shells для style refs
 export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect });
+export async function visionJson({ system, user, images, model }); // JSON-ответ vision-модели
+export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture }); // src/artdirector.js
+export async function analyzeRoomBrief({ imageDataUrl, roomType }); // src/artdirector.js
 export async function parseRender(renderB64, mime);
 export function matchCatalog(items, products);
 export function snapAspect(width, height, allowed);
 export const MAX_REFERENCES; // 4
 ```
+
+## Арт-директор
+
+`src/artdirector.js` — отдельный vision-проход, который смотрит на реальное фото и пишет bespoke-направление под выбранный стиль: палитру, focal point, feature wall, материалы, свет, текстиль, декор и `avoid`. Блок `ART DIRECTION` вставляется в `buildPrompt()` сразу после `ARCHITECTURE LOCK`; он не может отменять блокировку архитектуры и план масштаба.
+
+- `buildArtDirection()` вызывается в `jobs.js` для базового рендера, пока `ART_DIRECTION_ENABLED` не выключен (`0/false`).
+- Стоимость vision-вызова добавляется в `renders.cost_usd`, результат — в `renders.meta.art_direction`.
+- `analyzeRoomBrief()` использует `POST /api/estimate-room`: оценка размеров + тип комнаты + 2–3 рекомендованных стиля; кнопка в генераторе подставляет их в форму.
 
 ## Возможности моделей
 
@@ -2323,6 +2339,28 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
+
+## 2026-10-30 — UI-тюнинг, FLUX 3 Image 1K и прогон 10 сценариев
+
+- Генератор переведён на **FLUX 3 Image 1K** (`.env`, `app_settings`, код-дефолт `src/modelconfig.js`).
+- UI: после загрузки фото показывается «Бриф комнаты» — тип, размеры, окна/двери, радиатор, рекомендованные стили и reasoning. Бриф запускается автоматически (401 молча игнорируется) и подставляет тип/размеры/первый стиль.
+- Блок «Дополнительно» сворачивает класс материалов, режим мебели и каталог; главный экран стал чище.
+- На результате появился «Авторский бриф»: палитра, акцент, стена, свет и настроение из `renders.meta.art_direction`.
+- Scale plan исправлен: детская — кровать 90–140 см (не king), спальня 3.0 м — 160 см; проходы считаются от реального запаса по бокам.
+- Прогон 10 сценариев на FLUX 1K с арт-директором: **10/10 ok, $0.5093, 573 с**. Vision-QA: style **9.20**, photo **8.70**, arch **9.80**, scale **8.80**, authorial **8.20**. Контрольный прогон детской после фикса: style 10, photo 9, arch 9, authorial 8; vision всё ещё занижает оценку масштаба.
+- Тестов 56; `npm test`, `tsc -b`, `vite build` зелёные. Артефакты прогона: `tmp/flux-tests/` (не коммитятся).
+- Миграция `029` фиксирует `model.render = black-forest-labs/flux-3-image`, `model.resolution = 1K` в `app_settings`, чтобы прод после деплоя работал на FLUX 1K; админка может переопределить позже.
+
+## 2026-10-30 — арт-директор, авторский промт и кураторские стили
+
+- Добавлен `src/artdirector.js`: vision-проход смотрит на реальное фото и пишет bespoke art direction под выбранный стиль (палитра с hex, focal point, feature wall, материалы, свет, текстиль, декор, avoid). Блок `ART DIRECTION` вставляется в `buildPrompt()` сразу после `ARCHITECTURE LOCK`; конфликт с архитектурой/масштабом решается в пользу архитектуры.
+- `buildArtDirection()` вызывается в `jobs.js` для базового рендера; стоимость vision-вызова входит в `renders.cost_usd`, результат — в `renders.meta.art_direction`. Отключается `ART_DIRECTION_ENABLED=0`.
+- `analyzeRoomBrief()` и `POST /api/estimate-room` теперь оценивают не только размеры, но и тип комнаты и 2–3 подходящих стиля. Бриф запускается автоматически при загрузке фото (401 молча игнорируется) и по кнопке «Определить по фото», подставляя тип, размеры и стиль в форму.
+- Кураторский набор стилей (`028_curated_styles_art_direction.sql`): активны 8 — scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean. Новые стили показывают ближайшую существующую обложку.
+- Демо-смета скрыта по умолчанию: `use_catalog=false` во фронтенде, сервере, дефолте `rooms` и миграции. Из UI генератора убраны цветовая схема и акцент как малополезные рудименты.
+- В `openrouter.js` добавлен общий `visionJson()` — единый JSON-ответ vision-модели для арт-директора.
+- Тестов теперь 55; `npm test`, `tsc -b` и `vite build` зелёные. `npm run lint` по-прежнему падает на прежних ошибках `Admin.tsx`/react-refresh, не связанных с изменением.
+- Не задеплоено: миграция `028` применится при старте контейнера после пуша.
 
 ## 2026-10-30 — scale planner и новые стили из Interior Prompt Generator 2026
 
@@ -2390,7 +2428,7 @@ export const MAX_REFERENCES; // 4
 
 - Вызовы image-модели сериализованы с минимальным интервалом `IMAGE_MIN_GAP_MS` (по умолчанию 10 секунд), чтобы не попадать в admission control.
 - При 429 теперь до 4 попыток с паузами 10/20/40 секунд и учётом `Retry-After`, а не один ретрай.
-- Остаток на OpenRouter-аккаунте ~$3.36 из $30 — при повторных 429 нужно пополнить баланс или снизить частоту запусков.
+- На тот момент остаток на OpenRouter был небольшим; позже баланс пополнен. При повторных 429 снижать частоту запусков.
 
 ## 2026-10-29 — architecture QA выключен
 

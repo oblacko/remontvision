@@ -32,7 +32,7 @@ Hero-сцены генерируются из наших товаров, про�
 
 ## ADR-007: модель выбирается в админке, FLUX 2 Pro — осторожно
 
-Текущая модель дизайна — FLUX 3 Image, очистки — FLUX 3 Image Klein. Seedream остаётся дешёвым фолбэком. FLUX.2 Pro не принимает `resolution`, возможна content moderation на спальнях; не делать основным без QA.
+Модель дизайна берётся из `app_settings`/`RENDER_MODEL` (текущая: FLUX 3 Image 1K, код-дефолт `black-forest-labs/flux-3-image`); очистка — FLUX 3 Image Klein. Seedream остаётся дешёвым фолбэком. FLUX.2 Pro не принимает `resolution`, возможна content moderation на спальнях; не делать основным без QA.
 
 ## ADR-008: прокси управляется из админки
 

@@ -127,6 +127,35 @@ export async function assertConfig() {
   log({ event: 'config_ok', render_model: renderModel, vision_model: visionModel });
 }
 
+// Единый vision-запрос с JSON-ответом. Используется арт-директором и другими
+// вспомогательными анализами, чтобы не дублировать парсинг/заголовки.
+export async function visionJson({ system = '', user = '', images = [], model = null } = {}) {
+  if (MOCK_MODE) return { parsed: {}, cost: null };
+  const r = await fetchWithRetry(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      model: model || getModelConfig().vision,
+      messages: [
+        ...(system ? [{ role: 'system', content: system }] : []),
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: user },
+            ...images.filter(Boolean).map(url => ({ type: 'image_url', image_url: { url } })),
+          ],
+        },
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try { parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
+  return { parsed, cost: data.usage?.cost ?? null };
+}
+
 const STYLES = {
   'Современный': 'modern minimalist interior, clean architectural lines, handleless matte cabinetry, warm layered lighting, refined materials, calm neutral palette',
   'Светлый': 'bright airy interior, white and light wood palette, lots of natural light, scandinavian, warm and calm',
@@ -204,6 +233,7 @@ export function buildPrompt({
   useCatalog = true,
   imageMap = [],
   dimensions = null,
+  artDirection = '',
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -292,6 +322,7 @@ The result must feel like a completed designer renovation with a genuine WOW eff
 This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
 
 ${architectureLock}
+${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY
 ${keep}.

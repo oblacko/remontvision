@@ -9,6 +9,7 @@ data/
 *.log
 .DS_Store
 npm-debug.log*
+tmp/
 
 # локальные проверки
 check-pg.mjs

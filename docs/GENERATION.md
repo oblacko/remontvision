@@ -23,7 +23,8 @@ flowchart LR
   D --> E["room types + style + tier"]
   E --> F["style refs: user > approved hero > cover"]
   F --> G["curate: room slots × tier × style"]
-  G --> H["prompt: roles, keep/change, light, styling, catalog, dimensions"]
+  G --> AD["art director: vision → bespoke direction"]
+  AD --> H["prompt: roles, keep/change, light, styling, catalog, dimensions, ART DIRECTION"]
   H --> C1["cleanup: FLUX 3 Klein → empty shell"] 
   C1 --> I["design: FLUX 3 Image"]
   I --> J["fitAspect + storage"]
@@ -50,7 +51,7 @@ flowchart LR
 
 Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`. Размеры валидируются: комната 1–30 м, высота 2–10 м, кровать 1–4 м.
 
-Перед созданием комнаты пользователь может нажать «Определить по фото»: `POST /api/estimate-room` (multipart `photo`, `room_type`) вызывает vision-модель, оценивает ширину/длину/высоту по типовым ориентирам (дверь, кровать, шкафы, перспектива) и возвращает `width_m`, `length_m`, `height_m`, `bed_present`, `confidence`, `reasoning`. Значения только заполняют поля формы — пользователь обязан проверить и поправить их перед генерацией.
+Перед созданием комнаты пользователь может нажать «Определить по фото»: `POST /api/estimate-room` (multipart `photo`, `room_type`) вызывает `analyzeRoomBrief()` из `src/artdirector.js`. Vision оценивает ширину/длину/высоту по типовым ориентирам (дверь, кровать, шкафы, перспектива), определяет тип комнаты и предлагает 2–3 стиля. Ответ содержит `width_m`, `length_m`, `height_m`, `bed_present`, `confidence`, `reasoning`, `room_type_guess`, `style_suggestions`, `architecture`, `existing_furniture`. Бриф запускается автоматически при загрузке фото (401 не открывает логин) и по кнопке; тип, размеры и первый подходящий стиль подставляются в форму — пользователь только проверяет и правит.
 
 ### 2. Очередь и кредит
 
@@ -84,6 +85,7 @@ flowchart LR
 Собирается в `src/openrouter.js`:
 
 - карта изображений: 1 — исходник, 2 — необязательный art ref; product refs отсутствуют;
+- `ART DIRECTION — BESPOKE FOR THIS ROOM` — авторское направление, которое арт-директор написал по конкретному фото (палитра, focal point, feature wall, материалы, свет, текстиль, декор). Вставляется сразу после `ARCHITECTURE LOCK` и не может отменять архитектуру/масштаб;
 - `ROOM DIMENSIONS AND SCALE` — реальные ширина/длина/высота, если пользователь их указал;
 - `SCALE PLAN` — вычисленный `src/scaleplan.js` план: размер кровати по ширине комнаты, проходы, кухня по площади, низкие потолки, узкие и длинные комнаты;
 - `BED SIZE` — полная длина кровати с каркасом, если указана;
@@ -186,6 +188,8 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 ## Текущие ограничения
 
 - Очистка + дизайн работают только при выключенной мебели; при включённой — один проход.
+- Арт-директор добавляет один vision-вызов на базовый рендер (отключается `ART_DIRECTION_ENABLED=0`); его стоимость входит в `renders.cost_usd`.
+- Каталог/смета по умолчанию выключены (`use_catalog=false`), пока в каталоге нет реальных URL.
 - Нет автоматической генерации и выбора 2–4 дизайн-вариантов; нужны отдельные UI выбора и биллинг.
 - Нет inpainting для люстр/розеток; товарная привязка использует обычную edit-генерацию.
 - Очистка добавляет второй вызов, но биллинг пока 1 кредит.

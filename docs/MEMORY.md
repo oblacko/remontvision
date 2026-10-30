@@ -30,24 +30,25 @@
 
 ## Промт и стиль
 
-- `buildPrompt()` собирает: TASK → ARCHITECTURE LOCK → KEEP EXACTLY → FURNITURE MODE/PLACEMENT → RADIATOR/WINDOW/LIGHTING → STYLE BRIEF → STYLE REFERENCE → MATERIALS/COLORS → OUTPUT/AVOID.
+- `buildPrompt()` собирает: TASK → ARCHITECTURE LOCK → **ART DIRECTION (bespoke)** → SCALE → KEEP EXACTLY → FURNITURE MODE/PLACEMENT → RADIATOR/WINDOW/LIGHTING → STYLE BRIEF → STYLE REFERENCE → MATERIALS/COLORS → OUTPUT/AVOID.
 - `ARCHITECTURE LOCK` запрещает новые окна/двери/ниши/балки/изменение пропорций; встроенное считается архитектурой.
 - `styleDescription` берётся из `styles.prompt_description` и вставляется в `STYLE BRIEF`.
 - Источник стиля переключается в админке → «Стили»:
   - `text` — только текстовый бриф, без фото-референса (текущий default);
   - `reference` — фото-референс, старое поведение;
   - `swatches` — material board с палитрой, без архитектуры.
-- Активны только два стиля: **Скандинавский** (`scandi`) и **Джапанди** (`japandi`). Остальные деактивированы миграцией `024_style_briefs.sql`; можно вернуть в админке.
-- У обоих стилей заполнены подробные briefs и по 6 свотчей. Swatch board генерируется `src/styleswatch.js`.
+- Активны 8 стилей (миграция `028`): **Скандинавский**, **Джапанди**, **Ваби-саби**, **Органик модерн**, **Тёплый минимализм**, **Биофильный**, **Современная классика**, **Средиземноморский модерн**. Остальные деактивированы; включаются в админке.
+- У активных стилей заполнены подробные briefs; у scandi/japandi — по 6 свотчей. Swatch board генерируется `src/styleswatch.js`.
+- **Арт-директор** (`src/artdirector.js`): vision читает реальное фото и пишет bespoke-направление (палитра, focal point, feature wall, материалы, свет, текстиль, декор). Вставляется в промт блоком `ART DIRECTION`. Отключается `ART_DIRECTION_ENABLED=0`; стоимость входит в `renders.cost_usd`.
 - Пользовательские фото-референсы в режимах `text`/`swatches` игнорируются (`meta.user_style_ref_ignored`).
-- Основная модель рендера: `openai/gpt-image-2`. Vision: `google/gemini-3-flash-preview`.
+- Основная модель рендера: **FLUX 3 Image 1K** (`black-forest-labs/flux-3-image`, `app_settings`/`.env`; код-дефолт `src/modelconfig.js`). Vision: `google/gemini-3-flash-preview`.
 - QA архитектуры **выключен** по умолчанию (`ARCHITECTURE_QA_ENABLED=0`). Не включать без прямой просьбы.
 
 ## Генерация и 429
 
 - Image-вызовы сериализуются через `withImageSlot`, минимальный интервал `IMAGE_MIN_GAP_MS=10000`.
 - При 429 до 4 попыток с паузами 10/20/40 секунд и учётом `Retry-After`.
-- OpenRouter-аккаунт на 2026-10-29: остаток ~$3.36 из $30. При повторных 429 нужно пополнить или снизить частоту.
+- Баланс OpenRouter пополнен (актуальный остаток смотреть в кабинете OpenRouter). При повторных 429 снижать частоту.
 - После ошибки рендера кредит возвращается автоматически.
 
 ## Подбор товаров
@@ -74,13 +75,17 @@
 - VPS: `/root/remontvision`, Docker Compose, `app` + `db`.
 - Публично: `https://www.remontvision.ru`.
 - Деплой: push в `main` → GitHub Actions → VPS.
-- Прод задеплоен на `afe13ad` (2026-10-30), smoke зелёный; стилей 17, активны 2.
-- Миграции: `001`–`027`.
-- Тесты: `npm test` — 53 теста. Frontend: `cd web && npm run lint && npm run build`.
+- Прод задеплоен на `afe13ad` (2026-10-30), smoke зелёный; в проде были активны 2 стиля.
+- Локально подготовлено, но ещё не задеплоено: арт-директор, 8 активных стилей (`028`), `use_catalog=false` по умолчанию, `estimate-room` с типом комнаты и стилями, UI-тюнинг (бриф комнаты, «Дополнительно», авторский бриф на результате), FLUX 3 Image 1K.
+- Текущая модель рендера: **FLUX 3 Image 1K**; прогон 10 сценариев — 10/10 ok, $0.5093, vision-QA в среднем style 9.20 / photo 8.70 / arch 9.80 / scale 8.80 / authorial 8.20.
+- Миграции: `001`–`029` (`029` фиксирует `model.render = black-forest-labs/flux-3-image`, `resolution = 1K` в `app_settings` при деплое).
+- Тесты: `npm test` — 56 тестов. Frontend: `cd web && npm run lint && npm run build`.
 - Размеры комнаты/кровати, `scalePlan` и radiator-cover блоки подключены к `buildPrompt`; скандинавский style brief — в `styles.prompt_description`.
+- Scale plan исправлен: детская — кровать 90–140 см (не king), спальня 3.0 м — 160 см, проходы считаются от реального запаса по бокам (`side = (width - bedWidth/100) / 2`).
 - Ширина/длина/высота комнаты спрашиваются у пользователя для всех типов; длина кровати — только для спальни/детской, по умолчанию 2.0 м, для остальных комнат игнорируется.
-- `POST /api/estimate-room` оценивает размеры по фото через vision (типовые ориентиры), заполняет форму, но пользователь обязан проверить и поправить вручную.
-- 7 новых стилей 2026 добавлены неактивными в `027_trend_styles.sql`; включаются в админке «Стили».
+- `POST /api/estimate-room` через `analyzeRoomBrief()` оценивает размеры, определяет тип комнаты и предлагает 2–3 стиля; бриф запускается автоматически при загрузке фото (401 молча игнорируется) и по кнопке, заполняет форму. Пользователь проверяет и правит.
+- Демо-каталог/смета по умолчанию выключены: `use_catalog=false` (frontend, server fallback, `rooms.use_catalog` default, миграция `028`).
+- 7 новых стилей 2026 добавлены в `027_trend_styles.sql`; миграция `028` активирует кураторский набор из 8 (scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean).
 - Типы комнат: справочник в `app_settings.roomtypes.config.v1`, админка «Комнаты», дефолты в `src/roomtypes.js`; `/api/room-types` отдаёт только активные.
 - Health: `GET /api/health`.
 

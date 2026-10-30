@@ -6,8 +6,15 @@ const { buildScalePlan, bedWidthForRoom } = await import('../src/scaleplan.js');
 test('bed width follows the narrow-room table', () => {
   assert.equal(bedWidthForRoom(2.1), 140);
   assert.equal(bedWidthForRoom(2.5), 160);
-  assert.equal(bedWidthForRoom(3.0), 180);
+  assert.equal(bedWidthForRoom(3.0), 160);
   assert.equal(bedWidthForRoom(4.0), 200);
+});
+
+test('children room gets a small bed and never a king', () => {
+  const plan = buildScalePlan({ roomType: 'Детская', width: 3.0, length: 4.0, height: 2.6, bedLength: 2 });
+  assert.match(plan, /120 cm wide bed/);
+  assert.match(plan, /single or small double bed/);
+  assert.match(plan, /never a king-size bed/);
 });
 
 test('narrow bedroom gets one walkway and wall-mounted bedside storage', () => {

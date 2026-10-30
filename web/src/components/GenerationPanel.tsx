@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Share2,
   Search,
+  SlidersHorizontal,
   Upload,
   X,
   Zap,
@@ -33,19 +34,37 @@ type Surface = {
 type ElectricalItem = { title: string; text: string }
 type Suggestion = { target: string; label: string; product_id: number; image_url?: string | null }
 type Analysis = { surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[] }
+type ArtDirection = {
+  palette?: { hex?: string | null; name?: string }[]
+  focalPoint?: string
+  featureWall?: string
+  lighting?: string
+  mood?: string
+}
+type RoomBrief = {
+  roomType?: string
+  width?: number | null
+  length?: number | null
+  height?: number | null
+  confidence?: string
+  styles?: string[]
+  architecture?: { windows?: number | null; doors?: number | null; builtins?: string[]; radiators?: boolean; ceiling?: string }
+  furniture?: string[]
+  reasoning?: string
+}
 type RoomResult = {
   id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
   room_width_m?: number | null; room_length_m?: number | null; room_height_m?: number | null; bed_length_m?: number | null;
   dimension_orientation?: string | null;
   keep_furniture?: boolean; use_catalog?: boolean;
-  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null } | null;
+  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
 type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
   budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
-  keepFurniture?: boolean; useCatalog?: boolean;
+  keepFurniture?: boolean; useCatalog?: boolean; artDirection?: ArtDirection | null;
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
@@ -67,23 +86,6 @@ const defaultStylePresets: StylePreset[] = [
   { key: 'boho', name: 'Бохо', accent: 'terra' },
   { key: 'deco', name: 'Ар-деко', accent: 'terra' },
   { key: 'country', name: 'Кантри', accent: 'forest' },
-] as const
-
-const accents = [
-  { key: 'none', name: 'Без акцента', token: null },
-  { key: 'forest', name: 'Оливковый', token: '--pl-forest-2' },
-  { key: 'sand', name: 'Песочный', token: '--pl-sand-2' },
-  { key: 'terra', name: 'Терракота', token: '--pl-terra-2' },
-  { key: 'dust', name: 'Синева', token: '--pl-dust-3' },
-  { key: 'graphite', name: 'Графит', token: '--pl-graphite-2' },
-] as const
-
-const schemes = [
-  { key: 'none', name: 'Без фильтра' },
-  { key: 'mono', name: 'Монохром' },
-  { key: 'analogous', name: 'Аналоговая' },
-  { key: 'complementary', name: 'Комплементарная' },
-  { key: 'split', name: 'Сплит' },
 ] as const
 
 const refinePresets = [
@@ -114,18 +116,6 @@ function stepIndex(step: Step): number {
   return 3
 }
 
-function AccentDot({ token }: { token: string | null }) {
-  return (
-    <span
-      className="relative block size-6 shrink-0 overflow-hidden rounded-full border border-foreground/50"
-      style={token ? { background: `oklch(var(${token}))` } : undefined}
-      aria-hidden="true"
-    >
-      {!token && <span className="absolute left-1/2 top-1/2 h-px w-8 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-foreground/60" />}
-    </span>
-  )
-}
-
 export function GenerationPanel({
   open,
   initialRoomId = '',
@@ -150,6 +140,7 @@ export function GenerationPanel({
   const [estimateBusy, setEstimateBusy] = useState(false)
   const [estimateError, setEstimateError] = useState('')
   const [estimateNote, setEstimateNote] = useState('')
+  const [brief, setBrief] = useState<RoomBrief | null>(null)
   const [stylePresets, setStylePresets] = useState<StylePreset[]>(defaultStylePresets)
   const [photo, setPhoto] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -162,13 +153,11 @@ export function GenerationPanel({
   const [cleanupError, setCleanupError] = useState('')
   const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
   const [style, setStyle] = useState<string | null>(null)
-  const [accent, setAccent] = useState('none')
-  const [scheme, setScheme] = useState('none')
   const [priceTier, setPriceTier] = useState('comfort')
   const [keepFurniture, setKeepFurniture] = useState(true)
-  const [useCatalog, setUseCatalog] = useState(true)
+  const [useCatalog, setUseCatalog] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
-  const [schemeOpen, setSchemeOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
   const [refFile, setRefFile] = useState<File | null>(null)
   const [refName, setRefName] = useState('')
@@ -299,6 +288,7 @@ export function GenerationPanel({
             ratio: 4 / 3,
             pricesAsOf: d.prices_as_of,
             analysis: render.analysis || null,
+            artDirection: render.art_direction || null,
           }
           setIterations([next])
           setCurrentId(next.id)
@@ -340,9 +330,11 @@ export function GenerationPanel({
     setCleaned(null); setUseCleaned(true); setCleanupError('')
     setRoomType(null)
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
-    setEstimateNote(''); setEstimateError('')
+    setEstimateNote(''); setEstimateError(''); setBrief(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
-    setKeepFurniture(true); setUseCatalog(true)
+    setKeepFurniture(true); setUseCatalog(false)
+    // Агентский шаг: сразу читаем комнату по фото — тип, размеры и стиль.
+    void estimateBrief(nextFile, { auto: true })
   }
 
   const cleanupRoom = async () => {
@@ -367,33 +359,57 @@ export function GenerationPanel({
     }
   }
 
-  const estimateDimensions = async () => {
-    if (!file || estimateBusy) return
+  const estimateBrief = async (sourceFile: File, { auto = false } = {}) => {
+    if (!sourceFile || estimateBusy) return
     setEstimateBusy(true); setEstimateError(''); setEstimateNote('')
     try {
       const fd = new FormData()
-      fd.append('photo', file)
-      fd.append('room_type', roomType || 'Другое')
+      fd.append('photo', sourceFile)
+      fd.append('room_type', auto ? '' : (roomType || 'Другое'))
       const r = await fetch('/api/estimate-room', { method: 'POST', body: fd })
       const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { onRequireLogin(); return }
-      if (!r.ok) throw new Error(d.error || 'Не удалось оценить размеры')
-      if (d.width_m) setRoomWidthM(String(d.width_m))
-      if (d.length_m) setRoomLengthM(String(d.length_m))
-      if (d.height_m) setRoomHeightM(String(d.height_m))
-      if (d.bed_present && isBedRoom) setBedLengthM('2')
+      if (r.status === 401) { if (!auto) onRequireLogin(); return }
+      if (!r.ok) throw new Error(d.error || 'Не удалось оценить комнату')
+      const currentRoomType = auto ? null : roomType
+      const guessedRoomType = d.room_type_guess && roomTypes.includes(d.room_type_guess) ? d.room_type_guess : null
+      const effectiveRoomType = currentRoomType || guessedRoomType
+      if (guessedRoomType) setRoomType(prev => prev || guessedRoomType)
+      if (d.width_m) setRoomWidthM(prev => auto && prev ? prev : String(d.width_m))
+      if (d.length_m) setRoomLengthM(prev => auto && prev ? prev : String(d.length_m))
+      if (d.height_m) setRoomHeightM(prev => auto && prev ? prev : String(d.height_m))
+      if (d.bed_present && (effectiveRoomType === 'Спальня' || effectiveRoomType === 'Детская')) setBedLengthM(prev => auto && prev ? prev : '2')
       const confidence = d.confidence === 'high' ? 'высокая' : d.confidence === 'medium' ? 'средняя' : 'низкая'
+      const suggestedStyles = Array.isArray(d.style_suggestions)
+        ? d.style_suggestions
+            .map((item: { name?: string }) => item?.name)
+            .filter((name: string | undefined): name is string => Boolean(name) && stylePresets.some(p => p.name === name))
+            .slice(0, 3)
+        : []
+      if (suggestedStyles.length) setStyle(prev => prev || suggestedStyles[0])
+      setBrief({
+        roomType: guessedRoomType || undefined,
+        width: d.width_m ?? null,
+        length: d.length_m ?? null,
+        height: d.height_m ?? null,
+        confidence: d.confidence,
+        styles: suggestedStyles,
+        architecture: d.architecture && typeof d.architecture === 'object' ? d.architecture : undefined,
+        furniture: Array.isArray(d.existing_furniture) ? d.existing_furniture.filter((x: unknown): x is string => typeof x === 'string') : [],
+        reasoning: typeof d.reasoning === 'string' ? d.reasoning : undefined,
+      })
       if (d.width_m || d.length_m || d.height_m) {
-        setEstimateNote(`Оценка по фото: ${d.width_m || '—'} × ${d.length_m || '—'} м, потолок ${d.height_m || '—'} м. Уверенность: ${confidence}. Проверьте и поправьте вручную.${d.reasoning ? ` ${d.reasoning}` : ''}`)
+        setEstimateNote(`Оценка по фото, уверенность: ${confidence}. Проверьте и поправьте при необходимости.`)
       } else {
         setEstimateNote('Не удалось уверенно определить размеры — введите их вручную.')
       }
     } catch (e) {
-      setEstimateError(e instanceof Error ? e.message : 'Не удалось оценить размеры')
+      if (!auto) setEstimateError(e instanceof Error ? e.message : 'Не удалось оценить комнату')
     } finally {
       setEstimateBusy(false)
     }
   }
+
+  const estimateDimensions = () => { if (file) void estimateBrief(file) }
 
   const acceptRef = (nextFile?: File) => {
     if (!nextFile || !nextFile.type.startsWith('image/')) return
@@ -510,9 +526,6 @@ export function GenerationPanel({
         fd.append('price_tier', priceTier)
         fd.append('keep_furniture', cleaned && useCleaned ? '0' : (keepFurniture ? '1' : '0'))
         fd.append('use_catalog', useCatalog ? '1' : '0')
-        if (cleaned && useCleaned) fd.append('cleanup_photo', cleaned.file)
-        fd.append('palette', scheme)
-        fd.append('accent', accent)
         if (refFile) fd.append('style_ref', refFile)
         if (!refFile && refUrl) fd.append('style_ref_url', refUrl)
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
@@ -563,6 +576,7 @@ export function GenerationPanel({
         ratio: photoRatio,
         pricesAsOf: room.prices_as_of,
         analysis: render.analysis || null,
+        artDirection: render.art_direction || null,
       }
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
@@ -583,9 +597,9 @@ export function GenerationPanel({
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
-    setEstimateNote(''); setEstimateError(''); setEstimateBusy(false)
-    setStyle(null); setAccent('none'); setScheme('none'); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(true)
-    setCustomOpen(false); setSchemeOpen(false)
+    setEstimateNote(''); setEstimateError(''); setEstimateBusy(false); setBrief(null)
+    setStyle(null); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(false)
+    setCustomOpen(false); setAdvancedOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
     loadedRoomRef.current = ''
     clearEditRef()
@@ -670,6 +684,32 @@ export function GenerationPanel({
                   </div>
                 </div>
               )}
+              {photo && (estimateBusy || brief) && (
+                <div className="mt-5 border p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="eyebrow">Бриф комнаты</p>
+                    {estimateBusy ? (
+                      <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />Смотрим фото…</span>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">Уверенность: {brief?.confidence === 'high' ? 'высокая' : brief?.confidence === 'medium' ? 'средняя' : 'низкая'}</span>
+                    )}
+                  </div>
+                  {brief && (
+                    <>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                        {brief.roomType && <span className="border bg-muted px-2 py-1">Тип: {brief.roomType}</span>}
+                        {brief.width && brief.length && <span className="border bg-muted px-2 py-1">{brief.width} × {brief.length} м</span>}
+                        {brief.height && <span className="border bg-muted px-2 py-1">Потолок {brief.height} м</span>}
+                        {brief.architecture?.windows != null && <span className="border bg-muted px-2 py-1">Окон: {brief.architecture.windows}</span>}
+                        {brief.architecture?.doors != null && <span className="border bg-muted px-2 py-1">Дверей: {brief.architecture.doors}</span>}
+                        {brief.architecture?.radiators && <span className="border bg-muted px-2 py-1">Радиатор</span>}
+                      </div>
+                      {brief.styles?.length ? <p className="mt-3 text-xs leading-5 text-muted-foreground">Подойдут стили: <span className="text-foreground">{brief.styles.join(', ')}</span>. Первый уже выбран.</p> : null}
+                      {brief.reasoning ? <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{brief.reasoning}</p> : null}
+                    </>
+                  )}
+                </div>
+              )}
               {photo && roomType && (
                 <div className="mt-5 border p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -708,7 +748,7 @@ export function GenerationPanel({
             {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Можно не выбирать стиль — тогда загрузите свой референс ниже.</p>}
             <div className="mt-8 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3 lg:grid-cols-5">
               {stylePresets.map((item) => (
-                <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { setStyle(item.name); setAccent(item.accent) }} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => setStyle(item.name)} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
                   <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
                     <img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
                     {style === item.name && (
@@ -765,60 +805,41 @@ export function GenerationPanel({
               )}
             </div>
 
-            <div className="border border-t-0">
-              <button type="button" aria-expanded={schemeOpen} onClick={() => setSchemeOpen((value) => !value)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                <span className="flex items-center gap-3"><Info className="size-4 text-primary-text" />Цветовая схема и акцент{scheme !== 'none' || accent !== 'none' ? <span className="text-xs text-muted-foreground">· настроено</span> : null}</span>
-                <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${schemeOpen ? 'rotate-180' : ''}`} />
+            <div className="mt-8 border">
+              <button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(v => !v)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}{useCatalog ? ' · каталог' : ''}</span>
+                <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`} />
               </button>
-              {schemeOpen && (
+              {advancedOpen && (
                 <div className="border-t border-foreground/25 p-4">
-                  <div className="flex flex-wrap gap-2">
-                    {schemes.map((item) => (
-                      <button key={item.key} type="button" aria-pressed={scheme === item.key} onClick={() => setScheme(item.key)} className={`min-h-10 border px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${scheme === item.key ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>
-                        {item.name}
+                  <div className="flex items-end justify-between gap-4">
+                    <div><p className="eyebrow">Класс материалов</p><p className="mt-1 text-xs text-muted-foreground">Уровень отделки и мебели. Смета не собирается, пока каталог выключен.</p></div>
+                    <output className="text-lg font-light">{tierName(priceTier)}</output>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-px border bg-border">
+                    {priceTiers.map(item => (
+                      <button key={item.key} type="button" aria-pressed={priceTier === item.key} onClick={() => setPriceTier(item.key)} className={`min-h-16 bg-background px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${priceTier === item.key ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>
+                        <span className="block text-sm font-medium">{item.name}</span>
+                        <span className="mt-1 block text-[11px] leading-4 opacity-70">{item.short}</span>
                       </button>
                     ))}
                   </div>
-                  <p className="eyebrow mt-6">Акцентный цвет</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {accents.map((item) => (
-                      <button key={item.key} type="button" aria-pressed={accent === item.key} onClick={() => setAccent(item.key)} className={`flex min-h-11 items-center gap-2.5 border px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${accent === item.key ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>
-                        <AccentDot token={item.token} /> {item.name}
-                      </button>
-                    ))}
+                  <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description}</p>
+
+                  <div className="mt-6 grid gap-px border bg-border sm:grid-cols-2">
+                    <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${keepFurniture ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
+                      <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
+                      <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Сохраняем существующую мебель и планировку. Можно обновить отделку.' : 'Меняем мебель и отделку, сохраняя архитектуру, окна и двери.'}</span></span>
+                    </button>
+                    <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${useCatalog ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
+                      <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
+                      <span><span className="block text-sm font-medium">Использовать каталог</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'Подбираем реальные товары, показываем смету и ссылки.' : 'AI свободно проектирует интерьер. Смета и товары не собираются.'}</span></span>
+                    </button>
                   </div>
-                  <p className="mt-5 flex gap-2 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-4 shrink-0" />Схема и акцент передаются в генерацию: модель учтёт их при подборе цвета.</p>
+                  <p className="mt-3 text-[11px] leading-5 text-muted-foreground">Очистка комнаты применяется автоматически, когда «Оставить мебель» выключено.</p>
                 </div>
               )}
             </div>
-
-            <div className="mt-8 border p-4">
-              <div className="flex items-end justify-between gap-4">
-                <div><p className="eyebrow">Класс материалов</p><p className="mt-1 text-xs text-muted-foreground">Заменяет бюджет-сумму: подбираем товары уровня, а не «впихиваем в цифру»</p></div>
-                <output className="text-lg font-light">{tierName(priceTier)}</output>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-px border bg-border">
-                {priceTiers.map(item => (
-                  <button key={item.key} type="button" aria-pressed={priceTier === item.key} onClick={() => setPriceTier(item.key)} className={`min-h-16 bg-background px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${priceTier === item.key ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>
-                    <span className="block text-sm font-medium">{item.name}</span>
-                    <span className="mt-1 block text-[11px] leading-4 opacity-70">{item.short}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description} {useCatalog ? 'Итоговая смета может отличаться — она ориентировочная.' : 'Класс не используется: каталог выключен.'}</p>
-            </div>
-
-            <div className="mt-8 grid gap-px border bg-border sm:grid-cols-2">
-              <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${keepFurniture ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
-                <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
-                <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Сохраняем существующую мебель и планировку. Можно переобить и обновить отделку.' : 'Меняем мебель и отделку, но сохраняем архитектуру, окна, двери и планировку.'}</span></span>
-              </button>
-              <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${useCatalog ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
-                <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
-                <span><span className="block text-sm font-medium">Использовать каталог</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'Подбираем реальные товары, показываем смету и ссылки.' : 'AI свободно придумывает интерьер. Смета и товары не собираются.'}</span></span>
-              </button>
-            </div>
-            <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Очистка комнаты включена по умолчанию в админке. Она применяется только когда «Оставить мебель» выключено.</p>
 
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
@@ -828,13 +849,7 @@ export function GenerationPanel({
                 type="button"
                 disabled={busy || (!style && !refFile && !refUrl)}
                 onClick={() => {
-                  const schemeName = schemes.find(item => item.key === scheme)?.name
-                  const accentName = accents.find(item => item.key === accent)?.name
-                  const request = [
-                    style ? `Стиль: ${style}` : 'Стиль по референсу',
-                    scheme !== 'none' ? `схема: ${schemeName}` : '',
-                    accent !== 'none' ? `акцент: ${accentName}` : '',
-                  ].filter(Boolean).join('; ')
+                  const request = style ? `Стиль: ${style}` : 'Стиль по референсу'
                   void startGeneration(request, style ?? 'Референс пользователя')
                 }}
                 className="action-primary min-h-14 px-8 text-base disabled:opacity-40"
@@ -896,6 +911,28 @@ export function GenerationPanel({
                   <span className="text-muted-foreground">{current.useCatalog === false ? 'Каталог отключён · смета не формируется' : `Класс «${tierName(current.priceTier)}» · подборка ${rub(current.total)}`}</span>
                   <span className="text-muted-foreground">{current.useCatalog === false ? 'Свободный дизайн' : 'Итог ориентировочный'}</span>
                 </div>
+                {current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
+                  <section className="mt-6 border p-4" aria-labelledby="art-direction">
+                    <p id="art-direction" className="eyebrow">Авторский бриф</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Направление, которое арт-директор написал по вашему фото и стилю.</p>
+                    {current.artDirection.palette?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {current.artDirection.palette.map((color, index) => (
+                          <span key={`${color.hex || color.name}-${index}`} className="inline-flex items-center gap-2 border bg-background px-2 py-1 text-[11px]">
+                            <span className="size-4 shrink-0 border" style={{ background: color.hex || 'transparent' }} aria-hidden="true" />
+                            {color.name || color.hex}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <dl className="mt-4 grid gap-3 text-xs leading-5 sm:grid-cols-2">
+                      {current.artDirection.focalPoint ? <div><dt className="eyebrow">Акцент</dt><dd className="mt-1">{current.artDirection.focalPoint}</dd></div> : null}
+                      {current.artDirection.featureWall ? <div><dt className="eyebrow">Стена</dt><dd className="mt-1">{current.artDirection.featureWall}</dd></div> : null}
+                      {current.artDirection.lighting ? <div><dt className="eyebrow">Свет</dt><dd className="mt-1">{current.artDirection.lighting}</dd></div> : null}
+                      {current.artDirection.mood ? <div><dt className="eyebrow">Настроение</dt><dd className="mt-1">{current.artDirection.mood}</dd></div> : null}
+                    </dl>
+                  </section>
+                ) : null}
                 {heroItems.length ? (
                   <section className="mt-6 border p-4" aria-labelledby="hero-products">
                     <p id="hero-products" className="eyebrow">Привязать товар к этому кадру</p>

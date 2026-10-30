@@ -7,22 +7,32 @@ const fmt = value => String(Math.round(value * 100) / 100);
 
 export function bedWidthForRoom(width) {
   if (width < 2.2) return 140;
-  if (width < 2.8) return 160;
-  if (width < 3.4) return 180;
+  if (width < 3.4) return 160;
+  if (width < 3.8) return 180;
   return 200;
 }
 
-function bedroomPlan({ width, length, height, bedLength }) {
-  const bedWidth = bedWidthForRoom(width);
-  const lines = [`Bedroom: choose a ${bedWidth} cm wide bed for a ${fmt(width)} m wide room.`];
+export function childBedWidthForRoom(width) {
+  if (width < 2.4) return 90;
+  if (width < 3.2) return 120;
+  return 140;
+}
+
+function bedroomPlan({ width, length, height, bedLength, child = false }) {
+  const bedWidth = child ? childBedWidthForRoom(width) : bedWidthForRoom(width);
+  const side = (width - bedWidth / 100) / 2;
+  const lines = [`${child ? "Children's room" : 'Bedroom'}: choose a ${bedWidth} cm wide bed for a ${fmt(width)} m wide room.`];
   if (bedLength) lines.push(`The bed's overall external length must be exactly ${fmt(bedLength)} m including the frame.`);
-  if (width < 2.2) {
-    lines.push('Keep the headboard on the longest solid wall, leave one 30–40 cm walkway, use wall-mounted bedside shelves instead of freestanding nightstands, and prefer under-bed storage over a floor wardrobe.');
-  } else if (width < 2.8) {
-    lines.push('Leave 40–60 cm walkable passages on both sides and use compact 40 cm nightstands; add a wardrobe only if it leaves at least 60 cm of passage.');
+  if (side < 0.5) {
+    lines.push('Tight sides: use wall-mounted bedside shelves instead of freestanding nightstands, leave one 30–40 cm walkway, and prefer under-bed storage over a floor wardrobe.');
+  } else if (side < 0.75) {
+    lines.push('Use compact 30–40 cm nightstands or wall-mounted shelves and keep at least 30 cm of clear passage on both sides; add a wardrobe only if it leaves a 60 cm path.');
+  } else if (side < 1.0) {
+    lines.push('Use two 40 cm nightstands and keep at least 40 cm of clear passage on both sides; add storage only if it preserves a 60 cm path.');
   } else {
-    lines.push('Leave at least 60 cm on both sides and use two 40–45 cm nightstands; add storage only if it preserves a 60 cm path.');
+    lines.push('Use two 40–45 cm nightstands and keep generous passages on both sides; add storage only if it preserves a 60 cm path.');
   }
+  if (child) lines.push('Use a single or small double bed (90–140 cm), never a king-size bed; keep a clear play zone and child-height storage.');
   if (bedLength && length < bedLength + 1.2) {
     lines.push('Omit a bench or storage at the foot of the bed and keep at least 60 cm between the bed foot and the opposite wall or door.');
   } else if (bedLength) {
@@ -108,7 +118,9 @@ export function buildScalePlan({ roomType = '', width, length, height, bedLength
     'Minimum clear circulation is 60 cm; 80 cm is comfortable. Keep door swings, windows, heating controls and ventilation clear.',
   ];
 
-  if (/спальн|детск|bedroom/i.test(name)) {
+  if (/детск|child/i.test(name)) {
+    lines.push(bedroomPlan({ width: w, length: l, height: h, bedLength: b, child: true }));
+  } else if (/спальн|bedroom/i.test(name)) {
     lines.push(bedroomPlan({ width: w, length: l, height: h, bedLength: b }));
   } else if (/гостин|зал|living/i.test(name)) {
     lines.push(livingPlan({ width: w, height: h }));

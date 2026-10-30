@@ -56,7 +56,7 @@ test('dimensions, bed length and radiator covers are injected as mandatory block
   assert.match(prompt, /height: 2.5 metres/);
   assert.match(prompt, /width is the window wall/);
   assert.match(prompt, /SCALE PLAN/);
-  assert.match(prompt, /180 cm wide bed/);
+  assert.match(prompt, /160 cm wide bed/);
   assert.match(prompt, /BED SIZE/);
   assert.match(prompt, /exactly 2 metres/);
   assert.match(prompt, /RADIATOR COVERS/);
@@ -168,4 +168,21 @@ test('edit prompt preserves built-ins and room geometry', () => {
   assert.match(prompt, /LOCKED INVARIANTS/);
   assert.match(prompt, /Built-in shelving/);
   assert.match(prompt, /Do not move objects/);
+});
+
+test('bespoke art direction is injected after the architecture lock', () => {
+  const prompt = buildPrompt({
+    style: 'Джапанди',
+    roomType: 'Спальня',
+    artDirection: 'Warm plaster walls, smoked oak bed, undyed linen textiles and 2700K pools of light.',
+  });
+  assert.match(prompt, /ART DIRECTION — BESPOKE FOR THIS ROOM/);
+  assert.match(prompt, /Warm plaster walls, smoked oak bed/);
+  assert.match(prompt, /keep the architecture/i);
+  assert.ok(prompt.indexOf('ARCHITECTURE LOCK') < prompt.indexOf('ART DIRECTION — BESPOKE'));
+});
+
+test('no art direction block when the art director did not run', () => {
+  const prompt = buildPrompt({ style: 'Джапанди', roomType: 'Спальня' });
+  assert.doesNotMatch(prompt, /ART DIRECTION/);
 });

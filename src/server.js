@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { q, migrate } from './db.js';
 import { startWorker, enqueueRender } from './jobs.js';
-import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect, estimateRoomDimensions } from './openrouter.js';
+import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect } from './openrouter.js';
+import { analyzeRoomBrief } from './artdirector.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
 import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
@@ -144,10 +145,22 @@ function productLink(p) {
 }
 
 const STATIC_STYLE_KEYS = new Set(['modern', 'scandi', 'loft', 'japandi', 'neo', 'minimal', 'dark', 'boho', 'deco', 'country']);
+// Новые стили 2026 показываем ближайшей существующей обложкой, пока нет своих ассетов.
+const STYLE_IMAGE_ALIASES = {
+  'wabi-sabi': 'japandi',
+  'organic': 'minimal',
+  'warm-minimal': 'scandi',
+  'biophilic': 'country',
+  'heritage': 'neo',
+  'maximalism': 'deco',
+  'mediterranean': 'deco',
+};
 
 function styleImageUrl(style) {
   if (style.preset_image_path) return `/style-images/${path.basename(style.preset_image_path)}`;
-  return STATIC_STYLE_KEYS.has(style.key) ? `/images/style-${style.key}.webp` : '/images/style-modern.webp';
+  if (STATIC_STYLE_KEYS.has(style.key)) return `/images/style-${style.key}.webp`;
+  const alias = STYLE_IMAGE_ALIASES[style.key];
+  return alias ? `/images/style-${alias}.webp` : '/images/style-modern.webp';
 }
 
 function styleDto(style) {
@@ -955,13 +968,18 @@ app.post('/api/estimate-room', rateLimit, upload.single('photo'), h(async (req, 
   if (MOCK_MODE) {
     return res.json({
       width_m: 3, length_m: 4, height_m: 2.7, bed_present: /спальн|детск/i.test(roomType),
-      confidence: 'low', reasoning: 'Mock-оценка для локальной разработки', assumptions: [], cost_usd: 0,
+      confidence: 'low', room_type_guess: roomType || 'Гостиная (зал)', room_type_confidence: 'low',
+      style_suggestions: [], architecture: {}, existing_furniture: [],
+      reasoning: 'Mock-оценка для локальной разработки', assumptions: [], cost_usd: 0,
     });
   }
   const clean = await sanitizeImage(photo.buffer);
-  const out = await estimateRoomDimensions(clean.toString('base64'), photo.mimetype, { roomType });
-  log({ event: 'room_estimate', room_type: roomType, width_m: out.width_m, length_m: out.length_m, height_m: out.height_m, confidence: out.confidence, cost_usd: out.cost ?? null });
-  res.json({ ...out, cost_usd: out.cost ?? null });
+  const out = await analyzeRoomBrief({
+    imageDataUrl: `data:${photo.mimetype};base64,${clean.toString('base64')}`,
+    roomType,
+  });
+  log({ event: 'room_brief', room_type: roomType, guess: out?.room_type_guess, width_m: out?.width_m, length_m: out?.length_m, height_m: out?.height_m, confidence: out?.confidence, styles: out?.style_suggestions?.map(s => s.name).join('|') || '', cost_usd: out?.cost ?? null });
+  res.json({ ...out, cost_usd: out?.cost ?? null });
 }));
 
 app.post('/api/rooms', rateLimit, upload.fields([
@@ -1010,7 +1028,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
     ? fallback
     : !(value === false || value === 0 || value === '0' || value === 'false' || value === 'off');
   const keepFurniture = bool(req.body.keep_furniture, true);
-  const useCatalog = bool(req.body.use_catalog, true);
+  const useCatalog = bool(req.body.use_catalog, false);
   const optionalMeasure = (value, min, max) => {
     const raw = String(value ?? '').replace(',', '.').trim();
     if (!raw) return null;
@@ -1102,6 +1120,13 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       model: render.model,
       edit_target: render.edit_target || null,
       analysis: render.analysis || null,
+      art_direction: render.meta?.art_direction ? {
+        palette: render.meta.art_direction.palette || [],
+        focalPoint: render.meta.art_direction.focalPoint || '',
+        featureWall: render.meta.art_direction.featureWall || '',
+        lighting: render.meta.art_direction.lighting || '',
+        mood: render.meta.art_direction.mood || '',
+      } : null,
       product_qa: render.meta?.product_qa ? {
         status: render.meta.product_qa.status,
         accepted: render.meta.product_qa.accepted,

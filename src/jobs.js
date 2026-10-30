@@ -19,6 +19,7 @@ import { modelCaps } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
+import { buildArtDirection } from './artdirector.js';
 
 const ARCHITECTURE_QA_ENABLED = /^(1|true|yes|on)$/i.test(process.env.ARCHITECTURE_QA_ENABLED || '');
 import { putBuffer, getBuffer } from './storage.js';
@@ -108,6 +109,7 @@ async function processRender(renderId) {
     log({ event: 'render_start', room_id: room.id, render_id: renderId, iteration, target: render.edit_target || null, price_tier: priceTier, keep_furniture: keepFurniture, use_catalog: useCatalog });
 
     let prompt;
+    let artDirectionCost = 0;
     let curated = [];
     let styleInfo = null;
     let imageMap = [];
@@ -201,6 +203,32 @@ async function processRender(renderId) {
         }
       }
 
+      // Арт-директор читает реальное фото и пишет bespoke-направление под стиль.
+      // Без него дизайн скатывается к шаблонному «стиль + нейтральная комната».
+      let artDirection = '';
+      if (!MOCK_MODE) {
+        try {
+          const adStart = Date.now();
+          const adBuf = await getBuffer(room.photo_path || sourceStored);
+          const ad = await buildArtDirection({
+            imageDataUrl: await bufferToDataUrl(adBuf),
+            roomType,
+            style: room.style,
+            styleDescription: styleInfo?.prompt_description || '',
+            dimensions: roomDimensions,
+            keepFurniture,
+          });
+          if (ad?.text) {
+            artDirection = ad.text;
+            artDirectionCost = ad.cost || 0;
+            meta.art_direction = { ...ad, ms: Date.now() - adStart };
+            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
+          }
+        } catch (e) {
+          log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+
       prompt = buildPrompt({
         style: room.style,
         priceTier,
@@ -216,6 +244,7 @@ async function processRender(renderId) {
         useCatalog,
         imageMap,
         dimensions: roomDimensions,
+        artDirection,
       });
 
       referenceImagesB64 = styleRefUrls;
@@ -296,7 +325,7 @@ async function processRender(renderId) {
         referenceImagesB64,
         aspectRatio,
       });
-      imageB64 = out.b64; cost = (cleanupCost || 0) + (out.cost || 0); model = out.model || null;
+      imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
       let architectureQa = null;
       if (ARCHITECTURE_QA_ENABLED && !iteration) {
         try {

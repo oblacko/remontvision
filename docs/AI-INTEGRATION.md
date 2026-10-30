@@ -6,9 +6,9 @@
 
 ## Текущая конфигурация
 
-- Render: `black-forest-labs/flux-3-image`, 1K, aspect auto (значение из админки).
+- Render: FLUX 3 Image 1K (значение из `app_settings`/`.env`; код-дефолт `black-forest-labs/flux-3-image`).
 - Cleanup: `black-forest-labs/flux-3-image-klein`, 1K, auto (только при `keep_furniture=false`).
-- Vision: `google/gemini-3-flash-preview` (в проде `google/gemini-3-flash-preview`).
+- Vision: `google/gemini-3-flash-preview`; он же пишет авторский art direction по фото (`src/artdirector.js`).
 - Модели хранятся в `app_settings` и меняются в админке «Модели».
 - Прокси — `src/proxy.js`, применяется без рестарта.
 
@@ -24,11 +24,22 @@ export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabe
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio });
 export async function generateFromText({ prompt, aspectRatio }); // shells для style refs
 export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect });
+export async function visionJson({ system, user, images, model }); // JSON-ответ vision-модели
+export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture }); // src/artdirector.js
+export async function analyzeRoomBrief({ imageDataUrl, roomType }); // src/artdirector.js
 export async function parseRender(renderB64, mime);
 export function matchCatalog(items, products);
 export function snapAspect(width, height, allowed);
 export const MAX_REFERENCES; // 4
 ```
+
+## Арт-директор
+
+`src/artdirector.js` — отдельный vision-проход, который смотрит на реальное фото и пишет bespoke-направление под выбранный стиль: палитру, focal point, feature wall, материалы, свет, текстиль, декор и `avoid`. Блок `ART DIRECTION` вставляется в `buildPrompt()` сразу после `ARCHITECTURE LOCK`; он не может отменять блокировку архитектуры и план масштаба.
+
+- `buildArtDirection()` вызывается в `jobs.js` для базового рендера, пока `ART_DIRECTION_ENABLED` не выключен (`0/false`).
+- Стоимость vision-вызова добавляется в `renders.cost_usd`, результат — в `renders.meta.art_direction`.
+- `analyzeRoomBrief()` использует `POST /api/estimate-room`: оценка размеров + тип комнаты + 2–3 рекомендованных стиля; кнопка в генераторе подставляет их в форму.
 
 ## Возможности моделей
 

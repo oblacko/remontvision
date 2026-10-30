@@ -12,7 +12,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 | Блок | Состояние |
 |---|---|
-| Генерация по фото | Работает: FLUX 3 Image, 1K, aspect auto |
+| Генерация по фото | Работает: FLUX 3 Image 1K (app_settings/.env) |
 | Vision-разбор | Работает: Gemini 3 Flash |
 | Стили и room types | 17 стилей в БД (2 активных, 7 новых неактивны), 12 типов комнат; типы, размеры и радиаторы управляются в админке |
 | Hero-референсы стилей | 120 сгенерировано, 26 approved (пилот 5 стилей × 6 комнат) |
@@ -104,7 +104,7 @@ npm test
 | БД | PostgreSQL 16 |
 | Очередь | Postgres + воркер `src/jobs.js` |
 | Файлы | диск или S3 (`src/storage.js`) |
-| AI | OpenRouter: FLUX 3 Image, FLUX 3 Image Klein (cleanup), Gemini 3 Flash |
+| AI | OpenRouter: FLUX 3 Image 1K (app_settings/.env), FLUX 3 Image Klein (cleanup), Gemini 3 Flash (vision + арт-директор) |
 | Почта | Resend / SMTP |
 | Платежи | Robokassa / ЮKassa |
 | Инфраструктура | Docker Compose, Nginx, Let's Encrypt, GitHub Actions |
