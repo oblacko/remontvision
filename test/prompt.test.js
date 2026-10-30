@@ -158,7 +158,7 @@ test('base prompt locks architecture and avoids structural additions', () => {
   assert.match(prompt, /Built-ins are architecture, not furniture/);
   assert.match(prompt, /Do not add a second window/);
   assert.match(prompt, /Ignore all architecture in the reference/);
-  assert.match(prompt, /cosmetic renovation/);
+  assert.match(prompt, /room envelope is locked/);
   assert.doesNotMatch(prompt, /deep renovation/);
   assert.doesNotMatch(prompt, /warm cove or wall wash|headboard ledge|hide the cornice/);
 });

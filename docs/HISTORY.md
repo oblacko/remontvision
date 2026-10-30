@@ -4,6 +4,17 @@
 
 Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
 
+## 2026-10-30 — разгрузка промта: убраны конфликты
+
+- Один источник геометрии: `FURNITURE PLAN` после `layoutCorrection`; `FURNITURE PLACEMENT` и generic `SCALE PLAN` больше не спорят с планом (остались только fallback без плана).
+- Один свет: generic `LIGHTING` / `LIGHTING + WINDOWS` не добавляются при наличии `ART DIRECTION`; радиатор — один режим с явным приоритетом.
+- Одна концепция: `STYLE BRIEF` заменён на `STYLE FAMILY` + `ART DIRECTION`; legacy palette/accent не добавляются при наличии art direction.
+- Вместо `3–5 vignettes` / `no empty walls` / `no empty shelves` — `VISUAL HIERARCHY` + `CONTROLLED DENSITY`.
+- `HUMAN TRACE`: одна книга + одна чашка; кот/ноутбук/тапочки убраны из дефолта.
+- `MATERIAL CHARACTER` берётся из art direction; `OUTPUT` сокращён (без 24–35mm/golden hour/8k/medium format), камера источника сохраняется.
+- Legacy-поля `pinterest`/`photo`/`avoid` в админке помечены как неактивные и не инжектятся.
+- Живой тест на подростковой 2.6×4.2: single bed 90, desk 120, дверь/мурал, QA quality 9/10 accepted; был один retry, стоимость $0.109.
+
 ## 2026-10-30 — почему дизайн стал хуже: Klein вместо FLUX
 
 - Убран лишний второй вход дизайнера: раньше при очистке в image-модель отправлялись и shell, и оригинал. Оригинал теперь читает только арт-директор/QA; дизайнер получает shell + style ref, иначе модель смешивает старую мебель/отделку с новой планировкой.

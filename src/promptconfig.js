@@ -8,14 +8,14 @@ export const PROMPT_FIELDS = [
   { key: 'radiators', label: 'Радиаторы', help: 'Вентилируемые экраны; не выдумывать радиаторы и не закрывать вентиляцию.' },
   { key: 'cleanup', label: 'Уборка и техника', help: 'Что убрать/спрятать: радиатор, ТВ, провода, старые вещи.' },
   { key: 'window', label: 'Окна и текстиль', help: 'Шторы, жалюзи, карнизы, тюль.' },
-  { key: 'pinterest', label: 'Pinterest-стайлинг', help: 'Арт, полки, мелочи, техника, плюш, 3–5 сцен.' },
-  { key: 'photo', label: 'Фотография', help: 'Камера, свет, плёнка, color grading, запрет CGI.' },
+  { key: 'pinterest', label: 'Pinterest-стайлинг (legacy)', help: 'Не участвует в текущем промте; заменён на VISUAL HIERARCHY / CONTROLLED DENSITY.' },
+  { key: 'photo', label: 'Фотография (legacy)', help: 'Не участвует: OUTPUT теперь фиксированный и сохраняет камеру источника.' },
   { key: 'furnitureOn', label: 'Мебель: оставить', help: 'Правило, когда «Оставить мебель» включено.' },
   { key: 'furnitureOff', label: 'Мебель: не учитывать', help: 'Правило, когда мебель можно убрать/заменить.' },
   { key: 'catalogOn', label: 'Каталог: включён', help: 'Как использовать товары и смету.' },
   { key: 'catalogOff', label: 'Каталог: выключен', help: 'Свободный дизайн без товаров.' },
   { key: 'extra', label: 'Дополнительно', help: 'Свободный текст, добавляется в конец art direction.' },
-  { key: 'avoid', label: 'Запреты', help: 'Негативный список в конце промта.' },
+  { key: 'avoid', label: 'Запреты (legacy)', help: 'Не участвует: критичные запреты встроены в OUTPUT.' },
 ];
 
 export const DEFAULT_PROMPT_CONFIG = {

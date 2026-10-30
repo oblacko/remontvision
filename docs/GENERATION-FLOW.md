@@ -49,7 +49,7 @@ flowchart TD
   REF --> PROMPT
   SW --> PROMPT
   ADT --> PROMPT
-  PROMPT --> PBLOCKS["TASK · ARCHITECTURE LOCK · ART DIRECTION · SCALE · KEEP/CHANGE · STYLE · MATERIALS · OUTPUT/AVOID"]
+  PROMPT --> PBLOCKS["TASK · ARCHITECTURE LOCK · ART DIRECTION · FURNITURE PLAN · PROGRAM LOCK · VISUAL HIERARCHY · HUMAN TRACE · MATERIAL CHARACTER · OUTPUT"]
 
   PBLOCKS --> CLEAN{"keep_furniture=false<br/>и cleanup.enabled<br/>и нет shell?"}
   CLEAN -->|"да"| CLEANUP["generateCleanupRender: FLUX 3 Klein → empty/clean shell"]
@@ -88,7 +88,7 @@ flowchart TD
 3. **Фиксирует функцию:** `room_function` (teen/child/adult), `functional_zones` (sleep/study/storage/media), `keep_features` (мурал, встроенный шкаф), `bed_type` (single остаётся single).
 4. **Детерминированно проверяет арифметику:** `layoutCorrection` считает боковые проходы кровати, шкаф на боковой/задней стене и предмет напротив; при противоречии добавляет `LAYOUT CORRECTION` и уменьшает кровать/убирает шкаф. Текстовому плану арт-директора не доверяем.
 5. **Отделяет план от кадра:** `framing_note` описывает, что видит камера, но **не может скрывать двери/окна/стены** — только мебель/декор.
-6. **Дизайн-модель получает:** shell (если использовался) + style ref, `ART DIRECTION`, `FURNITURE PLAN`, `PROGRAM LOCK`, `VISIBLE COMPOSITION` и живые детали. Оригинал в генерацию не идёт.
+6. **Дизайн-модель получает:** shell (если использовался) + style ref, `ART DIRECTION`, `FURNITURE PLAN`, `PROGRAM LOCK`, `VISUAL HIERARCHY` / `CONTROLLED DENSITY`, `HUMAN TRACE` (книга + чашка), `MATERIAL CHARACTER` и короткий `OUTPUT`. Оригинал в генерацию не идёт.
 7. **QA размеров** (`assessDimensions`) проверяет габариты, проходы, функцию, тип кровати и сохранность дверей/окон; при провале — один retry с `DIMENSION CORRECTION`.
 
 Правильная последовательность:
@@ -117,11 +117,13 @@ flowchart TD
 | Класс материалов | `rooms.price_tier` → `src/pricing.js` | curate, MATERIAL CLASS, смета |
 | Размеры комнаты/кровати | `rooms.room_width_m/length_m/height_m/bed_length_m/dimension_orientation` | ROOM DIMENSIONS, `src/scaleplan.js`, BED SIZE |
 | Ориентация размеров | `rooms.dimension_orientation` | уточнение ширины/длины в промте |
-| Правила промта | `app_settings.prompt.rules.v1` + дефолты `src/promptconfig.js` | light, cleanup, windows, pinterest, photo, avoid |
+| Правила промта | `app_settings.prompt.rules.v1` + дефолты `src/promptconfig.js` | dimensions, scalePlan (fallback), bed (fallback), radiators, cleanup, window, furniture, catalog, extra. `pinterest`/`photo`/`avoid` — legacy, больше не инжектятся |
 | Арт-директор | `buildArtDirection(photo, roomType, styleDescription, dimensions, scalePlan)` → vision | `room_function`, `bed_type`, `functional_zones`, `keep_features`, `layout_items`, `layout_plan`, `framing_note`, `ART DIRECTION`; `renders.meta.art_direction` |
 | План мебели | `art_direction.layout_items` (`type`, `description`, `width_cm`, `depth_cm`, `height_cm`, `position`, `clearance_cm`) | блок `FURNITURE PLAN — HARD DIMENSIONS` в промте |
 | Программа комнаты | `room_function`, `functional_zones`, `keep_features`, `bed_type` | блок `PROGRAM LOCK`: sleep + study/desk + storage + media; single не апгрейдится до double; мурал/фичи сохраняются |
 | Валидатор планировки | `layoutCorrection` в `src/scaleplan.js` | проверяет боковые проходы <60 см, шкаф и предмет напротив; при противоречии добавляет `LAYOUT CORRECTION` и правит ширину кровати |
+| Художественный слой | `ART DIRECTION` + `VISUAL HIERARCHY` + `CONTROLLED DENSITY` + `HUMAN TRACE` + `MATERIAL CHARACTER` | один главный акцент, 1–2 поддерживающих, без заполнения всех поверхностей, 2 живые детали |
+| OUTPUT | код `buildPrompt` | сохраняет камеру источника, короткий список запретов; без 24–35mm/golden hour/8k/medium format |
 | Кадр | `art_direction.framing_note` | блок `VISIBLE COMPOSITION — DO NOT CRAM`: план на всю комнату, но в кадр не впихивать всё |
 | Оригинал | `rooms.photo_path` | только арт-директор и QA; в design-модель не передаётся, чтобы не смешивать старую мебель/отделку с новой планировкой |
 | Модель дизайна | `app_settings.model.render` > `RENDER_MODEL` > код-дефолт | `generateRender`, `renders.model` |

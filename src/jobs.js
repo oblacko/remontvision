@@ -164,6 +164,7 @@ export async function processRender(renderId) {
     let bedType = '';
     let functionalZones = [];
     let keepFeatures = [];
+    let materialsDirective = '';
 
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
@@ -268,6 +269,7 @@ export async function processRender(renderId) {
             bedType = ad.bedType || '';
             functionalZones = ad.functionalZones || [];
             keepFeatures = ad.keepFeatures || [];
+            materialsDirective = ad.materials || '';
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
@@ -299,6 +301,7 @@ export async function processRender(renderId) {
         bedType,
         functionalZones,
         keepFeatures,
+        materialsDirective,
       });
 
       // Дизайнер получает только очищенный shell (если он есть) и style ref.
