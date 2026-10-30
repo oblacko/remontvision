@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T17:20:15.023Z
+Generated: 2026-10-30T17:53:43.085Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -215,7 +215,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 59 тестов, Postgres не нужен
+npm test                                      # node:test, 62 теста, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -313,7 +313,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 59 тестов: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 62 теста: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing/validator, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -382,10 +382,11 @@ Last updated: 2026-10-30
 - Production deployed from `main` via GitHub Actions; migrations `001`–`030` (new migrations apply on deploy).
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
-- Art director (`src/artdirector.js`): a vision pass reads the **original photo** + SCALE PLAN and designs a dimension-valid layout. Returns `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` for the whole room, `framing_note` (what the camera sees) and `ART DIRECTION`. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
-- Layout-first: `buildPrompt` injects `FURNITURE PLAN — HARD DIMENSIONS` and `VISIBLE COMPOSITION — DO NOT CRAM`. The plan covers the whole room, but the frame shows only the visible subset; out-of-frame items may be omitted. When a shell is used, the design model also receives the original photo as a room-envelope reference.
-- Dimension QA: `assessDimensions` checks visible furniture fit, walkways, oversize and room widening; one retry on failure. Disable with `DIMENSION_QA_ENABLED=0`; cost in `renders.meta.cost_breakdown.dimension_qa`.
-- Admin «Логи» shows the art director text, layout plan, framing note, an object table (description + dimensions + clearance) and the designer prompt; cabinet «Авторский бриф» shows the object list.
+- Art director (`src/artdirector.js`): a vision pass reads the **original photo** + SCALE PLAN and designs a dimension-valid layout. Returns `room_function`, `bed_type`, `existing_fixtures`, `functional_zones`, `keep_features`, `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` for the whole room, `framing_note` and `ART DIRECTION`. Single beds must stay single; murals/features are kept. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
+- Layout validator (`layoutCorrection` in `src/scaleplan.js`): deterministic checks for bed side clearance (<60 cm), wardrobe on side/back wall and opposite items; adds `LAYOUT CORRECTION` and shrinks/removes conflicting furniture. The art director's arithmetic is never trusted.
+- Layout-first: `buildPrompt` injects `FURNITURE PLAN — HARD DIMENSIONS`, `PROGRAM LOCK` (sleep/study/storage/media, bed type, kept features) and `VISIBLE COMPOSITION — DO NOT CRAM`. The plan covers the whole room, but the frame shows only the visible subset; out-of-frame **furniture/decor** may be omitted. Architecture (doors, windows, walls, ceiling) must never be hidden or cropped out. When a shell is used, the design model also receives the original photo as a room-envelope reference.
+- Dimension QA: `assessDimensions` checks furniture fit, walkways, oversize, room widening, preserved functional program (desk/study), bed type (single stays single) and doors/windows; one retry on failure. Disable with `DIMENSION_QA_ENABLED=0`; cost in `renders.meta.cost_breakdown.dimension_qa`.
+- Admin «Логи» shows the art director text, room function, bed type, functional zones, kept features, layout plan, framing note, an object table (description + dimensions + clearance) and the designer prompt; cabinet «Авторский бриф» shows the object list.
 - Full generation cost: `renders.cost_usd` is the sum of all requests; `renders.meta.cost_breakdown` stores art_direction, cleanup, design, design_retry, architecture_qa, product_qa, render_analysis, dimension_qa and failed. Cabinet shows the total + breakdown and a fullscreen render viewer.
 - Room dimensions: user can enter width/length/height manually or use `POST /api/estimate-room`, which now also detects room type and suggests 2-3 styles. The brief runs automatically on photo upload (silent on 401) and prefills the form; the user confirms. Bed length is only for bedroom/children rooms and defaults to 2.0 m.
 - Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
@@ -2345,6 +2346,12 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
+
+## 2026-10-30 — postmortem: арт-директор терял функцию, кровать и дверь
+
+- Причина: в layout-first инвентаризация `existing_fixtures` собирала только окно/дверь/радиатор, а не стол/кровать/шкаф/мурал. План строил взрослую спальню с двуспальной кроватью 160 без рабочего места; `framing_note` разрешал убрать дверь за кадр; QA проверял только габариты и пропускал это.
+- Исправлено: инвентаризация всей мебели и зон, `room_function`, `bed_type`, `functional_zones`, `keep_features`; single bed не апгрейдится до double; мурал/фича сохраняются; framing note не может скрывать двери/окна; детерминированный `layoutCorrection` в `scaleplan.js` проверяет боковые проходы, шкаф и противоположные предметы; QA проверяет program/bed type/doors/windows.
+- Живой тест на подростковой комнате 2.6×4.2: single bed 90×200, desk 110×60, дверь и мурал сохранены, QA 10/10, $0.0591.
 
 ## 2026-10-30 — layout-first: план под размеры, кадр без впихивания, объекты в логах
 

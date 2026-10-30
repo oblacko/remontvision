@@ -1,13 +1,37 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { buildScalePlan, bedWidthForRoom } = await import('../src/scaleplan.js');
+const { buildScalePlan, bedWidthForRoom, layoutCorrection } = await import('../src/scaleplan.js');
 
 test('bed width follows the narrow-room table', () => {
   assert.equal(bedWidthForRoom(2.1), 140);
   assert.equal(bedWidthForRoom(2.5), 160);
   assert.equal(bedWidthForRoom(3.0), 160);
   assert.equal(bedWidthForRoom(4.0), 200);
+});
+
+test('layout validator catches a 160 bed with 50 cm sides in a 260 cm room', () => {
+  const correction = layoutCorrection([
+    { type: 'bed', widthCm: 160, depthCm: 200, position: 'back wall, centered' },
+  ], { width: 2.6, length: 4.5 }, { bedType: 'double' });
+  assert.match(correction, /50 cm/);
+  assert.match(correction, /140 cm/);
+});
+
+test('layout validator accepts a 140 bed with 60 cm sides', () => {
+  const correction = layoutCorrection([
+    { type: 'bed', widthCm: 140, depthCm: 200, position: 'back wall, centered' },
+  ], { width: 2.6, length: 4.5 }, { bedType: 'small_double' });
+  assert.equal(correction, '');
+});
+
+test('layout validator rejects a wardrobe that does not fit beyond the bed', () => {
+  const correction = layoutCorrection([
+    { type: 'bed', widthCm: 140, depthCm: 200, position: 'back wall, centered' },
+    { type: 'wardrobe', widthCm: 200, depthCm: 60, position: 'left wall, near entrance' },
+  ], { width: 2.6, length: 4.2 }, { bedType: 'small_double' });
+  assert.match(correction, /Wardrobe 200 cm/);
+  assert.match(correction, /420 cm long/);
 });
 
 test('children room gets a small bed and never a king', () => {

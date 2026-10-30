@@ -27,6 +27,9 @@ type PromptRow = {
     cleanup?: { model?: string; resolution?: string; cost_usd?: number | null; shell_path?: string; error?: string } | null;
     art_direction?: {
       text?: string; layoutPlan?: string; framingNote?: string;
+      roomFunction?: string; bedType?: string;
+      functionalZones?: Array<{ zone?: string; items?: string[]; position?: string }>;
+      keepFeatures?: string[];
       layoutItems?: Array<{ type?: string; description?: string; widthCm?: number | null; depthCm?: number | null; heightCm?: number | null; position?: string; clearanceCm?: number | null }>;
       palette?: Array<{ hex?: string | null; name?: string }>;
       focalPoint?: string; featureWall?: string; lighting?: string; mood?: string;
@@ -1150,6 +1153,9 @@ export default function Admin() {
                         <summary className="cursor-pointer text-xs text-muted-foreground">Арт-директор — что написал <span className="ml-2 underline">показать</span></summary>
                         <div className="mt-2 space-y-2 text-[11px] leading-5">
                           {p.meta.art_direction.text ? <p>{p.meta.art_direction.text}</p> : null}
+                          {p.meta.art_direction.roomFunction || p.meta.art_direction.bedType ? <p><b>Функция:</b> {p.meta.art_direction.roomFunction || '—'} · <b>Кровать:</b> {p.meta.art_direction.bedType || '—'}</p> : null}
+                          {p.meta.art_direction.functionalZones?.length ? <p><b>Зоны:</b> {p.meta.art_direction.functionalZones.map(zone => `${zone.zone || '—'}${zone.items?.length ? ` (${zone.items.join(', ')})` : ''}${zone.position ? ` · ${zone.position}` : ''}`).join('; ')}</p> : null}
+                          {p.meta.art_direction.keepFeatures?.length ? <p><b>Сохранить:</b> {p.meta.art_direction.keepFeatures.join('; ')}</p> : null}
                           {p.meta.art_direction.layoutPlan ? <p><b>План на всю комнату:</b> {p.meta.art_direction.layoutPlan}</p> : null}
                           {p.meta.art_direction.framingNote ? <p><b>Что видит камера:</b> {p.meta.art_direction.framingNote}</p> : null}
                           {p.meta.art_direction.layoutItems?.length ? (

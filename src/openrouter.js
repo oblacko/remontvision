@@ -236,6 +236,10 @@ export function buildPrompt({
   artDirection = '',
   layoutPlan = '',
   framingNote = '',
+  roomFunction = '',
+  bedType = '',
+  functionalZones = [],
+  keepFeatures = [],
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -256,6 +260,13 @@ export function buildPrompt({
   const furniturePlacement = wetRoom
     ? 'Follow the FURNITURE PLAN exactly. Keep at least 60 cm clear in front of every fixture; use compact fixtures; do not exceed the room width or block the door swing.'
     : 'Follow the FURNITURE PLAN exactly. Place each item only where the plan says; keep the stated walkways clear; do not place a bed, sofa or wardrobe wider or longer than the plan.';
+  const zonesText = (Array.isArray(functionalZones) ? functionalZones : [])
+    .map(zone => `${zone.zone}${zone.items?.length ? ` (${zone.items.join(', ')})` : ''}${zone.position ? ` at ${zone.position}` : ''}`)
+    .filter(Boolean).join('; ');
+  const featuresText = (Array.isArray(keepFeatures) ? keepFeatures : []).filter(Boolean).join('; ');
+  const programLock = (roomFunction || zonesText || featuresText || bedType)
+    ? `\nPROGRAM LOCK — KEEP THE FUNCTION\nThe source is a ${roomFunction || 'room'}${zonesText ? ` with these zones: ${zonesText}` : ''}. Keep the same functional program: sleep, study/desk, storage and media. Do not remove a desk/workspace or replace it with a lounge chair, bench or decorative nook. Bed type: ${bedType || 'keep the source bed type'}; do not upgrade a single/small bed to a double. The source bed type overrides the SCALE PLAN bed width: if the source is single/small, use 90–120/140 cm even if the generic plan says 160.${featuresText ? ` Keep these existing features unless the plan explicitly replaces them: ${featuresText}.` : ''}\n`
+    : '';
   const livedInDetails = /спальн|bedroom/i.test(roomName)
     ? 'slippers by the bed, a ceramic mug on the nightstand, an open book, a laptop on the desk, a soft throw, a cat curled on the bed or chair'
     : /гостин|зал|living/i.test(roomName)
@@ -340,7 +351,8 @@ ${architectureLock}
 ${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK, the scale plan or the furniture plan, keep the architecture, dimensions and furniture plan.\n${artDirection}\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
 ${layoutPlan ? `\nFURNITURE PLAN — HARD DIMENSIONS (OVERRIDES ART DIRECTION)\n${layoutPlan}\nUse exactly these furniture sizes, positions and walkways. Do not show furniture larger than the plan or block the stated walkways. If the ART DIRECTION suggests a larger item or a different position, follow this plan and shrink or remove the conflicting item. Keep the room the same physical width and do not widen it. The plan describes the WHOLE room, not the whole frame: the camera may see only part of it. Do not force out-of-frame items into the shot; omit them instead of cramming or moving them.\n` : ''}
-${framingNote ? `\nVISIBLE COMPOSITION — DO NOT CRAM\n${framingNote}\nThe camera sees only part of the room. Do not force every planned item into the frame; items outside the frame may be omitted. Do not move furniture just to make it visible. The image must read as a natural photo of the room, not a catalog of everything that fits.\n` : ''}
+${programLock}
+${framingNote ? `\nVISIBLE COMPOSITION — DO NOT CRAM\n${framingNote}\nThe camera sees only part of the room. Do not force every planned item into the frame; items outside the frame may be omitted. Do not move furniture just to make it visible. The image must read as a natural photo of the room, not a catalog of everything that fits.\nIMPORTANT: this exception applies ONLY to furniture and decor. NEVER hide, crop out, remove, move or repaint doors, windows, walls, ceiling, radiator or the room envelope. The door and window must remain exactly where they are in the source, even if the composition becomes tighter.\n` : ''}
 KEEP EXACTLY
 ${keep}.
 Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.
@@ -1018,34 +1030,49 @@ Image 1 — исходное фото. Image 2 — сгенерированны�
   };
 }
 
-export async function assessDimensions({ sourceImageUrl, renderImageUrl, roomType = '', dimensions = null, plan = '', framing = '' }) {
+export async function assessDimensions({ sourceImageUrl, renderImageUrl, roomType = '', dimensions = null, plan = '', framing = '', roomFunction = '', bedType = '', functionalZones = [], keepFeatures = [] }) {
   const w = Number(dimensions?.width) || 0;
   const l = Number(dimensions?.length) || 0;
   const h = Number(dimensions?.height) || 0;
-  const system = `Ты строгий QA-инженер по эргономике интерьера. Image 1 — исходная/пустая комната, Image 2 — рендер.
-Проверяй ТОЛЬКО то, что видно в кадре. Не требуй показать предметы, которые находятся вне кадра или за камерой: план описывает всю комнату, а кадр — только её часть.
+  const zones = (Array.isArray(functionalZones) ? functionalZones : [])
+    .map(zone => `${zone.zone}${zone.items?.length ? ` (${zone.items.join(', ')})` : ''}${zone.position ? ` at ${zone.position}` : ''}`)
+    .filter(Boolean).join('; ');
+  const features = (Array.isArray(keepFeatures) ? keepFeatures : []).filter(Boolean).join('; ');
+  const system = `Ты строгий QA-инженер по эргономике и архитектуре интерьера. Image 1 — исходная/пустая комната, Image 2 — рендер.
 Верни строго JSON:
-{"accepted":true|false,"score":0-10,"checks":{"furniture_fits":true|false,"walkways_clear":true|false,"no_oversized":true|false,"room_not_widened":true|false},"issues":["..."]}
+{"accepted":true|false,"score":0-10,"checks":{"furniture_fits":true|false,"walkways_clear":true|false,"no_oversized":true|false,"room_not_widened":true|false,"program_preserved":true|false,"bed_type_preserved":true|false,"doors_windows_preserved":true|false},"issues":["..."]}
 - furniture_fits: мебель по размеру соответствует комнате и плану.
 - walkways_clear: проходы не заблокированы; там, где это видно, минимум ~60 см.
 - no_oversized: нет кровати/дивана/шкафа, которые явно шире/длиннее комнаты или плана.
 - room_not_widened: комната не расширена и не растянута.
-Если предмета не видно в кадре — это НЕ ошибка. Не придумывай проблемы. Только JSON.`;
-  const user = `Комната: ${roomType || 'room'}. Размеры: ${w}×${l}×${h} м. План на всю комнату: ${plan || 'нет'}. Что видит камера: ${framing || 'определи по фото'}. Оцени видимую композицию.`;
+- program_preserved: сохранена функция комнаты и зоны. Если на фото есть письменный стол/study-зона или комната teen/child, в рендере должен быть стол/рабочее место; замена стола креслом/банкеткой — ошибка.
+- bed_type_preserved: если на фото односпальная/маленькая кровать, в рендере не должно быть двуспальной/king.
+- doors_windows_preserved: те же двери и окна, на тех же местах, не скрыты и не обрезаны.
+Исключение «предмет за кадром — не ошибка» относится ТОЛЬКО к мебели и декору. Архитектура (двери, окна, стены, потолок, радиатор, объём комнаты) всегда должна быть сохранена; если дверь/окно пропали, сдвинулись или скрыты — doors_windows_preserved=false.
+Не придумывай проблемы. Только JSON.`;
+  const user = `Комната: ${roomType || 'room'}. Функция: ${roomFunction || 'не указана'}. Размеры: ${w}×${l}×${h} м. Тип кровати: ${bedType || 'не указан'}. Зоны: ${zones || 'не указаны'}. Сохранить features: ${features || 'нет'}. План на всю комнату: ${plan || 'нет'}. Что видит камера: ${framing || 'определи по фото'}. Оцени видимую композицию и архитектуру.`;
   const { parsed, cost } = await visionJson({ system, user, images: [sourceImageUrl, renderImageUrl] });
   const checks = {
     furniture_fits: parsed.checks?.furniture_fits === true,
     walkways_clear: parsed.checks?.walkways_clear === true,
     no_oversized: parsed.checks?.no_oversized === true,
     room_not_widened: parsed.checks?.room_not_widened === true,
+    program_preserved: parsed.checks?.program_preserved === true,
+    bed_type_preserved: parsed.checks?.bed_type_preserved === true,
+    doors_windows_preserved: parsed.checks?.doors_windows_preserved === true,
   };
-  const accepted = parsed.accepted === true
-    || (checks.furniture_fits && checks.walkways_clear && checks.no_oversized && checks.room_not_widened);
+  const accepted = checks.furniture_fits
+    && checks.walkways_clear
+    && checks.no_oversized
+    && checks.room_not_widened
+    && checks.program_preserved
+    && checks.bed_type_preserved
+    && checks.doors_windows_preserved;
   return {
     accepted,
     score: Math.max(0, Math.min(10, Number(parsed.score) || 0)),
     checks,
-    issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 5) : [],
+    issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 6) : [],
     cost: cost ?? null,
   };
 }

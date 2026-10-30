@@ -20,7 +20,7 @@ import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
 import { buildArtDirection } from './artdirector.js';
-import { buildScalePlan } from './scaleplan.js';
+import { buildScalePlan, layoutCorrection } from './scaleplan.js';
 
 const ARCHITECTURE_QA_ENABLED = /^(1|true|yes|on)$/i.test(process.env.ARCHITECTURE_QA_ENABLED || '');
 const DIMENSION_QA_ENABLED = !/^(0|false|no|off)$/i.test(process.env.DIMENSION_QA_ENABLED || '');
@@ -160,6 +160,10 @@ export async function processRender(renderId) {
     // Эти поля нужны и базовому рендеру, и общему QA-блоку ниже.
     let layoutPlan = '';
     let framingNote = '';
+    let roomFunction = '';
+    let bedType = '';
+    let functionalZones = [];
+    let keepFeatures = [];
 
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
@@ -253,7 +257,17 @@ export async function processRender(renderId) {
           if (ad?.text) {
             artDirection = ad.text;
             layoutPlan = ad.layoutPlan || scalePlanInner;
+            const correction = layoutCorrection(ad.layoutItems || [], roomDimensions, { bedType: ad.bedType || '' });
+            if (correction) {
+              layoutPlan = `${layoutPlan}\n${correction}`;
+              meta.layout_correction = correction;
+              log({ event: 'layout_correction', room_id: room.id, render_id: renderId, correction });
+            }
             framingNote = ad.framingNote || '';
+            roomFunction = ad.roomFunction || '';
+            bedType = ad.bedType || '';
+            functionalZones = ad.functionalZones || [];
+            keepFeatures = ad.keepFeatures || [];
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
@@ -294,6 +308,10 @@ export async function processRender(renderId) {
         artDirection,
         layoutPlan,
         framingNote,
+        roomFunction,
+        bedType,
+        functionalZones,
+        keepFeatures,
       });
 
       referenceImagesB64 = (useCleanup || precleanedShell) && originalPhotoDataUrl
@@ -444,6 +462,10 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
             dimensions: roomDimensions,
             plan: layoutPlan,
             framing: framingNote,
+            roomFunction,
+            bedType,
+            functionalZones,
+            keepFeatures,
           });
           addCost('dimension_qa', dimensionQa.cost);
           log({ event: 'dimension_qa', room_id: room.id, render_id: renderId, accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
@@ -451,8 +473,8 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
             const retryPrompt = `${prompt}
 
 DIMENSION CORRECTION — HARD REQUIREMENT
-The previous attempt failed dimension QA: ${dimensionQa.issues.join('; ') || 'furniture does not fit the room'}.
-Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated furniture sizes and positions, keep the walkways clear, do not widen the room, and do not cram out-of-frame items into the shot. This correction overrides any conflicting styling instruction.`;
+The previous attempt failed dimension/program/architecture QA: ${dimensionQa.issues.join('; ') || 'the layout does not match the room'}.
+Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated furniture sizes and positions, keep the walkways clear, do not widen the room, and do not cram out-of-frame items into the shot. Keep the source functional program (desk/study, storage, media), keep the source bed type (single stays single), and keep the door and window exactly where they are in the source. Do not hide or crop out architecture. This correction overrides any conflicting styling instruction.`;
             out = await generateRender({
               prompt: retryPrompt,
               sourceImageB64: srcB64,
@@ -471,6 +493,10 @@ Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated f
               dimensions: roomDimensions,
               plan: layoutPlan,
               framing: framingNote,
+              roomFunction,
+              bedType,
+              functionalZones,
+              keepFeatures,
             });
             addCost('dimension_qa', dimensionQa.cost);
             log({ event: 'dimension_qa_retry', room_id: room.id, render_id: renderId, accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });

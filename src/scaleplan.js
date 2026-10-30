@@ -146,3 +146,61 @@ export function buildScalePlan({ roomType = '', width, length, height, bedLength
   lines.push('Do not overscale furniture, do not shrink it unnaturally and do not change the room dimensions to make the plan fit. If the requested layout is impossible, choose smaller furniture and show the honest compromise.');
   return lines.join('\n');
 }
+
+// Детерминированная проверка текстового плана арт-директора.
+// Модель часто пишет «80 см проход», хотя арифметика даёт 40–50 см.
+export function layoutCorrection(items = [], dimensions = null, { bedType = '' } = {}) {
+  const widthCm = Number(dimensions?.width) * 100;
+  const lengthCm = Number(dimensions?.length) * 100;
+  if (!widthCm || !Array.isArray(items) || !items.length) return '';
+  const bed = items.find(item => /bed|кровать/i.test(item.type || ''));
+  if (!bed) return '';
+  const notes = [];
+  const bedWidth = Number(bed.widthCm) || 0;
+  const bedDepth = Number(bed.depthCm) || 0;
+  const bedPosition = String(bed.position || '').toLowerCase();
+  const againstBack = /back wall|задн|centered|по центру/i.test(bedPosition);
+  const againstSide = /left wall|right wall|боков/i.test(bedPosition);
+
+  if (bedWidth && againstBack) {
+    const side = Math.round((widthCm - bedWidth) / 2);
+    if (side < 60) {
+      const maxBed = bedType === 'single' ? 120 : Math.max(90, Math.floor((widthCm - 120) / 10) * 10);
+      const target = Math.min(bedWidth, maxBed);
+      notes.push(`Bed ${bedWidth} cm against the back wall leaves only ${side} cm per side (<60 cm). Use a ${target} cm ${bedType === 'single' ? 'single' : 'small double'} bed so each side keeps at least 60 cm.`);
+    }
+  } else if (bedWidth && againstSide) {
+    const side = Math.round(widthCm - bedWidth);
+    if (side < 60) {
+      const target = Math.max(90, Math.floor((widthCm - 60) / 10) * 10);
+      notes.push(`Bed ${bedWidth} cm against the side wall leaves only ${side} cm on the other side (<60 cm). Use a ${target} cm bed or move the bed.`);
+    }
+  }
+
+  const storage = items.find(item => /wardrobe|storage|closet|шкаф|хран/i.test(item.type || ''));
+  if (storage) {
+    const storageWidth = Number(storage.widthCm) || 0;
+    const storageDepth = Number(storage.depthCm) || 0;
+    const storagePosition = String(storage.position || '').toLowerCase();
+    if (lengthCm && /left wall|right wall|боков/i.test(storagePosition) && bedDepth && storageWidth && bedDepth + storageWidth + 60 > lengthCm) {
+      notes.push(`Wardrobe ${storageWidth} cm on the side wall + bed length ${bedDepth} cm + 60 cm path needs ${bedDepth + storageWidth + 60} cm, but the room is ${Math.round(lengthCm)} cm long. Shrink or remove the wardrobe.`);
+    }
+    if (/back wall|задн/i.test(storagePosition) && storageWidth && bedWidth && bedWidth + storageWidth + 120 > widthCm) {
+      notes.push(`Wardrobe ${storageWidth} cm on the back wall + bed ${bedWidth} cm + side clearances needs ${bedWidth + storageWidth + 120} cm, but the room is ${Math.round(widthCm)} cm wide. Move the wardrobe to a side wall or remove it.`);
+    }
+    if (/opposite|напротив/i.test(storagePosition) && storageDepth && bedWidth && storageDepth + bedWidth + 60 > widthCm) {
+      notes.push(`Wardrobe ${storageDepth} cm deep opposite the bed + bed ${bedWidth} cm + 60 cm path needs ${storageDepth + bedWidth + 60} cm, but the room is ${Math.round(widthCm)} cm wide. Remove or shrink the wardrobe.`);
+    }
+  }
+
+  const opposite = items.find(item => item !== bed
+    && /storage|wardrobe|desk|sideboard|console|шкаф|стол|комод/i.test(item.type || '')
+    && /opposite|напротив/i.test(String(item.position || '').toLowerCase()));
+  if (opposite) {
+    const depth = Number(opposite.depthCm) || 0;
+    const walkway = Math.round(widthCm - bedWidth - depth);
+    if (walkway < 60) notes.push(`Bed ${bedWidth} cm + opposite ${opposite.type} ${depth} cm leaves only ${walkway} cm (<60 cm). Remove or shrink the opposite item, or reduce the bed.`);
+  }
+
+  return notes.length ? `LAYOUT CORRECTION — ${notes.join(' ')}` : '';
+}

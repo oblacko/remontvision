@@ -27,7 +27,7 @@
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 59 тестов, Postgres не нужен
+npm test                                      # node:test, 62 теста, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -125,7 +125,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 59 тестов: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 62 теста: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing/validator, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
