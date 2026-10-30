@@ -88,7 +88,7 @@ flowchart TD
 3. **Фиксирует функцию:** `room_function` (teen/child/adult), `functional_zones` (sleep/study/storage/media), `keep_features` (мурал, встроенный шкаф), `bed_type` (single остаётся single).
 4. **Детерминированно проверяет арифметику:** `layoutCorrection` считает боковые проходы кровати, шкаф на боковой/задней стене и предмет напротив; при противоречии добавляет `LAYOUT CORRECTION` и уменьшает кровать/убирает шкаф. Текстовому плану арт-директора не доверяем.
 5. **Отделяет план от кадра:** `framing_note` описывает, что видит камера, но **не может скрывать двери/окна/стены** — только мебель/декор.
-6. **Дизайн-модель получает:** shell/оригинал, `ART DIRECTION`, `FURNITURE PLAN`, `PROGRAM LOCK`, `VISIBLE COMPOSITION` и живые детали.
+6. **Дизайн-модель получает:** shell (если использовался) + style ref, `ART DIRECTION`, `FURNITURE PLAN`, `PROGRAM LOCK`, `VISIBLE COMPOSITION` и живые детали. Оригинал в генерацию не идёт.
 7. **QA размеров** (`assessDimensions`) проверяет габариты, проходы, функцию, тип кровати и сохранность дверей/окон; при провале — один retry с `DIMENSION CORRECTION`.
 
 Правильная последовательность:
@@ -123,7 +123,7 @@ flowchart TD
 | Программа комнаты | `room_function`, `functional_zones`, `keep_features`, `bed_type` | блок `PROGRAM LOCK`: sleep + study/desk + storage + media; single не апгрейдится до double; мурал/фичи сохраняются |
 | Валидатор планировки | `layoutCorrection` в `src/scaleplan.js` | проверяет боковые проходы <60 см, шкаф и предмет напротив; при противоречии добавляет `LAYOUT CORRECTION` и правит ширину кровати |
 | Кадр | `art_direction.framing_note` | блок `VISIBLE COMPOSITION — DO NOT CRAM`: план на всю комнату, но в кадр не впихивать всё |
-| Оригинал как reference | `rooms.photo_path`, если использовался shell | дополнительное изображение для design: оболочка комнаты и камера, не старая мебель |
+| Оригинал | `rooms.photo_path` | только арт-директор и QA; в design-модель не передаётся, чтобы не смешивать старую мебель/отделку с новой планировкой |
 | Модель дизайна | `app_settings.model.render` > `RENDER_MODEL` > код-дефолт | `generateRender`, `renders.model` |
 | Разрешение/aspect | `app_settings.model.resolution/aspect_ratio` > env | image-запрос, `snapAspect` по фото |
 | Vision-модель | `app_settings.model.vision` > `VISION_MODEL` | арт-директор, бриф, анализ рендера, QA |

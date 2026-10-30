@@ -277,19 +277,6 @@ export async function processRender(renderId) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
       }
-      // Для очищенного shell оригинал остаётся источником правды по оболочке комнаты и камере.
-      if (!originalPhotoDataUrl && (useCleanup || precleanedShell)) {
-        try {
-          const refBuf = await getBuffer(room.photo_path || sourceStored);
-          originalPhotoDataUrl = await bufferToDataUrl(refBuf);
-        } catch (e) {
-          log({ event: 'layout_reference_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-        }
-      }
-      if ((useCleanup || precleanedShell) && originalPhotoDataUrl) {
-        imageMap.splice(1, 0, { role: 'original room — authority for architecture, windows, doors, camera and room envelope; do not copy its old furniture, finishes or clutter', label: 'room envelope reference' });
-      }
-
       prompt = buildPrompt({
         style: room.style,
         priceTier,
@@ -314,9 +301,10 @@ export async function processRender(renderId) {
         keepFeatures,
       });
 
-      referenceImagesB64 = (useCleanup || precleanedShell) && originalPhotoDataUrl
-        ? [originalPhotoDataUrl, ...styleRefUrls]
-        : styleRefUrls;
+      // Дизайнер получает только очищенный shell (если он есть) и style ref.
+      // Оригинал читает арт-директор отдельно; в image-модель его не передаём,
+      // иначе она смешивает старую мебель/отделку с новой планировкой.
+      referenceImagesB64 = styleRefUrls;
       meta.product_ids = curated.map(p => Number(p.id));
       meta.style_id = styleInfo?.id || null;
       meta.style_reference_mode = styleMode;

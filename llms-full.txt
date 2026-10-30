@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T18:15:31.963Z
+Generated: 2026-10-30T18:17:46.741Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -384,7 +384,7 @@ Last updated: 2026-10-30
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
 - Art director (`src/artdirector.js`): a vision pass reads the **original photo** + SCALE PLAN and designs a dimension-valid layout. Returns `room_function`, `bed_type`, `existing_fixtures`, `functional_zones`, `keep_features`, `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` for the whole room, `framing_note` and `ART DIRECTION`. Single beds must stay single; murals/features are kept. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
 - Layout validator (`layoutCorrection` in `src/scaleplan.js`): deterministic checks for bed side clearance (<60 cm), wardrobe on side/back wall and opposite items; adds `LAYOUT CORRECTION` and shrinks/removes conflicting furniture. The art director's arithmetic is never trusted.
-- Layout-first: `buildPrompt` injects `FURNITURE PLAN — HARD DIMENSIONS`, `PROGRAM LOCK` (sleep/study/storage/media, bed type, kept features) and `VISIBLE COMPOSITION — DO NOT CRAM`. The plan covers the whole room, but the frame shows only the visible subset; out-of-frame **furniture/decor** may be omitted. Architecture (doors, windows, walls, ceiling) must never be hidden or cropped out. When a shell is used, the design model also receives the original photo as a room-envelope reference.
+- Layout-first: `buildPrompt` injects `FURNITURE PLAN — HARD DIMENSIONS`, `PROGRAM LOCK` (sleep/study/storage/media, bed type, kept features) and `VISIBLE COMPOSITION — DO NOT CRAM`. The plan covers the whole room, but the frame shows only the visible subset; out-of-frame **furniture/decor** may be omitted. Architecture (doors, windows, walls, ceiling) must never be hidden or cropped out. The original photo is read by the art director and QA only; the design model receives the shell (if any) + style refs, never the original, to avoid mixing old furniture/finishes with the new plan.
 - Dimension/quality QA: `assessDimensions` checks furniture fit, walkways, oversize, room widening, preserved functional program (desk/study), bed type (single stays single), doors/windows and `authorial_quality` >= 7; retry on failure, plus a FLUX fallback when the current model is not FLUX. Disable with `DIMENSION_QA_ENABLED=0`; cost in `renders.meta.cost_breakdown.dimension_qa`.
 - Admin «Логи» shows the art director text, room function, bed type, functional zones, kept features, layout plan, framing note, an object table (description + dimensions + clearance) and the designer prompt; cabinet «Авторский бриф» shows the object list.
 - Full generation cost: `renders.cost_usd` is the sum of all requests; `renders.meta.cost_breakdown` stores art_direction, cleanup, design, design_retry, architecture_qa, product_qa, render_analysis, dimension_qa and failed. Cabinet shows the total + breakdown and a fullscreen render viewer.
@@ -2349,6 +2349,7 @@ export const MAX_REFERENCES; // 4
 
 ## 2026-10-30 — почему дизайн стал хуже: Klein вместо FLUX
 
+- Убран лишний второй вход дизайнера: раньше при очистке в image-модель отправлялись и shell, и оригинал. Оригинал теперь читает только арт-директор/QA; дизайнер получает shell + style ref, иначе модель смешивает старую мебель/отделку с новой планировкой.
 - Дизайн-модель кодом не менялась: она хранится в `app_settings.model.render` и меняется в админке. Последние два живых рендера ушли в **FLUX 3 Image Klein** (модель очистки/локальных правок) — отсюда плоский дизайн и потеря геометрии; третий — в Seedream. Ранее хорошие кадры шли на FLUX 3 Image.
 - Добавлен guard: `isCleanupModel()` распознаёт Klein; `jobs.js` не использует Klein для дизайна и делает fallback на `black-forest-labs/flux-3-image` с логом `model_override`.
 - Если QA размеров/архитектуры провален, после обычного retry добавляется fallback-рендер на FLUX; при провале QA качество/геометрия фиксируются в `meta.dimension_qa`.
