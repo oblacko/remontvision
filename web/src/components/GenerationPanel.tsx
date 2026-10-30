@@ -40,6 +40,9 @@ type ArtDirection = {
   featureWall?: string
   lighting?: string
   mood?: string
+  layoutPlan?: string
+  framingNote?: string
+  layoutItems?: { type?: string; description?: string; widthCm?: number | null; depthCm?: number | null; heightCm?: number | null; position?: string; clearanceCm?: number | null }[]
 }
 type RoomBrief = {
   roomType?: string
@@ -928,7 +931,22 @@ export function GenerationPanel({
                       {current.artDirection.featureWall ? <div><dt className="eyebrow">Стена</dt><dd className="mt-1">{current.artDirection.featureWall}</dd></div> : null}
                       {current.artDirection.lighting ? <div><dt className="eyebrow">Свет</dt><dd className="mt-1">{current.artDirection.lighting}</dd></div> : null}
                       {current.artDirection.mood ? <div><dt className="eyebrow">Настроение</dt><dd className="mt-1">{current.artDirection.mood}</dd></div> : null}
+                      {current.artDirection.layoutPlan ? <div className="sm:col-span-2"><dt className="eyebrow">План на всю комнату</dt><dd className="mt-1">{current.artDirection.layoutPlan}</dd></div> : null}
+                      {current.artDirection.framingNote ? <div className="sm:col-span-2"><dt className="eyebrow">Что видит камера</dt><dd className="mt-1">{current.artDirection.framingNote}</dd></div> : null}
                     </dl>
+                    {current.artDirection.layoutItems?.length ? (
+                      <div className="mt-4">
+                        <p className="eyebrow">Объекты</p>
+                        <ul className="mt-2 divide-y border-y text-xs">
+                          {current.artDirection.layoutItems.map((item, index) => (
+                            <li key={`${item.type}-${index}`} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+                              <span><b>{item.type}</b>{item.description ? ` — ${item.description}` : ''}{item.position ? ` · ${item.position}` : ''}</span>
+                              <span className="font-mono text-muted-foreground">{[item.widthCm, item.depthCm, item.heightCm].filter(value => typeof value === 'number').join(' × ') || '—'}{item.widthCm ? ' см' : ''}{item.clearanceCm ? ` · проход ${item.clearanceCm} см` : ''}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                   </section>
                 ) : null}
                 {heroItems.length ? (

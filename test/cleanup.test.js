@@ -26,6 +26,11 @@ test('cleanup prompt keeps built-ins for kitchen', () => {
   assert.match(p, /freestanding furniture/);
 });
 
+test('custom cleanup prompt is passed through unchanged', () => {
+  setCleanupConfigForTests({ prompt: 'Remove everything and make an empty room.' });
+  assert.equal(buildCleanupPrompt('Санузел'), 'Remove everything and make an empty room.');
+});
+
 test('FLUX 3 Klein supports resolution, FLUX 2 Pro does not', () => {
   assert.equal(supportsResolution('black-forest-labs/flux-3-image-klein'), true);
   assert.equal(supportsResolution('black-forest-labs/flux.2-pro'), false);

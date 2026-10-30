@@ -8,6 +8,31 @@ export const ART_DIRECTION_ENABLED = !/^(0|false|no|off)$/i.test(String(process.
 
 const clampText = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
+function normalizeFixtures(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(item => {
+    if (typeof item === 'string') return { type: clampText(item, 60), position: '' };
+    return { type: clampText(item?.type, 60), position: clampText(item?.position, 80) };
+  }).filter(item => item.type).slice(0, 10);
+}
+
+function normalizeLayoutItems(value) {
+  if (!Array.isArray(value)) return [];
+  const number = value => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  };
+  return value.map(item => ({
+    type: clampText(item?.type, 50),
+    description: clampText(item?.description, 160),
+    widthCm: number(item?.width_cm),
+    depthCm: number(item?.depth_cm),
+    heightCm: number(item?.height_cm),
+    position: clampText(item?.position, 140),
+    clearanceCm: number(item?.clearance_cm),
+  })).filter(item => item.type).slice(0, 12);
+}
+
 function normalizePalette(value) {
   if (!Array.isArray(value)) return [];
   return value.map(item => {
@@ -20,10 +45,15 @@ function normalizePalette(value) {
   }).filter(item => item.name || item.hex).slice(0, 6);
 }
 
-const DIRECTIVE_SYSTEM = `Ты ведущий арт-директор интерьерного бюро. На входе — фотография реальной комнаты, её тип, размеры и выбранный стиль.
-Твоя задача — придумать авторское арт-направление именно для ЭТОЙ комнаты, а не взять шаблон стиля. Смотри на реальный свет, пропорции, архитектуру, материалы и ракурс на фото.
+const DIRECTIVE_SYSTEM = `Ты ведущий арт-директор и пространственный планировщик интерьеров. На входе — фотография реальной комнаты, её тип, точные размеры и выбранный стиль.
+Сначала оцени комнату и её размеры. Придумай лучшую планировку: какая мебель помещается, каких она размеров, где стоит, какие проходы остаются. Учитывай окна, двери, радиаторы, встроенную мебель и мокрые зоны.
+Затем опиши дизайн: новые finishes, мебель, свет, текстиль и декор.
 Верни строго JSON без текста вокруг:
 {
+  "existing_fixtures": [{"type":"bathtub","position":"left wall, corner"}],
+  "layout_items": [{"type":"bed","description":"upholstered oak bed with a linen headboard","width_cm":160,"depth_cm":200,"height_cm":100,"position":"left wall, head against back wall","clearance_cm":60}],
+  "layout_plan": "English: exact sizes in cm, positions and walkways for the WHOLE room",
+  "framing_note": "English: what the camera sees, what may stay out of frame, and what must not be crammed into the shot",
   "palette": [{"hex":"#RRGGBB","name":"кратко"}],
   "focal_point": "главный акцент композиции",
   "feature_wall": "акцентная стена/плоскость и её обработка",
@@ -33,14 +63,19 @@ const DIRECTIVE_SYSTEM = `Ты ведущий арт-директор интер
   "decor": "декор, искусство, растения, предметы",
   "mood": "настроение и атмосфера",
   "avoid": "чего избегать именно в этой комнате",
-  "prompt": "90-150 слов на английском: цельный art direction для image-модели"
+  "prompt": "90-150 слов на английском: дизайн комнаты с этой точной планировкой"
 }
 Правила:
+- Строго соблюдай размеры комнаты и SCALE PLAN. Сумма ширины мебели и проходов не может превышать ширину/длину комнаты. Если не влезает — уменьшай мебель или убирай второй предмет. Проход минимум 60 см, комфортно 80 см.
+- Не рисуй кровать/диван шире комнаты и не оставляй 10 см «прохода». Проверяй арифметику до того, как писать prompt.
+- Мебель и сантехнику можно переставлять в пределах комнаты; стены, окна, двери, потолок, камеру и объём комнаты не меняй.
+- layout_items: реальные предметы с description (материал/цвет/форма), width_cm/depth_cm/height_cm, position и clearance_cm.
+- layout_plan: на английском, с точными размерами и позициями для ВСЕЙ комнаты.
+- framing_note: на английском. Комната может вмещать больше, чем видно в кадре. Опиши, что реально видит камера, что может остаться за кадром и что нельзя впихивать в кадр. Не заставляй модель показывать весь план в одном ракурсе.
+- existing_fixtures — только для контекста, сохранять их не обязательно.
 - Палитра 4-6 гармоничных цветов под стиль и естественный свет на фото, с hex.
-- Не придумывай окна, двери, ниши, балки и новые объёмы: опирайся на архитектуру на фото.
-- Не копируй мебель с референсов; создавай авторскую, но реалистичную композицию.
-- Если размеры переданы — держи масштаб мебели и проходы в этих рамках.
-- Поле prompt — на английском, связный текст без markdown, без кавычек вокруг.`;
+- Не копируй старую отделку и хлам с фото; проектируй новое.
+- prompt — на английском, связный текст без markdown, без кавычек вокруг. Начни с точной планировки и размеров, затем опиши finishes, мебель, свет, текстиль и декор.`;
 
 export async function buildArtDirection({
   imageDataUrl,
@@ -49,6 +84,7 @@ export async function buildArtDirection({
   styleDescription = '',
   dimensions = null,
   keepFurniture = true,
+  scalePlan = '',
 } = {}) {
   if (!ART_DIRECTION_ENABLED || !imageDataUrl) return null;
   const room = roomTypeByName(roomType);
@@ -65,10 +101,11 @@ export async function buildArtDirection({
     `Выбранный стиль: ${style || 'подбери сам под комнату и свет'}.`,
     styleDescription ? `Бриф стиля: ${styleDescription}` : '',
     dims,
+    scalePlan ? `SCALE PLAN (HARD, из детерминированного планировщика):\n${scalePlan}` : '',
     keepFurniture
-      ? 'Существующую мебель можно заменить и переставить; архитектуру, окна, двери и потолок сохранить.'
-      : 'Существующую мебель можно заменить; архитектуру, окна, двери и потолок сохранить.',
-    'Напиши авторское арт-направление для этой конкретной комнаты.',
+      ? 'Мебель можно заменить и переставить. Стены, окна, двери, потолок, камеру и объём комнаты не менять.'
+      : 'Старую мебель и сантехнику можно заменить и переставить в пределах комнаты. Стены, окна, двери, потолок, камеру и объём комнаты не менять.',
+    'Сначала перечисли existing_fixtures с их положением. Затем выбери мебель и размеры, которые физически влезают в комнату с проходами. Затем напиши layout_items, layout_plan на всю комнату, framing_note (что видит камера и что можно не показывать) и prompt. Не пытайся впихнуть всё, что помещается в комнату, в один кадр.',
   ].filter(Boolean).join('\n');
   const { parsed, cost } = await visionJson({ system: DIRECTIVE_SYSTEM, user, images: [imageDataUrl] });
   const fields = {
@@ -82,6 +119,11 @@ export async function buildArtDirection({
     mood: clampText(parsed.mood, 200),
     avoid: clampText(parsed.avoid, 240),
   };
+  const existingFixtures = normalizeFixtures(parsed.existing_fixtures);
+  const layoutItems = normalizeLayoutItems(parsed.layout_items);
+  const layoutPlan = clampText(parsed.layout_plan, 1200)
+    || layoutItems.map(item => `${item.type}${item.description ? ` (${item.description})` : ''}${item.widthCm ? ` ${item.widthCm} cm` : ''}${item.depthCm ? ` × ${item.depthCm} cm` : ''}${item.position ? ` — ${item.position}` : ''}${item.clearanceCm ? `, clearance ${item.clearanceCm} cm` : ''}`).join('; ');
+  const framingNote = clampText(parsed.framing_note, 600);
   let text = clampText(parsed.prompt, 1800);
   if (!text) {
     text = [
@@ -95,7 +137,7 @@ export async function buildArtDirection({
     ].filter(Boolean).join(' ');
   }
   if (!text) return null;
-  return { ...fields, text, cost: cost ?? null };
+  return { ...fields, existingFixtures, layoutItems, layoutPlan, framingNote, text, cost: cost ?? null };
 }
 
 const BRIEF_SYSTEM = `Ты арт-директор и эксперт по интерьерной фотографии. По одной фотографии комнаты оцени помещение и предложи направление дизайна.

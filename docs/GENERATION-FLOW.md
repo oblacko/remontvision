@@ -36,8 +36,8 @@ flowchart TD
   REFMODE -->|"reference"| REF["style_references / user ref → 1 art ref"]
   REFMODE -->|"swatches"| SW["styleswatch → material board"]
 
-  BASE --> AD["Арт-директор: buildArtDirection (vision)"]
-  AD --> ADT["ART DIRECTION: палитра, focal point, стена, свет, текстиль, декор"]
+  BASE --> AD["Арт-директор: оригинал → inventory + layout_items + layout_plan + framing_note"]
+  AD --> ADT["ART DIRECTION + FURNITURE PLAN + VISIBLE COMPOSITION"]
 
   BASE --> CUR{"use_catalog?"}
   CUR -->|"да"| CURATE["curate: products × style × tier"]
@@ -52,8 +52,8 @@ flowchart TD
   PROMPT --> PBLOCKS["TASK · ARCHITECTURE LOCK · ART DIRECTION · SCALE · KEEP/CHANGE · STYLE · MATERIALS · OUTPUT/AVOID"]
 
   PBLOCKS --> CLEAN{"keep_furniture=false<br/>и cleanup.enabled<br/>и нет shell?"}
-  CLEAN -->|"да"| CLEANUP["generateCleanupRender: FLUX 3 Klein → shell"]
-  CLEAN -->|"нет"| DESIGN["generateRender: FLUX 3 Image 1K"]
+  CLEAN -->|"да"| CLEANUP["generateCleanupRender: FLUX 3 Klein → empty/clean shell"]
+  CLEAN -->|"нет"| DESIGN["generateRender: shell + original reference + layout lock"]
   CLEANUP --> DESIGN
 
   DESIGN --> ARCH{"ARCHITECTURE_QA_ENABLED?"}
@@ -79,12 +79,33 @@ flowchart TD
   SAVE --> END["renders.done · rooms.done"]
 ```
 
+## 2.1. Layout-first: план на всю комнату, кадр — только видимое
+
+Арт-директор **не охраняет старую планировку** и не обязан сохранять сантехнику. Он проектирует новую планировку под размеры комнаты:
+
+1. **Смотрит на оригинал** (`room.photo_path`), получает точные размеры и SCALE PLAN.
+2. **Считает, что физически помещается:** `layout_items` с `width_cm`/`depth_cm`/`height_cm`/`clearance_cm`, `layout_plan` с точными позициями и проходами.
+3. **Отделяет план от кадра:** `framing_note` описывает, что видит камера, а что может остаться за кадром. В промт уходит блок `VISIBLE COMPOSITION — DO NOT CRAM`: не впихивать весь план в один ракурс, не двигать мебель только ради видимости.
+4. **Дизайн-модель получает:** shell/оригинал, `ART DIRECTION`, `FURNITURE PLAN — HARD DIMENSIONS`, `framing_note` и живые детали.
+5. **QA размеров** (`assessDimensions`) проверяет видимую композицию и при провале делает один retry с `DIMENSION CORRECTION`.
+
+Правильная последовательность:
+
+```
+оригинал → art director (inventory + layout_items + layout_plan + framing_note)
+         → cleanup (optional)
+         → design (план + кадр + живые детали)
+         → dimension QA (retry при провале)
+```
+
+Пустая комната арт-директору не нужна. Она нужна только дизайн-модели как чистый холст, если включена очистка; план при этом всё равно задаёт арт-директор.
+
 ## 3. Что откуда берётся
 
 | Данные | Источник | Куда попадает |
 |---|---|---|
-| Фото комнаты | `rooms.photo_path` (uploads) | art director, design, architecture QA |
-| Пустой каркас | `rooms.precleaned_shell_path` или `renders.shell_path` | источник для design, если очистка была |
+| Фото комнаты | `rooms.photo_path` (uploads) | art director (оригинал), design (reference для сантехники/планировки), architecture QA |
+| Пустой каркас | `rooms.precleaned_shell_path` или `renders.shell_path` | источник для design, если очистка была; fixtures обязаны сохраниться |
 | Родительский рендер | `renders.parent_render_id` | источник и смета для правок |
 | Тип комнаты | `rooms.room_type`; конфиг `app_settings.roomtypes.config.v1` или `src/roomtypes.js` | prompt, слоты, keep/change/forbid, электрика, стилизация |
 | Стиль | `rooms.style` → `styles` (`name`, `key`, `prompt_description`, `swatches`, `active`) | style brief, валидация, обложка |
@@ -95,7 +116,10 @@ flowchart TD
 | Размеры комнаты/кровати | `rooms.room_width_m/length_m/height_m/bed_length_m/dimension_orientation` | ROOM DIMENSIONS, `src/scaleplan.js`, BED SIZE |
 | Ориентация размеров | `rooms.dimension_orientation` | уточнение ширины/длины в промте |
 | Правила промта | `app_settings.prompt.rules.v1` + дефолты `src/promptconfig.js` | light, cleanup, windows, pinterest, photo, avoid |
-| Арт-директор | `buildArtDirection(photo, roomType, styleDescription, dimensions)` → vision | блок `ART DIRECTION` в промте, `renders.meta.art_direction` |
+| Арт-директор | `buildArtDirection(photo, roomType, styleDescription, dimensions, scalePlan)` → vision | `layout_items` + `layout_plan` + `framing_note` + `ART DIRECTION`, `renders.meta.art_direction` |
+| План мебели | `art_direction.layout_items` (`type`, `description`, `width_cm`, `depth_cm`, `height_cm`, `position`, `clearance_cm`) | блок `FURNITURE PLAN — HARD DIMENSIONS` в промте |
+| Кадр | `art_direction.framing_note` | блок `VISIBLE COMPOSITION — DO NOT CRAM`: план на всю комнату, но в кадр не впихивать всё |
+| Оригинал как reference | `rooms.photo_path`, если использовался shell | дополнительное изображение для design: оболочка комнаты и камера, не старая мебель |
 | Модель дизайна | `app_settings.model.render` > `RENDER_MODEL` > код-дефолт | `generateRender`, `renders.model` |
 | Разрешение/aspect | `app_settings.model.resolution/aspect_ratio` > env | image-запрос, `snapAspect` по фото |
 | Vision-модель | `app_settings.model.vision` > `VISION_MODEL` | арт-директор, бриф, анализ рендера, QA |
@@ -118,6 +142,7 @@ flowchart TD
 | `architecture_qa` | vision-QA | `ARCHITECTURE_QA_ENABLED=1` (по умолчанию 0) |
 | `product_qa` | vision-QA товара | правка с привязкой товара |
 | `render_analysis` | vision-анализ рендера | всегда, для RAL/электрики/подсказок |
+| `dimension_qa` | vision-QA размеров | базовый рендер с размерами и планом |
 | `failed` | стоимость упавшего запроса | ошибка на любом этапе |
 
 Где смотреть:
@@ -125,6 +150,8 @@ flowchart TD
 - API: `GET /api/rooms/:id` → `render.cost_usd`, `render.cost_breakdown`;
 - API: `GET /api/my/generations` → `cost_usd`, `cost_breakdown`;
 - админка «Логи» → `renders.cost_usd`, `renders.meta.cost_breakdown`;
+- админка «Логи» → блок «Арт-директор»: `ART DIRECTION`, `layout_plan`, `framing_note`, таблица объектов (`type`, `description`, размеры, позиция, проход) и «Промт дизайнера»;
+- кабинет → «Авторский бриф»: план, кадр и список объектов с описанием и размерами;
 - JSON-логи `render_done` / `render_error` → `cost_breakdown`.
 
 ## 5. Режимы и зависимости

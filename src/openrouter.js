@@ -234,6 +234,8 @@ export function buildPrompt({
   imageMap = [],
   dimensions = null,
   artDirection = '',
+  layoutPlan = '',
+  framingNote = '',
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -250,6 +252,19 @@ export function buildPrompt({
     .join(' ') || 'Update surface finishes, textiles, lighting and decor without changing the room layout.';
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
   const styling = 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use only existing shelves, ledges and niches; never add a new built-in, ledge, cove or wall panel.';
+  const wetRoom = /санузел|ванн|туалет|bath|wc/i.test(roomName);
+  const furniturePlacement = wetRoom
+    ? 'Follow the FURNITURE PLAN exactly. Keep at least 60 cm clear in front of every fixture; use compact fixtures; do not exceed the room width or block the door swing.'
+    : 'Follow the FURNITURE PLAN exactly. Place each item only where the plan says; keep the stated walkways clear; do not place a bed, sofa or wardrobe wider or longer than the plan.';
+  const livedInDetails = /спальн|bedroom/i.test(roomName)
+    ? 'slippers by the bed, a ceramic mug on the nightstand, an open book, a laptop on the desk, a soft throw, a cat curled on the bed or chair'
+    : /гостин|зал|living/i.test(roomName)
+      ? 'a coffee cup on the table, an open book, a laptop, a soft throw, a cat on the sofa'
+      : /кухн|kitchen/i.test(roomName)
+        ? 'a coffee cup, a cutting board with fruit, a linen towel, a cat on a chair (never on the counter)'
+        : /санузел|ванн|туалет|bath/i.test(roomName)
+          ? 'folded towels, soap, a candle, a small plant, slippers (no food, laptop or cat in the wet zone)'
+          : 'a coffee cup, an open book, a soft throw, a small plant, a cat on a chair';
   const rules = getPromptConfig();
   const furnitureRule = keepFurniture ? rules.furnitureOn : rules.furnitureOff;
   const catalogText = useCatalog
@@ -316,14 +331,16 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
   return `${roles}
 
 TASK
-Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a cosmetic renovation in the selected style.
-This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.
+Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a furniture and finish redesign in the selected style.
+This is not a new room and not a structural renovation: the walls, windows, doors, ceiling, room volume and camera must remain identical to the source. Furniture and fixtures may be rearranged inside the room, but every item must fit the stated dimensions and the FURNITURE PLAN.
 The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
 This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
 
 ${architectureLock}
-${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
+${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK, the scale plan or the furniture plan, keep the architecture, dimensions and furniture plan.\n${artDirection}\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
+${layoutPlan ? `\nFURNITURE PLAN — HARD DIMENSIONS (OVERRIDES ART DIRECTION)\n${layoutPlan}\nUse exactly these furniture sizes, positions and walkways. Do not show furniture larger than the plan or block the stated walkways. If the ART DIRECTION suggests a larger item or a different position, follow this plan and shrink or remove the conflicting item. Keep the room the same physical width and do not widen it. The plan describes the WHOLE room, not the whole frame: the camera may see only part of it. Do not force out-of-frame items into the shot; omit them instead of cramming or moving them.\n` : ''}
+${framingNote ? `\nVISIBLE COMPOSITION — DO NOT CRAM\n${framingNote}\nThe camera sees only part of the room. Do not force every planned item into the frame; items outside the frame may be omitted. Do not move furniture just to make it visible. The image must read as a natural photo of the room, not a catalog of everything that fits.\n` : ''}
 KEEP EXACTLY
 ${keep}.
 Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.
@@ -332,7 +349,7 @@ FURNITURE MODE
 ${furnitureRule}
 
 FURNITURE PLACEMENT
-Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation; do not center it under the window if it was not there. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.
+${furniturePlacement}
 
 CHANGE / DEEP TRANSFORMATION
 ${change}.
@@ -357,6 +374,9 @@ ${roomRules}
 LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
 ${styling}
 Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. All decor must sit inside the existing room volume; do not alter wall, floor or ceiling planes, corners, perspective, plinth or room proportions. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
+
+LIVED-IN DETAILS — MAKE IT FEEL REAL
+Add 2–4 of these naturally: ${livedInDetails}. A pet (cat) is allowed only if it looks realistic and does not block architecture, furniture or walkways; otherwise omit it. Do not turn the room into clutter.
 
 PINTEREST-LEVEL STYLING
 ${rules.pinterest}
@@ -995,5 +1015,37 @@ Image 1 — исходное фото. Image 2 — сгенерированны�
     checks,
     issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 8) : [],
     cost: data.usage?.cost ?? null,
+  };
+}
+
+export async function assessDimensions({ sourceImageUrl, renderImageUrl, roomType = '', dimensions = null, plan = '', framing = '' }) {
+  const w = Number(dimensions?.width) || 0;
+  const l = Number(dimensions?.length) || 0;
+  const h = Number(dimensions?.height) || 0;
+  const system = `Ты строгий QA-инженер по эргономике интерьера. Image 1 — исходная/пустая комната, Image 2 — рендер.
+Проверяй ТОЛЬКО то, что видно в кадре. Не требуй показать предметы, которые находятся вне кадра или за камерой: план описывает всю комнату, а кадр — только её часть.
+Верни строго JSON:
+{"accepted":true|false,"score":0-10,"checks":{"furniture_fits":true|false,"walkways_clear":true|false,"no_oversized":true|false,"room_not_widened":true|false},"issues":["..."]}
+- furniture_fits: мебель по размеру соответствует комнате и плану.
+- walkways_clear: проходы не заблокированы; там, где это видно, минимум ~60 см.
+- no_oversized: нет кровати/дивана/шкафа, которые явно шире/длиннее комнаты или плана.
+- room_not_widened: комната не расширена и не растянута.
+Если предмета не видно в кадре — это НЕ ошибка. Не придумывай проблемы. Только JSON.`;
+  const user = `Комната: ${roomType || 'room'}. Размеры: ${w}×${l}×${h} м. План на всю комнату: ${plan || 'нет'}. Что видит камера: ${framing || 'определи по фото'}. Оцени видимую композицию.`;
+  const { parsed, cost } = await visionJson({ system, user, images: [sourceImageUrl, renderImageUrl] });
+  const checks = {
+    furniture_fits: parsed.checks?.furniture_fits === true,
+    walkways_clear: parsed.checks?.walkways_clear === true,
+    no_oversized: parsed.checks?.no_oversized === true,
+    room_not_widened: parsed.checks?.room_not_widened === true,
+  };
+  const accepted = parsed.accepted === true
+    || (checks.furniture_fits && checks.walkways_clear && checks.no_oversized && checks.room_not_widened);
+  return {
+    accepted,
+    score: Math.max(0, Math.min(10, Number(parsed.score) || 0)),
+    checks,
+    issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 5) : [],
+    cost: cost ?? null,
   };
 }

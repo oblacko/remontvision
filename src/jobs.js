@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, assessArchitecture, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, assessArchitecture, assessDimensions, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { curateProducts, referenceImagesDetailed } from './curate.js';
@@ -20,8 +20,10 @@ import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
 import { buildArtDirection } from './artdirector.js';
+import { buildScalePlan } from './scaleplan.js';
 
 const ARCHITECTURE_QA_ENABLED = /^(1|true|yes|on)$/i.test(process.env.ARCHITECTURE_QA_ENABLED || '');
+const DIMENSION_QA_ENABLED = !/^(0|false|no|off)$/i.test(process.env.DIMENSION_QA_ENABLED || '');
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -112,6 +114,7 @@ async function processRender(renderId) {
     architecture_qa: null,
     product_qa: null,
     render_analysis: null,
+    dimension_qa: null,
     failed: null,
   };
   const addCost = (key, value) => {
@@ -200,7 +203,7 @@ async function processRender(renderId) {
 
       let styleUserRef = false;
       const styleRefUrls = [];
-      imageMap = [{ role: (useCleanup || precleanedShell) ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
+      imageMap = [{ role: (useCleanup || precleanedShell) ? 'prepared empty shell — authority for cleared surfaces, camera and architecture' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
       if (styleMode === 'reference') {
         const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
         const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
@@ -223,31 +226,52 @@ async function processRender(renderId) {
         }
       }
 
-      // Арт-директор читает реальное фото и пишет bespoke-направление под стиль.
-      // Без него дизайн скатывается к шаблонному «стиль + нейтральная комната».
+      // Арт-директор читает оригинал, считает планировку под размеры и пишет бриф.
+      const scalePlanInner = roomDimensions
+        ? buildScalePlan({ roomType, ...roomDimensions })
+        : '';
       let artDirection = '';
+      let layoutPlan = scalePlanInner;
+      let framingNote = '';
+      let originalPhotoDataUrl = '';
       if (!MOCK_MODE) {
         try {
           const adStart = Date.now();
           const adBuf = await getBuffer(room.photo_path || sourceStored);
+          originalPhotoDataUrl = await bufferToDataUrl(adBuf);
           const ad = await buildArtDirection({
-            imageDataUrl: await bufferToDataUrl(adBuf),
+            imageDataUrl: originalPhotoDataUrl,
             roomType,
             style: room.style,
             styleDescription: styleInfo?.prompt_description || '',
             dimensions: roomDimensions,
             keepFurniture,
+            scalePlan: scalePlanInner,
           });
           if (ad?.text) {
             artDirection = ad.text;
+            layoutPlan = ad.layoutPlan || scalePlanInner;
+            framingNote = ad.framingNote || '';
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
-            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
+            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType, palette: ad.palette?.length || 0, layout_items: ad.layoutItems?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
           }
         } catch (e) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
+      }
+      // Для очищенного shell оригинал остаётся источником правды по оболочке комнаты и камере.
+      if (!originalPhotoDataUrl && (useCleanup || precleanedShell)) {
+        try {
+          const refBuf = await getBuffer(room.photo_path || sourceStored);
+          originalPhotoDataUrl = await bufferToDataUrl(refBuf);
+        } catch (e) {
+          log({ event: 'layout_reference_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+      if ((useCleanup || precleanedShell) && originalPhotoDataUrl) {
+        imageMap.splice(1, 0, { role: 'original room — authority for architecture, windows, doors, camera and room envelope; do not copy its old furniture, finishes or clutter', label: 'room envelope reference' });
       }
 
       prompt = buildPrompt({
@@ -266,9 +290,13 @@ async function processRender(renderId) {
         imageMap,
         dimensions: roomDimensions,
         artDirection,
+        layoutPlan,
+        framingNote,
       });
 
-      referenceImagesB64 = styleRefUrls;
+      referenceImagesB64 = (useCleanup || precleanedShell) && originalPhotoDataUrl
+        ? [originalPhotoDataUrl, ...styleRefUrls]
+        : styleRefUrls;
       meta.product_ids = curated.map(p => Number(p.id));
       meta.style_id = styleInfo?.id || null;
       meta.style_reference_mode = styleMode;
@@ -399,7 +427,59 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
         }
       }
       meta.architecture_qa = architectureQa;
-      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
+
+      // Проверка эргономики: мебель должна соответствовать размерам, но в кадр не нужно впихивать весь план.
+      let dimensionQa = null;
+      if (DIMENSION_QA_ENABLED && !iteration && roomDimensions && layoutPlan) {
+        try {
+          const outBuf = Buffer.from(out.b64, 'base64');
+          const outExt = detectImageExt(outBuf);
+          const outMime = MIME_BY_EXT[outExt] || 'image/png';
+          dimensionQa = await assessDimensions({
+            sourceImageUrl: srcB64,
+            renderImageUrl: `data:${outMime};base64,${out.b64}`,
+            roomType,
+            dimensions: roomDimensions,
+            plan: layoutPlan,
+            framing: framingNote,
+          });
+          addCost('dimension_qa', dimensionQa.cost);
+          log({ event: 'dimension_qa', room_id: room.id, render_id: renderId, accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
+          if (!dimensionQa.accepted) {
+            const retryPrompt = `${prompt}
+
+DIMENSION CORRECTION — HARD REQUIREMENT
+The previous attempt failed dimension QA: ${dimensionQa.issues.join('; ') || 'furniture does not fit the room'}.
+Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated furniture sizes and positions, keep the walkways clear, do not widen the room, and do not cram out-of-frame items into the shot. This correction overrides any conflicting styling instruction.`;
+            out = await generateRender({
+              prompt: retryPrompt,
+              sourceImageB64: srcB64,
+              referenceImagesB64,
+              aspectRatio,
+            });
+            imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
+            addCost('design_retry', out.cost);
+            const retryBuf = Buffer.from(out.b64, 'base64');
+            const retryExt = detectImageExt(retryBuf);
+            const retryMime = MIME_BY_EXT[retryExt] || 'image/png';
+            dimensionQa = await assessDimensions({
+              sourceImageUrl: srcB64,
+              renderImageUrl: `data:${retryMime};base64,${out.b64}`,
+              roomType,
+              dimensions: roomDimensions,
+              plan: layoutPlan,
+              framing: framingNote,
+            });
+            addCost('dimension_qa', dimensionQa.cost);
+            log({ event: 'dimension_qa_retry', room_id: room.id, render_id: renderId, accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
+          }
+        } catch (e) {
+          log({ event: 'dimension_qa_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+      meta.dimension_qa = dimensionQa;
+
+      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, dimension_qa: dimensionQa?.accepted ?? null, cost_usd: cost, ms: Date.now() - t0 });
     }
 
     const rawBytes = Buffer.from(imageB64, 'base64');

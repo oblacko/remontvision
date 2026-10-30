@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T15:43:27.581Z
+Generated: 2026-10-30T16:56:05.031Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -215,7 +215,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 56 тестов, Postgres не нужен
+npm test                                      # node:test, 59 тестов, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -313,7 +313,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 56 тестов: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 59 тестов: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -382,8 +382,11 @@ Last updated: 2026-10-30
 - Production deployed from `main` via GitHub Actions; migrations `001`–`030` (new migrations apply on deploy).
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
-- Art director (`src/artdirector.js`): a vision pass reads the real photo and writes a bespoke `ART DIRECTION` block (palette, focal point, feature wall, materials, lighting, textiles, decor); injected after `ARCHITECTURE LOCK`. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
-- Full generation cost: `renders.cost_usd` is the sum of all requests; `renders.meta.cost_breakdown` stores art_direction, cleanup, design, design_retry, architecture_qa, product_qa, render_analysis and failed. Cabinet shows the total + breakdown and a fullscreen render viewer.
+- Art director (`src/artdirector.js`): a vision pass reads the **original photo** + SCALE PLAN and designs a dimension-valid layout. Returns `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` for the whole room, `framing_note` (what the camera sees) and `ART DIRECTION`. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
+- Layout-first: `buildPrompt` injects `FURNITURE PLAN — HARD DIMENSIONS` and `VISIBLE COMPOSITION — DO NOT CRAM`. The plan covers the whole room, but the frame shows only the visible subset; out-of-frame items may be omitted. When a shell is used, the design model also receives the original photo as a room-envelope reference.
+- Dimension QA: `assessDimensions` checks visible furniture fit, walkways, oversize and room widening; one retry on failure. Disable with `DIMENSION_QA_ENABLED=0`; cost in `renders.meta.cost_breakdown.dimension_qa`.
+- Admin «Логи» shows the art director text, layout plan, framing note, an object table (description + dimensions + clearance) and the designer prompt; cabinet «Авторский бриф» shows the object list.
+- Full generation cost: `renders.cost_usd` is the sum of all requests; `renders.meta.cost_breakdown` stores art_direction, cleanup, design, design_retry, architecture_qa, product_qa, render_analysis, dimension_qa and failed. Cabinet shows the total + breakdown and a fullscreen render viewer.
 - Room dimensions: user can enter width/length/height manually or use `POST /api/estimate-room`, which now also detects room type and suggests 2-3 styles. The brief runs automatically on photo upload (silent on 401) and prefills the form; the user confirms. Bed length is only for bedroom/children rooms and defaults to 2.0 m.
 - Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
 - Saved reference prompts are now wired in: `docs/prompts/scandinavian-bedroom-3x6.txt` blocks live in `promptconfig` (`dimensions`, `scalePlan`, `bed`, `radiators`) and room dimension fields; `docs/prompts/scandinavian-style-driven.txt` style blocks live in the Scandinavian `styles.prompt_description` (migration 026).
@@ -2342,6 +2345,26 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
+
+## 2026-10-30 — layout-first: план под размеры, кадр без впихивания, объекты в логах
+
+- Арт-директор больше не охраняет старую планировку: он проектирует новую под точные размеры. Возвращает `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` на всю комнату и `framing_note` — что видит камера.
+- В промт добавлены `FURNITURE PLAN — HARD DIMENSIONS` и `VISIBLE COMPOSITION — DO NOT CRAM`: план считается на всю комнату, но в кадр не нужно впихивать всё; предметы за кадром можно не показывать.
+- Добавлен `assessDimensions` / QA размеров: проверяет, что мебель влезает, проходы свободны, комната не расширена; при провале — один retry. Отключается `DIMENSION_QA_ENABLED=0`.
+- Живые детали: `LIVED-IN DETAILS` с тапочками, чашкой, книгой, ноутбуком, пледом и котом (для спальни/гостиной), towels/candle/plant для санузла. 2–4 детали, без хлама.
+- Логи: админка «Логи» показывает `ART DIRECTION`, план, framing, таблицу объектов с описанием и размерами и «Промт дизайнера»; кабинет — «Авторский бриф» со списком объектов.
+- Живой прогон 3 сценариев на FLUX 1K: спальня 2.4 м (кровать 160 + 40/40, QA 10/10), гостиная 3.6 м (диван 240, кофе/книга/растение, QA 10/10), санузел 1.7×2.2 (душ 90×90, тумба 80, унитаз 36, шкаф 65, QA 10/10). Итого $0.1633. Кот в гостиной не появился — модель его опустила; тапочки, чашки, книги и растения появились.
+- Тестов 59; `npm test`, `tsc -b`, `vite build` зелёные.
+
+## 2026-10-30 — layout lock: арт-директор по оригиналу, очистка сохраняет сантехнику
+
+- Арт-директор всегда читает **оригинальное фото**, инвентаризирует `existing_fixtures` и возвращает `layout_lock`. В промт добавлен блок `LAYOUT LOCK`, который перекрывает конфликтующий `ART DIRECTION`.
+- Арт-директор теперь проектирует «пустую комнату с сохранённой планировкой»: новые finishes/мебель/свет, но сантехника, встроенная мебель, коммуникации и мокрые зоны остаются на местах.
+- `buildCleanupPrompt()` для `Санузел`/`Кухня` всегда добавляет `MANDATORY PRESERVE`; кастомный промт из админки больше не может стереть ванну, унитаз, раковину, стиральную машину, водонагреватель или встроенную кухню.
+- Если используется shell, design-модель получает оригинал как дополнительный reference для позиций fixtures; style reference остаётся отдельным.
+- Для санузла `FURNITURE PLACEMENT`, `ROOM RULES` и `avoid` больше не подставляют кровать/диван/ТВ и запрещают новую сантехнику и ковы.
+- Причина инцидента с санузлом: кастомный cleanup-промт стёр fixtures, shell стал пустым, арт-директор придумал новую планировку. После фикса порядок: оригинал → layout lock → очистка с preserve → дизайн.
+- Тестов 59; `npm test` зелёный.
 
 ## 2026-10-30 — себестоимость генерации, полноэкранный кабинет и дедупликация стилей
 

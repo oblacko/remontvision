@@ -186,3 +186,28 @@ test('no art direction block when the art director did not run', () => {
   const prompt = buildPrompt({ style: 'Джапанди', roomType: 'Спальня' });
   assert.doesNotMatch(prompt, /ART DIRECTION/);
 });
+
+test('furniture plan is injected after art direction and overrides it', () => {
+  const prompt = buildPrompt({
+    style: 'Тёплый минимализм',
+    roomType: 'Спальня',
+    dimensions: { width: 2.4, length: 4, height: 2.6 },
+    artDirection: 'Add a 200 cm wide bed and two large wardrobes.',
+    layoutPlan: 'Bed 160 × 200 cm on the left wall; 40 cm nightstand; 60 cm walkway on the right.',
+  });
+  assert.match(prompt, /FURNITURE PLAN — HARD DIMENSIONS/);
+  assert.match(prompt, /160 × 200 cm/);
+  assert.ok(prompt.indexOf('ART DIRECTION') < prompt.indexOf('FURNITURE PLAN — HARD DIMENSIONS'));
+});
+
+test('framing note prevents cramming the whole plan into one shot', () => {
+  const prompt = buildPrompt({
+    style: 'Тёплый минимализм',
+    roomType: 'Спальня',
+    layoutPlan: 'Bed 160 × 200 cm; wardrobe on the wall behind the camera.',
+    framingNote: 'Camera sees the bed and the window wall; the wardrobe stays out of frame.',
+  });
+  assert.match(prompt, /VISIBLE COMPOSITION/);
+  assert.match(prompt, /wardrobe stays out of frame/);
+  assert.match(prompt, /Do not force out-of-frame items/);
+});

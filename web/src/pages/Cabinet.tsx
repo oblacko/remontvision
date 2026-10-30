@@ -8,7 +8,7 @@ type Me = { email: string; balance: number }
 type Consents = { offer: boolean; personal: boolean; transfer: boolean }
 type CostBreakdown = {
   art_direction?: number | null; cleanup?: number | null; design?: number | null; design_retry?: number | null;
-  architecture_qa?: number | null; product_qa?: number | null; render_analysis?: number | null; failed?: number | null;
+  architecture_qa?: number | null; product_qa?: number | null; render_analysis?: number | null; dimension_qa?: number | null; failed?: number | null;
 }
 type GenRow = {
   id: string; room_id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
@@ -21,7 +21,7 @@ type Pack = { id: string; title: string; credits: number; price_kopecks: number 
 type GenItem = { name: string; price: number; qty: number; unit: string; url: string; link_label?: string; direct_url?: boolean; source?: string; match_score?: number; presentation_status?: 'curated' | 'matched' | 'verified' }
 type RoomData = {
   id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; keep_furniture?: boolean; use_catalog?: boolean; status: string; error: string | null;
-  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; cost_usd?: number | null; cost_breakdown?: CostBreakdown | null } | null;
+  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; cost_usd?: number | null; cost_breakdown?: CostBreakdown | null; dimension_qa?: { accepted?: boolean; score?: number | null; issues?: string[] } | null } | null;
   items: GenItem[]; total: number; prices_as_of: string | null;
 }
 type RoomGroup = { roomId: string; style: string; versions: GenRow[]; latest: GenRow; image: string | null; credits: number; costUsd: number }
@@ -47,7 +47,7 @@ const statusLabel = (status: string) => status === 'done' ? 'готово' : sta
 const usd = (value?: number | null) => typeof value === 'number' ? `$${value.toFixed(4)}` : '—'
 const COST_LABELS: Record<string, string> = {
   art_direction: 'арт-директор', cleanup: 'очистка', design: 'дизайн', design_retry: 'дизайн-ретрай',
-  architecture_qa: 'QA архитектуры', product_qa: 'QA товара', render_analysis: 'анализ рендера', failed: 'ошибка запроса',
+  architecture_qa: 'QA архитектуры', product_qa: 'QA товара', render_analysis: 'анализ рендера', dimension_qa: 'QA размеров', failed: 'ошибка запроса',
 }
 const costRows = (breakdown?: CostBreakdown | null) => Object.entries(breakdown || {})
   .filter(([, value]) => typeof value === 'number' && value > 0)
@@ -420,6 +420,11 @@ export default function Cabinet() {
                           <div key={row.key} className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">{row.label}</dt><dd className="font-mono">{usd(row.value)}</dd></div>
                         ))}
                       </dl>
+                    )}
+                    {roomData.render.dimension_qa && (
+                      <p className={`mt-3 border-t pt-3 text-[11px] leading-5 ${roomData.render.dimension_qa.accepted ? 'text-muted-foreground' : 'text-destructive'}`}>
+                        QA размеров: {roomData.render.dimension_qa.accepted ? 'пройден' : 'есть замечания'}{typeof roomData.render.dimension_qa.score === 'number' ? ` · ${roomData.render.dimension_qa.score}/10` : ''}{roomData.render.dimension_qa.issues?.length ? ` · ${roomData.render.dimension_qa.issues.join('; ')}` : ''}
+                      </p>
                     )}
                   </div>
                 )}

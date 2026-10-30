@@ -27,6 +27,8 @@
 - Модель/промт очистки берутся из `cleanup.config.v1`, но флаг `cleanup.enabled` ручную кнопку не блокирует.
 - Если очистка падает, показывается ошибка; молчаливого перехода на оригинал больше нет.
 - Старый автоматический cleanup в `jobs.js` остался, но по умолчанию `cleanup.enabled=false`, поэтому без precleaned shell он не срабатывает.
+- Арт-директор не обязан сохранять старую планировку/сантехнику: он проектирует новую планировку под размеры. Очистка может как сохранять fixtures (дефолтный room-aware промт), так и очищать комнату полностью (кастомный промт из админки) — это выбор пользователя/админа.
+- Если используется shell, дизайн-модель получает оригинал как reference для оболочки комнаты и камеры; арт-директор при этом всегда читает оригинал, а не shell.
 
 ## Промт и стиль
 
@@ -39,8 +41,10 @@
   - `swatches` — material board с палитрой, без архитектуры.
 - Активны 8 стилей (миграция `028`): **Скандинавский**, **Джапанди**, **Ваби-саби**, **Органик модерн**, **Тёплый минимализм**, **Биофильный**, **Современная классика**, **Средиземноморский модерн**. Всего 15: `minimal` и `neo` удалены миграцией `030` после проверки использования; `modern` сохранён, им пользуются 8 старых комнат. Референсы `neo` перенесены на `heritage`.
 - У активных стилей заполнены подробные briefs; у scandi/japandi — по 6 свотчей. Swatch board генерируется `src/styleswatch.js`.
-- **Арт-директор** (`src/artdirector.js`): vision читает реальное фото и пишет bespoke-направление (палитра, focal point, feature wall, материалы, свет, текстиль, декор). Вставляется в промт блоком `ART DIRECTION`. Отключается `ART_DIRECTION_ENABLED=0`; стоимость входит в `renders.cost_usd`.
-- **Себестоимость полной генерации**: `renders.cost_usd` = сумма всех запросов, разбивка в `renders.meta.cost_breakdown` (`art_direction`, `cleanup`, `design`, `design_retry`, `architecture_qa`, `product_qa`, `render_analysis`, `failed`). Кабинет показывает итог и разбивку; схема — `docs/GENERATION-FLOW.md`.
+- **Арт-директор** (`src/artdirector.js`): vision читает **оригинал**, получает SCALE PLAN и проектирует новую планировку под размеры. Возвращает `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` (вся комната), `framing_note` (что видит камера), `existing_fixtures` и `ART DIRECTION`. В промт идут блоки `ART DIRECTION`, `FURNITURE PLAN — HARD DIMENSIONS` и `VISIBLE COMPOSITION — DO NOT CRAM`. Пустой shell арт-директору не нужен. Отключается `ART_DIRECTION_ENABLED=0`; стоимость входит в `renders.cost_usd`.
+- **QA размеров** (`assessDimensions`): после базового рендера проверяет видимую композицию; при провале — один retry с `DIMENSION CORRECTION`. Отключается `DIMENSION_QA_ENABLED=0`; стоимость — `renders.meta.cost_breakdown.dimension_qa`.
+- **Логи**: админка «Логи» показывает `ART DIRECTION`, план, framing, таблицу объектов и «Промт дизайнера»; кабинет — «Авторский бриф» со списком объектов (описание + размеры + проход).
+- **Себестоимость полной генерации**: `renders.cost_usd` = сумма всех запросов, разбивка в `renders.meta.cost_breakdown` (`art_direction`, `cleanup`, `design`, `design_retry`, `architecture_qa`, `product_qa`, `render_analysis`, `dimension_qa`, `failed`). Кабинет показывает итог и разбивку; схема — `docs/GENERATION-FLOW.md`.
 - **Кабинет**: в истории комнаты есть полноэкранный просмотр рендера (кнопка `Expand`, Escape закрывает), себестоимость по версии и сумма по комнате.
 - Пользовательские фото-референсы в режимах `text`/`swatches` игнорируются (`meta.user_style_ref_ignored`).
 - Основная модель рендера: **FLUX 3 Image 1K** (`black-forest-labs/flux-3-image`, `app_settings`/`.env`; код-дефолт `src/modelconfig.js`). Vision: `google/gemini-3-flash-preview`.
@@ -77,8 +81,8 @@
 - VPS: `/root/remontvision`, Docker Compose, `app` + `db`.
 - Публично: `https://www.remontvision.ru`.
 - Деплой: push в `main` → GitHub Actions → VPS.
-- Прод обновляется пушем в `main` (GitHub Actions → VPS); последний деплой — арт-директор, FLUX 1K, себестоимость, полноэкранный кабинет, дедупликация стилей.
-- Задеплоено: арт-директор, 8 активных стилей (`028`), `use_catalog=false` по умолчанию, `estimate-room` с типом комнаты и стилями, UI-тюнинг (бриф комнаты, «Дополнительно», авторский бриф на результате), FLUX 3 Image 1K, разбивка себестоимости, удаление `minimal`/`neo` (`030`).
+- Прод обновляется пушем в `main` (GitHub Actions → VPS); последний деплой — layout-first, QA размеров, объекты в логах.
+- Задеплоено: арт-директор, 8 активных стилей (`028`), `use_catalog=false` по умолчанию, `estimate-room` с типом комнаты и стилями, UI-тюнинг, FLUX 3 Image 1K, разбивка себестоимости, удаление `minimal`/`neo` (`030`), layout-first (`layout_items`/`layout_plan`/`framing_note`), QA размеров, «живые» детали, объекты в логах.
 - Текущая модель рендера: **FLUX 3 Image 1K**; прогон 10 сценариев — 10/10 ok, $0.5093, vision-QA в среднем style 9.20 / photo 8.70 / arch 9.80 / scale 8.80 / authorial 8.20.
 - Миграции: `001`–`030` (`029` фиксирует FLUX 3 Image 1K; `030` удаляет `minimal`/`neo` только если они не используются комнатами).
 - Тесты: `npm test` — 56 тестов. Frontend: `cd web && npm run lint && npm run build`.

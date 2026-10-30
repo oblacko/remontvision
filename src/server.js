@@ -1128,6 +1128,15 @@ app.get('/api/rooms/:id', h(async (req, res) => {
         featureWall: render.meta.art_direction.featureWall || '',
         lighting: render.meta.art_direction.lighting || '',
         mood: render.meta.art_direction.mood || '',
+        layoutPlan: render.meta.art_direction.layoutPlan || '',
+        framingNote: render.meta.art_direction.framingNote || '',
+        layoutItems: render.meta.art_direction.layoutItems || [],
+      } : null,
+      dimension_qa: render.meta?.dimension_qa ? {
+        accepted: render.meta.dimension_qa.accepted === true,
+        score: render.meta.dimension_qa.score ?? null,
+        checks: render.meta.dimension_qa.checks || {},
+        issues: render.meta.dimension_qa.issues || [],
       } : null,
       product_qa: render.meta?.product_qa ? {
         status: render.meta.product_qa.status,

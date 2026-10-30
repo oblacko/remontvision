@@ -22,7 +22,18 @@ type PromptRow = {
   request_text: string | null; prompt: string | null; model: string | null;
   cost_usd: number | null; duration_ms: number | null; credits_spent: number | null;
   image_url: string | null; photo_url: string | null;
-  meta?: { mode?: string; target?: string | null; refs?: Array<{ index: number; role: string; label?: string }>; cleanup?: { model?: string; resolution?: string; cost_usd?: number | null; shell_path?: string; error?: string } | null } | null;
+  meta?: {
+    mode?: string; target?: string | null; refs?: Array<{ index: number; role: string; label?: string }>;
+    cleanup?: { model?: string; resolution?: string; cost_usd?: number | null; shell_path?: string; error?: string } | null;
+    art_direction?: {
+      text?: string; layoutPlan?: string; framingNote?: string;
+      layoutItems?: Array<{ type?: string; description?: string; widthCm?: number | null; depthCm?: number | null; heightCm?: number | null; position?: string; clearanceCm?: number | null }>;
+      palette?: Array<{ hex?: string | null; name?: string }>;
+      focalPoint?: string; featureWall?: string; lighting?: string; mood?: string;
+    } | null;
+    dimension_qa?: { accepted?: boolean; score?: number | null; checks?: Record<string, boolean>; issues?: string[] } | null;
+    cost_breakdown?: Record<string, number | null> | null;
+  } | null;
 }
 type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
@@ -1129,11 +1140,41 @@ export default function Admin() {
                         {p.meta?.refs?.length ? <p className="mt-1 text-muted-foreground">Референсы: {p.meta.refs.map(r => `${r.index}. ${r.role}${r.label ? ` (${r.label})` : ''}`).join(' · ')}</p> : null}
                         {p.meta?.mode === 'edit' && p.meta.target ? <p className="mt-1 text-muted-foreground">Правка: {p.meta.target}</p> : null}
                         {p.meta?.cleanup ? <p className="mt-1 text-muted-foreground">Очистка: {p.meta.cleanup.model || '—'} {p.meta.cleanup.resolution || ''}{p.meta.cleanup.error ? ` · ошибка: ${p.meta.cleanup.error}` : p.meta.cleanup.cost_usd != null ? ` · $${p.meta.cleanup.cost_usd}` : ''}</p> : null}
+                        {p.meta?.dimension_qa ? <p className="mt-1 text-muted-foreground">QA размеров: {p.meta.dimension_qa.accepted ? 'пройден' : 'замечания'}{typeof p.meta.dimension_qa.score === 'number' ? ` · ${p.meta.dimension_qa.score}/10` : ''}{p.meta.dimension_qa.issues?.length ? ` · ${p.meta.dimension_qa.issues.join('; ')}` : ''}</p> : null}
                         <p className="mt-1 text-muted-foreground">{p.model || '—'} · {p.cost_usd != null ? `$${p.cost_usd}` : '—'}{p.duration_ms ? ` · ${(p.duration_ms / 1000).toFixed(1)} с` : ''}</p>
                         <p className="mt-1">{p.request_text || 'Базовый дизайн'}</p>
                       </div>
                     </div>
-                    {p.prompt ? <details className="mt-3 border-t pt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Промт модели <span className="ml-2 underline">показать</span></summary><div className="mt-2"><button type="button" onClick={() => { navigator.clipboard?.writeText(p.prompt || '').catch(() => {}) }} className="mb-2 text-[11px] underline">копировать</button><pre className="max-h-80 overflow-auto whitespace-pre-wrap border bg-muted p-3 text-[11px] leading-5">{p.prompt}</pre></div></details> : <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">Промт не сохранён</p>}
+                    {p.meta?.art_direction ? (
+                      <details className="mt-3 border-t pt-3">
+                        <summary className="cursor-pointer text-xs text-muted-foreground">Арт-директор — что написал <span className="ml-2 underline">показать</span></summary>
+                        <div className="mt-2 space-y-2 text-[11px] leading-5">
+                          {p.meta.art_direction.text ? <p>{p.meta.art_direction.text}</p> : null}
+                          {p.meta.art_direction.layoutPlan ? <p><b>План на всю комнату:</b> {p.meta.art_direction.layoutPlan}</p> : null}
+                          {p.meta.art_direction.framingNote ? <p><b>Что видит камера:</b> {p.meta.art_direction.framingNote}</p> : null}
+                          {p.meta.art_direction.layoutItems?.length ? (
+                            <div className="overflow-auto">
+                              <p className="font-medium">Объекты</p>
+                              <table className="mt-1 w-full text-left text-[11px]">
+                                <thead><tr className="border-b"><th className="py-1 pr-2">Тип</th><th className="py-1 pr-2">Описание</th><th className="py-1 pr-2">Размеры</th><th className="py-1 pr-2">Где</th><th className="py-1">Проход</th></tr></thead>
+                                <tbody>
+                                  {p.meta.art_direction.layoutItems.map((item, index) => (
+                                    <tr key={`${item.type}-${index}`} className="border-b last:border-b-0">
+                                      <td className="py-1 pr-2 font-medium">{item.type || '—'}</td>
+                                      <td className="py-1 pr-2">{item.description || '—'}</td>
+                                      <td className="py-1 pr-2 font-mono">{[item.widthCm, item.depthCm, item.heightCm].filter(v => typeof v === 'number').join(' × ') || '—'}{item.widthCm ? ' см' : ''}</td>
+                                      <td className="py-1 pr-2">{item.position || '—'}</td>
+                                      <td className="py-1 font-mono">{item.clearanceCm ? `${item.clearanceCm} см` : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : null}
+                        </div>
+                      </details>
+                    ) : null}
+                    {p.prompt ? <details className="mt-3 border-t pt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Промт дизайнера (image-модель) <span className="ml-2 underline">показать</span></summary><div className="mt-2"><button type="button" onClick={() => { navigator.clipboard?.writeText(p.prompt || '').catch(() => {}) }} className="mb-2 text-[11px] underline">копировать</button><pre className="max-h-80 overflow-auto whitespace-pre-wrap border bg-muted p-3 text-[11px] leading-5">{p.prompt}</pre></div></details> : <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">Промт не сохранён</p>}
                   </article>
                 ))}
                 {!filteredPrompts.length && <p className="border border-dashed p-8 text-center text-sm text-muted-foreground">Промтов пока нет.</p>}
