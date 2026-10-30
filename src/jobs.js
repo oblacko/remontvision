@@ -80,7 +80,7 @@ async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
   return { refs, user: false };
 }
 
-async function processRender(renderId) {
+export async function processRender(renderId) {
   const t0 = Date.now();
   const render = await q.getRender(renderId);
   if (!render || render.status !== 'processing') return;
@@ -157,6 +157,9 @@ async function processRender(renderId) {
     let editProduct = null;
     let sourceStored = precleanedShell || room.photo_path;
     let referenceImagesB64 = [];
+    // Эти поля нужны и базовому рендеру, и общему QA-блоку ниже.
+    let layoutPlan = '';
+    let framingNote = '';
 
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
@@ -231,8 +234,7 @@ async function processRender(renderId) {
         ? buildScalePlan({ roomType, ...roomDimensions })
         : '';
       let artDirection = '';
-      let layoutPlan = scalePlanInner;
-      let framingNote = '';
+      layoutPlan = scalePlanInner;
       let originalPhotoDataUrl = '';
       if (!MOCK_MODE) {
         try {
