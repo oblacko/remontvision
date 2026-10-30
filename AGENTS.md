@@ -27,7 +27,7 @@
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 51 тест, Postgres не нужен
+npm test                                      # node:test, 53 теста, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -68,6 +68,7 @@ node --check src/openrouter.js
 |---|---|
 | Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
 | Размеры комнаты, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js`, `web/src/components/GenerationPanel.tsx` |
+| Оценка размеров по фото | `src/openrouter.js`, `src/server.js`, `web/src/components/GenerationPanel.tsx` |
 | Правила комнат, слоты, запреты | `src/roomtypes.js` |
 | Подбор товаров (старый каталог) | `src/curate.js` |
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
@@ -124,7 +125,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 51 тест: промт, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 53 теста: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.

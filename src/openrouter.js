@@ -641,6 +641,50 @@ quality_not_worse — свет, композиция, фотографичнос
   };
 }
 
+// Vision: оцениваем реальные габариты комнаты по фото. Это подсказка, а не измерение.
+export async function estimateRoomDimensions(imageB64, mime = 'image/jpeg', { roomType = '' } = {}) {
+  const sys = `Ты эксперт по интерьерной фотографии и оценке масштаба. По одной фотографии комнаты оцени её реальные внутренние габариты.
+Опирайся на типовые размеры: дверь 2.0–2.1 м, длина кровати 2.0 м, глубина кухонных шкафов 0.6 м, высота стула 0.45 м, плитка/панели, рост человека. Учитывай перспективу и ширину объектива, не путай визуальную ширину с реальной.
+Верни строго JSON без текста вокруг:
+{"width_m": number, "length_m": number, "height_m": number, "bed_present": boolean, "confidence": "low|medium|high", "reasoning": "кратко по-русски", "assumptions": ["..."]}
+width_m — ширина комнаты, length_m — длина, height_m — высота от пола до потолка, в метрах. Округляй до 0.1 м. Не выдумывай точность: если масштаб неочевиден, дай разумную оценку и confidence low. Только JSON.`;
+  const r = await fetchWithRetry(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      model: getModelConfig().vision,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: [
+          { type: 'text', text: `Тип комнаты: ${roomType || 'не указан'}. Оцени внутренние габариты.` },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${imageB64}` } },
+        ]},
+      ],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  const data = await r.json();
+  const txt = data.choices?.[0]?.message?.content || '{}';
+  let parsed = {};
+  try { parsed = JSON.parse(txt.match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
+  const measure = (value, min, max) => {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < min || number > max) return null;
+    return Math.round(number * 10) / 10;
+  };
+  const confidence = ['low', 'medium', 'high'].includes(parsed.confidence) ? parsed.confidence : 'low';
+  return {
+    width_m: measure(parsed.width_m, 1.5, 20),
+    length_m: measure(parsed.length_m, 1.5, 30),
+    height_m: measure(parsed.height_m, 2, 6),
+    bed_present: parsed.bed_present === true,
+    confidence,
+    reasoning: String(parsed.reasoning || '').slice(0, 300),
+    assumptions: Array.isArray(parsed.assumptions) ? parsed.assumptions.map(String).slice(0, 4).map(s => s.slice(0, 160)) : [],
+    cost: data.usage?.cost ?? null,
+  };
+}
+
 // Vision: читаем готовый рендер и достаём материалы, поверхности, электрику и подсказки.
 export async function parseRender(renderB64, mime = 'image/png') {
   const sys = `Ты — анализатор интерьерных рендеров. Верни строго JSON-объект без текста вокруг:

@@ -41,6 +41,7 @@ Admin: заголовок `X-Admin-Key`.
 | POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
 | POST | `/api/renders/:id/procurement` | запуск подбора товаров, списывает 1 кредит; повторный вызов отдаёт существующий запуск |
 | POST | `/api/cleanup` | очистка комнаты по загруженному фото; возвращает data URL пустой комнаты |
+| POST | `/api/estimate-room` | vision-оценка размеров по фото: `{width_m, length_m, height_m, bed_present, confidence, reasoning}`; требует авторизацию |
 | GET | `/api/procurement/:id` | статус, позиции и найденные товары |
 | GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
@@ -64,7 +65,7 @@ Admin: заголовок `X-Admin-Key`.
 | `keep_furniture` | нет | `1/0`, default `1` |
 | `use_catalog` | нет | `1/0`, default `1` |
 | `room_width_m`, `room_length_m`, `room_height_m` | нет | реальные размеры комнаты в метрах; либо все три, либо ни одного |
-| `bed_length_m` | нет | полная длина кровати с каркасом, метры |
+| `bed_length_m` | нет | только для спальни/детской; по умолчанию 2.0 м. Для остальных комнат игнорируется |
 | `dimension_orientation` | нет | что считается шириной/длиной |
 | `palette`, `accent` | нет | цветовая схема/акцент |
 

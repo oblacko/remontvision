@@ -5,7 +5,7 @@ process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.IMAGE_MIN_GAP_MS = '0';
 process.env.RENDER_MODEL = 'test/model';
 
-const { generateRender, assessProductEdit, parseRender, snapAspect } = await import('../src/openrouter.js');
+const { generateRender, assessProductEdit, parseRender, estimateRoomDimensions, snapAspect } = await import('../src/openrouter.js');
 const { supportsResolution, modelCaps } = await import('../src/modelcaps.js');
 
 const SOURCE = 'data:image/jpeg;base64,SOURCE';
@@ -118,6 +118,34 @@ test('product QA rejects when visual quality gets worse', async () => {
   assert.equal(out.accepted, false);
   assert.equal(out.status, 'rejected');
   assert.deepEqual(out.issues, ['Свет стал плоским']);
+});
+
+test('room dimension estimate parses vision JSON and clamps bad values', async () => {
+  let body;
+  globalThis.fetch = async (_url, opts) => {
+    body = JSON.parse(opts.body);
+    return json({
+      usage: { cost: 0.002 },
+      choices: [{ message: { content: JSON.stringify({
+        width_m: 3.24,
+        length_m: 6.08,
+        height_m: 2.5,
+        bed_present: true,
+        confidence: 'medium',
+        reasoning: 'Ориентир — дверь и кровать',
+        assumptions: ['дверь 2 м'],
+      }) } }],
+    });
+  };
+  const out = await estimateRoomDimensions('IMAGE', 'image/jpeg', { roomType: 'Спальня' });
+  assert.match(body.messages[1].content[0].text, /Спальня/);
+  assert.match(body.messages[1].content[1].image_url.url, /^data:image\/jpeg;base64,IMAGE$/);
+  assert.equal(out.width_m, 3.2);
+  assert.equal(out.length_m, 6.1);
+  assert.equal(out.height_m, 2.5);
+  assert.equal(out.bed_present, true);
+  assert.equal(out.confidence, 'medium');
+  assert.equal(out.cost, 0.002);
 });
 
 test('FLUX does not receive resolution, Seedream does', () => {

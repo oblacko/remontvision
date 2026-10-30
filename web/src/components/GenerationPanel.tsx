@@ -147,6 +147,9 @@ export function GenerationPanel({
   const [roomHeightM, setRoomHeightM] = useState('')
   const [bedLengthM, setBedLengthM] = useState('')
   const [dimensionOrientation, setDimensionOrientation] = useState('')
+  const [estimateBusy, setEstimateBusy] = useState(false)
+  const [estimateError, setEstimateError] = useState('')
+  const [estimateNote, setEstimateNote] = useState('')
   const [stylePresets, setStylePresets] = useState<StylePreset[]>(defaultStylePresets)
   const [photo, setPhoto] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -157,6 +160,7 @@ export function GenerationPanel({
   const [useCleaned, setUseCleaned] = useState(true)
   const [cleanupBusy, setCleanupBusy] = useState(false)
   const [cleanupError, setCleanupError] = useState('')
+  const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
   const [style, setStyle] = useState<string | null>(null)
   const [accent, setAccent] = useState('none')
   const [scheme, setScheme] = useState('none')
@@ -260,7 +264,8 @@ export function GenerationPanel({
         setRoomWidthM(d.room_width_m != null ? String(d.room_width_m) : '')
         setRoomLengthM(d.room_length_m != null ? String(d.room_length_m) : '')
         setRoomHeightM(d.room_height_m != null ? String(d.room_height_m) : '')
-        setBedLengthM(d.bed_length_m != null ? String(d.bed_length_m) : '')
+        const loadedBedRoom = d.room_type === 'Спальня' || d.room_type === 'Детская'
+        setBedLengthM(d.bed_length_m != null ? String(d.bed_length_m) : (loadedBedRoom ? '2' : ''))
         setDimensionOrientation(d.dimension_orientation || '')
         setPriceTier(d.price_tier || 'comfort')
         setKeepFurniture(d.keep_furniture !== false)
@@ -334,6 +339,8 @@ export function GenerationPanel({
     setPhotoError(''); setGenError('')
     setCleaned(null); setUseCleaned(true); setCleanupError('')
     setRoomType(null)
+    setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
+    setEstimateNote(''); setEstimateError('')
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
     setKeepFurniture(true); setUseCatalog(true)
   }
@@ -357,6 +364,34 @@ export function GenerationPanel({
       setCleanupError(e instanceof Error ? e.message : 'Не удалось очистить комнату')
     } finally {
       setCleanupBusy(false)
+    }
+  }
+
+  const estimateDimensions = async () => {
+    if (!file || estimateBusy) return
+    setEstimateBusy(true); setEstimateError(''); setEstimateNote('')
+    try {
+      const fd = new FormData()
+      fd.append('photo', file)
+      fd.append('room_type', roomType || 'Другое')
+      const r = await fetch('/api/estimate-room', { method: 'POST', body: fd })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { onRequireLogin(); return }
+      if (!r.ok) throw new Error(d.error || 'Не удалось оценить размеры')
+      if (d.width_m) setRoomWidthM(String(d.width_m))
+      if (d.length_m) setRoomLengthM(String(d.length_m))
+      if (d.height_m) setRoomHeightM(String(d.height_m))
+      if (d.bed_present && isBedRoom) setBedLengthM('2')
+      const confidence = d.confidence === 'high' ? 'высокая' : d.confidence === 'medium' ? 'средняя' : 'низкая'
+      if (d.width_m || d.length_m || d.height_m) {
+        setEstimateNote(`Оценка по фото: ${d.width_m || '—'} × ${d.length_m || '—'} м, потолок ${d.height_m || '—'} м. Уверенность: ${confidence}. Проверьте и поправьте вручную.${d.reasoning ? ` ${d.reasoning}` : ''}`)
+      } else {
+        setEstimateNote('Не удалось уверенно определить размеры — введите их вручную.')
+      }
+    } catch (e) {
+      setEstimateError(e instanceof Error ? e.message : 'Не удалось оценить размеры')
+    } finally {
+      setEstimateBusy(false)
     }
   }
 
@@ -470,7 +505,7 @@ export function GenerationPanel({
         if (roomWidthM.trim()) fd.append('room_width_m', roomWidthM.replace(',', '.'))
         if (roomLengthM.trim()) fd.append('room_length_m', roomLengthM.replace(',', '.'))
         if (roomHeightM.trim()) fd.append('room_height_m', roomHeightM.replace(',', '.'))
-        if (bedLengthM.trim()) fd.append('bed_length_m', bedLengthM.replace(',', '.'))
+        if (isBedRoom) fd.append('bed_length_m', (bedLengthM.trim() || '2').replace(',', '.'))
         if (dimensionOrientation.trim()) fd.append('dimension_orientation', dimensionOrientation.trim())
         fd.append('price_tier', priceTier)
         fd.append('keep_furniture', cleaned && useCleaned ? '0' : (keepFurniture ? '1' : '0'))
@@ -548,6 +583,7 @@ export function GenerationPanel({
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
+    setEstimateNote(''); setEstimateError(''); setEstimateBusy(false)
     setStyle(null); setAccent('none'); setScheme('none'); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(true)
     setCustomOpen(false); setSchemeOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
@@ -630,22 +666,29 @@ export function GenerationPanel({
                   <p className="eyebrow">Тип комнаты</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">Чтобы в дизайне не появились предметы из другого помещения.</p>
                   <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setCleaned(null); setUseCleaned(true); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
+                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setBedLengthM(type === 'Спальня' || type === 'Детская' ? '2' : ''); setCleaned(null); setUseCleaned(true); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
                   </div>
                 </div>
               )}
               {photo && roomType && (
-                <details className="mt-5 border p-4">
-                  <summary className="cursor-pointer text-sm font-medium">Размеры комнаты и кровати <span className="ml-1 text-xs font-normal text-muted-foreground">необязательно</span></summary>
-                  <p className="mt-3 text-xs leading-5 text-muted-foreground">Если знаете реальные размеры, модель будет соблюдать масштаб мебели. Ширина, длина и высота заполняются вместе; длину кровати можно указать отдельно.</p>
-                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="mt-5 border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="eyebrow">Размеры комнаты <span className="ml-1 font-normal text-muted-foreground">необязательно</span></p>
+                      <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">Укажите реальные ширину, длину и высоту — модель точнее подберёт мебель и проходы. Заполняйте все три поля вместе.</p>
+                    </div>
+                    <button type="button" disabled={!file || estimateBusy} onClick={() => void estimateDimensions()} className="action-secondary min-h-9 px-3 text-xs disabled:opacity-40">{estimateBusy ? 'Определяем…' : 'Определить по фото'}</button>
+                  </div>
+                  {estimateNote && <p className="mt-3 border border-primary/30 bg-primary/5 px-3 py-2 text-xs leading-5 text-muted-foreground">{estimateNote}</p>}
+                  {estimateError && <p className="mt-3 text-xs text-destructive" role="alert">{estimateError}</p>}
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <label className="block"><span className="eyebrow mb-1 block">Ширина, м</span><input value={roomWidthM} onChange={event => setRoomWidthM(event.target.value)} inputMode="decimal" placeholder="3.0" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
                     <label className="block"><span className="eyebrow mb-1 block">Длина, м</span><input value={roomLengthM} onChange={event => setRoomLengthM(event.target.value)} inputMode="decimal" placeholder="6.0" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
                     <label className="block"><span className="eyebrow mb-1 block">Высота, м</span><input value={roomHeightM} onChange={event => setRoomHeightM(event.target.value)} inputMode="decimal" placeholder="2.5" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
-                    <label className="block"><span className="eyebrow mb-1 block">Кровать, м</span><input value={bedLengthM} onChange={event => setBedLengthM(event.target.value)} inputMode="decimal" placeholder="2.0" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
                   </div>
+                  {isBedRoom && <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Для спальни и детской длина кровати 2,0 м подставляется автоматически.</p>}
                   <label className="mt-3 block"><span className="eyebrow mb-1 block">Ориентация размеров</span><textarea value={dimensionOrientation} onChange={event => setDimensionOrientation(event.target.value)} rows={2} placeholder="Например: ширина — стена с окном, длина — от двери до окна" className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
-                </details>
+                </div>
               )}
               <div className="mt-4" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
                 {photoError && <p className="mb-3 text-sm text-destructive" role="alert">{photoError}</p>}

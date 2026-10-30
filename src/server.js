@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { q, migrate } from './db.js';
 import { startWorker, enqueueRender } from './jobs.js';
-import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect } from './openrouter.js';
+import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect, estimateRoomDimensions } from './openrouter.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
 import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
@@ -947,6 +947,23 @@ app.post('/api/cleanup', rateLimit, upload.single('photo'), h(async (req, res) =
   res.json({ image: `data:${mime};base64,${shell.toString('base64')}`, model: out.model || cleanupCfg.model, cost_usd: out.cost ?? null });
 }));
 
+app.post('/api/estimate-room', rateLimit, upload.single('photo'), h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const photo = req.file;
+  if (!photo) return res.status(400).json({ error: 'Нет фото' });
+  const roomType = String(req.body?.room_type || '').trim().slice(0, 80);
+  if (MOCK_MODE) {
+    return res.json({
+      width_m: 3, length_m: 4, height_m: 2.7, bed_present: /спальн|детск/i.test(roomType),
+      confidence: 'low', reasoning: 'Mock-оценка для локальной разработки', assumptions: [], cost_usd: 0,
+    });
+  }
+  const clean = await sanitizeImage(photo.buffer);
+  const out = await estimateRoomDimensions(clean.toString('base64'), photo.mimetype, { roomType });
+  log({ event: 'room_estimate', room_type: roomType, width_m: out.width_m, length_m: out.length_m, height_m: out.height_m, confidence: out.confidence, cost_usd: out.cost ?? null });
+  res.json({ ...out, cost_usd: out.cost ?? null });
+}));
+
 app.post('/api/rooms', rateLimit, upload.fields([
   { name: 'photo', maxCount: 1 },
   { name: 'style_ref', maxCount: 1 },
@@ -1005,7 +1022,8 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const roomLengthM = optionalMeasure(req.body.room_length_m, 1, 30);
   const roomHeightM = optionalMeasure(req.body.room_height_m, 2, 10);
   const bedLengthM = optionalMeasure(req.body.bed_length_m, 1, 4);
-  if ([roomWidthM, roomLengthM, roomHeightM, bedLengthM].some(value => value === undefined)) {
+  const isBedRoom = /спальн|детск/i.test(roomType);
+  if ([roomWidthM, roomLengthM, roomHeightM].some(value => value === undefined) || (isBedRoom && bedLengthM === undefined)) {
     return res.status(400).json({ error: 'Размеры должны быть положительными числами в метрах: комната 1–30, высота 2–10, кровать 1–4' });
   }
   const hasRoomMeasure = [roomWidthM, roomLengthM, roomHeightM].some(value => value !== null);
@@ -1013,6 +1031,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   if (hasRoomMeasure && !hasAllRoomMeasures) {
     return res.status(400).json({ error: 'Заполните все три размера комнаты: ширину, длину и высоту' });
   }
+  const effectiveBedLengthM = isBedRoom ? (bedLengthM ?? 2) : null;
   const dimensionOrientation = String(req.body.dimension_orientation || '').trim().slice(0, 200) || null;
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
@@ -1027,7 +1046,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
       return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}` });
     }
   }
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, bedLengthM, dimensionOrientation);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {

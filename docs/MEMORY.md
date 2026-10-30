@@ -76,8 +76,10 @@
 - Деплой: push в `main` → GitHub Actions → VPS.
 - Прод задеплоен на `d279c48` (2026-10-30), smoke зелёный; стилей 17, активны 2.
 - Миграции: `001`–`027`.
-- Тесты: `npm test` — 51 тест. Frontend: `cd web && npm run lint && npm run build`.
+- Тесты: `npm test` — 53 теста. Frontend: `cd web && npm run lint && npm run build`.
 - Размеры комнаты/кровати, `scalePlan` и radiator-cover блоки подключены к `buildPrompt`; скандинавский style brief — в `styles.prompt_description`.
+- Ширина/длина/высота комнаты спрашиваются у пользователя для всех типов; длина кровати — только для спальни/детской, по умолчанию 2.0 м, для остальных комнат игнорируется.
+- `POST /api/estimate-room` оценивает размеры по фото через vision (типовые ориентиры), заполняет форму, но пользователь обязан проверить и поправить вручную.
 - 7 новых стилей 2026 добавлены неактивными в `027_trend_styles.sql`; включаются в админке «Стили».
 - Типы комнат: справочник в `app_settings.roomtypes.config.v1`, админка «Комнаты», дефолты в `src/roomtypes.js`; `/api/room-types` отдаёт только активные.
 - Health: `GET /api/health`.

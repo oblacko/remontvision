@@ -40,6 +40,11 @@ test('long narrow room keeps the central path clear', () => {
   assert.match(plan, /60 cm path/);
 });
 
+test('non-bedroom plans do not mention a bed even if bed length is passed', () => {
+  const plan = buildScalePlan({ roomType: 'Гостиная (зал)', width: 4, length: 5, height: 2.7, bedLength: 2 });
+  assert.doesNotMatch(plan, /bed|кроват/i);
+});
+
 test('no plan without all room dimensions', () => {
   assert.equal(buildScalePlan({ roomType: 'Спальня', width: 3, length: 6 }), '');
 });

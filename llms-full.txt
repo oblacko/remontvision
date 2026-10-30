@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T13:08:31.524Z
+Generated: 2026-10-30T13:28:39.620Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -47,7 +47,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 1. Пользователь загружает фото комнаты, выбирает тип комнаты, стиль или свой референс, класс материалов.
 2. Если мебель не сохраняем — сначала очищаем комнату до пустого каркаса, затем делаем дизайн с сохранением архитектуры, камеры и пропорций.
-3. Если указаны размеры комнаты и кровати, планировщик масштаба подбирает габариты мебели и проходы; правила размеров, радиаторов и плана редактируются в админке «Промт».
+3. Размеры комнаты можно ввести вручную или нажать «Определить по фото» — vision предложит ширину, длину и высоту, а пользователь проверит и поправит. Планировщик масштаба подберёт габариты мебели и проходы. Для спальни и детской длина кровати 2 м подставляется автоматически; правила размеров, радиаторов и плана редактируются в админке «Промт».
 4. Базовый дизайн создаётся без карточек товаров: исходник задаёт геометрию, один art ref — только свет, палитру, материалы и стайлинг.
 5. Vision-разбор достаёт материалы, поверхности, электрику и подсказки для правок.
 6. Смета собирается из товаров каталога и честно разделяет подобранные, похожие и проверенные на рендере позиции.
@@ -215,7 +215,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 51 тест, Postgres не нужен
+npm test                                      # node:test, 53 теста, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -256,6 +256,7 @@ node --check src/openrouter.js
 |---|---|
 | Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
 | Размеры комнаты, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js`, `web/src/components/GenerationPanel.tsx` |
+| Оценка размеров по фото | `src/openrouter.js`, `src/server.js`, `web/src/components/GenerationPanel.tsx` |
 | Правила комнат, слоты, запреты | `src/roomtypes.js` |
 | Подбор товаров (старый каталог) | `src/curate.js` |
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
@@ -312,7 +313,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 51 тест: промт, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 53 теста: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -380,6 +381,7 @@ Last updated: 2026-10-30
 - Production deployed at `d279c48` (2026-10-30); migrations `001`–`027` applied.
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
+- Room dimensions: user can enter width/length/height manually or click `POST /api/estimate-room` for a vision estimate; estimates prefill the form but must be confirmed. Bed length is only for bedroom/children rooms and defaults to 2.0 m.
 - Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
 - Saved reference prompts are now wired in: `docs/prompts/scandinavian-bedroom-3x6.txt` blocks live in `promptconfig` (`dimensions`, `scalePlan`, `bed`, `radiators`) and room dimension fields; `docs/prompts/scandinavian-style-driven.txt` style blocks live in the Scandinavian `styles.prompt_description` (migration 026).
 - New reference `docs/prompts/interior-prompt-generator-2026.md`: deterministic scale planner in `src/scaleplan.js` (bed width, 60/80 cm walkways, kitchen by area, low ceilings, narrow/long rooms) and 7 trend styles added inactive in migration 027 (Wabi-Sabi, Organic Modern, Warm Minimalism, Biophilic, Modern Heritage, New Maximalism, Mediterranean Modern). Activate styles in admin.
@@ -428,7 +430,7 @@ Last updated: 2026-10-30
 
 ```bash
 npm install
-npm test                 # 51 test
+npm test                 # 53 tests
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -632,10 +634,12 @@ flowchart LR
 - `use_catalog` — `1/0`;
 - `palette`, `accent`;
 - `room_width_m`, `room_length_m`, `room_height_m` — необязательные реальные размеры комнаты; заполняются только все три вместе;
-- `bed_length_m` — необязательная полная длина кровати с каркасом;
+- `bed_length_m` — только для спальни/детской; если не передан, подставляется 2.0 м. Для остальных комнат игнорируется;
 - `dimension_orientation` — что считается шириной/длиной, например «ширина — стена с окном».
 
 Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`. Размеры валидируются: комната 1–30 м, высота 2–10 м, кровать 1–4 м.
+
+Перед созданием комнаты пользователь может нажать «Определить по фото»: `POST /api/estimate-room` (multipart `photo`, `room_type`) вызывает vision-модель, оценивает ширину/длину/высоту по типовым ориентирам (дверь, кровать, шкафы, перспектива) и возвращает `width_m`, `length_m`, `height_m`, `bed_present`, `confidence`, `reasoning`. Значения только заполняют поля формы — пользователь обязан проверить и поправить их перед генерацией.
 
 ### 2. Очередь и кредит
 
@@ -1092,7 +1096,7 @@ URL: `/admin`
 - **Свет** — cove, подсветка, лампы, запреты.
 - **Размеры комнаты** — блок с `{room}`, `{width}`, `{length}`, `{height}`, `{orientation}`; добавляется, когда пользователь указал размеры.
 - **План масштаба** — обёртка вокруг вычисленного плана мебели и проходов (`{room}`, `{plan}`).
-- **Кровать** — блок с `{room}`, `{bed_length}`; добавляется, когда указана длина кровати.
+- **Кровать** — блок с `{room}`, `{bed_length}`; используется только для спальни/детской, длина по умолчанию 2.0 м. Для гостиной, кухни и санузла блок не добавляется.
 - **Радиаторы** — вентилируемые декоративные экраны; запрет выдумывать радиаторы и закрывать вентиляцию.
 - **Уборка и техника** — радиатор, ТВ, провода, зеркала, люстры.
 - **Окна и текстиль** — шторы, жалюзи, карнизы.
@@ -1208,6 +1212,7 @@ Admin: заголовок `X-Admin-Key`.
 | POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
 | POST | `/api/renders/:id/procurement` | запуск подбора товаров, списывает 1 кредит; повторный вызов отдаёт существующий запуск |
 | POST | `/api/cleanup` | очистка комнаты по загруженному фото; возвращает data URL пустой комнаты |
+| POST | `/api/estimate-room` | vision-оценка размеров по фото: `{width_m, length_m, height_m, bed_present, confidence, reasoning}`; требует авторизацию |
 | GET | `/api/procurement/:id` | статус, позиции и найденные товары |
 | GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
@@ -1231,7 +1236,7 @@ Admin: заголовок `X-Admin-Key`.
 | `keep_furniture` | нет | `1/0`, default `1` |
 | `use_catalog` | нет | `1/0`, default `1` |
 | `room_width_m`, `room_length_m`, `room_height_m` | нет | реальные размеры комнаты в метрах; либо все три, либо ни одного |
-| `bed_length_m` | нет | полная длина кровати с каркасом, метры |
+| `bed_length_m` | нет | только для спальни/детской; по умолчанию 2.0 м. Для остальных комнат игнорируется |
 | `dimension_orientation` | нет | что считается шириной/длиной |
 | `palette`, `accent` | нет | цветовая схема/акцент |
 
@@ -2324,9 +2329,23 @@ export const MAX_REFERENCES; // 4
 - Сохранён внешний референс `docs/prompts/interior-prompt-generator-2026.md` (2321 строка): 7-блочный шаблон, таблицы масштаба, нормы проходов, режимы референсов, 10 стилей × 5 промтов, QA-чеклист.
 - Добавлен детерминированный `src/scaleplan.js`: ширина кровати по ширине комнаты, проходы 60/80 см, кухня по площади, низкие потолки, узкие/длинные комнаты. План вставляется в `buildPrompt()` как `SCALE PLAN` при наличии размеров; обёртка редактируется в админке («Промт»).
 - Добавлены 7 новых стилей неактивными (`027_trend_styles.sql`): Ваби-саби, Органик модерн, Тёплый минимализм, Биофильный, Современная классика, Новый максимализм, Средиземноморский модерн. Активируются в админке «Стили».
-- Не внедрено: автоматический `analyze_room`, product-reference режимы `must_use/preferred/inspiration` в base-генерации и QA-порог `scaleHonesty`. Причины: текущий design-first пайплайн и product refs только в edit.
-- Тестов теперь 51.
+- Не внедрено: полный автоматический `analyze_room` (окна/двери/препятствия), product-reference режимы `must_use/preferred/inspiration` в base-генерации и QA-порог `scaleHonesty`. Оценка размеров по фото сделана эвристической, см. ниже.
 - Задеплоено в прод: `d279c48`, GitHub Actions успешно, smoke зелёный. Миграции `026`–`027` применены; в БД 17 стилей, активны 2 (Скандинавский, Джапанди).
+
+## 2026-10-30 — оценка размеров комнаты по фото
+
+- Добавлен `POST /api/estimate-room`: vision-модель оценивает ширину/длину/высоту по фото и типовым ориентирам, возвращает `confidence`, `reasoning` и `bed_present`.
+- В генераторе появилась кнопка «Определить по фото»: оценка подставляет значения в поля размеров, пользователь проверяет и правит вручную.
+- Оценка приблизительная: при неуверенности `confidence=low`, UI явно просит проверить размеры. Автоматически в генерацию оценка не попадает без подтверждения.
+- Эндпоинт требует авторизацию и использует `rateLimit`, как остальные vision-вызовы.
+- Тестов теперь 53.
+
+## 2026-10-30 — размеры комнаты без кровати в не-спальнях
+
+- Поле длины кровати убрано из генератора для всех комнат, кроме спальни и детской. Для них длина 2.0 м подставляется автоматически.
+- Сервер игнорирует `bed_length_m` для гостиной, кухни, санузла и других комнат; блок `BED SIZE` в промт не попадает.
+- Размеры комнаты (ширина/длина/высота) сделаны видимыми и общими для всех типов; они остаются необязательными, но заполняются только вместе.
+- `SCALE PLAN` для не-спален больше не содержит кроватей и спальных сценариев.
 
 ## 2026-10-30 — промты подключены к генерации
 
