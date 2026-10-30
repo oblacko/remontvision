@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T18:35:45.415Z
+Generated: 2026-10-30T18:42:22.974Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -198,7 +198,7 @@ app/
 
 ## Главное, что нужно знать до изменений
 
-1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
+1. **Сейчас каталог демонстрационный и отключён в дизайне.** 100 активных товаров, у всех `url = NULL`; `use_catalog` принудительно `false` в `jobs.js`/`server.js`, товары и product refs в промт не попадают. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
 2. **Не хардкодьте модели.** Render/vision/cleanup-модели хранятся в `app_settings` и `.env` (`RENDER_MODEL`, `VISION_MODEL`, cleanup-конфиг) и меняются через админку. Перед выводами проверяйте фактическую конфигурацию; architecture QA по умолчанию выключен (`ARCHITECTURE_QA_ENABLED=0`).
 3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; FLUX 2 Pro resolution не принимает. У FLUX возможна блокировка content moderation на спальнях/кроватях — проверяйте.
 4. **Промт состоит из двух слоёв:**
@@ -215,7 +215,7 @@ app/
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 63 теста, Postgres не нужен
+npm test                                      # node:test, 64 теста, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -313,7 +313,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 63 теста: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing/validator, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps (cleanup guard), подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 64 теста: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing/validator, каталог отключён в промте, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps (cleanup guard), подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
@@ -377,7 +377,7 @@ Last updated: 2026-10-30
 ## Current state (2026-10-30)
 
 - Generation: FLUX 3 Image 1K (`app_settings`/`.env`; migration 031; code default `black-forest-labs/flux-3-image`), aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash + art director. `isCleanupModel()` blocks Klein as a design model and falls back to FLUX; QA failure also triggers a FLUX fallback.
-- Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
+- Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`. `keep_furniture` defaults to **false** for new rooms; the user can turn it on. Catalog products are **hard-disabled** in design (`use_catalog=false` in jobs/server): no product refs, no catalog materials, no render_items.
 - 15 styles in DB, 8 active (scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean); minimal/neo removed by migration 030, modern kept because old rooms use it. 12 default room types, 100 active demo products, **0 products with real URL**.
 - Production deployed from `main` via GitHub Actions; migrations `001`–`030` (new migrations apply on deploy).
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
@@ -2346,6 +2346,14 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
+
+## 2026-10-30 — по умолчанию без мебели и без каталога
+
+- «Оставить мебель» теперь **выключено по умолчанию**: frontend initial/reset/accept, server fallback и `rooms.keep_furniture` default (миграция `032`). Пользователь может включить вручную.
+- Каталог **принудительно отключён в дизайне**: `jobs.js` всегда `useCatalog=false`, `server.js` игнорирует `use_catalog` и пишет `false`, в промт не попадают товары/product refs, `render_items` не собираются.
+- Из UI убран переключатель «Использовать каталог»; в «Дополнительно» остался только режим мебели и пояснение, что каталог/смета отключены.
+- Добавлен тест: `buildPrompt` с `useCatalog=false` и товарами не содержит товар в промте.
+- Проверено локально: `information_schema` → `keep_furniture=false`, `use_catalog=false`; `npm test` — 64 теста.
 
 ## 2026-10-30 — разгрузка промта: убраны конфликты
 

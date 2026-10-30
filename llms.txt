@@ -27,7 +27,7 @@ Last updated: 2026-10-30
 ## Current state (2026-10-30)
 
 - Generation: FLUX 3 Image 1K (`app_settings`/`.env`; migration 031; code default `black-forest-labs/flux-3-image`), aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash + art director. `isCleanupModel()` blocks Klein as a design model and falls back to FLUX; QA failure also triggers a FLUX fallback.
-- Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
+- Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`. `keep_furniture` defaults to **false** for new rooms; the user can turn it on. Catalog products are **hard-disabled** in design (`use_catalog=false` in jobs/server): no product refs, no catalog materials, no render_items.
 - 15 styles in DB, 8 active (scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean); minimal/neo removed by migration 030, modern kept because old rooms use it. 12 default room types, 100 active demo products, **0 products with real URL**.
 - Production deployed from `main` via GitHub Actions; migrations `001`–`030` (new migrations apply on deploy).
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).

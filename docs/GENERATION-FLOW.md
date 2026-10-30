@@ -130,7 +130,7 @@ flowchart TD
 | Разрешение/aspect | `app_settings.model.resolution/aspect_ratio` > env | image-запрос, `snapAspect` по фото |
 | Vision-модель | `app_settings.model.vision` > `VISION_MODEL` | арт-директор, бриф, анализ рендера, QA |
 | Очистка | `app_settings.cleanup.config.v1` (`src/cleanupconfig.js`) | `generateCleanupRender`, shell |
-| Каталог | `products` + `style_products` + `matchCatalog` | смета и подсказки (если `use_catalog=true`) |
+| Каталог | `products` + `style_products` + `matchCatalog` | в дизайне отключён: товары и смета не используются |
 | Прокси | `app_settings` / env (`src/proxy.js`) | все OpenRouter-запросы |
 | Кредиты | `users.balance` + `credit_txn` | списание 1 кредита, возврат при ошибке/QA |
 | Себестоимость | `usage.cost` каждого запроса | `renders.cost_usd` и `renders.meta.cost_breakdown` |
@@ -164,10 +164,10 @@ flowchart TD
 
 | Флаг | Влияет на |
 |---|---|
-| `keep_furniture=true` | один проход, существующая мебель сохраняется; очистка не запускается |
-| `keep_furniture=false` | очистка (если включена) → дизайн с нуля |
-| `use_catalog=true` | curate, материалы в промте, смета, matchCatalog |
-| `use_catalog=false` | свободный дизайн, без товаров и сметы (дефолт) |
+| `keep_furniture=true` | только если пользователь явно включил; существующая мебель сохраняется, очистка не запускается |
+| `keep_furniture=false` | **дефолт**; очистка (если включена) → дизайн с нуля |
+| `use_catalog=true` | не используется: каталог принудительно выключен в дизайне |
+| `use_catalog=false` | всегда; свободный дизайн, без товаров и сметы |
 | `style.config.mode=text` | только текстовый style brief, пользовательский фото-референс игнорируется |
 | `style.config.mode=reference` | 1 art ref: пользовательский > approved hero > обложка |
 | `style.config.mode=swatches` | material board из `styleswatch`, без архитектуры |

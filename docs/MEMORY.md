@@ -87,12 +87,13 @@
 - Задеплоено: арт-директор, 8 активных стилей (`028`), `use_catalog=false` по умолчанию, `estimate-room` с типом комнаты и стилями, UI-тюнинг, FLUX 3 Image 1K, разбивка себестоимости, удаление `minimal`/`neo` (`030`), layout-first (`layout_items`/`layout_plan`/`framing_note`), QA размеров, «живые» детали, объекты в логах.
 - Текущая модель рендера: **FLUX 3 Image 1K**; прогон 10 сценариев — 10/10 ok, $0.5093, vision-QA в среднем style 9.20 / photo 8.70 / arch 9.80 / scale 8.80 / authorial 8.20.
 - Миграции: `001`–`030` (`029` фиксирует FLUX 3 Image 1K; `030` удаляет `minimal`/`neo` только если они не используются комнатами).
-- Тесты: `npm test` — 63 теста. Frontend: `cd web && npm run lint && npm run build`.
+- Тесты: `npm test` — 64 теста. Frontend: `cd web && npm run lint && npm run build`.
 - Размеры комнаты/кровати, `scalePlan` и radiator-cover блоки подключены к `buildPrompt`; скандинавский style brief — в `styles.prompt_description`.
 - Scale plan исправлен: детская — кровать 90–140 см (не king), спальня 3.0 м — 160 см, проходы считаются от реального запаса по бокам (`side = (width - bedWidth/100) / 2`).
 - Ширина/длина/высота комнаты спрашиваются у пользователя для всех типов; длина кровати — только для спальни/детской, по умолчанию 2.0 м, для остальных комнат игнорируется.
 - `POST /api/estimate-room` через `analyzeRoomBrief()` оценивает размеры, определяет тип комнаты и предлагает 2–3 стиля; бриф запускается автоматически при загрузке фото (401 молча игнорируется) и по кнопке, заполняет форму. Пользователь проверяет и правит.
-- Демо-каталог/смета по умолчанию выключены: `use_catalog=false` (frontend, server fallback, `rooms.use_catalog` default, миграция `028`).
+- Каталог в дизайне принудительно отключён: `jobs.js`/`server.js` всегда используют `useCatalog=false`, товары и product refs в промт не попадают. `rooms.use_catalog` default false; миграция `032` также ставит `keep_furniture=false` по умолчанию для новых комнат.
+- «Оставить мебель» по умолчанию **выключено** (frontend initial/reset/accept, server fallback, `rooms.keep_furniture` default false). Пользователь может включить вручную.
 - 7 новых стилей 2026 добавлены в `027_trend_styles.sql`; миграция `028` активирует кураторский набор из 8 (scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean).
 - Типы комнат: справочник в `app_settings.roomtypes.config.v1`, админка «Комнаты», дефолты в `src/roomtypes.js`; `/api/room-types` отдаёт только активные.
 - Health: `GET /api/health`.

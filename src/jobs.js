@@ -90,7 +90,9 @@ export async function processRender(renderId) {
   const roomTypeInfo = roomTypeByName(roomType);
   const priceTier = normalizeTier(room.price_tier || 'comfort');
   const keepFurniture = room.keep_furniture !== false;
-  const useCatalog = room.use_catalog !== false;
+  // Каталог временно не участвует в дизайне: только свободный дизайн.
+  // Флаг в БД остаётся для истории/будущего, но в промт товары не попадают.
+  const useCatalog = false;
   const roomDimensions = (room.room_width_m || room.room_length_m || room.room_height_m || room.bed_length_m)
     ? {
         width: room.room_width_m == null ? null : Number(room.room_width_m),

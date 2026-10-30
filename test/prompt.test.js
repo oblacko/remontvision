@@ -187,6 +187,17 @@ test('no art direction block when the art director did not run', () => {
   assert.doesNotMatch(prompt, /ART DIRECTION/);
 });
 
+test('catalog products are not included in the design prompt', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    useCatalog: false,
+    products: [{ id: 1, name: 'UNIQUE_CATALOG_PRODUCT', category: 'bed', price: 100 }],
+  });
+  assert.match(prompt, /CATALOG DISABLED/);
+  assert.doesNotMatch(prompt, /UNIQUE_CATALOG_PRODUCT/);
+});
+
 test('furniture plan is injected after art direction and overrides it', () => {
   const prompt = buildPrompt({
     style: 'Тёплый минимализм',

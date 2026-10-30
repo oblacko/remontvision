@@ -10,7 +10,7 @@
 
 ## Главное, что нужно знать до изменений
 
-1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
+1. **Сейчас каталог демонстрационный и отключён в дизайне.** 100 активных товаров, у всех `url = NULL`; `use_catalog` принудительно `false` в `jobs.js`/`server.js`, товары и product refs в промт не попадают. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
 2. **Не хардкодьте модели.** Render/vision/cleanup-модели хранятся в `app_settings` и `.env` (`RENDER_MODEL`, `VISION_MODEL`, cleanup-конфиг) и меняются через админку. Перед выводами проверяйте фактическую конфигурацию; architecture QA по умолчанию выключен (`ARCHITECTURE_QA_ENABLED=0`).
 3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; FLUX 2 Pro resolution не принимает. У FLUX возможна блокировка content moderation на спальнях/кроватях — проверяйте.
 4. **Промт состоит из двух слоёв:**
@@ -27,7 +27,7 @@
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 63 теста, Postgres не нужен
+npm test                                      # node:test, 64 теста, Postgres не нужен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.6+, .env через node --env-file
@@ -125,7 +125,7 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 63 теста: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing/validator, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps (cleanup guard), подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — 64 теста: промт, размеры/кровать/радиаторы/scale plan, layout plan/framing/validator, каталог отключён в промте, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps (cleanup guard), подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
