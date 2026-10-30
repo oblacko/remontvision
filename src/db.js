@@ -242,7 +242,7 @@ export const q = {
       .then(r => r.rows),
   userGenerations: userId =>
     pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at, r.request_text,
-                       r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms,
+                       r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms, r.meta,
                        rm.style, rm.budget, rm.price_tier, rm.photo_path, rm.room_type,
                        GREATEST(0,
                          COALESCE((SELECT SUM(-ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.delta < 0), 0)

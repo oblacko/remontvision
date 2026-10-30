@@ -199,6 +199,7 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 
 ## Связанные документы
 
+- [GENERATION-FLOW.md](GENERATION-FLOW.md) — полная схема: данные, источники, зависимости и себестоимость
 - [CATALOG.md](CATALOG.md)
 - [PROMPT-RULES.md](PROMPT-RULES.md) — если добавлен отдельный файл; иначе раздел в ADMIN.md
 - [OPS.md](OPERATIONS.md)

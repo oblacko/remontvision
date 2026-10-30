@@ -1,0 +1,149 @@
+# Полный сценарий генерации: данные, источники и зависимости
+
+Это карта того, как фото превращается в готовый дизайн: какие запросы уходят, какие данные в них участвуют, откуда они берутся и как считается себестоимость. Код: `src/server.js`, `src/jobs.js`, `src/openrouter.js`, `src/artdirector.js`.
+
+## 1. Пользовательский сценарий
+
+```mermaid
+flowchart TD
+  U["Пользователь"] -->|"JPG/PNG/WebP ≤15 МБ"| UP["Загрузка фото"]
+  UP --> AB["Авто-бриф: POST /api/estimate-room"]
+  AB -->|"vision: analyzeRoomBrief"| BR["Тип комнаты, размеры, окна/двери, стили"]
+  BR --> FORM["Форма: тип, размеры, стиль"]
+  FORM -->|"поправил при необходимости"| GEN["Сгенерировать · 1 кредит"]
+  GEN --> API["POST /api/rooms"]
+  API --> Q["Очередь: rooms + renders(queued) + credit_txn"]
+  Q --> W["Worker processRender"]
+  W --> DONE["renders.done + rooms.done"]
+  DONE --> RESULT["Результат: кадр, авторский бриф, правки"]
+  RESULT -->|"1 кредит"| PROC["Найти товары (procurement)"]
+```
+
+## 2. Полный пайплайн рендера
+
+```mermaid
+flowchart TD
+  START["processRender(room, render)"] --> LOAD["Загрузить room, render, roomType, style, priceTier"]
+  LOAD --> MODE{"iteration?"}
+
+  MODE -->|"да (правка)"| ITER["parent render + optional product ref"]
+  ITER --> EDITP["buildEditPrompt: короткий точечный промт"]
+
+  MODE -->|"нет (базовый)"| BASE["База"]
+  BASE --> STYLE["styles: prompt_description + swatches"]
+  BASE --> REFMODE{"style.config.mode"}
+  REFMODE -->|"text"| TEXT["Только текстовый бриф"]
+  REFMODE -->|"reference"| REF["style_references / user ref → 1 art ref"]
+  REFMODE -->|"swatches"| SW["styleswatch → material board"]
+
+  BASE --> AD["Арт-директор: buildArtDirection (vision)"]
+  AD --> ADT["ART DIRECTION: палитра, focal point, стена, свет, текстиль, декор"]
+
+  BASE --> CUR{"use_catalog?"}
+  CUR -->|"да"| CURATE["curate: products × style × tier"]
+  CUR -->|"нет"| NOCAT["Без товаров и сметы"]
+
+  CURATE --> PROMPT["buildPrompt"]
+  NOCAT --> PROMPT
+  TEXT --> PROMPT
+  REF --> PROMPT
+  SW --> PROMPT
+  ADT --> PROMPT
+  PROMPT --> PBLOCKS["TASK · ARCHITECTURE LOCK · ART DIRECTION · SCALE · KEEP/CHANGE · STYLE · MATERIALS · OUTPUT/AVOID"]
+
+  PBLOCKS --> CLEAN{"keep_furniture=false<br/>и cleanup.enabled<br/>и нет shell?"}
+  CLEAN -->|"да"| CLEANUP["generateCleanupRender: FLUX 3 Klein → shell"]
+  CLEAN -->|"нет"| DESIGN["generateRender: FLUX 3 Image 1K"]
+  CLEANUP --> DESIGN
+
+  DESIGN --> ARCH{"ARCHITECTURE_QA_ENABLED?"}
+  ARCH -->|"да"| AQA["assessArchitecture"]
+  AQA -->|"fail"| ARETRY["retry generateRender + QA"]
+  AQA -->|"pass"| STORE
+  ARETRY --> STORE["fitAspect + putBuffer: renders/{id}.ext"]
+  ARCH -->|"нет"| STORE
+  EDITP --> DESIGN
+
+  STORE --> PQA{"iteration + product?"}
+  PQA -->|"да"| QA["assessProductEdit"]
+  QA -->|"reject"| REJECT["renders.rejected · refund"]
+  QA -->|"accept"| ANALYZE
+  PQA -->|"нет"| ANALYZE
+
+  ANALYZE["parseRender (vision): items, surfaces, electrical, visible"] --> MATCH{"use_catalog?"}
+  MATCH -->|"да"| MC["matchCatalog + items"]
+  MATCH -->|"нет"| NOMATCH["Без каталога"]
+  MC --> ANA["buildAnalysis: RAL, электрика, подсказки"]
+  NOMATCH --> ANA
+  ANA --> SAVE["renders.analysis + meta.cost_breakdown + cost_usd"]
+  SAVE --> END["renders.done · rooms.done"]
+```
+
+## 3. Что откуда берётся
+
+| Данные | Источник | Куда попадает |
+|---|---|---|
+| Фото комнаты | `rooms.photo_path` (uploads) | art director, design, architecture QA |
+| Пустой каркас | `rooms.precleaned_shell_path` или `renders.shell_path` | источник для design, если очистка была |
+| Родительский рендер | `renders.parent_render_id` | источник и смета для правок |
+| Тип комнаты | `rooms.room_type`; конфиг `app_settings.roomtypes.config.v1` или `src/roomtypes.js` | prompt, слоты, keep/change/forbid, электрика, стилизация |
+| Стиль | `rooms.style` → `styles` (`name`, `key`, `prompt_description`, `swatches`, `active`) | style brief, валидация, обложка |
+| Фото-референсы стиля | `style_references` (approved, по комнате) + пользовательский `rooms.style_ref_path` | 1 art ref в `reference`-режиме |
+| Товары стиля | `style_products` → `products` | curate, материалы/пол/стены в промте |
+| Режим стиля | `app_settings` (`style.config.v1`, `src/styleconfig.js`) | text / reference / swatches |
+| Класс материалов | `rooms.price_tier` → `src/pricing.js` | curate, MATERIAL CLASS, смета |
+| Размеры комнаты/кровати | `rooms.room_width_m/length_m/height_m/bed_length_m/dimension_orientation` | ROOM DIMENSIONS, `src/scaleplan.js`, BED SIZE |
+| Ориентация размеров | `rooms.dimension_orientation` | уточнение ширины/длины в промте |
+| Правила промта | `app_settings.prompt.rules.v1` + дефолты `src/promptconfig.js` | light, cleanup, windows, pinterest, photo, avoid |
+| Арт-директор | `buildArtDirection(photo, roomType, styleDescription, dimensions)` → vision | блок `ART DIRECTION` в промте, `renders.meta.art_direction` |
+| Модель дизайна | `app_settings.model.render` > `RENDER_MODEL` > код-дефолт | `generateRender`, `renders.model` |
+| Разрешение/aspect | `app_settings.model.resolution/aspect_ratio` > env | image-запрос, `snapAspect` по фото |
+| Vision-модель | `app_settings.model.vision` > `VISION_MODEL` | арт-директор, бриф, анализ рендера, QA |
+| Очистка | `app_settings.cleanup.config.v1` (`src/cleanupconfig.js`) | `generateCleanupRender`, shell |
+| Каталог | `products` + `style_products` + `matchCatalog` | смета и подсказки (если `use_catalog=true`) |
+| Прокси | `app_settings` / env (`src/proxy.js`) | все OpenRouter-запросы |
+| Кредиты | `users.balance` + `credit_txn` | списание 1 кредита, возврат при ошибке/QA |
+| Себестоимость | `usage.cost` каждого запроса | `renders.cost_usd` и `renders.meta.cost_breakdown` |
+
+## 4. Себестоимость полной генерации
+
+Один базовый дизайн может включать до 5+ платных запросов. Все они суммируются в `renders.cost_usd`, разбивка — в `renders.meta.cost_breakdown`:
+
+| Ключ | Запрос | Когда |
+|---|---|---|
+| `art_direction` | vision-арт-директор | базовый рендер, если `ART_DIRECTION_ENABLED≠0` |
+| `cleanup` | FLUX 3 Image Klein | `keep_furniture=false` + очистка включена + нет shell |
+| `design` | FLUX 3 Image 1K | всегда |
+| `design_retry` | повторный дизайн | architecture QA отклонил первый кадр |
+| `architecture_qa` | vision-QA | `ARCHITECTURE_QA_ENABLED=1` (по умолчанию 0) |
+| `product_qa` | vision-QA товара | правка с привязкой товара |
+| `render_analysis` | vision-анализ рендера | всегда, для RAL/электрики/подсказок |
+| `failed` | стоимость упавшего запроса | ошибка на любом этапе |
+
+Где смотреть:
+- кабинет → «Мои дизайны» → комната → «Себестоимость генерации» (итог + разбивка);
+- API: `GET /api/rooms/:id` → `render.cost_usd`, `render.cost_breakdown`;
+- API: `GET /api/my/generations` → `cost_usd`, `cost_breakdown`;
+- админка «Логи» → `renders.cost_usd`, `renders.meta.cost_breakdown`;
+- JSON-логи `render_done` / `render_error` → `cost_breakdown`.
+
+## 5. Режимы и зависимости
+
+| Флаг | Влияет на |
+|---|---|
+| `keep_furniture=true` | один проход, существующая мебель сохраняется; очистка не запускается |
+| `keep_furniture=false` | очистка (если включена) → дизайн с нуля |
+| `use_catalog=true` | curate, материалы в промте, смета, matchCatalog |
+| `use_catalog=false` | свободный дизайн, без товаров и сметы (дефолт) |
+| `style.config.mode=text` | только текстовый style brief, пользовательский фото-референс игнорируется |
+| `style.config.mode=reference` | 1 art ref: пользовательский > approved hero > обложка |
+| `style.config.mode=swatches` | material board из `styleswatch`, без архитектуры |
+| `ART_DIRECTION_ENABLED=0` | отключает vision-арт-директора |
+| `ARCHITECTURE_QA_ENABLED=1` | включает QA архитектуры и retry (дороже) |
+
+## 6. Ошибки, кредиты и стоимость
+
+- Ошибка любого запроса → `renders.error`, `error_stage`, `rooms.error`; кредит возвращается.
+- Товарный QA rejected → `renders.rejected`, кредит возвращается, родительский кадр остаётся.
+- Себестоимость в USD не возвращается: провайдер уже списал деньги; в `cost_usd` попадает сумма известных запросов, включая `failed`.
+- 402 → UI открывает пополнение; 401 → вход; 409 → комната ещё генерируется.

@@ -103,6 +103,26 @@ async function processRender(renderId) {
   const useCleanup = !iteration && !keepFurniture && !precleanedShell && cleanupCfg.enabled;
   let stage = 'start';
 
+  // Себестоимость полной генерации: каждый внешний запрос пишется отдельно.
+  const costBreakdown = {
+    art_direction: null,
+    cleanup: null,
+    design: null,
+    design_retry: null,
+    architecture_qa: null,
+    product_qa: null,
+    render_analysis: null,
+    failed: null,
+  };
+  const addCost = (key, value) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    costBreakdown[key] = (costBreakdown[key] || 0) + value;
+  };
+  const sumCostBreakdown = () => {
+    const total = Object.values(costBreakdown).reduce((sum, value) => sum + (typeof value === 'number' ? value : 0), 0);
+    return total > 0 ? total : null;
+  };
+
   try {
     stage = 'analyzing';
     await q.setRoomStatus('analyzing', room.id);
@@ -221,6 +241,7 @@ async function processRender(renderId) {
           if (ad?.text) {
             artDirection = ad.text;
             artDirectionCost = ad.cost || 0;
+            addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
             log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
           }
@@ -301,6 +322,7 @@ async function processRender(renderId) {
           designBuf = shellBytes;
           meta.source_used = 'cleanup';
           cleanupCost = cleanupOut.cost || 0;
+          addCost('cleanup', cleanupOut.cost);
           meta.cleanup = {
             model: cleanupCfg.model,
             resolution: cleanupCfg.resolution,
@@ -312,6 +334,7 @@ async function processRender(renderId) {
           };
           log({ event: 'cleanup_done', room_id: room.id, render_id: renderId, model: cleanupCfg.model, aspect: cleanupAspect, cost_usd: cleanupOut.cost ?? null, ms: Date.now() - cleanupStart });
         } catch (e) {
+          addCost('cleanup', e.cost);
           meta.source_used = 'original';
           meta.cleanup = { model: cleanupCfg.model, error: String(e.message || e).slice(0, 500), ms: Date.now() - cleanupStart };
           log({ event: 'cleanup_error', room_id: room.id, render_id: renderId, model: cleanupCfg.model, error: String(e.message || e).slice(0, 500) });
@@ -326,6 +349,7 @@ async function processRender(renderId) {
         aspectRatio,
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
+      addCost('design', out.cost);
       let architectureQa = null;
       if (ARCHITECTURE_QA_ENABLED && !iteration) {
         try {
@@ -337,6 +361,7 @@ async function processRender(renderId) {
             renderImageUrl: `data:${outMime};base64,${out.b64}`,
           });
           cost += architectureQa.cost || 0;
+          addCost('architecture_qa', architectureQa.cost);
           log({ event: 'architecture_qa', room_id: room.id, render_id: renderId, accepted: architectureQa.accepted, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: architectureQa.cost ?? null });
           if (!architectureQa.accepted) {
             const retryPrompt = `${prompt}
@@ -352,6 +377,7 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
               model: 'openai/gpt-image-2',
             });
             imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
+            addCost('design_retry', out.cost);
             const retryBuf = Buffer.from(out.b64, 'base64');
             const retryExt = detectImageExt(retryBuf);
             const retryMime = MIME_BY_EXT[retryExt] || 'image/png';
@@ -360,6 +386,7 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
               renderImageUrl: `data:${retryMime};base64,${out.b64}`,
             });
             cost += architectureQa.cost || 0;
+            addCost('architecture_qa', architectureQa.cost);
             log({ event: 'architecture_qa_retry', room_id: room.id, render_id: renderId, accepted: architectureQa.accepted, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: architectureQa.cost ?? null });
             if (!architectureQa.accepted) {
               throw new Error(`Не удалось сохранить архитектуру комнаты: ${architectureQa.issues.slice(0, 3).join('; ') || 'геометрия изменилась'}`);
@@ -414,14 +441,14 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
         }
       }
       meta.product_qa = productQa;
+      addCost('product_qa', productQa?.cost);
       if (!productQa.accepted && !MOCK_MODE) {
         const reason = productQa.issues.join('; ').slice(0, 240);
         const notice = productQa.status === 'error'
           ? 'Не удалось проверить товарную правку. Прежняя версия сохранена, кредит возвращён.'
           : `Товарная правка не прошла проверку${reason ? `: ${reason}` : '.'} Прежняя версия сохранена, кредит возвращён.`;
-        const qaParts = [cost, productQa.cost].filter(value => typeof value === 'number');
-        const qaTotalCost = qaParts.length ? qaParts.reduce((sum, value) => sum + value, 0) : null;
-        await q.setRenderMeta(renderId, { ...meta, model, cost_usd: cost ?? null, product_qa: productQa });
+        const qaTotalCost = sumCostBreakdown();
+        await q.setRenderMeta(renderId, { ...meta, model, cost_usd: qaTotalCost, cost_breakdown: costBreakdown, product_qa: productQa });
         await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id);
         await q.setRoomNotice(notice, room.id);
         const restored = await restoreCreditForRender(renderId, 'product_qa_rejected');
@@ -440,6 +467,7 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
       try {
         parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
         visionCost = parsed.cost;
+        addCost('render_analysis', visionCost);
         log({ event: 'render_analysis', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length });
       } catch (e) {
         log({ event: 'render_analysis_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
@@ -515,30 +543,31 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
     await q.setRenderAnalysis(renderId, analysis);
     log({ event: 'render_matched', room_id: room.id, render_id: renderId, parsed_items: parsed.items.length, matched: matched.length, curated: curated.length, suggestions: analysis.suggestions.length });
 
+    const totalCost = sumCostBreakdown();
     await q.setRenderMeta(renderId, {
       ...meta,
       model,
-      cost_usd: cost ?? null,
+      cost_usd: totalCost,
+      cost_breakdown: costBreakdown,
       product_qa_cost_usd: productQa?.cost ?? null,
       vision_cost_usd: visionCost ?? null,
       suggestion_targets: analysis.suggestions.map(s => s.target),
     });
 
-    const parts = [cost, productQa?.cost, visionCost].filter(c => typeof c === 'number');
-    const totalCost = parts.length ? parts.reduce((a, b) => a + b, 0) : null;
     await q.setRenderDone(renderKey, totalCost, model, render.id);
     await q.setRoomStatus('done', room.id);
-    log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
+    log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_breakdown: costBreakdown, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
   } catch (e) {
     const msg = String(e.message || e).slice(0, 500);
-    const errorCost = typeof e.cost === 'number' ? e.cost : null;
+    addCost('failed', e.cost);
+    const errorCost = sumCostBreakdown();
     await q.setRenderError(msg, renderId, stage, errorCost);
     await q.setRoomError(msg, room.id);
     try {
       const restored = await restoreCreditForRender(renderId, `render_error:${stage}`);
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, credit_restored: restored, ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restored: restored, ms: Date.now() - t0 });
     } catch (restoreError) {
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
     }
   }
 }

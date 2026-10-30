@@ -76,16 +76,14 @@ const fmtDateTime = (iso?: string | null) => iso
 
 type StylePreset = { key: string; name: string; accent: string; image_url?: string }
 const defaultStylePresets: StylePreset[] = [
-  { key: 'modern', name: 'Современный', accent: 'sand' },
-  { key: 'scandi', name: 'Скандинавский', accent: 'dust' },
-  { key: 'loft', name: 'Лофт', accent: 'graphite' },
-  { key: 'japandi', name: 'Джапанди', accent: 'forest' },
-  { key: 'neo', name: 'Неоклассика', accent: 'sand' },
-  { key: 'minimal', name: 'Минимализм', accent: 'graphite' },
-  { key: 'dark', name: 'Тёмный модерн', accent: 'graphite' },
-  { key: 'boho', name: 'Бохо', accent: 'terra' },
-  { key: 'deco', name: 'Ар-деко', accent: 'terra' },
-  { key: 'country', name: 'Кантри', accent: 'forest' },
+  { key: 'scandi', name: 'Скандинавский', accent: 'dust', image_url: '/images/style-scandi.webp' },
+  { key: 'japandi', name: 'Джапанди', accent: 'forest', image_url: '/images/style-japandi.webp' },
+  { key: 'wabi-sabi', name: 'Ваби-саби', accent: 'sand', image_url: '/images/style-japandi.webp' },
+  { key: 'organic', name: 'Органик модерн', accent: 'sand', image_url: '/images/style-minimal.webp' },
+  { key: 'warm-minimal', name: 'Тёплый минимализм', accent: 'dust', image_url: '/images/style-scandi.webp' },
+  { key: 'biophilic', name: 'Биофильный', accent: 'forest', image_url: '/images/style-country.webp' },
+  { key: 'heritage', name: 'Современная классика', accent: 'terra', image_url: '/images/style-neo.webp' },
+  { key: 'mediterranean', name: 'Средиземноморский модерн', accent: 'terra', image_url: '/images/style-deco.webp' },
 ] as const
 
 const refinePresets = [
