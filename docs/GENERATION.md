@@ -37,7 +37,7 @@ flowchart LR
 `POST /api/rooms` (multipart):
 
 - `photo` — фото комнаты;
-- `room_type` — один из 12 типов;
+- `room_type` — один из активных типов комнат (по умолчанию 12);
 - `style` — название стиля или пусто, если есть референс;
 - `style_ref` / `style_ref_url` — пользовательский референс;
 - `price_tier` — `start|comfort|premium|atelier`;

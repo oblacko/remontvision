@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T12:53:09.043Z
+Generated: 2026-10-30T13:08:31.524Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -26,7 +26,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 |---|---|
 | Генерация по фото | Работает: FLUX 3 Image, 1K, aspect auto |
 | Vision-разбор | Работает: Gemini 3 Flash |
-| Стили и room types | 10 стилей, 12 типов комнат; типы, размеры и радиаторы управляются в админке |
+| Стили и room types | 17 стилей в БД (2 активных, 7 новых неактивны), 12 типов комнат; типы, размеры и радиаторы управляются в админке |
 | Hero-референсы стилей | 120 сгенерировано, 26 approved (пилот 5 стилей × 6 комнат) |
 | Каталог | **Демо-каталог**: 100 активных товаров, **0 с реальным URL** |
 | Импорт товаров | По одному URL и списком до 20 ссылок, с quality checks |
@@ -36,7 +36,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Шаринг | `/s/:token`, лайки, комментарии |
 | Платежи | Robokassa (по умолчанию), ЮKassa как альтернатива; возвраты выключены |
 | Подбор товаров | 1 кредит за запуск, Yandex Search API + allowlist магазинов, список без сметы |
-| Админка | Пользователи, кредиты, пакеты, стили, промт, логи, модели, прокси, каталог |
+| Админка | Пользователи, кредиты, пакеты, комнаты, стили, промт, логи, модели, прокси, каталог |
 | Мобильный редактор `/app` | Старый монолитный интерфейс, не в новом стиле |
 
 > **Главное ограничение запуска:** реальные заказы пока невозможны, потому что у товаров нет реальных URL. Демо-товары нужны для проверки дизайна, стилей и сметы. Пока не импортированы реальные товары с URL, кнопка ведёт в поиск, а не на страницу товара.
@@ -317,7 +317,7 @@ node --check src/openrouter.js
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
 
-## Известные ограничения (на 2026-10-29)
+## Известные ограничения (на 2026-10-30)
 
 - Нет реального каталога с URL → нет заказов из старой сметы.
 - Подбор товаров использует Yandex Search API и allowlist магазинов; Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он не используется как основной магазин.
@@ -372,11 +372,12 @@ Last updated: 2026-10-30
 - [docs/HISTORY.md](https://github.com/oblacko/remontvision/blob/main/docs/HISTORY.md) — chronological changelog.
 - [llms-full.txt](https://github.com/oblacko/remontvision/blob/main/llms-full.txt) — full docs in one file.
 
-## Current state (2026-10-28)
+## Current state (2026-10-30)
 
 - Generation: FLUX 3 Image, 1K, aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash.
 - Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
-- 10 styles, 12 default room types, 100 active demo products, **0 products with real URL**.
+- 17 styles in DB (2 active: Скандинавский, Джапанди; 7 new 2026 styles inactive), 12 default room types, 100 active demo products, **0 products with real URL**.
+- Production deployed at `d279c48` (2026-10-30); migrations `001`–`027` applied.
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
 - Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
@@ -623,7 +624,7 @@ flowchart LR
 `POST /api/rooms` (multipart):
 
 - `photo` — фото комнаты;
-- `room_type` — один из 12 типов;
+- `room_type` — один из активных типов комнат (по умолчанию 12);
 - `style` — название стиля или пусто, если есть референс;
 - `style_ref` / `style_ref_url` — пользовательский референс;
 - `price_tier` — `start|comfort|premium|atelier`;
@@ -2316,7 +2317,7 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
+Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `d279c48`.
 
 ## 2026-10-30 — scale planner и новые стили из Interior Prompt Generator 2026
 
@@ -2325,6 +2326,7 @@ export const MAX_REFERENCES; // 4
 - Добавлены 7 новых стилей неактивными (`027_trend_styles.sql`): Ваби-саби, Органик модерн, Тёплый минимализм, Биофильный, Современная классика, Новый максимализм, Средиземноморский модерн. Активируются в админке «Стили».
 - Не внедрено: автоматический `analyze_room`, product-reference режимы `must_use/preferred/inspiration` в base-генерации и QA-порог `scaleHonesty`. Причины: текущий design-first пайплайн и product refs только в edit.
 - Тестов теперь 51.
+- Задеплоено в прод: `d279c48`, GitHub Actions успешно, smoke зелёный. Миграции `026`–`027` применены; в БД 17 стилей, активны 2 (Скандинавский, Джапанди).
 
 ## 2026-10-30 — промты подключены к генерации
 
