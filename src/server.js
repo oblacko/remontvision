@@ -13,10 +13,9 @@ import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { sanitizeImage, fitAspect } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
-import { ROOM_TYPE_NAMES } from './roomtypes.js';
+import { ROOM_TYPE_NAMES, activeRoomTypeNames, roomTypeByName, isRoomTypeActive, getRoomTypeConfig, getRoomTypeDefaults, saveRoomTypes, resetRoomTypes, loadRoomTypes } from './roomtypes.js';
 import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
 import { curateProducts } from './curate.js';
-import { roomTypeByName } from './roomtypes.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedCatalog } from './catalogseed.js';
 import { seedStyleReferences } from './stylerefseed.js';
@@ -238,7 +237,7 @@ app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: 
 app.get('/api/styles', h(async (_req, res) => {
   res.json((await q.styles(true)).map(styleDto));
 }));
-app.get('/api/room-types', (_req, res) => res.json(ROOM_TYPE_NAMES));
+app.get('/api/room-types', (_req, res) => res.json(activeRoomTypeNames()));
 
 // ---------- авторизация (e-mail код; заделка под OAuth yandex/vk/mailru) ----------
 app.post('/api/auth/request-code', rateLimit, h(async (req, res) => {
@@ -680,6 +679,34 @@ app.delete('/api/admin/styles/:id/products/:productId', h(async (req, res) => {
   res.status(ok ? 204 : 404).end();
 }));
 
+// ---------- типы комнат: справочник и настройки ----------
+app.get('/api/admin/settings/room-types', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ config: getRoomTypeConfig(), defaults: getRoomTypeDefaults() });
+}));
+
+app.put('/api/admin/settings/room-types', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const config = await saveRoomTypes(req.body?.config ?? req.body);
+    log({ event: 'room_types_saved', count: config.length, active: config.filter(type => type.active !== false).length });
+    res.json({ config, defaults: getRoomTypeDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/settings/room-types/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const config = await resetRoomTypes();
+    log({ event: 'room_types_reset' });
+    res.json({ config, defaults: getRoomTypeDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
 // ---------- модели генерации: только админ ----------
 app.get('/api/admin/settings/models', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -951,7 +978,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   if (requestedStyle === 'Референс пользователя' && !styleRef && !styleRefUrl) {
     return res.status(400).json({ error: 'Для стиля по референсу загрузите изображение или ссылку' });
   }
-  const roomType = ROOM_TYPE_NAMES.includes(requestedRoomType) ? requestedRoomType : 'Другое';
+  const roomType = ROOM_TYPE_NAMES.includes(requestedRoomType) && isRoomTypeActive(requestedRoomType) ? requestedRoomType : 'Другое';
   const dbStyle = requestedStyle ? await q.styleByName(requestedStyle) : null;
   const style = requestedStyle
     ? (dbStyle && dbStyle.active ? dbStyle.name : (allowedStyles.includes(requestedStyle) ? requestedStyle : 'Современный'))
@@ -967,6 +994,26 @@ app.post('/api/rooms', rateLimit, upload.fields([
     : !(value === false || value === 0 || value === '0' || value === 'false' || value === 'off');
   const keepFurniture = bool(req.body.keep_furniture, true);
   const useCatalog = bool(req.body.use_catalog, true);
+  const optionalMeasure = (value, min, max) => {
+    const raw = String(value ?? '').replace(',', '.').trim();
+    if (!raw) return null;
+    const number = Number(raw);
+    if (!Number.isFinite(number) || number < min || number > max) return undefined;
+    return number;
+  };
+  const roomWidthM = optionalMeasure(req.body.room_width_m, 1, 30);
+  const roomLengthM = optionalMeasure(req.body.room_length_m, 1, 30);
+  const roomHeightM = optionalMeasure(req.body.room_height_m, 2, 10);
+  const bedLengthM = optionalMeasure(req.body.bed_length_m, 1, 4);
+  if ([roomWidthM, roomLengthM, roomHeightM, bedLengthM].some(value => value === undefined)) {
+    return res.status(400).json({ error: 'Размеры должны быть положительными числами в метрах: комната 1–30, высота 2–10, кровать 1–4' });
+  }
+  const hasRoomMeasure = [roomWidthM, roomLengthM, roomHeightM].some(value => value !== null);
+  const hasAllRoomMeasures = [roomWidthM, roomLengthM, roomHeightM].every(value => value !== null);
+  if (hasRoomMeasure && !hasAllRoomMeasures) {
+    return res.status(400).json({ error: 'Заполните все три размера комнаты: ширину, длину и высоту' });
+  }
+  const dimensionOrientation = String(req.body.dimension_orientation || '').trim().slice(0, 200) || null;
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
   let styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
@@ -980,7 +1027,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
       return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}` });
     }
   }
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog, cleanupKey);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, bedLengthM, dimensionOrientation);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
@@ -1013,6 +1060,11 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     id: room.id,
     style: room.style,
     room_type: room.room_type,
+    room_width_m: room.room_width_m == null ? null : Number(room.room_width_m),
+    room_length_m: room.room_length_m == null ? null : Number(room.room_length_m),
+    room_height_m: room.room_height_m == null ? null : Number(room.room_height_m),
+    bed_length_m: room.bed_length_m == null ? null : Number(room.bed_length_m),
+    dimension_orientation: room.dimension_orientation || null,
     budget: room.budget,
     price_tier: room.price_tier || 'comfort',
     keep_furniture: room.keep_furniture !== false,
@@ -1314,6 +1366,7 @@ async function main() {
   await loadCleanupConfig(); // очистка комнаты: модель/промт из app_settings
   await loadProcurementConfig(); // подбор товаров: слои, лимиты, домены
   await loadStyleConfig(); // источник стиля: текст/свотчи
+  await loadRoomTypes();   // типы комнат: справочник и промты из app_settings
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }

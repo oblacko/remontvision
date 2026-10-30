@@ -43,9 +43,12 @@ flowchart LR
 - `price_tier` — `start|comfort|premium|atelier`;
 - `keep_furniture` — `1/0`;
 - `use_catalog` — `1/0`;
-- `palette`, `accent`.
+- `palette`, `accent`;
+- `room_width_m`, `room_length_m`, `room_height_m` — необязательные реальные размеры комнаты; заполняются только все три вместе;
+- `bed_length_m` — необязательная полная длина кровати с каркасом;
+- `dimension_orientation` — что считается шириной/длиной, например «ширина — стена с окном».
 
-Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`.
+Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`. Размеры валидируются: комната 1–30 м, высота 2–10 м, кровать 1–4 м.
 
 ### 2. Очередь и кредит
 
@@ -79,6 +82,10 @@ flowchart LR
 Собирается в `src/openrouter.js`:
 
 - карта изображений: 1 — исходник, 2 — необязательный art ref; product refs отсутствуют;
+- `ROOM DIMENSIONS AND SCALE` — реальные ширина/длина/высота, если пользователь их указал;
+- `SCALE PLAN` — вычисленный `src/scaleplan.js` план: размер кровати по ширине комнаты, проходы, кухня по площади, низкие потолки, узкие и длинные комнаты;
+- `BED SIZE` — полная длина кровати с каркасом, если указана;
+- `RADIATOR COVERS` — вентилируемые экраны для видимых радиаторов; не выдумывать их, если радиаторов нет;
 - `KEEP EXACTLY` — архитектура, камера, окна/двери, мебель (если включено);
 - `FURNITURE MODE` — сохранить/убрать;
 - `CHANGE / DEEP TRANSFORMATION`;
@@ -92,7 +99,7 @@ flowchart LR
 - `OUTPUT` — фото-язык (24–35 мм, golden hour, film grain, не CGI);
 - `AVOID` — негативный список.
 
-Правила `lighting`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` редактируются в админке («Промт») и хранятся в `app_settings.prompt.rules.v1`. Дефолты — в `src/promptconfig.js`.
+Правила `lighting`, `dimensions`, `scalePlan`, `bed`, `radiators`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` редактируются в админке («Промт») и хранятся в `app_settings.prompt.rules.v1`. Дефолты — в `src/promptconfig.js`.
 
 ### 6. Очистка и image generation
 

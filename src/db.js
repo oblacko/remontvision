@@ -62,10 +62,10 @@ export async function migrate() {
 // ---------- запросы ----------
 export const q = {
   // rooms
-  createRoom: (id, style, budget, photoPath, userId, roomType = null, palette = null, accent = null, styleRefPath = null, priceTier = 'comfort', keepFurniture = true, useCatalog = true, precleanedShellPath = null) =>
-    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, room_type, palette, accent, style_ref_path, price_tier, keep_furniture, use_catalog, precleaned_shell_path)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [id, style, budget, photoPath, userId, roomType, palette, accent, styleRefPath, priceTier, keepFurniture, useCatalog, precleanedShellPath]),
+  createRoom: (id, style, budget, photoPath, userId, roomType = null, palette = null, accent = null, styleRefPath = null, priceTier = 'comfort', keepFurniture = true, useCatalog = true, precleanedShellPath = null, roomWidthM = null, roomLengthM = null, roomHeightM = null, bedLengthM = null, dimensionOrientation = null) =>
+    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, room_type, palette, accent, style_ref_path, price_tier, keep_furniture, use_catalog, precleaned_shell_path, room_width_m, room_length_m, room_height_m, bed_length_m, dimension_orientation)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+      [id, style, budget, photoPath, userId, roomType, palette, accent, styleRefPath, priceTier, keepFurniture, useCatalog, precleanedShellPath, roomWidthM, roomLengthM, roomHeightM, bedLengthM, dimensionOrientation]),
   getRoom: id => pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   roomByPhotoKey: key =>
     pool.query(`SELECT user_id FROM rooms WHERE photo_path = $1 OR photo_path LIKE '%/' || $1 LIMIT 1`, [key])

@@ -88,6 +88,15 @@ async function processRender(renderId) {
   const priceTier = normalizeTier(room.price_tier || 'comfort');
   const keepFurniture = room.keep_furniture !== false;
   const useCatalog = room.use_catalog !== false;
+  const roomDimensions = (room.room_width_m || room.room_length_m || room.room_height_m || room.bed_length_m)
+    ? {
+        width: room.room_width_m == null ? null : Number(room.room_width_m),
+        length: room.room_length_m == null ? null : Number(room.room_length_m),
+        height: room.room_height_m == null ? null : Number(room.room_height_m),
+        bedLength: room.bed_length_m == null ? null : Number(room.bed_length_m),
+        orientation: room.dimension_orientation || '',
+      }
+    : null;
   const cleanupCfg = getCleanupConfig();
   const precleanedShell = room.precleaned_shell_path || null;
   const useCleanup = !iteration && !keepFurniture && !precleanedShell && cleanupCfg.enabled;
@@ -106,6 +115,7 @@ async function processRender(renderId) {
       mode: iteration ? 'edit' : 'base',
       pipeline: iteration && render.ref_product_id ? 'design_product_binding_v1' : 'design_first_v1',
       room_type: roomType,
+      dimensions: roomDimensions,
       price_tier: priceTier,
       keep_furniture: keepFurniture,
       use_catalog: useCatalog,
@@ -205,6 +215,7 @@ async function processRender(renderId) {
         keepFurniture,
         useCatalog,
         imageMap,
+        dimensions: roomDimensions,
       });
 
       referenceImagesB64 = styleRefUrls;

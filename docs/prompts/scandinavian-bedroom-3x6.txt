@@ -1,0 +1,478 @@
+Redesign the {room} shown in Image 1 into a warm, expressive,
+designer-led Scandinavian interior.
+
+Create a thoughtful, realistic Nordic home with natural materials,
+visible colour accents, layered lighting and curated decor.
+The result should feel personal and professionally composed,
+not like an empty showroom or a generic all-white furniture catalogue.
+
+IMAGE ROLES:
+
+Image 1 is the source room.
+It is the sole visual reference for architecture, room geometry,
+window and door placement, camera position, perspective and framing.
+
+Images 2–N, if supplied, are colour, material and texture references ONLY.
+They are a material moodboard, not products to reproduce,
+not room-layout references and not architectural references.
+
+PRIORITY ORDER:
+
+1. Preserve the architecture and camera view from Image 1.
+2. Respect the supplied room dimensions, bed length
+   and explicit user constraints.
+3. Preserve existing radiators in their original locations,
+   but visually conceal them with ventilated decorative covers.
+4. Use Images 2–N for colour, material and texture inspiration only.
+5. Apply the Scandinavian design direction within these constraints.
+
+ARCHITECTURE — PRESERVE:
+
+- Exact room geometry, proportions and ceiling height.
+- Original camera position, perspective, framing and image aspect ratio.
+- Existing windows, doors, openings and their dimensions and positions.
+- Structural columns, beams, stairs and architectural features.
+- Existing radiator positions, heating connections
+  and ventilation grille locations.
+- Existing flooring, including its direction and pattern.
+- Existing built-in kitchen units, sanitary fixtures and integrated
+  cabinetry unless their replacement is explicitly requested.
+- The overall direction of natural daylight.
+
+Do not add windows, enlarge openings, move walls or change the floor plan.
+Do not widen the room, raise the ceiling or use a wider camera view
+to make the design fit.
+
+Wall paint, wallpaper and removable decorative treatments may change.
+Decorative radiator covers are explicitly permitted.
+Do not alter structural geometry to create decorative features.
+
+ROOM DIMENSIONS AND SCALE:
+
+Room type: {room}.
+
+Known clear internal dimensions:
+- Room width: 3.0 metres.
+- Room length: 6.0 metres.
+- Finished floor-to-ceiling height: 2.5 metres.
+
+Dimension orientation:
+{dimension_orientation}
+
+These measurements describe the existing room.
+Use them as real-world scale constraints for furniture selection
+and arrangement, not as permission to reshape the source room.
+
+BED SIZE:
+
+Include a bed with an overall external length of exactly 2.0 metres,
+measured from the head end to the foot end, including its frame.
+This measurement refers to the whole bed, not just the mattress.
+
+The bed width is not specified.
+Choose a width appropriate to the room’s layout and available
+circulation space.
+
+Keep the bed realistically proportioned.
+Do not shorten, stretch or visually compress it to make
+the arrangement fit.
+Avoid an oversized headboard or footboard that increases
+the overall bed length beyond the specified 2.0 metres.
+
+SCALE AND PLACEMENT:
+
+Scale all furniture consistently with:
+- A room width of 3.0 metres.
+- A room length of 6.0 metres.
+- A ceiling height of 2.5 metres.
+- An overall bed length of 2.0 metres.
+
+Preserve the source photo’s room geometry, camera position,
+perspective and framing.
+Do not increase the apparent room width or depth.
+Do not raise the ceiling or stretch the image.
+
+Arrange the bed and supporting furniture so that doors can open
+and windows, heating controls and storage remain accessible.
+
+Account for the physical depth of radiator covers when arranging
+furniture and circulation routes.
+Do not treat radiator covers as flat wall graphics.
+
+If the proposed composition is too crowded, choose smaller
+supporting furniture or omit secondary pieces.
+Do not change the room dimensions or the specified bed length.
+Do not unnaturally shrink furniture to fit.
+
+Do not show dimension lines, arrows, labels, floor plans
+or measurement text in the final image.
+
+RADIATOR COVERS — REQUIRED WHEN RADIATORS ARE PRESENT:
+
+If any heating radiators are visible in Image 1, visually conceal
+each of them behind a purpose-designed decorative radiator cover.
+
+Keep the actual radiator and heating connections in their original
+positions. Do not remove, relocate or replace the heating system.
+
+Design the covers as understated Scandinavian elements:
+- Clean, simple proportions.
+- A visually lightweight, slatted or perforated front.
+- A finish coordinated with the room’s palette and materials.
+- Warm off-white, a matching wall colour or a suitable
+  natural-wood appearance, depending on the design direction.
+
+Use one coherent cover design throughout the room.
+
+Show a clearly ventilated construction:
+- An open grille, spaced slats or substantial perforations at the front.
+- An unobstructed lower air inlet.
+- A continuous upper grille or open outlet for rising warm air.
+
+Do not create a sealed box or a solid cabinet that visually traps
+the radiator behind an unventilated surface.
+
+Keep thermostatic valve heads and controls accessible and outside
+the enclosed warm-air pocket.
+Do not depict an ordinary thermostatic valve head sealed inside
+the cover.
+
+Make the front panel appear removable for maintenance.
+Allow plausible clearance around the radiator without inventing
+precise installation dimensions.
+
+Keep the cover proportionate to the existing radiator.
+Do not extend it into a full wall of cabinetry or an oversized bench.
+Do not add upholstered seating, cushions or storage on top.
+
+Where the radiator is beneath a window:
+- Preserve the window’s dimensions and original position.
+- Keep the cover below the window opening.
+- Do not obstruct window operation.
+- Do not cover the upper ventilation outlet with curtains or objects.
+
+Do not cover separate wall ventilation grilles or air vents.
+Do not invent radiators or radiator covers where none are present.
+
+These covers are part of the visual design concept, not a technical
+installation specification.
+
+MATERIAL AND COLOUR REFERENCES:
+
+For Images 2–N, extract and reinterpret:
+- Dominant and secondary colours.
+- Warm or cool undertones.
+- Material types and surface finishes.
+- Fabric textures and weave.
+- Wood tones and grain character.
+- Relationships between matte, textured and reflective surfaces.
+
+Apply these qualities selectively to upholstery, bedding,
+curtains, rugs, wall treatments, furniture finishes,
+radiator-cover finishes and decorative accents.
+
+Do not reproduce the exact objects, furniture silhouettes,
+product shapes, brands, logos or arrangements from these images.
+Do not copy their backgrounds, architecture, room layout,
+camera angle or lighting setup.
+
+A product photo is a source of colour and material information,
+not an instruction to place that product in the room.
+
+Choose furniture independently to suit the source room,
+its function, its dimensions and the Scandinavian design direction.
+
+Create one coherent palette rather than combining every reference literally.
+If reference images conflict, select the most compatible colours
+and materials instead of forcing all of them into the design.
+
+SCANDINAVIAN DESIGN DIRECTION:
+
+Create a contemporary Scandinavian interior that is warm,
+functional, tactile and visually distinctive.
+
+Combine:
+- Clean, practical furniture forms.
+- Natural wood and honest material textures.
+- Soft textiles and comfortable upholstery.
+- A deliberate colour composition.
+- One clear focal point.
+- Thoughtful wall styling.
+- Layered lighting.
+- A restrained collection of meaningful decorative objects.
+- Radiator covers integrated into the overall design where required.
+
+Avoid interpreting Scandinavian design as an almost empty white room.
+Use calm negative space, but make the main visible areas feel resolved.
+
+COLOUR PALETTE:
+
+When material references are supplied, use their compatible colours
+as the primary palette source.
+Translate them into a balanced Scandinavian composition.
+
+Use:
+- A calm foundation across large surfaces.
+- One clearly visible secondary colour.
+- One smaller accent colour.
+- Small dark or metallic details for definition where appropriate.
+
+Repeat the selected accent colour in two or three deliberate places
+to connect the composition.
+
+If no colour references are supplied, use:
+- Warm off-white, oatmeal and natural oak as the foundation.
+- Muted sage OR dusty blue as the secondary colour.
+- Small touches of terracotta or rust as the accent.
+- Charcoal sparingly for contrast.
+
+Do not use every suggested colour simultaneously.
+Avoid an entirely white, grey or beige interior.
+
+WALL COMPOSITION:
+
+Give the main visible wall an intentional treatment appropriate
+to the room’s function and available wall area.
+
+Choose ONE coherent approach:
+- A muted painted feature wall with one substantial artwork.
+- A warm neutral wall with a composed group of two or three
+  well-scaled framed prints.
+- A restrained colour-block treatment with a large graphic artwork.
+- A subtle textured wall finish with a carefully positioned artwork.
+
+Derive the wall colour and artwork palette from the material references
+when they are supplied.
+
+Compose the wall treatment in relation to the bed and headboard
+where these are visible.
+Keep artwork and any mounted objects visually supported
+and positioned safely above or beside the furniture.
+
+Scale artwork to the furniture and wall area.
+Do not leave the main wall visually unresolved.
+Do not fill every wall: retain intentional negative space.
+
+Avoid tiny scattered pictures, random panels and excessive ornament.
+Do not add structural niches, new openings or architectural built-ins
+solely to decorate the wall.
+The required removable radiator covers are an exception
+to the restriction on adding cabinetry-like elements.
+
+FURNITURE AND FUNCTION:
+
+Use the specified bed as the main furniture anchor.
+Choose supporting furniture appropriate to the actual function
+of the {room} and the remaining usable space.
+
+Use well-proportioned Scandinavian furniture with:
+- Functional forms.
+- Slender or gently rounded profiles.
+- Visible natural wood.
+- Comfortable, tactile upholstery.
+- A considered mix of complementary silhouettes.
+
+Create one primary focal point centred on the bed,
+its textiles and the wall composition where the camera view allows.
+
+Use compact bedside tables or a visually light bedside solution
+when space is limited.
+Add storage only where it fits without blocking circulation.
+
+Where space allows, introduce one distinctive secondary piece:
+a colourful upholstered chair, a sculptural lamp,
+a characterful wooden cabinet or an expressive small table.
+
+Do not add a sofa, extra seating or duplicate storage merely
+to fill the room.
+Do not make every piece identical in colour, material or shape.
+
+Avoid oversized furniture and objects that block doors,
+windows, radiator-cover ventilation, heating controls
+or access to the bed.
+
+MATERIALS AND TEXTURES:
+
+Build a coherent material scheme informed by the reference images.
+
+Balance a small number of visibly different surfaces, such as:
+- Natural oak or ash.
+- Wool or textured woven fabric.
+- Linen or cotton.
+- Matte painted surfaces.
+- Ceramics.
+- Small brushed-metal or dark-metal details.
+
+If the references suggest different compatible materials,
+use those instead of forcing the default examples.
+
+Make texture differences visible without exaggerating them.
+Avoid glossy plastic-looking surfaces, excessive bouclé
+and an indiscriminate mixture of finishes.
+
+Coordinate radiator-cover finishes with nearby walls or furniture.
+Do not make the covers a competing focal point.
+
+LIGHTING:
+
+Combine soft natural daylight with a believable layered lighting scheme.
+
+Use fixtures appropriate to the room, ceiling height
+and available space:
+- A compact ceiling fixture or suitably sized pendant.
+- Bedside reading lights or small table lamps.
+- A restrained accent light or floor lamp only where space allows.
+
+Keep hanging fixtures proportionate to the 2.5-metre ceiling height
+and clear of circulation routes.
+
+Prefer softly diffused, warm artificial lighting.
+Place lamps logically near bedside, reading or working areas.
+Avoid exposed bright bulbs and harsh glare directed toward the bed.
+
+Do not rely only on ceiling lighting.
+Do not add every fixture type if the room is small.
+Do not invent ceiling recesses, a suspended ceiling
+or architectural coves to accommodate lighting.
+
+Preserve the general daylight direction from Image 1.
+Use soft, balanced illumination without harsh ceiling hotspots,
+strong window-shaped ceiling projections or distracting glare.
+
+TEXTILES:
+
+Use textiles to add warmth, softness and controlled visual interest.
+
+Create a layered but restrained bed composition:
+- Natural-looking linen or cotton bedding.
+- A coordinated duvet or bed cover.
+- A limited number of pillows.
+- One casually placed throw or textured blanket.
+
+Where appropriate:
+- Add a well-sized rug related to the bed and circulation space.
+- Add natural-fabric curtains suited to the actual windows.
+- Combine plain textiles with one subtle stripe,
+  check or graphic pattern.
+
+Use the reference colours and textures selectively.
+Avoid excessive pillows, bulky bedding and decorative fabric
+covering every surface.
+
+Do not obstruct doorways, heating controls or access to windows.
+Keep curtains away from radiator-cover air inlets and outlets.
+Do not drape curtains over the radiator covers.
+Do not use curtains to hide or change the apparent window geometry.
+
+DECOR AND PERSONALITY:
+
+Use a small number of deliberate, well-scaled decorative elements:
+- One substantial artwork or a coherent artwork grouping.
+- Ceramic vessels.
+- A few books.
+- One sculptural object.
+- A plant where space and daylight allow.
+
+Choose decor appropriate to the function of the {room}.
+Arrange objects in intentional groupings rather than scattering
+small accessories across every surface.
+
+Keep bedside tables, desks and other functional surfaces usable.
+Keep radiator-cover ventilation openings clear of books,
+plants, textiles and decorative objects.
+
+Make the room feel inhabited and personal, not randomly accessorised.
+
+COMPOSITION AND DESIGN QUALITY:
+
+Establish one clear focal point and a few supporting details.
+
+Create visual interest through:
+- Proportion.
+- Colour repetition.
+- Material contrast.
+- Texture.
+- A balance of vertical and horizontal elements.
+- Controlled asymmetry.
+- Deliberate negative space.
+
+Use fewer, better-chosen elements rather than adding clutter.
+Make each major visible wall and furniture grouping feel intentionally designed.
+Keep the overall concept cohesive and achievable in a real home.
+
+Respect the room’s long, relatively narrow proportions.
+Use furniture placement, colour and textiles to create a balanced
+composition without changing the architectural dimensions.
+
+RENDERING:
+
+Produce a photorealistic interior photograph of the redesigned room.
+
+Preserve Image 1’s camera view and architectural perspective.
+Use realistic furniture scale, natural material detail,
+coherent shadows and balanced exposure.
+
+Keep colours accurate to the chosen palette.
+Avoid an orange filter, cold blue lighting, excessive HDR,
+blown-out windows and artificial cinematic effects.
+
+Do not add text, labels, logos, watermarks or moodboard layouts.
+Return one coherent view of the redesigned room.
+
+AVOID:
+
+- Bare, unresolved main walls.
+- An all-white, all-grey or uniformly beige scheme.
+- Generic showroom styling.
+- Exact copies of products from the material reference images.
+- Copying a reference image’s room layout or architecture.
+- Oversized furniture or visually stretched room proportions.
+- A bed longer than the specified 2.0 metres overall.
+- Random clutter and excessive decorative objects.
+- Too many plants, cushions or pillows.
+- Tiny artwork scattered across large walls.
+- Cold overhead-only lighting.
+- Harsh ceiling glare or window-shaped ceiling light patches.
+- Distorted furniture, floating objects and impossible supports.
+- Blocked doorways, windows or circulation routes.
+- New windows, doors, openings or structural changes.
+- Exposed radiator bodies where a decorative cover is required.
+- Sealed, unventilated radiator boxes.
+- Thermostatic controls enclosed inside a warm-air pocket.
+- Radiator covers that block windows, ventilation grilles or access.
+- Curtains or decorative objects blocking radiator-cover ventilation.
+
+FINAL CHECK:
+
+Confirm that:
+- The source architecture and camera perspective are preserved.
+- The room reads as 3.0 metres wide, 6.0 metres long
+  and 2.5 metres high.
+- The bed has an overall external length of 2.0 metres.
+- Reference images inform colours and textures without copied products.
+- The main wall and bed composition feel intentionally designed.
+- Existing visible radiators have coordinated ventilated covers.
+- Radiator controls remain accessible and ventilation paths remain clear.
+- No radiators or covers have been invented where none existed.
+- The room remains functional and visually uncluttered.
+
+FINAL RESULT:
+
+A warm, expressive and cohesive Scandinavian {room},
+recognisably based on Image 1.
+
+The design must respect the supplied room dimensions:
+3.0 metres wide, 6.0 metres long and 2.5 metres high,
+with a bed measuring 2.0 metres in overall external length.
+
+Use the reference images as a source of colours, materials and textures,
+not as a catalogue of objects to copy.
+
+Where existing radiators are present, integrate them visually
+with coordinated, ventilated decorative covers without relocating
+the heating system.
+
+The room should have a clear focal point, thoughtful wall styling,
+natural materials, layered lighting, visible colour accents
+and curated decor — with the feeling that a designer has considered
+the entire composition.

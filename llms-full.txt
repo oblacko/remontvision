@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-29T16:22:43.036Z
+Generated: 2026-10-30T12:53:09.043Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -20,13 +20,13 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 ---
 
-## Статус на 2026-10-28
+## Статус на 2026-10-30
 
 | Блок | Состояние |
 |---|---|
 | Генерация по фото | Работает: FLUX 3 Image, 1K, aspect auto |
 | Vision-разбор | Работает: Gemini 3 Flash |
-| Стили и room types | 10 стилей, 12 типов комнат |
+| Стили и room types | 10 стилей, 12 типов комнат; типы, размеры и радиаторы управляются в админке |
 | Hero-референсы стилей | 120 сгенерировано, 26 approved (пилот 5 стилей × 6 комнат) |
 | Каталог | **Демо-каталог**: 100 активных товаров, **0 с реальным URL** |
 | Импорт товаров | По одному URL и списком до 20 ссылок, с quality checks |
@@ -47,11 +47,12 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 1. Пользователь загружает фото комнаты, выбирает тип комнаты, стиль или свой референс, класс материалов.
 2. Если мебель не сохраняем — сначала очищаем комнату до пустого каркаса, затем делаем дизайн с сохранением архитектуры, камеры и пропорций.
-3. Базовый дизайн создаётся без карточек товаров: исходник задаёт геометрию, один art ref — только свет, палитру, материалы и стайлинг.
-4. Vision-разбор достаёт материалы, поверхности, электрику и подсказки для правок.
-5. Смета собирается из товаров каталога и честно разделяет подобранные, похожие и проверенные на рендере позиции.
-6. Hero-товар можно перенести в кадр отдельной правкой; vision QA отклоняет ухудшенный результат и возвращает кредит.
-7. Результат можно скачать, открыть в кабинете или поделиться публичной ссылкой.
+3. Если указаны размеры комнаты и кровати, планировщик масштаба подбирает габариты мебели и проходы; правила размеров, радиаторов и плана редактируются в админке «Промт».
+4. Базовый дизайн создаётся без карточек товаров: исходник задаёт геометрию, один art ref — только свет, палитру, материалы и стайлинг.
+5. Vision-разбор достаёт материалы, поверхности, электрику и подсказки для правок.
+6. Смета собирается из товаров каталога и честно разделяет подобранные, похожие и проверенные на рендере позиции.
+7. Hero-товар можно перенести в кадр отдельной правкой; vision QA отклоняет ухудшенный результат и возвращает кредит.
+8. Результат можно скачать, открыть в кабинете или поделиться публичной ссылкой.
 
 Подробно: [docs/GENERATION.md](docs/GENERATION.md).
 
@@ -193,12 +194,12 @@ app/
 
 `ремонтвижн` — AI-редизайн интерьера по фото. Пользователь загружает фото, выбирает комнату/стиль/класс материалов, получает визуализацию, затем может запустить платный подбор реальных товаров по рендеру. Есть кабинет, публичный шаринг, админка, импорт товаров, кредиты и платежи.
 
-Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt).
+Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt). Рабочая память и текущие решения: [docs/MEMORY.md](docs/MEMORY.md).
 
 ## Главное, что нужно знать до изменений
 
 1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
-2. **Текущая модель генерации** — `black-forest-labs/flux-3-image`, очистка — `black-forest-labs/flux-3-image-klein`, vision — `google/gemini-3-flash-preview`, 1K, aspect auto. Модели хранятся в `app_settings` и меняются через админку; проверяйте фактическое значение перед выводами.
+2. **Не хардкодьте модели.** Render/vision/cleanup-модели хранятся в `app_settings` и `.env` (`RENDER_MODEL`, `VISION_MODEL`, cleanup-конфиг) и меняются через админку. Перед выводами проверяйте фактическую конфигурацию; architecture QA по умолчанию выключен (`ARCHITECTURE_QA_ENABLED=0`).
 3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; FLUX 2 Pro resolution не принимает. У FLUX возможна блокировка content moderation на спальнях/кроватях — проверяйте.
 4. **Промт состоит из двух слоёв:**
    - код: `src/openrouter.js`, `src/roomtypes.js`;
@@ -209,22 +210,31 @@ app/
 
 ## Команды
 
+Все команды — из корня репозитория (`app/`), если не указано иное.
+
 ```bash
 # Backend
 npm install
-npm test                    # node:test, 39 тестов
-npm start                   # Node 20.6+, .env через node --env-file
+npm test                                      # node:test, 51 тест, Postgres не нужен
+node --test test/prompt.test.js               # один файл
+node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
+npm start                                     # Node 20.6+, .env через node --env-file
+npm run dev                                   # watch-режим
 
 # Frontend
 cd web
 npm install
-npm run build               # tsc -b + vite build → web/dist
+npm run lint                                  # ESLint 9, flat config
+npm run build                                 # tsc -b + vite build → web/dist
+npx tsc -b                                    # только проверка типов (без сборки)
+npm run dev                                   # Vite dev-сервер
 
-# Локальная БД
-docker compose up -d db     # Postgres 127.0.0.1:5434
+# Локальная БД и документация
+docker compose up -d db                       # Postgres 127.0.0.1:5434
+npm run docs:llms                             # пересобрать llms-full.txt после правок docs
 ```
 
-Проверка синтаксиса:
+Проверка синтаксиса backend-файлов:
 
 ```bash
 node --check src/server.js
@@ -245,6 +255,7 @@ node --check src/openrouter.js
 | Задача | Файлы |
 |---|---|
 | Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
+| Размеры комнаты, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js`, `web/src/components/GenerationPanel.tsx` |
 | Правила комнат, слоты, запреты | `src/roomtypes.js` |
 | Подбор товаров (старый каталог) | `src/curate.js` |
 | Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
@@ -266,31 +277,53 @@ node --check src/openrouter.js
 | Админка | `web/src/pages/Admin.tsx` |
 | Публичный шаринг | `web/src/pages/Share.tsx`, `web/src/components/ShareDialog.tsx` |
 
-## Конвенции
+## Стиль кода
 
-- Backend — ESM, Node 20, без TypeScript.
-- SQL-миграции только добавлять новыми файлами; не редактировать уже применённые.
-- `db.js` при импорте без `RV_DATABASE_URL` делает `process.exit(1)`. В unit-тестах не импортируйте `db.js` напрямую; в `modelconfig.js`/`promptconfig.js` используйте динамический импорт.
-- Промт-правила по умолчанию — в `promptconfig.js`; `buildPrompt` берёт их из `getPromptConfig()`.
-- Для асинхронных route-обработчиков использовать `h()`.
-- Внешние изображения по URL — только через `fetchRemoteImage` (SSRF-защита).
-- Секреты/URL прокси маскировать в API (`maskProxy`).
-- Не запускать долгоживущий локальный сервер в фоне; для проверок — `timeout`/`curl`/скрипт.
+### Backend (ESM, JavaScript)
+
+- ESM (`"type": "module"`), Node 20.6+, без TypeScript. В относительных импортах всегда указывайте `.js`.
+- 2 пробела, одинарные кавычки, точка с запятой в конце инструкций. Не переформатируйте чужие файлы целиком.
+- Порядок импортов: `node:*` → внешние пакеты → локальные `./*.js`. Именованные импорты предпочтительнее `default`.
+- Имена файлов — одним словом в нижнем регистре (`promptconfig.js`, `modelcaps.js`). Функции/переменные — `camelCase`, константы — `UPPER_SNAKE_CASE`, таблицы/колонки SQL — `snake_case`.
+- Все async route-обработчики оборачивайте в `h()`; ошибки бросайте как `Error` и при необходимости ставьте `e.status` (400/402/404/409/429/502/503).
+- Клиенту отдавайте `{ error: 'текст на русском' }`; для 5xx — общее «Внутренняя ошибка», детали только в `log({ event, ... })`.
+- Секреты, токены и URL прокси не логируйте и маскируйте в API (`maskProxy`).
+- SQL — только параметризованный (`$1`, `$2`), значения не интерполируйте. Транзакции — через `withTransaction`.
+- Миграции только добавляйте новыми файлами `NNN_snake_name.sql`; уже применённые не редактируйте.
+- Внешние изображения по URL — только через `fetchRemoteImage` (защита от SSRF и больших файлов).
+- Комментарии — на русском, только про неочевидные причины/ограничения, без пересказа кода.
+
+### Frontend (TypeScript, React 19)
+
+- Строгий TS: `strict`, `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`. Типы импортируйте через `import type`; `any` не добавляйте без необходимости.
+- 2 пробела, одинарные кавычки, без точки с запятой в коде приложения. Файлы `web/src/components/ui/*` — сгенерированный shadcn/ui: сохраняйте их стиль (двойные кавычки, точки с запятой).
+- Порядок импортов: React → внешние пакеты → `@/...` → относительные пути. Алиас `@/*` указывает на `web/src/*`.
+- Компоненты — function components. Страницы в `web/src/pages/` экспортируются по умолчанию; переиспользуемые компоненты в `web/src/components/` — именованным экспортом (`export function X`).
+- Имена: компоненты/типы — `PascalCase`, функции/переменные — `camelCase`, хуки — `useSomething`, файлы компонентов — `PascalCase.tsx`.
+- Стили — Tailwind 3 и семантические токены из `index.css` (`bg-background`, `text-foreground`, `border-border`). Для условных классов используйте `cn()` из `@/lib/utils`.
+- UI-примитивы берите из `web/src/components/ui/` (Radix/shadcn), иконки — `lucide-react`; не добавляйте новые UI-библиотеки без необходимости.
+- `fetch` оборачивайте в `try/catch`, проверяйте `r.ok`, не считайте ответ JSON без проверки. Пользовательские ошибки — на русском.
+
+### Тесты
+
+- `node:test` + `node:assert/strict`. Описания тестов — короткие английские фразы.
+- Переменные окружения выставляйте до динамического `await import(...)`; в unit-тестах не импортируйте `db.js` напрямую (он делает `process.exit(1)` без `RV_DATABASE_URL`).
+- Для конфигов используйте тестовые хелперы, если они есть (например, `setPromptConfigForTests`), чтобы не трогать БД.
 
 ## Тесты и проверка
 
-- `npm test` — 39 тестов: промт, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры, model caps, подписи Robokassa, Yandex Search XML, procurement templates.
-- `cd web && npm run build` — TypeScript + Vite.
+- `npm test` — 51 тест: промт, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
 
-## Известные ограничения (на 2026-10-28)
+## Известные ограничения (на 2026-10-29)
 
 - Нет реального каталога с URL → нет заказов из старой сметы.
 - Подбор товаров использует Yandex Search API и allowlist магазинов; Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он не используется как основной магазин.
 - Смета по площади и количествам пока не считается: только список товаров.
 - Покрытие подбора неполное: hero-предметы, свет, ковры, пол и часть текстиля находятся; стены/потолок/плинтус и часть магазинов пока дают fallback-ссылку. Расширять через новые адаптеры и category-page extraction.
-- Очистка комнаты по умолчанию выключена: design pass идёт по исходному фото, чтобы сохранить планировку. GPT Image 2 — основная модель; architecture QA по умолчанию выключен (`ARCHITECTURE_QA_ENABLED=0`), включается только через env. Image-вызовы сериализуются, при 429 — до 4 попыток (10/20/40 с).
+- Очистка комнаты по умолчанию выключена: design pass идёт по исходному фото, чтобы сохранить планировку. Architecture QA по умолчанию выключен (`ARCHITECTURE_QA_ENABLED=0`), включается только через env. Image-вызовы сериализуются, при 429 — до 4 попыток (10/20/40 с).
 - Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
 - Нет inpainting для люстр/розеток; позиции могут плавать.
 - Нет автоматического обновления цен/наличия и фидов.
@@ -301,12 +334,13 @@ node --check src/openrouter.js
 ## Definition of done
 
 1. `npm test` зелёный.
-2. `web` собирается.
-3. Обновлён `docs/HISTORY.md`.
-4. Обновлены relevant docs и, если менялась архитектура/статус, `llms.txt`/`llms-full.txt`.
-5. Нет секретов в diff.
-6. `npm run docs:llms` при изменении документации.
-7. Деплой прошёл, smoke зелёный.
+2. `cd web && npm run lint` проходит.
+3. `cd web && npm run build` собирается.
+4. Обновлён `docs/HISTORY.md`.
+5. Обновлены relevant docs и, если менялась архитектура/статус, `llms.txt`/`llms-full.txt`.
+6. Нет секретов в diff.
+7. `npm run docs:llms` при изменении документации.
+8. Деплой прошёл, smoke зелёный.
 
 
 ---
@@ -319,7 +353,7 @@ node --check src/openrouter.js
 
 Repo: https://github.com/oblacko/remontvision (private)  
 Prod: https://www.remontvision.ru  
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Start here
 
@@ -342,9 +376,12 @@ Last updated: 2026-10-29
 
 - Generation: FLUX 3 Image, 1K, aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash.
 - Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
-- 10 styles, 12 room types, 100 active demo products, **0 products with real URL**.
+- 10 styles, 12 default room types, 100 active demo products, **0 products with real URL**.
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
-- Prompt rules editable in admin (`app_settings.prompt.rules.v1`).
+- Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
+- Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
+- Saved reference prompts are now wired in: `docs/prompts/scandinavian-bedroom-3x6.txt` blocks live in `promptconfig` (`dimensions`, `scalePlan`, `bed`, `radiators`) and room dimension fields; `docs/prompts/scandinavian-style-driven.txt` style blocks live in the Scandinavian `styles.prompt_description` (migration 026).
+- New reference `docs/prompts/interior-prompt-generator-2026.md`: deterministic scale planner in `src/scaleplan.js` (bed width, 60/80 cm walkways, kitchen by area, low ceilings, narrow/long rooms) and 7 trend styles added inactive in migration 027 (Wabi-Sabi, Organic Modern, Warm Minimalism, Biophilic, Modern Heritage, New Maximalism, Mediterranean Modern). Activate styles in admin.
 - Catalog import by URL and bulk list; drafts only, manual activation.
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
@@ -376,7 +413,7 @@ Last updated: 2026-10-29
 - `src/jobs.js` — worker.
 - `src/openrouter.js` — provider, prompt, vision, matching.
 - `src/promptconfig.js` — prompt defaults/config.
-- `src/roomtypes.js` — room slots/keep/change/styling.
+- `src/roomtypes.js` — room types, slots/keep/change/styling, admin config load/save.
 - `src/curate.js` — product selection + refs.
 - `src/productimport.js` — URL import.
 - `src/modelcaps.js` — model capabilities.
@@ -390,7 +427,7 @@ Last updated: 2026-10-29
 
 ```bash
 npm install
-npm test                 # 39 tests
+npm test                 # 51 test
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434
@@ -592,9 +629,12 @@ flowchart LR
 - `price_tier` — `start|comfort|premium|atelier`;
 - `keep_furniture` — `1/0`;
 - `use_catalog` — `1/0`;
-- `palette`, `accent`.
+- `palette`, `accent`;
+- `room_width_m`, `room_length_m`, `room_height_m` — необязательные реальные размеры комнаты; заполняются только все три вместе;
+- `bed_length_m` — необязательная полная длина кровати с каркасом;
+- `dimension_orientation` — что считается шириной/длиной, например «ширина — стена с окном».
 
-Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`.
+Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`. Размеры валидируются: комната 1–30 м, высота 2–10 м, кровать 1–4 м.
 
 ### 2. Очередь и кредит
 
@@ -628,6 +668,10 @@ flowchart LR
 Собирается в `src/openrouter.js`:
 
 - карта изображений: 1 — исходник, 2 — необязательный art ref; product refs отсутствуют;
+- `ROOM DIMENSIONS AND SCALE` — реальные ширина/длина/высота, если пользователь их указал;
+- `SCALE PLAN` — вычисленный `src/scaleplan.js` план: размер кровати по ширине комнаты, проходы, кухня по площади, низкие потолки, узкие и длинные комнаты;
+- `BED SIZE` — полная длина кровати с каркасом, если указана;
+- `RADIATOR COVERS` — вентилируемые экраны для видимых радиаторов; не выдумывать их, если радиаторов нет;
 - `KEEP EXACTLY` — архитектура, камера, окна/двери, мебель (если включено);
 - `FURNITURE MODE` — сохранить/убрать;
 - `CHANGE / DEEP TRANSFORMATION`;
@@ -641,7 +685,7 @@ flowchart LR
 - `OUTPUT` — фото-язык (24–35 мм, golden hour, film grain, не CGI);
 - `AVOID` — негативный список.
 
-Правила `lighting`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` редактируются в админке («Промт») и хранятся в `app_settings.prompt.rules.v1`. Дефолты — в `src/promptconfig.js`.
+Правила `lighting`, `dimensions`, `scalePlan`, `bed`, `radiators`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` редактируются в админке («Промт») и хранятся в `app_settings.prompt.rules.v1`. Дефолты — в `src/promptconfig.js`.
 
 ### 6. Очистка и image generation
 
@@ -785,6 +829,32 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 13. `STYLE` — style ref/text/palette/accent.
 14. `MATERIAL CLASS`.
 15. `OUTPUT` + `AVOID`.
+
+Дополнительно после architecture lock вставляются `ROOM DIMENSIONS AND SCALE` и `BED SIZE` (только если пользователь передал размеры), `SCALE PLAN` (вычисленный план мебели и проходов) и `RADIATOR COVERS` (всегда, с условием «только если радиатор виден»).
+
+## Сохранённые эталонные промты
+
+### Scandinavian 3×6 bedroom
+
+- Файл: [prompts/scandinavian-bedroom-3x6.txt](prompts/scandinavian-bedroom-3x6.txt) — полный эталон.
+- В генерацию подключены его ключевые блоки: размеры комнаты, длина кровати и вентилируемые радиаторные экраны.
+- Поля админки «Промт»: `dimensions` (`{room}`, `{width}`, `{length}`, `{height}`, `{orientation}`), `bed` (`{room}`, `{bed_length}`), `radiators`.
+- В генераторе появились необязательные поля «Ширина / Длина / Высота / Кровать, м» и «Ориентация размеров». Если размеры не заполнены, блоки размеров и кровати не добавляются; радиаторные правила действуют всегда.
+- Референсы 2–N трактуются только как цвета/материалы/текстуры, без копирования мебели, планировки и архитектуры.
+
+### Scandinavian style-driven room
+
+- Файл: [prompts/scandinavian-style-driven.txt](prompts/scandinavian-style-driven.txt) — полный эталон.
+- Его style-блоки (палитра, главная стена, мебель, материалы, свет, текстиль, декор, композиция, avoid) перенесены в `styles.prompt_description` стиля «Скандинавский» миграцией `026_prompt_integration.sql`.
+- `buildPrompt()` вставляет их в `STYLE BRIEF`; архитектура, image roles и material class остаются из текущего пайплайна.
+- Полный файл сохранён для ручных прогонов и сравнения, но в генерации используется структурированный style brief, а не whole-prompt override.
+
+### Interior Prompt Generator 2026
+
+- Файл: [prompts/interior-prompt-generator-2026.md](prompts/interior-prompt-generator-2026.md) — внешний референс на 2321 строку: 7-блочный шаблон, таблицы масштаба, нормы проходов, режимы референсов, 10 стилей × 5 промтов и QA-чеклист.
+- **Внедрено:** детерминированный `src/scaleplan.js` (кровать по ширине комнаты, проходы 60/80 см, кухня по площади, низкие потолки, узкие/длинные комнаты) и поле админки `scalePlan` (`{room}`, `{plan}`). План добавляется в `buildPrompt()` только при наличии размеров.
+- **Внедрено:** 7 новых стилей из референса добавлены неактивными миграцией `027_trend_styles.sql`: Ваби-саби, Органик модерн, Тёплый минимализм, Биофильный, Современная классика, Новый максимализм, Средиземноморский модерн. Включаются в админке «Стили».
+- **Не внедрено:** `must_use/preferred/inspiration` для product refs в base-генерации (у нас design-first, product refs только в edit), автоматический `analyze_room` геометрии по фото и QA-порог `scaleHonesty`/`walkwaysPlausible` — это следующие шаги.
 
 ## Правила по умолчанию (смысл)
 
@@ -987,6 +1057,7 @@ URL: `/admin`
 |---|---|
 | Пользователи | баланс, начисление/списание кредитов, ledger, история генераций |
 | Пакеты кредитов | CRUD пакетов, цены, активность |
+| Комнаты | справочник типов комнат: prompt, категории, слоты, keep/change, электрика, стилизация, активность |
 | Стили | стили, prompt description, референсы, approve, товары стиля, генератор комплекта |
 | Промт | редактируемые правила промта |
 | Логи | фактические промты рендеров, модель, стоимость, референсы |
@@ -995,6 +1066,22 @@ URL: `/admin`
 | Прокси | URL прокси, сохранение, health-check, маска пароля |
 | Каталог | импорт по URL, массовый импорт, таблица товаров, цена/класс/статус |
 
+## Комнаты
+
+Справочник хранится в `app_settings.roomtypes.config.v1`, дефолты — `src/roomtypes.js`. Изменения применяются к новым генерациям без деплоя.
+
+- **Название** — то, что видит пользователь; используется как ключ в старых комнатах, style references и товарах.
+- **Prompt** — английское название комнаты для модели.
+- **Категории** — какие товары допустимы; только из списка категорий каталога.
+- **Слоты** — JSON-массив `{ key, categories }`, из него собирается смета. Категории слота должны входить в категории комнаты.
+- **Keep / Change / Guidance / Forbid** — правила сохранения, замены, уместных предметов и запретов в промте.
+- **Styling** — Pinterest-описание для финальной стилизации.
+- **Электрика** — JSON-массив `{ title, text }` с рекомендациями по розеткам и свету.
+- **Активен** — выключенный тип не показывается пользователям, но старые комнаты продолжают работать.
+- **Сбросить всё** — возвращает заводские 12 типов.
+
+Системный тип **«Другое»** удалить нельзя: он остаётся fallback для старых и неизвестных комнат. Должен остаться хотя бы один активный тип. Переименование не мигрирует старые данные, поэтому для вывода типа из использования лучше снять «активен».
+
 ## Промт
 
 Правила хранятся в `app_settings.prompt.rules.v1`, дефолты — `src/promptconfig.js`.
@@ -1002,6 +1089,10 @@ URL: `/admin`
 Поля:
 
 - **Свет** — cove, подсветка, лампы, запреты.
+- **Размеры комнаты** — блок с `{room}`, `{width}`, `{length}`, `{height}`, `{orientation}`; добавляется, когда пользователь указал размеры.
+- **План масштаба** — обёртка вокруг вычисленного плана мебели и проходов (`{room}`, `{plan}`).
+- **Кровать** — блок с `{room}`, `{bed_length}`; добавляется, когда указана длина кровати.
+- **Радиаторы** — вентилируемые декоративные экраны; запрет выдумывать радиаторы и закрывать вентиляцию.
 - **Уборка и техника** — радиатор, ТВ, провода, зеркала, люстры.
 - **Окна и текстиль** — шторы, жалюзи, карнизы.
 - **Pinterest-стайлинг** — арт, полки, техника, плюш, сцены.
@@ -1016,6 +1107,7 @@ URL: `/admin`
 ## Стили
 
 - Создание/редактирование стиля, ключ, название, prompt description, обложка.
+- В миграции `027` добавлены неактивные стили 2026 (Ваби-саби, Органик модерн, Тёплый минимализм, Биофильный, Современная классика, Новый максимализм, Средиземноморский модерн); включаются здесь.
 - **Референсы**: hero/board/upload, комната, score, approved. В генерацию идут только approved; hero — приоритет.
 - **Товары стиля**: избранные товары, комната, sort.
 - **Генератор комплекта**: комната + класс → товары только с URL → недостающие слоты → «Добавить всё в стиль».
@@ -1088,7 +1180,7 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/models` | image-модели OpenRouter |
 | GET | `/api/legal` | версии и ссылки юридических документов |
 | GET | `/api/styles` | активные стили |
-| GET | `/api/room-types` | 12 типов комнат |
+| GET | `/api/room-types` | активные типы комнат (из админки) |
 | GET | `/api/packs` | пакеты кредитов |
 | GET/POST | `/api/payments/robokassa/result` | ResultURL Robokassa: проверка `Password#2`, ответ `OK{InvId}` |
 | GET/POST | `/api/payments/robokassa/success` | fallback-редирект в кабинет; SuccessURL указывается на `/cabinet/paid` |
@@ -1130,13 +1222,16 @@ Admin: заголовок `X-Admin-Key`.
 | Поле | Обяз. | Значение |
 |---|---|---|
 | `photo` | да | JPG/PNG/WebP ≤ 15 МБ |
-| `room_type` | нет | один из 12, иначе `Другое` |
+| `room_type` | нет | один из активных типов, иначе `Другое` |
 | `style` | нет* | название стиля |
 | `style_ref` | нет* | файл референса |
 | `style_ref_url` | нет* | URL референса |
 | `price_tier` | нет | `start|comfort|premium|atelier` |
 | `keep_furniture` | нет | `1/0`, default `1` |
 | `use_catalog` | нет | `1/0`, default `1` |
+| `room_width_m`, `room_length_m`, `room_height_m` | нет | реальные размеры комнаты в метрах; либо все три, либо ни одного |
+| `bed_length_m` | нет | полная длина кровати с каркасом, метры |
+| `dimension_orientation` | нет | что считается шириной/длиной |
 | `palette`, `accent` | нет | цветовая схема/акцент |
 
 \* Нужен стиль или референс. Если есть только референс — стиль `Референс пользователя`.
@@ -1150,6 +1245,11 @@ Admin: заголовок `X-Admin-Key`.
   "id": "...",
   "style": "...",
   "room_type": "Спальня",
+  "room_width_m": 3,
+  "room_length_m": 6,
+  "room_height_m": 2.5,
+  "bed_length_m": 2,
+  "dimension_orientation": "ширина — стена с окном",
   "price_tier": "comfort",
   "keep_furniture": true,
   "use_catalog": true,
@@ -1216,6 +1316,8 @@ Admin: заголовок `X-Admin-Key`.
 | Метод | Путь | Описание |
 |---|---|---|
 | GET/PUT | `/api/admin/settings/models` | render/vision/resolution/aspect |
+| GET/PUT | `/api/admin/settings/room-types` | типы комнат: prompt, категории, слоты, электрика, активность |
+| POST | `/api/admin/settings/room-types/reset` | вернуть заводской справочник комнат |
 | GET/PUT | `/api/admin/settings/prompt` | правила промта |
 | POST | `/api/admin/settings/prompt/reset` | сброс |
 | GET/PUT | `/api/admin/settings/proxy` | прокси |
@@ -2215,6 +2317,44 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата сборки: 2026-10-26. Статус: приложение работает локально и на VPS, автодеплой настроен.
+
+## 2026-10-30 — scale planner и новые стили из Interior Prompt Generator 2026
+
+- Сохранён внешний референс `docs/prompts/interior-prompt-generator-2026.md` (2321 строка): 7-блочный шаблон, таблицы масштаба, нормы проходов, режимы референсов, 10 стилей × 5 промтов, QA-чеклист.
+- Добавлен детерминированный `src/scaleplan.js`: ширина кровати по ширине комнаты, проходы 60/80 см, кухня по площади, низкие потолки, узкие/длинные комнаты. План вставляется в `buildPrompt()` как `SCALE PLAN` при наличии размеров; обёртка редактируется в админке («Промт»).
+- Добавлены 7 новых стилей неактивными (`027_trend_styles.sql`): Ваби-саби, Органик модерн, Тёплый минимализм, Биофильный, Современная классика, Новый максимализм, Средиземноморский модерн. Активируются в админке «Стили».
+- Не внедрено: автоматический `analyze_room`, product-reference режимы `must_use/preferred/inspiration` в base-генерации и QA-порог `scaleHonesty`. Причины: текущий design-first пайплайн и product refs только в edit.
+- Тестов теперь 51.
+
+## 2026-10-30 — промты подключены к генерации
+
+- Style-driven скандинавский промт перенесён в `styles.prompt_description` миграцией `026_prompt_integration.sql`; `buildPrompt()` вставляет его в `STYLE BRIEF`.
+- В `promptconfig` добавлены редактируемые блоки `dimensions`, `bed`, `radiators` (админка «Промт»). Они не дублируют architecture lock и включаются только когда есть данные.
+- В генераторе появились необязательные поля ширины/длины/высоты комнаты, длины кровати и ориентации размеров. Размеры хранятся в `rooms` (`room_width_m`, `room_length_m`, `room_height_m`, `bed_length_m`, `dimension_orientation`) и передаются в `buildPrompt`.
+- Радиаторные правила действуют всегда, но требуют экран только для видимых радиаторов; запрещено выдумывать радиаторы, закрывать вентиляцию и прятать терморегулятор.
+- `POST /api/rooms` валидирует размеры: комната 1–30 м, высота 2–10 м, кровать 1–4 м; ширина/длина/высота заполняются только вместе.
+- Тестов тогда стало 45.
+
+## 2026-10-30 — сохранён style-driven промт Scandinavian
+
+- Сохранён универсальный промт `docs/prompts/scandinavian-style-driven.txt`: тёплый скандинавский интерьер без фиксированных метров и обязательной кровати.
+- Промт хорошо сочетается с текущим пайплайном: геометрию берёт из фото, стиль — из `styles.prompt_description`; отдельные блоки (палитра, стена, свет, текстиль, декор) можно переносить в description стиля или в `promptconfig.extra`.
+- Ссылка и разбор отличий от 3×6-промта добавлены в `docs/PROMPT-RULES.md`.
+
+## 2026-10-30 — сохранён эталонный промт Scandinavian 3×6
+
+- Сохранён рабочий полный промт `docs/prompts/scandinavian-bedroom-3x6.txt`: скандинавский интерьер, размеры 3.0 × 6.0 × 2.5 м, кровать 2.0 м, вентилируемые экраны радиаторов, референсы только как цвета/материалы.
+- Промт не меняет текущий `buildPrompt()`: это эталон для ручной генерации и сравнения. Плейсхолдеры — `{room}` и `{dimension_orientation}`.
+- Ссылка и пояснение добавлены в `docs/PROMPT-RULES.md`.
+
+## 2026-10-30 — управление типами комнат в админке
+
+- В админке появилась вкладка «Комнаты»: список типов, активность, сортировка, prompt, категории, слоты сметы, keep/change/guidance/forbid, Pinterest-стайлинг и электрика.
+- Справочник хранится в `app_settings.roomtypes.config.v1`; дефолты остались в `src/roomtypes.js`, сброс возвращает заводские 12 типов.
+- Изменения применяются без деплоя: `/api/room-types` отдаёт только активные типы, генератор подгружает список с сервера, а старые комнаты продолжают находить свои правила по имени.
+- Выключенный тип скрывается из выбора, но не ломает историю. Системный тип «Другое» защищён от удаления как fallback.
+- Валидация не даёт сохранить дубликаты, неизвестные категории и слот с категорией вне категорий комнаты.
+- Добавлены `test/roomtypes.test.js`; тестов теперь 43.
 
 ## 2026-10-29 — кнопка очистки комнаты
 

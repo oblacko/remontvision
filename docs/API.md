@@ -14,7 +14,7 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/models` | image-модели OpenRouter |
 | GET | `/api/legal` | версии и ссылки юридических документов |
 | GET | `/api/styles` | активные стили |
-| GET | `/api/room-types` | 12 типов комнат |
+| GET | `/api/room-types` | активные типы комнат (из админки) |
 | GET | `/api/packs` | пакеты кредитов |
 | GET/POST | `/api/payments/robokassa/result` | ResultURL Robokassa: проверка `Password#2`, ответ `OK{InvId}` |
 | GET/POST | `/api/payments/robokassa/success` | fallback-редирект в кабинет; SuccessURL указывается на `/cabinet/paid` |
@@ -56,13 +56,16 @@ Admin: заголовок `X-Admin-Key`.
 | Поле | Обяз. | Значение |
 |---|---|---|
 | `photo` | да | JPG/PNG/WebP ≤ 15 МБ |
-| `room_type` | нет | один из 12, иначе `Другое` |
+| `room_type` | нет | один из активных типов, иначе `Другое` |
 | `style` | нет* | название стиля |
 | `style_ref` | нет* | файл референса |
 | `style_ref_url` | нет* | URL референса |
 | `price_tier` | нет | `start|comfort|premium|atelier` |
 | `keep_furniture` | нет | `1/0`, default `1` |
 | `use_catalog` | нет | `1/0`, default `1` |
+| `room_width_m`, `room_length_m`, `room_height_m` | нет | реальные размеры комнаты в метрах; либо все три, либо ни одного |
+| `bed_length_m` | нет | полная длина кровати с каркасом, метры |
+| `dimension_orientation` | нет | что считается шириной/длиной |
 | `palette`, `accent` | нет | цветовая схема/акцент |
 
 \* Нужен стиль или референс. Если есть только референс — стиль `Референс пользователя`.
@@ -76,6 +79,11 @@ Admin: заголовок `X-Admin-Key`.
   "id": "...",
   "style": "...",
   "room_type": "Спальня",
+  "room_width_m": 3,
+  "room_length_m": 6,
+  "room_height_m": 2.5,
+  "bed_length_m": 2,
+  "dimension_orientation": "ширина — стена с окном",
   "price_tier": "comfort",
   "keep_furniture": true,
   "use_catalog": true,
@@ -142,6 +150,8 @@ Admin: заголовок `X-Admin-Key`.
 | Метод | Путь | Описание |
 |---|---|---|
 | GET/PUT | `/api/admin/settings/models` | render/vision/resolution/aspect |
+| GET/PUT | `/api/admin/settings/room-types` | типы комнат: prompt, категории, слоты, электрика, активность |
+| POST | `/api/admin/settings/room-types/reset` | вернуть заводской справочник комнат |
 | GET/PUT | `/api/admin/settings/prompt` | правила промта |
 | POST | `/api/admin/settings/prompt/reset` | сброс |
 | GET/PUT | `/api/admin/settings/proxy` | прокси |

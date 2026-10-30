@@ -74,8 +74,11 @@
 - VPS: `/root/remontvision`, Docker Compose, `app` + `db`.
 - Публично: `https://www.remontvision.ru`.
 - Деплой: push в `main` → GitHub Actions → VPS.
-- Миграции: `001`–`025`.
-- Тесты: `npm test` — 39 тестов. Frontend: `cd web && npm run build`.
+- Миграции: `001`–`027`.
+- Тесты: `npm test` — 51 тест. Frontend: `cd web && npm run lint && npm run build`.
+- Размеры комнаты/кровати, `scalePlan` и radiator-cover блоки подключены к `buildPrompt`; скандинавский style brief — в `styles.prompt_description`.
+- 7 новых стилей 2026 добавлены неактивными в `027_trend_styles.sql`; включаются в админке «Стили».
+- Типы комнат: справочник в `app_settings.roomtypes.config.v1`, админка «Комнаты», дефолты в `src/roomtypes.js`; `/api/room-types` отдаёт только активные.
 - Health: `GET /api/health`.
 
 ## Последние важные коммиты

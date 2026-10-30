@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'procurement' | 'proxy' | 'catalog'
+type Tab = 'users' | 'packs' | 'rooms' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'procurement' | 'proxy' | 'catalog'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -73,13 +73,71 @@ type ModelSettings = {
   image_models: Array<{ id: string; input_refs: boolean }>;
 }
 type StyleDetail = { style: Style; prompt_description: string; references: StyleRef[]; products: Product[] }
+type RoomType = {
+  name: string; prompt: string; categories: string[]; slots: Array<{ key: string; categories: string[] }>;
+  keep: string; change: string; guidance: string; forbid: string;
+  electrical: Array<{ title: string; text: string }>; styling: string; active: boolean; sort: number;
+}
+type RoomTypeDraft = {
+  name: string; prompt: string; categories: string; slots: string; keep: string; change: string;
+  guidance: string; forbid: string; electrical: string; styling: string; active: boolean; sort: string;
+}
 
 const KEY_STORAGE = 'rv_admin_key'
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value / 100)) + ' ₽'
 const money = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const productImage = (p: Product) => p.image_path ? `/products/${p.image_path.split('/').pop()}` : (p.image_url || '')
-const roomTypeNames = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое'] as const
+const defaultRoomTypeNames = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое']
+const emptyRoomTypeDraft = (): RoomTypeDraft => ({
+  name: 'Новая комната',
+  prompt: 'room',
+  categories: 'floor, paint, light, outlets',
+  slots: JSON.stringify([{ key: 'floor', categories: ['floor'] }, { key: 'wall', categories: ['paint'] }, { key: 'light', categories: ['light'] }, { key: 'outlets', categories: ['outlets'] }], null, 2),
+  keep: 'the existing room purpose, architecture and camera angle.',
+  change: 'finishes, lighting and styling that match the room purpose.',
+  guidance: 'Keep the room purpose exactly as in the source photo.',
+  forbid: 'Do not add fixtures from another room type. Do not change the room purpose.',
+  electrical: JSON.stringify([{ title: 'Электрика', text: 'Розетки и выключатели по фактическому сценарию комнаты.' }], null, 2),
+  styling: '',
+  active: true,
+  sort: '100',
+})
+const roomTypeToDraft = (room: RoomType): RoomTypeDraft => ({
+  name: room.name,
+  prompt: room.prompt,
+  categories: room.categories.join(', '),
+  slots: JSON.stringify(room.slots, null, 2),
+  keep: room.keep,
+  change: room.change,
+  guidance: room.guidance,
+  forbid: room.forbid,
+  electrical: JSON.stringify(room.electrical, null, 2),
+  styling: room.styling,
+  active: room.active !== false,
+  sort: String(room.sort ?? 0),
+})
+const parseRoomTypeArray = <T,>(value: string, label: string): T[] => {
+  let parsed: unknown
+  try { parsed = JSON.parse(value || '[]') }
+  catch { throw new Error(`${label}: некорректный JSON`) }
+  if (!Array.isArray(parsed)) throw new Error(`${label}: нужен JSON-массив`)
+  return parsed as T[]
+}
+const draftToRoomType = (draft: RoomTypeDraft): RoomType => ({
+  name: draft.name.trim(),
+  prompt: draft.prompt.trim(),
+  categories: draft.categories.split(',').map(item => item.trim()).filter(Boolean),
+  slots: parseRoomTypeArray<RoomType['slots'][number]>(draft.slots, 'Слоты'),
+  keep: draft.keep.trim(),
+  change: draft.change.trim(),
+  guidance: draft.guidance.trim(),
+  forbid: draft.forbid.trim(),
+  electrical: parseRoomTypeArray<RoomType['electrical'][number]>(draft.electrical, 'Электрика'),
+  styling: draft.styling.trim(),
+  active: draft.active,
+  sort: Number(draft.sort) || 0,
+})
 const accents = ['sand', 'dust', 'graphite', 'forest', 'terra'] as const
 const accentNames: Record<string, string> = { sand: 'Песочный', dust: 'Синева', graphite: 'Графит', forest: 'Оливковый', terra: 'Терракота' }
 const modelFamily = (id: string) =>
@@ -147,6 +205,14 @@ export default function Admin() {
   const [packs, setPacks] = useState<Pack[]>([])
   const [editPackId, setEditPackId] = useState<string | null>(null)
   const [packForm, setPackForm] = useState({ id: '', title: '', credits: '2', price: '99', active: true, sort: '10' })
+
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
+  const [roomTypeNames, setRoomTypeNames] = useState<string[]>(defaultRoomTypeNames)
+  const [roomTypeDefaults, setRoomTypeDefaults] = useState<RoomType[]>([])
+  const [selectedRoomType, setSelectedRoomType] = useState<string | null>(null)
+  const [roomTypeForm, setRoomTypeForm] = useState<RoomTypeDraft>(emptyRoomTypeDraft)
+  const [roomTypesBusy, setRoomTypesBusy] = useState(false)
+  const [roomTypesNotice, setRoomTypesNotice] = useState('')
 
   const [modelSettings, setModelSettings] = useState<ModelSettings | null>(null)
   const [renderDraft, setRenderDraft] = useState('')
@@ -241,6 +307,97 @@ export default function Admin() {
   const loadPacks = async () => {
     try { setPacks(await readJson(await api('/api/admin/packs'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const loadRoomTypes = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/room-types'))
+      const config = Array.isArray(d.config) ? d.config as RoomType[] : []
+      const defaults = Array.isArray(d.defaults) ? d.defaults as RoomType[] : []
+      setRoomTypes(config)
+      setRoomTypeDefaults(defaults)
+      setRoomTypeNames(config.map(room => room.name))
+      setRoomTypesNotice('')
+      const current = selectedRoomType ? config.find(room => room.name === selectedRoomType) : null
+      if (current) setRoomTypeForm(roomTypeToDraft(current))
+      else if (config[0]) { setSelectedRoomType(config[0].name); setRoomTypeForm(roomTypeToDraft(config[0])) }
+      else { setSelectedRoomType(null); setRoomTypeForm(emptyRoomTypeDraft()) }
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const selectRoomType = (room: RoomType) => {
+    setSelectedRoomType(room.name)
+    setRoomTypeForm(roomTypeToDraft(room))
+    setRoomTypesNotice('')
+  }
+  const startNewRoomType = () => {
+    const names = new Set(roomTypes.map(room => room.name.toLowerCase()))
+    let name = 'Новая комната'
+    let suffix = 2
+    while (names.has(name.toLowerCase())) name = `Новая комната ${suffix++}`
+    setSelectedRoomType(null)
+    setRoomTypeForm({ ...emptyRoomTypeDraft(), name, sort: String((roomTypes.length + 1) * 10) })
+    setRoomTypesNotice('Заполните поля и нажмите «Создать тип»')
+  }
+  const saveRoomType = async (event: FormEvent) => {
+    event.preventDefault()
+    setAdminError(''); setRoomTypesNotice('')
+    let item: RoomType
+    try { item = draftToRoomType(roomTypeForm) }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Проверьте JSON в слотах и электрике'); return }
+    if (!item.name) { setAdminError('Введите название типа комнаты'); return }
+    const next = [...roomTypes]
+    const currentIndex = selectedRoomType ? next.findIndex(room => room.name === selectedRoomType) : -1
+    if (next.some((room, index) => index !== currentIndex && room.name.toLowerCase() === item.name.toLowerCase())) {
+      setAdminError(`Тип «${item.name}» уже существует`)
+      return
+    }
+    if (currentIndex >= 0) next[currentIndex] = item
+    else next.push(item)
+    setRoomTypesBusy(true)
+    try {
+      const d = await readJson(await api('/api/admin/settings/room-types', { method: 'PUT', body: JSON.stringify({ config: next }) }))
+      const config = Array.isArray(d.config) ? d.config as RoomType[] : next
+      setRoomTypes(config)
+      setRoomTypeNames(config.map(room => room.name))
+      const saved = config.find(room => room.name === item.name) || item
+      setSelectedRoomType(saved.name)
+      setRoomTypeForm(roomTypeToDraft(saved))
+      setRoomTypesNotice(currentIndex >= 0 ? 'Тип комнаты сохранён' : 'Тип комнаты создан')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сохранить тип комнаты') }
+    finally { setRoomTypesBusy(false) }
+  }
+  const deleteRoomType = async (name: string) => {
+    if (name === 'Другое') { setAdminError('«Другое» — системный fallback для старых и неизвестных комнат, его нельзя удалить. Можно снять «активен».'); return }
+    if (roomTypes.length <= 1) { setAdminError('Должен остаться хотя бы один тип комнаты'); return }
+    if (!confirm(`Удалить тип «${name}»? Старые комнаты и референсы с этим room_type останутся в базе, но перестанут находить свои правила. Лучше выключить его галочкой «активен».`)) return
+    const next = roomTypes.filter(room => room.name !== name)
+    setRoomTypesBusy(true); setAdminError(''); setRoomTypesNotice('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/room-types', { method: 'PUT', body: JSON.stringify({ config: next }) }))
+      const config = Array.isArray(d.config) ? d.config as RoomType[] : next
+      setRoomTypes(config)
+      setRoomTypeNames(config.map(room => room.name))
+      const first = config[0] || null
+      setSelectedRoomType(first?.name || null)
+      setRoomTypeForm(first ? roomTypeToDraft(first) : emptyRoomTypeDraft())
+      setRoomTypesNotice(`Тип «${name}» удалён`)
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось удалить тип комнаты') }
+    finally { setRoomTypesBusy(false) }
+  }
+  const resetRoomTypes = async () => {
+    if (!confirm('Вернуть заводской список типов комнат? Все изменения справочника будут потеряны.')) return
+    setRoomTypesBusy(true); setAdminError(''); setRoomTypesNotice('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/room-types/reset', { method: 'POST' }))
+      const config = Array.isArray(d.config) ? d.config as RoomType[] : []
+      setRoomTypes(config)
+      setRoomTypeDefaults(Array.isArray(d.defaults) ? d.defaults as RoomType[] : [])
+      setRoomTypeNames(config.map(room => room.name))
+      const first = config[0] || null
+      setSelectedRoomType(first?.name || null)
+      setRoomTypeForm(first ? roomTypeToDraft(first) : emptyRoomTypeDraft())
+      setRoomTypesNotice('Возвращён заводской список типов комнат')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сбросить типы комнат') }
+    finally { setRoomTypesBusy(false) }
   }
   const loadStyles = async () => {
     try { setStyles(await readJson(await api('/api/admin/styles'))); }
@@ -493,6 +650,7 @@ export default function Admin() {
   }
 
   useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'procurement') loadProcurement() }, [authed, tab])
+  useEffect(() => { if (authed) void loadRoomTypes() }, [authed])
   useEffect(() => {
     if (!authed) return
     api('/api/admin/products').then(r => r.ok ? r.json() : []).then(setAllProducts).catch(() => {})
@@ -681,7 +839,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['procurement', 'Поиск'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['rooms', 'Комнаты'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['procurement', 'Поиск'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -748,6 +906,56 @@ export default function Admin() {
                 </div>
                 <button type="submit" className="action-primary mt-4 w-full">{editPackId ? 'Сохранить' : 'Создать пакет'}</button>
               </form>
+            </div>
+          )}
+
+          {tab === 'rooms' && (
+            <div className="mt-8 grid gap-6 xl:grid-cols-[22rem_1fr]">
+              <section>
+                <div className="flex items-center justify-between gap-2"><p className="eyebrow">Справочник комнат</p><button type="button" onClick={startNewRoomType} className="text-xs underline"><Plus className="mr-1 inline size-3" />новый</button></div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">Тип комнаты задаёт допустимые категории товаров, слоты сметы, правила сохранения/замены, электрику и стилизацию для промта. Выключенные типы не показываются пользователям, но старые комнаты продолжают работать.</p>
+                <div className="mt-3 space-y-2">
+                  {roomTypes.map(room => (
+                    <button key={room.name} type="button" onClick={() => selectRoomType(room)} className={`flex w-full items-center gap-3 border p-2 text-left transition-colors hover:bg-muted ${selectedRoomType === room.name ? 'bg-muted' : ''}`}>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{room.name}</span><span className="mt-1 block text-xs text-muted-foreground">{room.categories.length} кат. · {room.slots.length} слотов · sort {room.sort}</span></span>
+                      {room.active === false && <span className="text-[10px] uppercase text-muted-foreground">off</span>}
+                    </button>
+                  ))}
+                  {!roomTypes.length && <p className="border p-3 text-sm text-muted-foreground">Загружаем типы комнат…</p>}
+                </div>
+              </section>
+              <section className="min-w-0">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div><p className="eyebrow">{selectedRoomType ? 'Редактирование типа' : 'Новый тип комнаты'}</p><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Изменения применяются к новым генерациям. Переименование не обновляет старые комнаты, style references и товары, поэтому для вывода из использования лучше снять «активен».</p></div>
+                  <button type="button" disabled={roomTypesBusy} onClick={() => void resetRoomTypes()} className="action-secondary">Сбросить всё</button>
+                </div>
+                {roomTypesNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{roomTypesNotice}</p>}
+                <form onSubmit={saveRoomType} className="mt-4 border p-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block"><span className="eyebrow mb-2 block">Название</span><input value={roomTypeForm.name} onChange={e => setRoomTypeForm({ ...roomTypeForm, name: e.target.value })} placeholder="Например: Гостиная (зал)" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Prompt для модели (английский)</span><input value={roomTypeForm.prompt} onChange={e => setRoomTypeForm({ ...roomTypeForm, prompt: e.target.value })} placeholder="living room" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary" /></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Сортировка</span><input value={roomTypeForm.sort} onChange={e => setRoomTypeForm({ ...roomTypeForm, sort: e.target.value })} inputMode="numeric" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
+                    <label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={roomTypeForm.active} onChange={e => setRoomTypeForm({ ...roomTypeForm, active: e.target.checked })} className="size-4 accent-primary" />активен для пользователей</label>
+                    <label className="block sm:col-span-2"><span className="eyebrow mb-2 block">Категории товаров</span><input value={roomTypeForm.categories} onChange={e => setRoomTypeForm({ ...roomTypeForm, categories: e.target.value })} placeholder="floor, paint, light, outlets" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary" /><span className="mt-2 block text-[11px] leading-5 text-muted-foreground">Через запятую. Доступны: {productCategories.join(', ')}.</span></label>
+                  </div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <label className="block"><span className="eyebrow mb-2 block">Keep — что сохранить</span><textarea value={roomTypeForm.keep} onChange={e => setRoomTypeForm({ ...roomTypeForm, keep: e.target.value })} rows={3} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Change — что можно менять</span><textarea value={roomTypeForm.change} onChange={e => setRoomTypeForm({ ...roomTypeForm, change: e.target.value })} rows={3} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Guidance — что уместно</span><textarea value={roomTypeForm.guidance} onChange={e => setRoomTypeForm({ ...roomTypeForm, guidance: e.target.value })} rows={2} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Forbid — что запрещено</span><textarea value={roomTypeForm.forbid} onChange={e => setRoomTypeForm({ ...roomTypeForm, forbid: e.target.value })} rows={2} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
+                    <label className="block lg:col-span-2"><span className="eyebrow mb-2 block">Styling — Pinterest-стайлинг</span><textarea value={roomTypeForm.styling} onChange={e => setRoomTypeForm({ ...roomTypeForm, styling: e.target.value })} rows={4} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
+                  </div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <label className="block"><span className="eyebrow mb-2 block">Слоты сметы (JSON)</span><textarea value={roomTypeForm.slots} onChange={e => setRoomTypeForm({ ...roomTypeForm, slots: e.target.value })} rows={9} className="w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" /><span className="mt-2 block text-[11px] leading-5 text-muted-foreground">Массив объектов <code>{'{ key, categories }'}</code>. Категории слота должны входить в категории комнаты.</span></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Электрика (JSON)</span><textarea value={roomTypeForm.electrical} onChange={e => setRoomTypeForm({ ...roomTypeForm, electrical: e.target.value })} rows={9} className="w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" /><span className="mt-2 block text-[11px] leading-5 text-muted-foreground">Массив объектов <code>{'{ title, text }'}</code> для рекомендаций по розеткам и свету.</span></label>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <button type="submit" disabled={roomTypesBusy} className="action-primary">{roomTypesBusy ? 'Сохраняем…' : selectedRoomType ? 'Сохранить тип' : 'Создать тип'}</button>
+                    {selectedRoomType && <button type="button" disabled={roomTypesBusy} onClick={() => void deleteRoomType(selectedRoomType)} className="text-xs text-destructive underline">удалить тип</button>}
+                  </div>
+                </form>
+                {roomTypeDefaults.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Заводской справочник: {roomTypeDefaults.length} типов. «Сбросить всё» вернёт их и удалит пользовательские изменения.</p>}
+              </section>
             </div>
           )}
 
@@ -866,6 +1074,10 @@ export default function Admin() {
                 <div className="mt-6 space-y-5">
                   {([
                     ['lighting', 'Свет', 'Главный вау-инструмент: слои, cove, подсветка, запреты.'],
+                    ['dimensions', 'Размеры комнаты', 'Плейсхолдеры: {room}, {width}, {length}, {height}, {orientation}.'],
+                    ['scalePlan', 'План масштаба', 'Обёртка вокруг вычисленного плана мебели: {room}, {plan}.'],
+                    ['bed', 'Кровать', 'Плейсхолдеры: {room}, {bed_length}.'],
+                    ['radiators', 'Радиаторы', 'Вентилируемые экраны; не выдумывать радиаторы.'],
                     ['cleanup', 'Уборка и техника', 'Что убрать или спрятать: радиатор, ТВ, провода, старые вещи.'],
                     ['window', 'Окна и текстиль', 'Шторы, жалюзи, карнизы, тюль.'],
                     ['pinterest', 'Pinterest-стайлинг', 'Арт, полки, мелочи, техника, плюш, 3–5 сцен.'],

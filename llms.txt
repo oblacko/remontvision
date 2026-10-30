@@ -4,7 +4,7 @@
 
 Repo: https://github.com/oblacko/remontvision (private)  
 Prod: https://www.remontvision.ru  
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Start here
 
@@ -27,9 +27,12 @@ Last updated: 2026-10-29
 
 - Generation: FLUX 3 Image, 1K, aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash.
 - Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
-- 10 styles, 12 room types, 100 active demo products, **0 products with real URL**.
+- 10 styles, 12 default room types, 100 active demo products, **0 products with real URL**.
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
-- Prompt rules editable in admin (`app_settings.prompt.rules.v1`).
+- Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
+- Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
+- Saved reference prompts are now wired in: `docs/prompts/scandinavian-bedroom-3x6.txt` blocks live in `promptconfig` (`dimensions`, `scalePlan`, `bed`, `radiators`) and room dimension fields; `docs/prompts/scandinavian-style-driven.txt` style blocks live in the Scandinavian `styles.prompt_description` (migration 026).
+- New reference `docs/prompts/interior-prompt-generator-2026.md`: deterministic scale planner in `src/scaleplan.js` (bed width, 60/80 cm walkways, kitchen by area, low ceilings, narrow/long rooms) and 7 trend styles added inactive in migration 027 (Wabi-Sabi, Organic Modern, Warm Minimalism, Biophilic, Modern Heritage, New Maximalism, Mediterranean Modern). Activate styles in admin.
 - Catalog import by URL and bulk list; drafts only, manual activation.
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
@@ -61,7 +64,7 @@ Last updated: 2026-10-29
 - `src/jobs.js` — worker.
 - `src/openrouter.js` — provider, prompt, vision, matching.
 - `src/promptconfig.js` — prompt defaults/config.
-- `src/roomtypes.js` — room slots/keep/change/styling.
+- `src/roomtypes.js` — room types, slots/keep/change/styling, admin config load/save.
 - `src/curate.js` — product selection + refs.
 - `src/productimport.js` — URL import.
 - `src/modelcaps.js` — model capabilities.
@@ -75,7 +78,7 @@ Last updated: 2026-10-29
 
 ```bash
 npm install
-npm test                 # 39 tests
+npm test                 # 51 test
 npm start                # Node >=20.6, --env-file
 cd web && npm run build  # tsc + vite
 docker compose up -d db  # local Postgres 127.0.0.1:5434

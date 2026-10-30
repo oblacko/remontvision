@@ -44,6 +44,33 @@ test('base prompt is a deep redesign with explicit keep/change and material clas
   assert.match(prompt, /Image 1|1\. source room/);
 });
 
+test('dimensions, bed length and radiator covers are injected as mandatory blocks', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    dimensions: { width: 3, length: 6, height: 2.5, bedLength: 2, orientation: 'width is the window wall' },
+  });
+  assert.match(prompt, /ROOM DIMENSIONS AND SCALE/);
+  assert.match(prompt, /Room width: 3 metres/);
+  assert.match(prompt, /Room length: 6 metres/);
+  assert.match(prompt, /height: 2.5 metres/);
+  assert.match(prompt, /width is the window wall/);
+  assert.match(prompt, /SCALE PLAN/);
+  assert.match(prompt, /180 cm wide bed/);
+  assert.match(prompt, /BED SIZE/);
+  assert.match(prompt, /exactly 2 metres/);
+  assert.match(prompt, /RADIATOR COVERS/);
+  assert.match(prompt, /thermostatic/i);
+  assert.match(prompt, /Do not invent radiators/);
+});
+
+test('dimension blocks are omitted without room measurements but radiator rules stay global', () => {
+  const prompt = buildPrompt({ style: 'Современный', roomType: 'Гостиная (зал)' });
+  assert.doesNotMatch(prompt, /ROOM DIMENSIONS AND SCALE/);
+  assert.doesNotMatch(prompt, /BED SIZE/);
+  assert.match(prompt, /RADIATOR COVERS/);
+});
+
 test('prompt modes can drop furniture and catalog', () => {
   const prompt = buildPrompt({
     style: 'Джапанди',

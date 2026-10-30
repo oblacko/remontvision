@@ -7,6 +7,7 @@ import { getModelConfig } from './modelconfig.js';
 import { supportsAdvancedOptions, modelFamily, supportsResolution } from './modelcaps.js';
 import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 import { getPromptConfig } from './promptconfig.js';
+import { buildScalePlan } from './scaleplan.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -140,6 +141,13 @@ const STYLES = {
   'Бохо': 'bohemian interior, layered textiles, rattan, plants, warm earthy colors, relaxed artisanal styling',
   'Ар-деко': 'art deco interior, brass, velvet, geometric patterns, rich jewel tones',
   'Кантри': 'country interior, natural wood, cozy textiles, warm rustic details, handmade character',
+  'Ваби-саби': 'wabi-sabi interior, rough lime plaster, clay, reclaimed wood, undyed linen, raw stone, imperfection, 2200–2700K soft light',
+  'Органик модерн': 'organic modern interior, clean curved silhouettes, travertine, white oak, bouclé, linen, rattan, warm indirect 2700–3000K light',
+  'Тёплый минимализм': 'warm minimalist interior, off-white and greige, hidden storage, pale wood, textured plaster, one saturated accent, 2700–3000K indirect light',
+  'Биофильный': 'biophilic interior, living wall, abundant plants, warm wood, textured stone, cork and jute, full-spectrum daylight with 3000K evening light',
+  'Современная классика': 'modern heritage interior, updated moldings and paneling, warm white and tobacco, walnut, velvet, marble, unlacquered brass, layered 2700K light',
+  'Новый максимализм': 'new maximalist interior, curated jewel tones, velvet, silk, brass, dark wood, gallery wall, layered dramatic 2700K light',
+  'Средиземноморский модерн': 'Mediterranean modern interior, warm lime plaster, terracotta, arches, rattan, linen, unglazed ceramics, warm 3000–3500K light',
   'Референс пользователя': 'the uploaded style reference',
 };
 
@@ -175,6 +183,10 @@ function productsText(products = []) {
   }).join('\n');
 }
 
+function fillTemplate(text, vars = {}) {
+  return String(text || '').replace(/\{(\w+)\}/g, (_, key) => vars[key] == null ? '' : String(vars[key]));
+}
+
 export function buildPrompt({
   style,
   priceTier = 'comfort',
@@ -191,6 +203,7 @@ export function buildPrompt({
   keepFurniture = true,
   useCatalog = true,
   imageMap = [],
+  dimensions = null,
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -214,6 +227,30 @@ export function buildPrompt({
     : 'No catalog products are used for this render. Choose materials, lighting and furniture that best fit the style and the room. Do not add a product list or estimate.';
   const catalogRule = useCatalog ? rules.catalogOn : rules.catalogOff;
   const roles = imageRolesText(imageMap);
+  const hasRoomDimensions = Boolean(dimensions
+    && Number(dimensions.width) > 0
+    && Number(dimensions.length) > 0
+    && Number(dimensions.height) > 0);
+  const dimensionsText = hasRoomDimensions
+    ? fillTemplate(rules.dimensions, {
+        room: roomName,
+        width: Number(dimensions.width),
+        length: Number(dimensions.length),
+        height: Number(dimensions.height),
+        orientation: dimensions.orientation || 'not specified by the user',
+      })
+    : '';
+  const scalePlanInner = hasRoomDimensions
+    ? buildScalePlan({ roomType, ...dimensions })
+    : '';
+  const scalePlanText = scalePlanInner
+    ? fillTemplate(rules.scalePlan, { room: roomName, plan: scalePlanInner })
+    : '';
+  const bedText = Number(dimensions?.bedLength) > 0
+    ? fillTemplate(rules.bed, { room: roomName, bed_length: Number(dimensions.bedLength) })
+    : '';
+  const radiatorsText = fillTemplate(rules.radiators, { room: roomName });
+  const scaleText = [dimensionsText, scalePlanText, bedText, radiatorsText].filter(Boolean).join('\n\n');
   const architectureLock = `ARCHITECTURE LOCK — HIGHEST PRIORITY
 This is the SAME physical room, not a new room. This is a cosmetic renovation only. The source image is a photograph of the actual room; do not redesign its architecture.
 LOCKED INVARIANTS — do not violate any of these:
@@ -255,7 +292,7 @@ The result must feel like a completed designer renovation with a genuine WOW eff
 This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
 
 ${architectureLock}
-
+${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY
 ${keep}.
 Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.

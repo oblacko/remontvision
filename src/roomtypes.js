@@ -1,7 +1,7 @@
 // Тип комнаты — это не только запрет «кровати с умывальником».
 // Он задаёт слоты материалов, что сохранять, что менять и рекомендации по электрике.
 // categories — какие товары вообще допустимы; slots — что реально выбираем в смету.
-export const ROOM_TYPES = [
+const DEFAULT_ROOM_TYPES = [
   {
     name: 'Гостиная (зал)',
     prompt: 'living room',
@@ -299,10 +299,157 @@ const STYLING_BY_ROOM = {
   'Кладовка': 'Keep it practical: boxes, labels, shelving and warm light; no decor clutter.',
   'Другое': 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.',
 };
-for (const type of ROOM_TYPES) type.styling = STYLING_BY_ROOM[type.name] || STYLING_BY_ROOM['Другое'];
+const ROOM_CATEGORIES = new Set(DEFAULT_ROOM_TYPES.flatMap(type => type.categories));
+DEFAULT_ROOM_TYPES.forEach((type, index) => {
+  type.styling = STYLING_BY_ROOM[type.name] || STYLING_BY_ROOM['Другое'];
+  type.active = type.active !== false;
+  type.sort = Number.isFinite(type.sort) ? type.sort : index;
+});
 
-const byName = new Map(ROOM_TYPES.map(type => [type.name.toLowerCase(), type]));
-export const ROOM_TYPE_NAMES = ROOM_TYPES.map(type => type.name);
+export const ROOM_TYPES = [];
+export const ROOM_TYPE_NAMES = [];
+let byName = new Map();
+
+const clone = value => structuredClone(value);
+const unique = values => [...new Set(values)];
+
+function cleanText(value, field, max = 8000) {
+  const out = String(value ?? '').trim();
+  if (out.length > max) throw new Error(`${field}: максимум ${max} символов`);
+  return out;
+}
+
+function stringList(value, field, max = 80) {
+  if (!Array.isArray(value)) throw new Error(`${field}: нужен массив`);
+  const out = unique(value.map(item => cleanText(item, field, max)).filter(Boolean));
+  if (!out.length) throw new Error(`${field}: нужен хотя бы один элемент`);
+  return out;
+}
+
+function normalizeRoomType(input, index) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Тип комнаты должен быть объектом');
+  const name = cleanText(input.name, 'Название', 80);
+  if (!name) throw new Error('У типа комнаты должно быть название');
+  const prompt = cleanText(input.prompt, `«${name}»: prompt`, 300);
+  if (!prompt) throw new Error(`«${name}»: нужен английский prompt для модели`);
+  const categories = stringList(input.categories, `«${name}»: categories`);
+  for (const category of categories) {
+    if (!ROOM_CATEGORIES.has(category)) throw new Error(`«${name}»: неизвестная категория ${category}`);
+  }
+  const slots = Array.isArray(input.slots) ? input.slots : [];
+  const normalizedSlots = slots.map((slot, slotIndex) => {
+    const key = cleanText(slot?.key, `«${name}»: слот ${slotIndex + 1}`, 80);
+    if (!key) throw new Error(`«${name}»: у слота нет key`);
+    const slotCategories = stringList(slot?.categories, `«${name}»/${key}: categories`);
+    for (const category of slotCategories) {
+      if (!categories.includes(category)) throw new Error(`«${name}»/${key}: категория ${category} не входит в categories комнаты`);
+    }
+    return { key, categories: slotCategories };
+  });
+  const seenSlots = new Set();
+  for (const slot of normalizedSlots) {
+    if (seenSlots.has(slot.key)) throw new Error(`«${name}»: слот ${slot.key} повторяется`);
+    seenSlots.add(slot.key);
+  }
+  const electrical = Array.isArray(input.electrical)
+    ? input.electrical.map((item, itemIndex) => ({
+        title: cleanText(item?.title, `«${name}»: электрика ${itemIndex + 1}`, 200),
+        text: cleanText(item?.text, `«${name}»: электрика ${itemIndex + 1}`, 1000),
+      })).filter(item => item.title || item.text)
+    : [];
+  return {
+    name,
+    prompt,
+    categories,
+    slots: normalizedSlots,
+    keep: cleanText(input.keep, `«${name}»: keep`),
+    change: cleanText(input.change, `«${name}»: change`),
+    guidance: cleanText(input.guidance, `«${name}»: guidance`),
+    forbid: cleanText(input.forbid, `«${name}»: forbid`),
+    electrical,
+    styling: cleanText(input.styling, `«${name}»: styling`) || STYLING_BY_ROOM[name] || STYLING_BY_ROOM['Другое'],
+    active: input.active !== false,
+    sort: Number.isFinite(Number(input.sort)) ? Number(input.sort) : index,
+  };
+}
+
+export function validateRoomTypes(input) {
+  if (!Array.isArray(input) || !input.length) throw new Error('Нужен непустой список типов комнат');
+  if (input.length > 50) throw new Error('Слишком много типов комнат');
+  const list = input.map((item, index) => normalizeRoomType(item, index));
+  const seen = new Set();
+  for (const type of list) {
+    const key = type.name.toLowerCase();
+    if (seen.has(key)) throw new Error(`Тип комнаты «${type.name}» повторяется`);
+    seen.add(key);
+  }
+  if (!list.some(type => type.name === 'Другое')) {
+    throw new Error('Нужен системный тип «Другое»: он используется как fallback для старых и неизвестных комнат');
+  }
+  if (!list.some(type => type.active !== false)) {
+    throw new Error('Должен остаться хотя бы один активный тип комнаты');
+  }
+  return list.sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, 'ru'));
+}
+
+function applyRoomTypes(list) {
+  const next = clone(list);
+  ROOM_TYPES.splice(0, ROOM_TYPES.length, ...next);
+  ROOM_TYPE_NAMES.splice(0, ROOM_TYPE_NAMES.length, ...next.map(type => type.name));
+  byName = new Map(next.map(type => [type.name.toLowerCase(), type]));
+}
+
+applyRoomTypes(DEFAULT_ROOM_TYPES);
+
+export function getRoomTypeConfig() {
+  return clone(ROOM_TYPES);
+}
+
+export function getRoomTypeDefaults() {
+  return clone(DEFAULT_ROOM_TYPES);
+}
+
+export function activeRoomTypeNames() {
+  return ROOM_TYPES.filter(type => type.active !== false).map(type => type.name);
+}
+
+export function isRoomTypeActive(name) {
+  return roomTypeByName(name)?.active === true;
+}
+
+export function setRoomTypesForTests(list) {
+  applyRoomTypes(validateRoomTypes(list));
+}
+
+export const ROOM_TYPES_KEY = 'roomtypes.config.v1';
+
+export async function loadRoomTypes() {
+  try {
+    const { q } = await import('./db.js');
+    const rows = await q.settingsByKeys([ROOM_TYPES_KEY]);
+    const raw = rows.find(row => row.key === ROOM_TYPES_KEY)?.value;
+    applyRoomTypes(raw ? validateRoomTypes(JSON.parse(raw)) : DEFAULT_ROOM_TYPES);
+  } catch (e) {
+    console.error('[roomtypes] не удалось загрузить настройки:', String(e.message || e).slice(0, 300));
+    applyRoomTypes(DEFAULT_ROOM_TYPES);
+  }
+  return getRoomTypeConfig();
+}
+
+export async function saveRoomTypes(input) {
+  const next = validateRoomTypes(input);
+  const { q } = await import('./db.js');
+  await q.setSetting(ROOM_TYPES_KEY, JSON.stringify(next));
+  applyRoomTypes(next);
+  return getRoomTypeConfig();
+}
+
+export async function resetRoomTypes() {
+  const { q } = await import('./db.js');
+  await q.deleteSetting(ROOM_TYPES_KEY);
+  applyRoomTypes(DEFAULT_ROOM_TYPES);
+  return getRoomTypeConfig();
+}
 
 export function roomTypeByName(name) {
   return byName.get(String(name || '').trim().toLowerCase()) || null;
