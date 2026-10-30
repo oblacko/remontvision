@@ -123,6 +123,7 @@ flowchart TD
 | Программа комнаты | `room_function`, `functional_zones`, `keep_features`, `bed_type` | блок `PROGRAM LOCK`: sleep + study/desk + storage + media; single не апгрейдится до double; мурал/фичи сохраняются |
 | Валидатор планировки | `layoutCorrection` в `src/scaleplan.js` | проверяет боковые проходы <60 см, шкаф и предмет напротив; при противоречии добавляет `LAYOUT CORRECTION` и правит ширину кровати |
 | Художественный слой | `ART DIRECTION` + `VISUAL HIERARCHY` + `CONTROLLED DENSITY` + `HUMAN TRACE` + `MATERIAL CHARACTER` | один главный акцент, 1–2 поддерживающих, без заполнения всех поверхностей, 2 живые детали |
+| Офисная концепция | `roomtypes.concept` для `Кабинет` + `Скандинавский` | deep ink-blue / oak / cognac leather / крупный арт / workspace monitor-keyboard; заменяет художественные блоки, план остаётся источником размеров |
 | OUTPUT | код `buildPrompt` | сохраняет камеру источника, короткий список запретов; без 24–35mm/golden hour/8k/medium format |
 | Кадр | `art_direction.framing_note` | блок `VISIBLE COMPOSITION — DO NOT CRAM`: план на всю комнату, но в кадр не впихивать всё |
 | Оригинал | `rooms.photo_path` | только арт-директор и QA; в design-модель не передаётся, чтобы не смешивать старую мебель/отделку с новой планировкой |

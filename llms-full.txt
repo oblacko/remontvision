@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T18:42:22.974Z
+Generated: 2026-10-30T19:12:44.088Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -385,6 +385,7 @@ Last updated: 2026-10-30
 - Art director (`src/artdirector.js`): a vision pass reads the **original photo** + SCALE PLAN and designs a dimension-valid layout. Returns `room_function`, `bed_type`, `existing_fixtures`, `functional_zones`, `keep_features`, `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` for the whole room, `framing_note` and `ART DIRECTION`. Single beds must stay single; murals/features are kept. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
 - Layout validator (`layoutCorrection` in `src/scaleplan.js`): deterministic checks for bed side clearance (<60 cm), wardrobe on side/back wall and opposite items; adds `LAYOUT CORRECTION` and shrinks/removes conflicting furniture. The art director's arithmetic is never trusted.
 - Layout-first: `buildPrompt` uses one geometry authority (`FURNITURE PLAN`), one lighting concept (from `ART DIRECTION`), `PROGRAM LOCK` (real zones, bed type, kept features), `VISUAL HIERARCHY` + `CONTROLLED DENSITY`, `HUMAN TRACE` (one book + one cup), `MATERIAL CHARACTER` and a short `OUTPUT` that preserves the source camera. The plan covers the whole room, but the frame shows only the visible subset; out-of-frame furniture/decor may be omitted; architecture (doors, windows, walls, ceiling) must never be hidden. The original photo is read by the art director and QA only; the design model receives the shell (if any) + style refs, never the original. Legacy `pinterest`/`photo`/`avoid` prompt fields are no longer injected.
+- Office concept: `roomtypes.concept` for `Кабинет` + Scandinavian adds the Nordic collector's study (deep ink-blue feature wall, oak desk, cognac leather reading chair, large graphic art, functional workspace with monitor/keyboard/mouse, task lamp, ergonomic chair, oak bookcase). It replaces the artistic blocks but keeps `FURNITURE PLAN` for sizes/positions; the old TV may be removed, the mirror wardrobe stays visible, and the desk orientation is explicit.
 - Dimension/quality QA: `assessDimensions` checks furniture fit, walkways, oversize, room widening, preserved functional program (desk/study), bed type (single stays single), doors/windows and `authorial_quality` >= 7; retry on failure, plus a FLUX fallback when the current model is not FLUX. Disable with `DIMENSION_QA_ENABLED=0`; cost in `renders.meta.cost_breakdown.dimension_qa`.
 - Admin «Логи» shows the art director text, room function, bed type, functional zones, kept features, layout plan, framing note, an object table (description + dimensions + clearance) and the designer prompt; cabinet «Авторский бриф» shows the object list.
 - Full generation cost: `renders.cost_usd` is the sum of all requests; `renders.meta.cost_breakdown` stores art_direction, cleanup, design, design_retry, architecture_qa, product_qa, render_analysis, dimension_qa and failed. Cabinet shows the total + breakdown and a fullscreen render viewer.
@@ -2346,6 +2347,13 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
+
+## 2026-10-30 — офисная концепция: Nordic collector's study
+
+- Для `Кабинет` + `Скандинавский` добавлена конкретная авторская концепция (`roomtypes.concept`): deep muted ink-blue feature wall, natural oak desk, cognac leather reading chair, крупный графический арт, функциональный workspace (monitor/keyboard/mouse), task lamp, эргономичное кресло, oak bookcase.
+- Концепция заменяет generic `ART DIRECTION` / `VISUAL HIERARCHY` / `MATERIAL CHARACTER` / `LIGHTING` / `HUMAN TRACE`, но **не** размеры/позиции: `FURNITURE PLAN` остаётся единственным источником геометрии.
+- Убраны конфликты: старый TV можно убрать (электрические точки сохраняются), радиатор — только единый блок (строка из cleanup удалена), зеркальный шкаф остаётся видимым с правдоподобным отражением, ориентация стола выбрана одна (вдоль правой стены, сидящий лицом к стене), `STYLE REFERENCE` — только при наличии референса.
+- Живой тест кабинета 2.8×4.5 на FLUX 1K: deep ink-blue + oak + cognac leather, monitor/keyboard, арт, зеркальный шкаф сохранён, QA quality 9/10 accepted, без retry, $0.0683.
 
 ## 2026-10-30 — по умолчанию без мебели и без каталога
 

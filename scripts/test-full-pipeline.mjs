@@ -6,8 +6,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import pg from 'pg';
 import { processRender } from '../src/jobs.js';
+import { saveCleanupConfig } from '../src/cleanupconfig.js';
 
 const pool = new pg.Pool({ connectionString: process.env.RV_DATABASE_URL });
+if (process.env.TEST_CLEANUP === '1') await saveCleanupConfig({ enabled: true });
 const roomId = crypto.randomUUID();
 const renderId = crypto.randomUUID();
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');

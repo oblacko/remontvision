@@ -247,6 +247,9 @@ export function buildPrompt({
   const styleDesc = styleDescription || STYLES[style] || STYLES['Современный'];
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room shown in the source photo';
+  const concept = room?.concept || null;
+  // Концепция кабинета — скандинавская; для других стилей оставляем арт-директора.
+  const conceptActive = Boolean(concept) && /скандинав|scandi/i.test(style);
   const keep = keepFurniture
     ? String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '')
     : 'the architecture, camera, perspective, walls, windows, doors, ceiling height, room proportions, built-ins, plumbing and electrical points';
@@ -291,9 +294,8 @@ export function buildPrompt({
 Primary focus: ${primaryFocus}, including its proportions, upholstery and relationship to the window.
 Secondary focus: one visible artwork or one sculptural portable lamp, only where the room allows.
 Supporting detail: one small, personal surface arrangement.
-Do not make every surface compete for attention. Let secondary storage and the radiator treatment recede visually.
-
-CONTROLLED DENSITY
+Do not make every surface compete for attention. Let secondary storage and the radiator treatment recede visually.`;
+  const densityText = `CONTROLLED DENSITY
 Use one main styled composition and one or two supporting arrangements. Keep some wall areas and surfaces intentionally clear. Empty space is acceptable when it balances a strong focal point. Do not decorate every shelf or fill every corner. Every added object must contribute colour, texture, function or a clear personal detail; otherwise omit it.`;
   const humanTraceText = `HUMAN TRACE
 Suggest one quiet moment of everyday life: ${humanTrace}. Use only these two personal details. Do not add a laptop, headphones, camera, slippers, plush toys or pets by default. The room should feel inhabited through subtle use, not a collection of staged accessories.`;
@@ -344,8 +346,8 @@ LOCKED INVARIANTS — do not violate any of these:
 - Windows: same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Do not add a second window. Do not widen, raise, lower or move the window.
 - Doors: same count, size, position, frame, handle and swing. Do not add a doorway, hallway or second room.
 - Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobe, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Preserve their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves, add niches, change the ceiling line, add beams or columns.
-- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights may use only existing points; do not add new recessed, cove, track or wall lights.
-- Mirrors and reflections are reflections, not openings: do not turn a mirrored wardrobe or mirror reflection into a window, door or new room.
+- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe and vent. New lights may use only existing points; do not add new recessed, cove, track or wall lights. TVs, wall-mounted decor and loose shelves may be removed or replaced according to the plan; their electrical points stay.
+- Mirrors and reflections are reflections, not openings. If a mirrored wardrobe is visible, preserve its visible portion and update the reflection plausibly; do not hide it, crop it out, remove it, or turn it into a window, door or new room.
 - If a design idea conflicts with any locked invariant, keep the architecture and change the finish or decor instead.`;
 
   if (iteration) {
@@ -367,7 +369,12 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
     ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
   ].filter(Boolean).join(' ');
-  const materialCharacter = materialsDirective || 'Use the materials from the design thesis with believable roughness, grain, weave and controlled reflections. Avoid generic flat wood/linen/plaster and glossy CGI.';
+  const effectiveArtDirection = conceptActive ? concept.artDirection : artDirection;
+  const effectiveFraming = conceptActive ? concept.framing : framingNote;
+  const workspaceBlock = conceptActive ? concept.workspace : '';
+  const lightingBlock = conceptActive ? concept.lighting : '';
+  const materialCharacter = conceptActive ? '' : (materialsDirective || 'Use the materials from the design thesis with believable roughness, grain, weave and controlled reflections. Avoid generic flat wood/linen/plaster and glossy CGI.');
+  const cleanupText = rules.cleanup.replace(/Replace only the radiator body with[^.]*\./gi, '');
 
   return `${roles}
 
@@ -381,11 +388,13 @@ The result must feel like a completed designer renovation: calm, editorial and i
 This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
 
 ${architectureLock}
-${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK, the room dimensions or the furniture plan, keep the architecture, dimensions and furniture plan.\n${artDirection}\n` : ''}
+${conceptActive
+  ? `\n${concept.artDirection}\n`
+  : (artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK, the room dimensions or the furniture plan, keep the architecture, dimensions and furniture plan.\n${artDirection}\n` : '')}
 ${geometryText ? `\n${geometryText}\n` : ''}
-${layoutPlan ? `\nFURNITURE PLAN — HARD DIMENSIONS (OVERRIDES ART DIRECTION)\n${layoutPlan}\nUse exactly these furniture sizes, positions and walkways. Do not show furniture larger than the plan or block the stated walkways. If the ART DIRECTION suggests a larger item or a different position, follow this plan and shrink or remove the conflicting item. Keep the room the same physical width and do not widen it. The plan describes the WHOLE room, not the whole frame: the camera may see only part of it. Do not force out-of-frame items into the shot; omit them instead of cramming or moving them.\n` : ''}
+${layoutPlan ? `\nFURNITURE PLAN — HARD DIMENSIONS (OVERRIDES ART DIRECTION)\n${layoutPlan}\nUse exactly these furniture sizes, positions and walkways. Do not show furniture larger than the plan or block the stated walkways. If the ART DIRECTION suggests a larger item or a different position, follow this plan and shrink or remove the conflicting item. Keep the room the same physical width and do not widen it. The plan describes the WHOLE room, not the whole frame: the camera may see only part of it. Do not force out-of-frame items into the shot; omit them instead of cramming or moving them. The plan defines sizes and positions only; for materials, colours and furniture form, follow ART DIRECTION and MATERIAL CHARACTER.\n` : ''}
 ${programLock}
-${framingNote ? `\nVISIBLE COMPOSITION — DO NOT CRAM\n${framingNote}\nThe camera sees only part of the room. Do not force every planned item into the frame; items outside the frame may be omitted. Do not move furniture just to make it visible. The image must read as a natural photo of the room, not a catalog of everything that fits.\nIMPORTANT: this exception applies ONLY to furniture and decor. NEVER hide, crop out, remove, move or repaint doors, windows, walls, ceiling, radiator or the room envelope. The door and window must remain exactly where they are in the source, even if the composition becomes tighter.\n` : ''}
+${effectiveFraming ? `\nVISIBLE COMPOSITION — DO NOT CRAM\n${effectiveFraming}\nThe camera sees only part of the room. Do not force every planned item into the frame; items outside the frame may be omitted. Do not move furniture just to make it visible. The image must read as a natural photo of the room, not a catalog of everything that fits.\nIMPORTANT: this exception applies ONLY to furniture and decor. NEVER hide, crop out, remove, move or repaint doors, windows, walls, ceiling, radiator, mirrored wardrobe or the room envelope. The door, window and visible mirror wardrobe must remain where they are in the source, even if the composition becomes tighter.\n` : ''}
 KEEP EXACTLY
 ${layoutPlan ? 'the room envelope: walls, windows, doors, ceiling, floor level, plumbing, electrical points and the source camera.' : `${keep}.`}
 Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.
@@ -404,23 +413,25 @@ Keep the result functional, keep realistic dimensions, and do not block doors or
 COMPOSITION
 Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved only when furniture replacement is allowed; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
 
-${artDirection ? '' : `LIGHTING\n${rules.lighting}\n`}
+${conceptActive || artDirection ? '' : `LIGHTING\n${rules.lighting}\n`}
 CLEANUP / REALISM
-${rules.cleanup}
+${cleanupText}
 
 RADIATOR TREATMENT — SINGLE AUTHORITY
 ${radiatorsText}
 This is the only radiator treatment; ignore any conflicting radiator instruction above.
-
+${lightingBlock ? `\n${lightingBlock}\n` : ''}
 WINDOW STYLING
 ${rules.window}
 
 ROOM RULES
 ${layoutPlan && room?.forbid ? room.forbid : roomRules}
 
-${hierarchyText}
+${conceptActive ? concept.hierarchy : hierarchyText}
 
-${humanTraceText}
+${densityText}
+
+${workspaceBlock ? `${workspaceBlock}\n\n` : ''}${conceptActive ? concept.humanTrace : humanTraceText}
 ${rules.extra ? `
 EXTRA ART DIRECTION
 ${rules.extra}` : ''}
@@ -432,19 +443,19 @@ MATERIAL CONSTRAINTS — TEXT ONLY, NO PRODUCT IMAGES
 ${catalogText}
 Use these text descriptions only as constraints for finishes, colors, formats and physical scale. Match large surfaces (floor, walls, countertop, cabinet fronts) to the listed material where visible. Tile/plank patterns must match the stated format. Do not force a material into the frame if it is not visible. Choose furniture, lighting, decor and composition for the strength of the design rather than trying to depict the estimate. Small decor, plants, textiles, art and books are encouraged to complete the styling.
 
-${artDirection ? `STYLE FAMILY\n${style}. The ART DIRECTION above is the single specific concept; do not blend a second style or accent palette.` : `STYLE BRIEF\n${styleDesc}`}
+${conceptActive || artDirection ? `STYLE FAMILY\n${style}. The ART DIRECTION above is the single specific concept; do not blend a second style or accent palette.` : `STYLE BRIEF\n${styleDesc}`}
 
 STYLE REFERENCE
 ${styleRefText}
-The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Do not transfer any architectural feature from the reference.
-${artDirection ? '' : colors}
+${hasStyleRef ? 'The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Do not transfer any architectural feature from the reference.' : ''}
+${conceptActive || artDirection ? '' : colors}
 
-MATERIAL CHARACTER
-${materialCharacter}
+${conceptActive ? concept.material : `MATERIAL CHARACTER
+${materialCharacter}`}
 
-MATERIAL CLASS
+${conceptActive ? '' : `MATERIAL CLASS
 ${tier.promptName || tier.name} — ${tier.prompt}
-The selected materials already match this class; keep the rest of the room consistent with it.
+The selected materials already match this class; keep the rest of the room consistent with it.`}
 
 OUTPUT
 ${outputText}`;

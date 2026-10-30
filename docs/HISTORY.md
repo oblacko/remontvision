@@ -4,6 +4,13 @@
 
 Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
 
+## 2026-10-30 — офисная концепция: Nordic collector's study
+
+- Для `Кабинет` + `Скандинавский` добавлена конкретная авторская концепция (`roomtypes.concept`): deep muted ink-blue feature wall, natural oak desk, cognac leather reading chair, крупный графический арт, функциональный workspace (monitor/keyboard/mouse), task lamp, эргономичное кресло, oak bookcase.
+- Концепция заменяет generic `ART DIRECTION` / `VISUAL HIERARCHY` / `MATERIAL CHARACTER` / `LIGHTING` / `HUMAN TRACE`, но **не** размеры/позиции: `FURNITURE PLAN` остаётся единственным источником геометрии.
+- Убраны конфликты: старый TV можно убрать (электрические точки сохраняются), радиатор — только единый блок (строка из cleanup удалена), зеркальный шкаф остаётся видимым с правдоподобным отражением, ориентация стола выбрана одна (вдоль правой стены, сидящий лицом к стене), `STYLE REFERENCE` — только при наличии референса.
+- Живой тест кабинета 2.8×4.5 на FLUX 1K: deep ink-blue + oak + cognac leather, monitor/keyboard, арт, зеркальный шкаф сохранён, QA quality 9/10 accepted, без retry, $0.0683.
+
 ## 2026-10-30 — по умолчанию без мебели и без каталога
 
 - «Оставить мебель» теперь **выключено по умолчанию**: frontend initial/reset/accept, server fallback и `rooms.keep_furniture` default (миграция `032`). Пользователь может включить вручную.
