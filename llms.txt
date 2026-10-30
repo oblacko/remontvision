@@ -28,7 +28,7 @@ Last updated: 2026-10-30
 - Generation: FLUX 3 Image, 1K, aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash.
 - Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
 - 17 styles in DB (2 active: Скандинавский, Джапанди; 7 new 2026 styles inactive), 12 default room types, 100 active demo products, **0 products with real URL**.
-- Production deployed at `d279c48` (2026-10-30); migrations `001`–`027` applied.
+- Production deployed at `afe13ad` (2026-10-30); migrations `001`–`027` applied.
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
 - Room dimensions: user can enter width/length/height manually or click `POST /api/estimate-room` for a vision estimate; estimates prefill the form but must be confirmed. Bed length is only for bedroom/children rooms and defaults to 2.0 m.

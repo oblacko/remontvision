@@ -64,7 +64,7 @@ flowchart LR
 | Таблица | Назначение |
 |---|---|
 | `users`, `sessions`, `auth_identities` | аккаунты и вход |
-| `rooms` | комната: фото, стиль, room type, tier, флаги, style ref |
+| `rooms` | комната: фото, стиль, room type, tier, флаги, style ref, размеры (`room_width_m`, `room_length_m`, `room_height_m`, `bed_length_m`, `dimension_orientation`), precleaned shell |
 | `renders` | версия: prompt, model, cost, image, analysis, share_token, edit refs |
 | `render_items` | смета конкретного рендера |
 | `products` | каталог: категория, цена, tier, room_types, dimensions, URL, картинка |

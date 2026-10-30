@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-10-30T13:28:39.620Z
+Generated: 2026-10-30T13:48:37.075Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -378,7 +378,7 @@ Last updated: 2026-10-30
 - Generation: FLUX 3 Image, 1K, aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash.
 - Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
 - 17 styles in DB (2 active: Скандинавский, Джапанди; 7 new 2026 styles inactive), 12 default room types, 100 active demo products, **0 products with real URL**.
-- Production deployed at `d279c48` (2026-10-30); migrations `001`–`027` applied.
+- Production deployed at `afe13ad` (2026-10-30); migrations `001`–`027` applied.
 - 120 style references, 26 approved (pilot 5 styles × 6 rooms).
 - Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
 - Room dimensions: user can enter width/length/height manually or click `POST /api/estimate-room` for a vision estimate; estimates prefill the form but must be confirmed. Bed length is only for bedroom/children rooms and defaults to 2.0 m.
@@ -526,7 +526,7 @@ flowchart LR
 | Таблица | Назначение |
 |---|---|
 | `users`, `sessions`, `auth_identities` | аккаунты и вход |
-| `rooms` | комната: фото, стиль, room type, tier, флаги, style ref |
+| `rooms` | комната: фото, стиль, room type, tier, флаги, style ref, размеры (`room_width_m`, `room_length_m`, `room_height_m`, `bed_length_m`, `dimension_orientation`), precleaned shell |
 | `renders` | версия: prompt, model, cost, image, analysis, share_token, edit refs |
 | `render_items` | смета конкретного рендера |
 | `products` | каталог: категория, цена, tier, room_types, dimensions, URL, картинка |
@@ -835,7 +835,7 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 14. `MATERIAL CLASS`.
 15. `OUTPUT` + `AVOID`.
 
-Дополнительно после architecture lock вставляются `ROOM DIMENSIONS AND SCALE` и `BED SIZE` (только если пользователь передал размеры), `SCALE PLAN` (вычисленный план мебели и проходов) и `RADIATOR COVERS` (всегда, с условием «только если радиатор виден»).
+Дополнительно после architecture lock вставляются `ROOM DIMENSIONS AND SCALE` (если переданы размеры комнаты), `SCALE PLAN` (вычисленный план мебели и проходов), `BED SIZE` (только для спальни/детской, длина по умолчанию 2.0 м) и `RADIATOR COVERS` (всегда, с условием «только если радиатор виден»).
 
 ## Сохранённые эталонные промты
 
@@ -844,7 +844,7 @@ Change only the pendant. Keep everything else exactly as in Image 1.
 - Файл: [prompts/scandinavian-bedroom-3x6.txt](prompts/scandinavian-bedroom-3x6.txt) — полный эталон.
 - В генерацию подключены его ключевые блоки: размеры комнаты, длина кровати и вентилируемые радиаторные экраны.
 - Поля админки «Промт»: `dimensions` (`{room}`, `{width}`, `{length}`, `{height}`, `{orientation}`), `bed` (`{room}`, `{bed_length}`), `radiators`.
-- В генераторе появились необязательные поля «Ширина / Длина / Высота / Кровать, м» и «Ориентация размеров». Если размеры не заполнены, блоки размеров и кровати не добавляются; радиаторные правила действуют всегда.
+- В генераторе появились необязательные поля «Ширина / Длина / Высота» и «Ориентация размеров», а также кнопка «Определить по фото». Длина кровати в форме не спрашивается: для спальни/детской подставляется 2.0 м, для остальных комнат блок не добавляется. Радиаторные правила действуют всегда.
 - Референсы 2–N трактуются только как цвета/материалы/текстуры, без копирования мебели, планировки и архитектуры.
 
 ### Scandinavian style-driven room
@@ -2322,7 +2322,7 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `d279c48`.
+Дата обновления: 2026-10-30. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
 
 ## 2026-10-30 — scale planner и новые стили из Interior Prompt Generator 2026
 
@@ -2339,6 +2339,7 @@ export const MAX_REFERENCES; // 4
 - Оценка приблизительная: при неуверенности `confidence=low`, UI явно просит проверить размеры. Автоматически в генерацию оценка не попадает без подтверждения.
 - Эндпоинт требует авторизацию и использует `rateLimit`, как остальные vision-вызовы.
 - Тестов теперь 53.
+- Задеплоено в прод: `afe13ad`, GitHub Actions успешно, smoke зелёный; `/api/estimate-room` без авторизации отдаёт 401, новый бандл содержит кнопку.
 
 ## 2026-10-30 — размеры комнаты без кровати в не-спальнях
 

@@ -74,7 +74,7 @@
 - VPS: `/root/remontvision`, Docker Compose, `app` + `db`.
 - Публично: `https://www.remontvision.ru`.
 - Деплой: push в `main` → GitHub Actions → VPS.
-- Прод задеплоен на `d279c48` (2026-10-30), smoke зелёный; стилей 17, активны 2.
+- Прод задеплоен на `afe13ad` (2026-10-30), smoke зелёный; стилей 17, активны 2.
 - Миграции: `001`–`027`.
 - Тесты: `npm test` — 53 теста. Frontend: `cd web && npm run lint && npm run build`.
 - Размеры комнаты/кровати, `scalePlan` и radiator-cover блоки подключены к `buildPrompt`; скандинавский style brief — в `styles.prompt_description`.
@@ -86,6 +86,7 @@
 
 ## Последние важные коммиты
 
+- `afe13ad` — оценка размеров комнаты по фото; поля размеров для всех типов, кровать только для спальни/детской.
 - `d279c48` — типы комнат в админке, промты, scale planner, 7 стилей 2026 (неактивны), миграции 026–027.
 - `862337e` — рабочая память проекта.
 - `6479e26` — кнопка очистки комнаты после загрузки, `rooms.precleaned_shell_path`.
