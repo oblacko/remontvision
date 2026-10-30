@@ -1135,6 +1135,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       dimension_qa: render.meta?.dimension_qa ? {
         accepted: render.meta.dimension_qa.accepted === true,
         score: render.meta.dimension_qa.score ?? null,
+        quality: render.meta.dimension_qa.quality ?? null,
         checks: render.meta.dimension_qa.checks || {},
         issues: render.meta.dimension_qa.issues || [],
       } : null,

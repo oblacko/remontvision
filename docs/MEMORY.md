@@ -43,12 +43,12 @@
 - У активных стилей заполнены подробные briefs; у scandi/japandi — по 6 свотчей. Swatch board генерируется `src/styleswatch.js`.
 - **Арт-директор** (`src/artdirector.js`): vision читает **оригинал**, получает SCALE PLAN и проектирует новую планировку под размеры. Возвращает `room_function`, `bed_type`, `existing_fixtures`, `functional_zones`, `keep_features`, `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` (вся комната), `framing_note` (что видит камера), `ART DIRECTION`. В промт идут `ART DIRECTION`, `FURNITURE PLAN`, `PROGRAM LOCK` и `VISIBLE COMPOSITION`; архитектуру (двери/окна/стены) нельзя скрывать. Пустой shell арт-директору не нужен. Отключается `ART_DIRECTION_ENABLED=0`; стоимость входит в `renders.cost_usd`.
 - **Валидатор планировки** (`layoutCorrection` в `src/scaleplan.js`): детерминированно проверяет боковые проходы кровати (<60 см), шкаф на боковой/задней стене, предмет напротив кровати; при противоречии добавляет `LAYOUT CORRECTION` и корректирует ширину кровати/убирает шкаф. Арт-директору доверяем инвентаризацию и описание, но не арифметику.
-- **QA размеров** (`assessDimensions`): после базового рендера проверяет видимую композицию; при провале — один retry с `DIMENSION CORRECTION`. Отключается `DIMENSION_QA_ENABLED=0`; стоимость — `renders.meta.cost_breakdown.dimension_qa`.
+- **QA размеров и качества** (`assessDimensions`): после базового рендера проверяет габариты, проходы, функцию, тип кровати, двери/окна и `authorial_quality` (>=7). При провале — retry с `DIMENSION / QUALITY CORRECTION`; если модель не FLUX, добавляется fallback-рендер на FLUX. Отключается `DIMENSION_QA_ENABLED=0`; стоимость — `renders.meta.cost_breakdown.dimension_qa`.
 - **Логи**: админка «Логи» показывает `ART DIRECTION`, план, framing, таблицу объектов и «Промт дизайнера»; кабинет — «Авторский бриф» со списком объектов (описание + размеры + проход).
 - **Себестоимость полной генерации**: `renders.cost_usd` = сумма всех запросов, разбивка в `renders.meta.cost_breakdown` (`art_direction`, `cleanup`, `design`, `design_retry`, `architecture_qa`, `product_qa`, `render_analysis`, `dimension_qa`, `failed`). Кабинет показывает итог и разбивку; схема — `docs/GENERATION-FLOW.md`.
 - **Кабинет**: в истории комнаты есть полноэкранный просмотр рендера (кнопка `Expand`, Escape закрывает), себестоимость по версии и сумма по комнате.
 - Пользовательские фото-референсы в режимах `text`/`swatches` игнорируются (`meta.user_style_ref_ignored`).
-- Основная модель рендера: **FLUX 3 Image 1K** (`black-forest-labs/flux-3-image`, `app_settings`/`.env`; код-дефолт `src/modelconfig.js`). Vision: `google/gemini-3-flash-preview`.
+- Основная модель рендера: **FLUX 3 Image 1K** (`black-forest-labs/flux-3-image`, `app_settings`/`.env`; миграция `031`; код-дефолт `src/modelconfig.js`). `FLUX 3 Image Klein` — только очистка; `isCleanupModel()` не даёт использовать его для дизайна. Vision: `google/gemini-3-flash-preview`.
 - QA архитектуры **выключен** по умолчанию (`ARCHITECTURE_QA_ENABLED=0`). Не включать без прямой просьбы.
 
 ## Генерация и 429
@@ -86,7 +86,7 @@
 - Задеплоено: арт-директор, 8 активных стилей (`028`), `use_catalog=false` по умолчанию, `estimate-room` с типом комнаты и стилями, UI-тюнинг, FLUX 3 Image 1K, разбивка себестоимости, удаление `minimal`/`neo` (`030`), layout-first (`layout_items`/`layout_plan`/`framing_note`), QA размеров, «живые» детали, объекты в логах.
 - Текущая модель рендера: **FLUX 3 Image 1K**; прогон 10 сценариев — 10/10 ok, $0.5093, vision-QA в среднем style 9.20 / photo 8.70 / arch 9.80 / scale 8.80 / authorial 8.20.
 - Миграции: `001`–`030` (`029` фиксирует FLUX 3 Image 1K; `030` удаляет `minimal`/`neo` только если они не используются комнатами).
-- Тесты: `npm test` — 62 теста. Frontend: `cd web && npm run lint && npm run build`.
+- Тесты: `npm test` — 63 теста. Frontend: `cd web && npm run lint && npm run build`.
 - Размеры комнаты/кровати, `scalePlan` и radiator-cover блоки подключены к `buildPrompt`; скандинавский style brief — в `styles.prompt_description`.
 - Scale plan исправлен: детская — кровать 90–140 см (не king), спальня 3.0 м — 160 см, проходы считаются от реального запаса по бокам (`side = (width - bedWidth/100) / 2`).
 - Ширина/длина/высота комнаты спрашиваются у пользователя для всех типов; длина кровати — только для спальни/детской, по умолчанию 2.0 м, для остальных комнат игнорируется.

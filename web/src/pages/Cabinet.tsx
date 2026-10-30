@@ -21,7 +21,7 @@ type Pack = { id: string; title: string; credits: number; price_kopecks: number 
 type GenItem = { name: string; price: number; qty: number; unit: string; url: string; link_label?: string; direct_url?: boolean; source?: string; match_score?: number; presentation_status?: 'curated' | 'matched' | 'verified' }
 type RoomData = {
   id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; keep_furniture?: boolean; use_catalog?: boolean; status: string; error: string | null;
-  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; cost_usd?: number | null; cost_breakdown?: CostBreakdown | null; dimension_qa?: { accepted?: boolean; score?: number | null; issues?: string[] } | null } | null;
+  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; cost_usd?: number | null; cost_breakdown?: CostBreakdown | null; dimension_qa?: { accepted?: boolean; score?: number | null; quality?: number | null; issues?: string[] } | null } | null;
   items: GenItem[]; total: number; prices_as_of: string | null;
 }
 type RoomGroup = { roomId: string; style: string; versions: GenRow[]; latest: GenRow; image: string | null; credits: number; costUsd: number }
@@ -423,7 +423,7 @@ export default function Cabinet() {
                     )}
                     {roomData.render.dimension_qa && (
                       <p className={`mt-3 border-t pt-3 text-[11px] leading-5 ${roomData.render.dimension_qa.accepted ? 'text-muted-foreground' : 'text-destructive'}`}>
-                        QA размеров: {roomData.render.dimension_qa.accepted ? 'пройден' : 'есть замечания'}{typeof roomData.render.dimension_qa.score === 'number' ? ` · ${roomData.render.dimension_qa.score}/10` : ''}{roomData.render.dimension_qa.issues?.length ? ` · ${roomData.render.dimension_qa.issues.join('; ')}` : ''}
+                        QA размеров: {roomData.render.dimension_qa.accepted ? 'пройден' : 'есть замечания'}{typeof roomData.render.dimension_qa.score === 'number' ? ` · ${roomData.render.dimension_qa.score}/10` : ''}{typeof roomData.render.dimension_qa.quality === 'number' ? ` · авторство ${roomData.render.dimension_qa.quality}/10` : ''}{roomData.render.dimension_qa.issues?.length ? ` · ${roomData.render.dimension_qa.issues.join('; ')}` : ''}
                       </p>
                     )}
                   </div>

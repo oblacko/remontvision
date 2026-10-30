@@ -34,7 +34,7 @@ type PromptRow = {
       palette?: Array<{ hex?: string | null; name?: string }>;
       focalPoint?: string; featureWall?: string; lighting?: string; mood?: string;
     } | null;
-    dimension_qa?: { accepted?: boolean; score?: number | null; checks?: Record<string, boolean>; issues?: string[] } | null;
+    dimension_qa?: { accepted?: boolean; score?: number | null; quality?: number | null; checks?: Record<string, boolean>; issues?: string[] } | null;
     cost_breakdown?: Record<string, number | null> | null;
   } | null;
 }
@@ -1143,7 +1143,7 @@ export default function Admin() {
                         {p.meta?.refs?.length ? <p className="mt-1 text-muted-foreground">Референсы: {p.meta.refs.map(r => `${r.index}. ${r.role}${r.label ? ` (${r.label})` : ''}`).join(' · ')}</p> : null}
                         {p.meta?.mode === 'edit' && p.meta.target ? <p className="mt-1 text-muted-foreground">Правка: {p.meta.target}</p> : null}
                         {p.meta?.cleanup ? <p className="mt-1 text-muted-foreground">Очистка: {p.meta.cleanup.model || '—'} {p.meta.cleanup.resolution || ''}{p.meta.cleanup.error ? ` · ошибка: ${p.meta.cleanup.error}` : p.meta.cleanup.cost_usd != null ? ` · $${p.meta.cleanup.cost_usd}` : ''}</p> : null}
-                        {p.meta?.dimension_qa ? <p className="mt-1 text-muted-foreground">QA размеров: {p.meta.dimension_qa.accepted ? 'пройден' : 'замечания'}{typeof p.meta.dimension_qa.score === 'number' ? ` · ${p.meta.dimension_qa.score}/10` : ''}{p.meta.dimension_qa.issues?.length ? ` · ${p.meta.dimension_qa.issues.join('; ')}` : ''}</p> : null}
+                        {p.meta?.dimension_qa ? <p className="mt-1 text-muted-foreground">QA размеров: {p.meta.dimension_qa.accepted ? 'пройден' : 'замечания'}{typeof p.meta.dimension_qa.score === 'number' ? ` · ${p.meta.dimension_qa.score}/10` : ''}{typeof p.meta.dimension_qa.quality === 'number' ? ` · авторство ${p.meta.dimension_qa.quality}/10` : ''}{p.meta.dimension_qa.issues?.length ? ` · ${p.meta.dimension_qa.issues.join('; ')}` : ''}</p> : null}
                         <p className="mt-1 text-muted-foreground">{p.model || '—'} · {p.cost_usd != null ? `$${p.cost_usd}` : '—'}{p.duration_ms ? ` · ${(p.duration_ms / 1000).toFixed(1)} с` : ''}</p>
                         <p className="mt-1">{p.request_text || 'Базовый дизайн'}</p>
                       </div>
@@ -1201,6 +1201,7 @@ export default function Admin() {
                       {[...modelSettings.image_models].sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}
                     </select>
                     <p className="mt-2 text-xs text-muted-foreground">{modelSettings.image_models.find(m => m.id === renderDraft)?.input_refs ? 'Поддерживает input_references — фото комнаты, референсы стиля и товаров уйдут в модель.' : 'Не заявлены input_references — фото и референсы могут не уйти. Проверьте перед включением.'}</p>
+                    {/klein/i.test(renderDraft) && <p className="mt-2 text-xs text-destructive">FLUX Klein — модель очистки/локальных правок. Для дизайна она не используется: jobs.js сделает fallback на FLUX 3 Image.</p>}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div><label htmlFor="resolution" className="eyebrow mb-2 block">Разрешение</label>{capsFor(renderDraft).resolutions.length ? <select id="resolution" value={resolutionDraft} onChange={e => setResolutionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(renderDraft).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select> : <div className="flex h-11 items-center border bg-muted px-3 text-sm text-muted-foreground">Задаётся моделью</div>}</div>

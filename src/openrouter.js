@@ -1040,7 +1040,8 @@ export async function assessDimensions({ sourceImageUrl, renderImageUrl, roomTyp
   const features = (Array.isArray(keepFeatures) ? keepFeatures : []).filter(Boolean).join('; ');
   const system = `Ты строгий QA-инженер по эргономике и архитектуре интерьера. Image 1 — исходная/пустая комната, Image 2 — рендер.
 Верни строго JSON:
-{"accepted":true|false,"score":0-10,"checks":{"furniture_fits":true|false,"walkways_clear":true|false,"no_oversized":true|false,"room_not_widened":true|false,"program_preserved":true|false,"bed_type_preserved":true|false,"doors_windows_preserved":true|false},"issues":["..."]}
+{"accepted":true|false,"score":0-10,"authorial_quality":0-10,"checks":{"furniture_fits":true|false,"walkways_clear":true|false,"no_oversized":true|false,"room_not_widened":true|false,"program_preserved":true|false,"bed_type_preserved":true|false,"doors_windows_preserved":true|false},"issues":["..."]}
+- authorial_quality: цельная авторская композиция, свет, материалы, стилинг; не стерильный шоурум, не пустая комната и не случайный набор мебели.
 - furniture_fits: мебель по размеру соответствует комнате и плану.
 - walkways_clear: проходы не заблокированы; там, где это видно, минимум ~60 см.
 - no_oversized: нет кровати/дивана/шкафа, которые явно шире/длиннее комнаты или плана.
@@ -1061,16 +1062,19 @@ export async function assessDimensions({ sourceImageUrl, renderImageUrl, roomTyp
     bed_type_preserved: parsed.checks?.bed_type_preserved === true,
     doors_windows_preserved: parsed.checks?.doors_windows_preserved === true,
   };
+  const quality = Math.max(0, Math.min(10, Number(parsed.authorial_quality) || 0));
   const accepted = checks.furniture_fits
     && checks.walkways_clear
     && checks.no_oversized
     && checks.room_not_widened
     && checks.program_preserved
     && checks.bed_type_preserved
-    && checks.doors_windows_preserved;
+    && checks.doors_windows_preserved
+    && quality >= 7;
   return {
     accepted,
     score: Math.max(0, Math.min(10, Number(parsed.score) || 0)),
+    quality,
     checks,
     issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 6) : [],
     cost: cost ?? null,

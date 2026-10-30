@@ -15,7 +15,7 @@ import { roomTypeByName } from './roomtypes.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
-import { modelCaps } from './modelcaps.js';
+import { modelCaps, isCleanupModel } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
@@ -341,7 +341,12 @@ export async function processRender(renderId) {
       const originalDataUrl = await bufferToDataUrl(originalBuf);
       const { width, height } = imageSize(originalBuf);
       targetRatio = width / height;
-      const renderModel = getModelConfig().render;
+      const configuredModel = getModelConfig().render;
+      const renderModel = isCleanupModel(configuredModel) ? 'black-forest-labs/flux-3-image' : configuredModel;
+      if (renderModel !== configuredModel) {
+        meta.model_override = { configured: configuredModel, used: renderModel, reason: 'cleanup model cannot be used for design' };
+        log({ event: 'model_override', room_id: room.id, render_id: renderId, configured: configuredModel, used: renderModel, reason: 'cleanup model cannot be used for design' });
+      }
       const aspectRatio = snapAspect(width, height, modelCaps(renderModel).aspects);
       let designBuf = originalBuf;
       let cleanupCost = 0;
@@ -395,6 +400,7 @@ export async function processRender(renderId) {
         sourceImageB64: srcB64,
         referenceImagesB64,
         aspectRatio,
+        model: renderModel,
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
       addCost('design', out.cost);
@@ -422,7 +428,7 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
               sourceImageB64: srcB64,
               referenceImagesB64,
               aspectRatio,
-              model: 'openai/gpt-image-2',
+              model: renderModel,
             });
             imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
             addCost('design_retry', out.cost);
@@ -472,14 +478,15 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
           if (!dimensionQa.accepted) {
             const retryPrompt = `${prompt}
 
-DIMENSION CORRECTION — HARD REQUIREMENT
-The previous attempt failed dimension/program/architecture QA: ${dimensionQa.issues.join('; ') || 'the layout does not match the room'}.
-Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated furniture sizes and positions, keep the walkways clear, do not widen the room, and do not cram out-of-frame items into the shot. Keep the source functional program (desk/study, storage, media), keep the source bed type (single stays single), and keep the door and window exactly where they are in the source. Do not hide or crop out architecture. This correction overrides any conflicting styling instruction.`;
+DIMENSION / QUALITY CORRECTION — HARD REQUIREMENT
+The previous attempt failed QA: ${dimensionQa.issues.join('; ') || 'the layout or design quality does not match the brief'}.
+Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated furniture sizes and positions, keep the walkways clear, do not widen the room, and do not cram out-of-frame items into the shot. Keep the source functional program (desk/study, storage, media), keep the source bed type (single stays single), and keep the door and window exactly where they are in the source. Do not hide or crop out architecture. Make the design authorial and editorial: strong focal point, layered warm light, tactile materials, believable styling, not a sterile showroom or an empty room. This correction overrides any conflicting styling instruction.`;
             out = await generateRender({
               prompt: retryPrompt,
               sourceImageB64: srcB64,
               referenceImagesB64,
               aspectRatio,
+              model: renderModel,
             });
             imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
             addCost('design_retry', out.cost);
@@ -500,6 +507,36 @@ Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated f
             });
             addCost('dimension_qa', dimensionQa.cost);
             log({ event: 'dimension_qa_retry', room_id: room.id, render_id: renderId, accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
+
+            // Если текущая модель не FLUX и план всё ещё не сходится — пробуем FLUX,
+            // он заметно лучше держит геометрию и архитектуру.
+            if (!dimensionQa.accepted && renderModel !== 'black-forest-labs/flux-3-image') {
+              out = await generateRender({
+                prompt: retryPrompt,
+                sourceImageB64: srcB64,
+                referenceImagesB64,
+                aspectRatio,
+                model: 'black-forest-labs/flux-3-image',
+              });
+              imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
+              addCost('design_retry', out.cost);
+              const fallbackBuf = Buffer.from(out.b64, 'base64');
+              const fallbackMime = MIME_BY_EXT[detectImageExt(fallbackBuf)] || 'image/png';
+              dimensionQa = await assessDimensions({
+                sourceImageUrl: srcB64,
+                renderImageUrl: `data:${fallbackMime};base64,${out.b64}`,
+                roomType,
+                dimensions: roomDimensions,
+                plan: layoutPlan,
+                framing: framingNote,
+                roomFunction,
+                bedType,
+                functionalZones,
+                keepFeatures,
+              });
+              addCost('dimension_qa', dimensionQa.cost);
+              log({ event: 'dimension_qa_fallback', room_id: room.id, render_id: renderId, model: 'black-forest-labs/flux-3-image', accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
+            }
           }
         } catch (e) {
           log({ event: 'dimension_qa_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
