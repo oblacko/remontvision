@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, assessArchitecture, assessDimensions, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, assessArchitecture, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { curateProducts, referenceImagesDetailed } from './curate.js';
@@ -15,15 +15,13 @@ import { roomTypeByName } from './roomtypes.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
-import { modelCaps, isCleanupModel } from './modelcaps.js';
+import { modelCaps } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
 import { buildArtDirection } from './artdirector.js';
-import { buildScalePlan, layoutCorrection } from './scaleplan.js';
 
 const ARCHITECTURE_QA_ENABLED = /^(1|true|yes|on)$/i.test(process.env.ARCHITECTURE_QA_ENABLED || '');
-const DIMENSION_QA_ENABLED = !/^(0|false|no|off)$/i.test(process.env.DIMENSION_QA_ENABLED || '');
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -80,7 +78,7 @@ async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
   return { refs, user: false };
 }
 
-export async function processRender(renderId) {
+async function processRender(renderId) {
   const t0 = Date.now();
   const render = await q.getRender(renderId);
   if (!render || render.status !== 'processing') return;
@@ -90,9 +88,7 @@ export async function processRender(renderId) {
   const roomTypeInfo = roomTypeByName(roomType);
   const priceTier = normalizeTier(room.price_tier || 'comfort');
   const keepFurniture = room.keep_furniture !== false;
-  // Каталог временно не участвует в дизайне: только свободный дизайн.
-  // Флаг в БД остаётся для истории/будущего, но в промт товары не попадают.
-  const useCatalog = false;
+  const useCatalog = room.use_catalog !== false;
   const roomDimensions = (room.room_width_m || room.room_length_m || room.room_height_m || room.bed_length_m)
     ? {
         width: room.room_width_m == null ? null : Number(room.room_width_m),
@@ -116,7 +112,6 @@ export async function processRender(renderId) {
     architecture_qa: null,
     product_qa: null,
     render_analysis: null,
-    dimension_qa: null,
     failed: null,
   };
   const addCost = (key, value) => {
@@ -159,14 +154,6 @@ export async function processRender(renderId) {
     let editProduct = null;
     let sourceStored = precleanedShell || room.photo_path;
     let referenceImagesB64 = [];
-    // Эти поля нужны и базовому рендеру, и общему QA-блоку ниже.
-    let layoutPlan = '';
-    let framingNote = '';
-    let roomFunction = '';
-    let bedType = '';
-    let functionalZones = [];
-    let keepFeatures = [];
-    let materialsDirective = '';
 
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
@@ -213,7 +200,7 @@ export async function processRender(renderId) {
 
       let styleUserRef = false;
       const styleRefUrls = [];
-      imageMap = [{ role: (useCleanup || precleanedShell) ? 'prepared empty shell — authority for cleared surfaces, camera and architecture' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
+      imageMap = [{ role: (useCleanup || precleanedShell) ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
       if (styleMode === 'reference') {
         const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
         const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
@@ -236,51 +223,33 @@ export async function processRender(renderId) {
         }
       }
 
-      // Арт-директор читает оригинал, считает планировку под размеры и пишет бриф.
-      const scalePlanInner = roomDimensions
-        ? buildScalePlan({ roomType, ...roomDimensions })
-        : '';
+      // Арт-директор читает реальное фото и пишет bespoke-направление под стиль.
+      // Без него дизайн скатывается к шаблонному «стиль + нейтральная комната».
       let artDirection = '';
-      layoutPlan = scalePlanInner;
-      let originalPhotoDataUrl = '';
       if (!MOCK_MODE) {
         try {
           const adStart = Date.now();
           const adBuf = await getBuffer(room.photo_path || sourceStored);
-          originalPhotoDataUrl = await bufferToDataUrl(adBuf);
           const ad = await buildArtDirection({
-            imageDataUrl: originalPhotoDataUrl,
+            imageDataUrl: await bufferToDataUrl(adBuf),
             roomType,
             style: room.style,
             styleDescription: styleInfo?.prompt_description || '',
             dimensions: roomDimensions,
             keepFurniture,
-            scalePlan: scalePlanInner,
           });
           if (ad?.text) {
             artDirection = ad.text;
-            layoutPlan = ad.layoutPlan || scalePlanInner;
-            const correction = layoutCorrection(ad.layoutItems || [], roomDimensions, { bedType: ad.bedType || '' });
-            if (correction) {
-              layoutPlan = `${layoutPlan}\n${correction}`;
-              meta.layout_correction = correction;
-              log({ event: 'layout_correction', room_id: room.id, render_id: renderId, correction });
-            }
-            framingNote = ad.framingNote || '';
-            roomFunction = ad.roomFunction || '';
-            bedType = ad.bedType || '';
-            functionalZones = ad.functionalZones || [];
-            keepFeatures = ad.keepFeatures || [];
-            materialsDirective = ad.materials || '';
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
-            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType, palette: ad.palette?.length || 0, layout_items: ad.layoutItems?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
+            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
           }
         } catch (e) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
       }
+
       prompt = buildPrompt({
         style: room.style,
         priceTier,
@@ -297,18 +266,8 @@ export async function processRender(renderId) {
         imageMap,
         dimensions: roomDimensions,
         artDirection,
-        layoutPlan,
-        framingNote,
-        roomFunction,
-        bedType,
-        functionalZones,
-        keepFeatures,
-        materialsDirective,
       });
 
-      // Дизайнер получает только очищенный shell (если он есть) и style ref.
-      // Оригинал читает арт-директор отдельно; в image-модель его не передаём,
-      // иначе она смешивает старую мебель/отделку с новой планировкой.
       referenceImagesB64 = styleRefUrls;
       meta.product_ids = curated.map(p => Number(p.id));
       meta.style_id = styleInfo?.id || null;
@@ -334,12 +293,7 @@ export async function processRender(renderId) {
       const originalDataUrl = await bufferToDataUrl(originalBuf);
       const { width, height } = imageSize(originalBuf);
       targetRatio = width / height;
-      const configuredModel = getModelConfig().render;
-      const renderModel = isCleanupModel(configuredModel) ? 'black-forest-labs/flux-3-image' : configuredModel;
-      if (renderModel !== configuredModel) {
-        meta.model_override = { configured: configuredModel, used: renderModel, reason: 'cleanup model cannot be used for design' };
-        log({ event: 'model_override', room_id: room.id, render_id: renderId, configured: configuredModel, used: renderModel, reason: 'cleanup model cannot be used for design' });
-      }
+      const renderModel = getModelConfig().render;
       const aspectRatio = snapAspect(width, height, modelCaps(renderModel).aspects);
       let designBuf = originalBuf;
       let cleanupCost = 0;
@@ -393,7 +347,6 @@ export async function processRender(renderId) {
         sourceImageB64: srcB64,
         referenceImagesB64,
         aspectRatio,
-        model: renderModel,
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
       addCost('design', out.cost);
@@ -421,7 +374,7 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
               sourceImageB64: srcB64,
               referenceImagesB64,
               aspectRatio,
-              model: renderModel,
+              model: 'openai/gpt-image-2',
             });
             imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
             addCost('design_retry', out.cost);
@@ -446,98 +399,7 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
         }
       }
       meta.architecture_qa = architectureQa;
-
-      // Проверка эргономики: мебель должна соответствовать размерам, но в кадр не нужно впихивать весь план.
-      let dimensionQa = null;
-      if (DIMENSION_QA_ENABLED && !iteration && roomDimensions && layoutPlan) {
-        try {
-          const outBuf = Buffer.from(out.b64, 'base64');
-          const outExt = detectImageExt(outBuf);
-          const outMime = MIME_BY_EXT[outExt] || 'image/png';
-          dimensionQa = await assessDimensions({
-            sourceImageUrl: srcB64,
-            renderImageUrl: `data:${outMime};base64,${out.b64}`,
-            roomType,
-            dimensions: roomDimensions,
-            plan: layoutPlan,
-            framing: framingNote,
-            roomFunction,
-            bedType,
-            functionalZones,
-            keepFeatures,
-          });
-          addCost('dimension_qa', dimensionQa.cost);
-          log({ event: 'dimension_qa', room_id: room.id, render_id: renderId, accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
-          if (!dimensionQa.accepted) {
-            const retryPrompt = `${prompt}
-
-DIMENSION / QUALITY CORRECTION — HARD REQUIREMENT
-The previous attempt failed QA: ${dimensionQa.issues.join('; ') || 'the layout or design quality does not match the brief'}.
-Regenerate the SAME room and FOLLOW THE FURNITURE PLAN EXACTLY: use the stated furniture sizes and positions, keep the walkways clear, do not widen the room, and do not cram out-of-frame items into the shot. Keep the source functional program (desk/study, storage, media), keep the source bed type (single stays single), and keep the door and window exactly where they are in the source. Do not hide or crop out architecture. Make the design authorial and editorial: strong focal point, layered warm light, tactile materials, believable styling, not a sterile showroom or an empty room. This correction overrides any conflicting styling instruction.`;
-            out = await generateRender({
-              prompt: retryPrompt,
-              sourceImageB64: srcB64,
-              referenceImagesB64,
-              aspectRatio,
-              model: renderModel,
-            });
-            imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
-            addCost('design_retry', out.cost);
-            const retryBuf = Buffer.from(out.b64, 'base64');
-            const retryExt = detectImageExt(retryBuf);
-            const retryMime = MIME_BY_EXT[retryExt] || 'image/png';
-            dimensionQa = await assessDimensions({
-              sourceImageUrl: srcB64,
-              renderImageUrl: `data:${retryMime};base64,${out.b64}`,
-              roomType,
-              dimensions: roomDimensions,
-              plan: layoutPlan,
-              framing: framingNote,
-              roomFunction,
-              bedType,
-              functionalZones,
-              keepFeatures,
-            });
-            addCost('dimension_qa', dimensionQa.cost);
-            log({ event: 'dimension_qa_retry', room_id: room.id, render_id: renderId, accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
-
-            // Если текущая модель не FLUX и план всё ещё не сходится — пробуем FLUX,
-            // он заметно лучше держит геометрию и архитектуру.
-            if (!dimensionQa.accepted && renderModel !== 'black-forest-labs/flux-3-image') {
-              out = await generateRender({
-                prompt: retryPrompt,
-                sourceImageB64: srcB64,
-                referenceImagesB64,
-                aspectRatio,
-                model: 'black-forest-labs/flux-3-image',
-              });
-              imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
-              addCost('design_retry', out.cost);
-              const fallbackBuf = Buffer.from(out.b64, 'base64');
-              const fallbackMime = MIME_BY_EXT[detectImageExt(fallbackBuf)] || 'image/png';
-              dimensionQa = await assessDimensions({
-                sourceImageUrl: srcB64,
-                renderImageUrl: `data:${fallbackMime};base64,${out.b64}`,
-                roomType,
-                dimensions: roomDimensions,
-                plan: layoutPlan,
-                framing: framingNote,
-                roomFunction,
-                bedType,
-                functionalZones,
-                keepFeatures,
-              });
-              addCost('dimension_qa', dimensionQa.cost);
-              log({ event: 'dimension_qa_fallback', room_id: room.id, render_id: renderId, model: 'black-forest-labs/flux-3-image', accepted: dimensionQa.accepted, score: dimensionQa.score, checks: dimensionQa.checks, issues: dimensionQa.issues, cost_usd: dimensionQa.cost ?? null });
-            }
-          }
-        } catch (e) {
-          log({ event: 'dimension_qa_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-        }
-      }
-      meta.dimension_qa = dimensionQa;
-
-      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, dimension_qa: dimensionQa?.accepted ?? null, cost_usd: cost, ms: Date.now() - t0 });
+      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
     }
 
     const rawBytes = Buffer.from(imageB64, 'base64');

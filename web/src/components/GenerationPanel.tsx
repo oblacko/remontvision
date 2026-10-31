@@ -40,9 +40,6 @@ type ArtDirection = {
   featureWall?: string
   lighting?: string
   mood?: string
-  layoutPlan?: string
-  framingNote?: string
-  layoutItems?: { type?: string; description?: string; widthCm?: number | null; depthCm?: number | null; heightCm?: number | null; position?: string; clearanceCm?: number | null }[]
 }
 type RoomBrief = {
   roomType?: string
@@ -155,7 +152,8 @@ export function GenerationPanel({
   const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
   const [style, setStyle] = useState<string | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
-  const [keepFurniture, setKeepFurniture] = useState(false)
+  const [keepFurniture, setKeepFurniture] = useState(true)
+  const [useCatalog, setUseCatalog] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
@@ -258,6 +256,7 @@ export function GenerationPanel({
         setDimensionOrientation(d.dimension_orientation || '')
         setPriceTier(d.price_tier || 'comfort')
         setKeepFurniture(d.keep_furniture !== false)
+        setUseCatalog(d.use_catalog !== false)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
         setPhotoError(''); setGenError(d.notice || '')
@@ -282,7 +281,7 @@ export function GenerationPanel({
             budget: d.budget || 150,
             priceTier: d.price_tier || 'comfort',
             keepFurniture: d.keep_furniture !== false,
-            useCatalog: false,
+            useCatalog: d.use_catalog !== false,
             roomId: initialRoomId,
             ratio: 4 / 3,
             pricesAsOf: d.prices_as_of,
@@ -331,7 +330,7 @@ export function GenerationPanel({
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
     setEstimateNote(''); setEstimateError(''); setBrief(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
-    setKeepFurniture(false)
+    setKeepFurniture(true); setUseCatalog(false)
     // Агентский шаг: сразу читаем комнату по фото — тип, размеры и стиль.
     void estimateBrief(nextFile, { auto: true })
   }
@@ -524,7 +523,7 @@ export function GenerationPanel({
         if (dimensionOrientation.trim()) fd.append('dimension_orientation', dimensionOrientation.trim())
         fd.append('price_tier', priceTier)
         fd.append('keep_furniture', cleaned && useCleaned ? '0' : (keepFurniture ? '1' : '0'))
-        fd.append('use_catalog', '0')
+        fd.append('use_catalog', useCatalog ? '1' : '0')
         if (refFile) fd.append('style_ref', refFile)
         if (!refFile && refUrl) fd.append('style_ref_url', refUrl)
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
@@ -570,7 +569,7 @@ export function GenerationPanel({
         budget: room.budget,
         priceTier: room.price_tier || priceTier,
         keepFurniture: room.keep_furniture !== false,
-        useCatalog: false,
+        useCatalog: room.use_catalog !== false,
         roomId: id,
         ratio: photoRatio,
         pricesAsOf: room.prices_as_of,
@@ -597,7 +596,7 @@ export function GenerationPanel({
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
     setEstimateNote(''); setEstimateError(''); setEstimateBusy(false); setBrief(null)
-    setStyle(null); setPriceTier('comfort'); setKeepFurniture(false)
+    setStyle(null); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(false)
     setCustomOpen(false); setAdvancedOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
     loadedRoomRef.current = ''
@@ -806,7 +805,7 @@ export function GenerationPanel({
 
             <div className="mt-8 border">
               <button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(v => !v)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? ' · мебель сохраняем' : ' · мебель меняем'}</span>
+                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}{useCatalog ? ' · каталог' : ''}</span>
                 <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`} />
               </button>
               {advancedOpen && (
@@ -825,14 +824,17 @@ export function GenerationPanel({
                   </div>
                   <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description}</p>
 
-                  <div className="mt-6 grid gap-px border bg-border">
+                  <div className="mt-6 grid gap-px border bg-border sm:grid-cols-2">
                     <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${keepFurniture ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
                       <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
                       <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Сохраняем существующую мебель и планировку. Можно обновить отделку.' : 'Меняем мебель и отделку, сохраняя архитектуру, окна и двери.'}</span></span>
                     </button>
+                    <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${useCatalog ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
+                      <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
+                      <span><span className="block text-sm font-medium">Использовать каталог</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'Подбираем реальные товары, показываем смету и ссылки.' : 'AI свободно проектирует интерьер. Смета и товары не собираются.'}</span></span>
+                    </button>
                   </div>
-                  <p className="mt-3 text-[11px] leading-5 text-muted-foreground">Каталог и смета отключены: дизайн генерируется свободно, без товаров.</p>
-                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">Очистка комнаты применяется автоматически, когда «Оставить мебель» выключено.</p>
+                  <p className="mt-3 text-[11px] leading-5 text-muted-foreground">Очистка комнаты применяется автоматически, когда «Оставить мебель» выключено.</p>
                 </div>
               )}
             </div>
@@ -926,22 +928,7 @@ export function GenerationPanel({
                       {current.artDirection.featureWall ? <div><dt className="eyebrow">Стена</dt><dd className="mt-1">{current.artDirection.featureWall}</dd></div> : null}
                       {current.artDirection.lighting ? <div><dt className="eyebrow">Свет</dt><dd className="mt-1">{current.artDirection.lighting}</dd></div> : null}
                       {current.artDirection.mood ? <div><dt className="eyebrow">Настроение</dt><dd className="mt-1">{current.artDirection.mood}</dd></div> : null}
-                      {current.artDirection.layoutPlan ? <div className="sm:col-span-2"><dt className="eyebrow">План на всю комнату</dt><dd className="mt-1">{current.artDirection.layoutPlan}</dd></div> : null}
-                      {current.artDirection.framingNote ? <div className="sm:col-span-2"><dt className="eyebrow">Что видит камера</dt><dd className="mt-1">{current.artDirection.framingNote}</dd></div> : null}
                     </dl>
-                    {current.artDirection.layoutItems?.length ? (
-                      <div className="mt-4">
-                        <p className="eyebrow">Объекты</p>
-                        <ul className="mt-2 divide-y border-y text-xs">
-                          {current.artDirection.layoutItems.map((item, index) => (
-                            <li key={`${item.type}-${index}`} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
-                              <span><b>{item.type}</b>{item.description ? ` — ${item.description}` : ''}{item.position ? ` · ${item.position}` : ''}</span>
-                              <span className="font-mono text-muted-foreground">{[item.widthCm, item.depthCm, item.heightCm].filter(value => typeof value === 'number').join(' × ') || '—'}{item.widthCm ? ' см' : ''}{item.clearanceCm ? ` · проход ${item.clearanceCm} см` : ''}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
                   </section>
                 ) : null}
                 {heroItems.length ? (

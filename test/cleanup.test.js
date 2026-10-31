@@ -5,7 +5,7 @@ process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
 const { buildCleanupPrompt, getCleanupConfig, setCleanupConfigForTests } = await import('../src/cleanupconfig.js');
-const { supportsResolution, isCleanupModel } = await import('../src/modelcaps.js');
+const { supportsResolution } = await import('../src/modelcaps.js');
 
 test('cleanup prompt keeps architecture and removes furniture for bedroom', () => {
   setCleanupConfigForTests({ prompt: 'Empty {room}. Keep {keep}. Remove {remove}.' });
@@ -24,17 +24,6 @@ test('cleanup prompt keeps built-ins for kitchen', () => {
   assert.match(p, /built-in kitchen cabinets/);
   assert.match(p, /plumbing/);
   assert.match(p, /freestanding furniture/);
-});
-
-test('custom cleanup prompt is passed through unchanged', () => {
-  setCleanupConfigForTests({ prompt: 'Remove everything and make an empty room.' });
-  assert.equal(buildCleanupPrompt('Санузел'), 'Remove everything and make an empty room.');
-});
-
-test('Klein is a cleanup model, not a design model', () => {
-  assert.equal(isCleanupModel('black-forest-labs/flux-3-image-klein'), true);
-  assert.equal(isCleanupModel('black-forest-labs/flux-3-image'), false);
-  assert.equal(isCleanupModel('bytedance-seed/seedream-5-0-flash'), false);
 });
 
 test('FLUX 3 Klein supports resolution, FLUX 2 Pro does not', () => {

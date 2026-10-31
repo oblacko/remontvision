@@ -31,11 +31,6 @@ export function modelFamily(id) {
   return 'other';
 }
 
-// Klein — модель очистки/локальных правок, не для полного дизайна.
-export function isCleanupModel(id) {
-  return /-klein/i.test(String(id || ''));
-}
-
 export function supportsAdvancedOptions(id) {
   const family = modelFamily(id);
   return family === 'seedream' || family === 'flux';

@@ -120,10 +120,10 @@ const DEFAULT_ROOM_TYPES = [
       { key: 'light', categories: ['light'] },
       { key: 'outlets', categories: ['outlets'] },
     ],
-    keep: 'the room envelope: walls, windows, doors, ceiling, floor level, waterproofing and camera angle. Wet zones must stay functional, but the fixture layout can be redesigned inside the room.',
-    change: 'wall and floor tile, vanity, countertop, faucets, mirror, lighting, styling and fixture layout inside the room. Keep everything moisture-resistant and keep 60 cm clear in front of every fixture.',
-    guidance: 'Design the best functional layout for the stated dimensions. Choose compact fixtures that fit, keep 60 cm clear in front of each, and do not exceed the room width.',
-    forbid: 'No bed, no sofa, no kitchen cabinets or cooktop, no living-room furniture, no wood floor in wet zones, no widened bathroom, no fixture or furniture that does not fit the room, no new ceiling coves unless already present.',
+    keep: 'the plumbing positions, toilet, sink, shower/bath footprint, waterproofing and camera angle. Do not move wet zones.',
+    change: 'wall and floor tile, vanity, countertop, fixtures, mirror, lighting and styling. Keep everything moisture-resistant.',
+    guidance: 'A vanity, sink, mirror, toilet, shower or bath and moisture-resistant materials are appropriate.',
+    forbid: 'No bed, no sofa, no kitchen cabinets or cooktop, no living-room furniture, no wood floor in wet zones.',
     electrical: [
       { title: 'Зеркало', text: 'Розетка и свет 1800–2000 мм, IP44.' },
       { title: 'Стиральная машина', text: 'Отдельная линия и УЗО; розетка вне зоны душа.' },
@@ -218,88 +218,8 @@ const DEFAULT_ROOM_TYPES = [
     ],
     keep: 'desk, chair, shelving and their realistic proportions; the architecture, camera, walls, windows and doors.',
     change: 'floor, walls, lighting, textiles, storage fronts and styling. Replace or restyle the desk, chair and storage using the listed furniture. You may reposition freestanding furniture for a better composition, keeping the workspace ergonomic.',
-    guidance: 'A desk, ergonomic office chair, shelving, task lighting and exactly one reading chair are appropriate.',
-    forbid: 'No bed, no kitchen, no bathroom fixtures. No sofa or large living-room group; exactly one reading chair is allowed if the verified plan includes it.',
-    concept: {
-      title: "THE NORDIC COLLECTOR'S STUDY",
-      artDirection: `ART DIRECTION — THE NORDIC COLLECTOR'S STUDY
-
-Create a distinctive Scandinavian home office with the character of a private creative studio: composed, tactile, functional and quietly confident. The room must have a clear design identity, not just a coordinated selection of neutral furniture.
-
-DESIGN THESIS:
-Deep muted ink-blue, natural oak, cognac leather and a single large graphic artwork.
-
-Keep the existing room envelope and furniture plan. Achieve the transformation through finish, furniture character, colour placement, lighting and composition — not new architecture.
-
-PALETTE:
-- Main background: warm chalk-white.
-- Right feature wall: deep muted ink-blue with a matte finish.
-- Main furniture: natural medium-light oak, not orange or whitewashed.
-- Reading chair: warm cognac leather.
-- Small details: soft black and restrained brushed metal.
-
-The blue wall must have enough depth to make the oak desk and the artwork stand out. Do not dilute the scheme into pale blue, beige and grey. Repeat cognac or a related warm earthy tone in one small detail only. Do not add a second competing accent palette.
-
-MAIN COMPOSITION:
-Treat the desk and artwork as one deliberately composed ensemble.
-Use the planned oak desk (target about 140 × 70 cm; the validated plan's exact dimensions take precedence) with a visually substantial but refined top, softly eased edges and clearly articulated legs. It must look like a considered furniture piece, not a generic thin office tabletop or a dining table.
-Keep it practical: usable legroom, clear working area and believable space for the ergonomic chair.
-Place one large contemporary artwork on the existing right wall, positioned in relation to the desk without moving architectural features.
-The artwork should have a confident abstract composition: warm ivory, charcoal and one restrained earthy note. Use a slim frame. Avoid generic motivational prints, tiny pictures and a crowded gallery wall.
-
-DESK ORIENTATION — HARD:
-The desk is parallel to the right wall; the seated user faces the wall. The window is on the left. Do not rotate the desk to face the door and do not show both orientations.
-
-SECONDARY COMPOSITION:
-Use the planned reading chair near the window as a warm counterpoint to the blue wall.
-Choose a compact, sculptural lounge chair with cognac leather upholstery, a light visual footprint and a recognisable structural frame. It must remain secondary to the workspace.
-Do not add an ottoman, side table or additional seating unless the verified plan has room for them.
-
-STORAGE:
-The planned oak bookcase should feel useful and collected. Use a few substantial books, closed storage where available and a small number of ceramics. Vary the arrangement without filling every shelf. Do not turn the bookcase into a grid of decorative accessories.
-
-OVERALL CHARACTER:
-A real place for focused work and reading, with the visual confidence of a designer's own study. Not a corporate office, hotel workspace or furniture showroom.`,
-      hierarchy: `VISUAL HIERARCHY
-
-Primary: the oak desk against the deep ink-blue wall, with the large artwork completing the composition.
-Secondary: the cognac reading chair in the natural light near the window.
-Supporting: the quiet oak storage, textured rug and restrained personal details.
-
-Let the eye move between these three relationships. Do not make every object sculptural or every surface decorative.`,
-      workspace: `WORKSPACE — FUNCTIONAL AND REAL
-
-Make the desk read as an actual working setup.
-Include one coherent equipment arrangement: a slim monitor, compact keyboard and mouse, with cables concealed through a believable route.
-Keep the monitor subordinate to the desk-and-art composition. Do not let it cover the main artwork.
-Include one adjustable task lamp. Leave a generous portion of the desktop clear for working.
-Use a visually refined ergonomic office chair with a supportive back, realistic seat proportions and an appropriate working height. Do not substitute a dining chair or lounge chair.
-Do not add multiple screens, random gadgets, visible chargers or decorative office accessories.`,
-      material: `MATERIAL CHARACTER
-
-Oak: a matte or low-sheen finish with visible but restrained grain. No orange varnish, repeated synthetic texture or rustic distressing.
-Blue wall: a deep muted matte paint with subtle natural tonal variation. No stains, dramatic plaster marks or glossy reflection.
-Leather: supple cognac leather with slight natural creasing, not shiny vinyl or heavily distressed upholstery.
-Rug: an oatmeal wool flat-weave with a subtle darker woven border or quiet linear detail. Not a blank beige rectangle and not a busy statement pattern.
-Curtains: warm off-white linen with visible weave, believable weight and broad vertical folds.
-Metal: soft black with restrained highlights. Do not make every fitting brass or every object black.`,
-      lighting: `LIGHTING DIRECTION
-
-Use soft directional daylight from the existing window as the main light. Let it reveal the desk edge, oak grain, leather and the texture of the rug.
-Maintain a gentle brightness falloff toward the entrance. Do not light every part of the room equally.
-Use the existing ceiling connection for one understated sculptural pendant if the source permits it.
-The task lamp provides a small warm pool of light on the desk. The planned reading lamp may provide a restrained secondary glow.
-Keep practical lighting warm, around 3000 K, without turning the room orange.
-Do not add coves, hidden LED strips, new wall-light points or architectural lighting.
-Avoid dramatic sunset beams, ceiling glare, flat ambient illumination and excessive HDR.`,
-      humanTrace: `HUMAN TRACE
-
-The computer equipment belongs to the functional workspace and is not decorative clutter.
-Add only two personal traces: a ceramic cup on a coaster and one book with a paper bookmark. Place them naturally without blocking the keyboard, mouse area or main working surface.
-Allow slight asymmetry and evidence of use. Do not arrange every object parallel to the desk edge.
-No additional lifestyle props, pets, slippers, headphones, cameras or scattered stationery.`,
-      framing: `Keep the source camera and room envelope. Keep the window, door and the visible portion of the mirrored wardrobe in frame; update its reflection plausibly. Do not hide or crop out the mirror wardrobe, and do not cram extra furniture into the shot.`,
-    },
+    guidance: 'A desk, ergonomic office chair, shelving and task lighting are appropriate.',
+    forbid: 'No bed, no kitchen, no bathroom fixtures. Do not add living-room furniture.',
     electrical: [
       { title: 'Стол', text: '4–6 розеток + интернет, 900 мм; отдельная линия для техники.' },
       { title: 'Свет', text: 'Общий свет + task-свет на столе, тёплый и нейтральный сценарии.' },

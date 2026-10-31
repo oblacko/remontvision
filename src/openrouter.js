@@ -234,22 +234,12 @@ export function buildPrompt({
   imageMap = [],
   dimensions = null,
   artDirection = '',
-  layoutPlan = '',
-  framingNote = '',
-  roomFunction = '',
-  bedType = '',
-  functionalZones = [],
-  keepFeatures = [],
-  materialsDirective = '',
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
   const styleDesc = styleDescription || STYLES[style] || STYLES['Современный'];
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room shown in the source photo';
-  const concept = room?.concept || null;
-  // Концепция кабинета — скандинавская; для других стилей оставляем арт-директора.
-  const conceptActive = Boolean(concept) && /скандинав|scandi/i.test(style);
   const keep = keepFurniture
     ? String(room?.keep || 'camera angle, perspective, walls, windows, doors, ceiling height and room proportions').replace(/\.+$/, '')
     : 'the architecture, camera, perspective, walls, windows, doors, ceiling height, room proportions, built-ins, plumbing and electrical points';
@@ -259,46 +249,7 @@ export function buildPrompt({
     .filter(sentence => !(keepFurniture ? /\b(replace|restyle|rearrange|reposition|move)\b/i : /\b(rearrange|reposition|move)\b/i).test(sentence))
     .join(' ') || 'Update surface finishes, textiles, lighting and decor without changing the room layout.';
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
-  const wetRoom = /санузел|ванн|туалет|bath|wc/i.test(roomName);
-  const primaryFocus = wetRoom
-    ? 'the vanity and wet-zone composition'
-    : /спальн|bedroom/i.test(roomName)
-      ? 'the bed composition'
-      : /гостин|зал|living/i.test(roomName)
-        ? 'the sofa and seating composition'
-        : /кухн|kitchen/i.test(roomName)
-          ? 'the kitchen run and island composition'
-          : 'the main furniture composition';
-  const humanTrace = /спальн|bedroom/i.test(roomName)
-    ? 'an open book and a ceramic cup on one bedside surface'
-    : /гостин|зал|living/i.test(roomName)
-      ? 'a coffee cup and an open book on the coffee table'
-      : /кухн|kitchen/i.test(roomName)
-        ? 'a coffee cup and a cutting board with fruit'
-        : /санузел|ванн|туалет|bath/i.test(roomName)
-          ? 'a folded towel and a soap dispenser on the vanity'
-          : 'a cup and a book on one surface';
-  const furniturePlacement = wetRoom
-    ? 'Follow the FURNITURE PLAN exactly. Keep at least 60 cm clear in front of every fixture; use compact fixtures; do not exceed the room width or block the door swing.'
-    : 'Follow the FURNITURE PLAN exactly. Place each item only where the plan says; keep the stated walkways clear; do not place a bed, sofa or wardrobe wider or longer than the plan.';
-  const zonesText = (Array.isArray(functionalZones) ? functionalZones : [])
-    .map(zone => `${zone.zone}${zone.items?.length ? ` (${zone.items.join(', ')})` : ''}${zone.position ? ` at ${zone.position}` : ''}`)
-    .filter(Boolean).join('; ');
-  const featuresText = (Array.isArray(keepFeatures) ? keepFeatures : []).filter(Boolean).join('; ');
-  const hasStudy = /study|desk|рабоч/i.test(zonesText);
-  const hasBed = Boolean(bedType && bedType !== 'none');
-  const programLock = (roomFunction || zonesText || featuresText || bedType)
-    ? `\nPROGRAM LOCK — KEEP THE FUNCTION\nThe source is a ${roomFunction || 'room'}${zonesText ? ` with these zones: ${zonesText}` : ''}. Keep the same functional program and zones as the source.${hasStudy ? ' Do not remove a desk/workspace or replace it with a lounge chair, bench or decorative nook.' : ''}${hasBed ? ` Bed type: ${bedType}; do not upgrade a single/small bed to a double. The source bed type overrides any generic size suggestion: if the source is single/small, use 90–120/140 cm.` : ''} Do not invent an extra built-in wardrobe or desk; the plan defines one storage solution.${featuresText ? ` Keep these existing features unless the plan explicitly replaces them: ${featuresText}.` : ''}\n`
-    : '';
-  const hierarchyText = `VISUAL HIERARCHY
-Primary focus: ${primaryFocus}, including its proportions, upholstery and relationship to the window.
-Secondary focus: one visible artwork or one sculptural portable lamp, only where the room allows.
-Supporting detail: one small, personal surface arrangement.
-Do not make every surface compete for attention. Let secondary storage and the radiator treatment recede visually.`;
-  const densityText = `CONTROLLED DENSITY
-Use one main styled composition and one or two supporting arrangements. Keep some wall areas and surfaces intentionally clear. Empty space is acceptable when it balances a strong focal point. Do not decorate every shelf or fill every corner. Every added object must contribute colour, texture, function or a clear personal detail; otherwise omit it.`;
-  const humanTraceText = `HUMAN TRACE
-Suggest one quiet moment of everyday life: ${humanTrace}. Use only these two personal details. Do not add a laptop, headphones, camera, slippers, plush toys or pets by default. The room should feel inhabited through subtle use, not a collection of staged accessories.`;
+  const styling = 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use only existing shelves, ledges and niches; never add a new built-in, ledge, cove or wall panel.';
   const rules = getPromptConfig();
   const furnitureRule = keepFurniture ? rules.furnitureOn : rules.furnitureOff;
   const catalogText = useCatalog
@@ -329,25 +280,17 @@ Suggest one quiet moment of everyday life: ${humanTrace}. Use only these two per
     ? fillTemplate(rules.bed, { room: roomName, bed_length: Number(dimensions.bedLength) })
     : '';
   const radiatorsText = fillTemplate(rules.radiators, { room: roomName });
-  const scaleText = [dimensionsText, scalePlanText, bedText].filter(Boolean).join('\n\n');
-  // Единственный источник геометрии — FURNITURE PLAN после валидатора.
-  // Без плана оставляем старый scale plan как fallback.
-  const geometryText = layoutPlan ? dimensionsText : scaleText;
-  const outputText = `Photorealistic editorial photograph of this exact room.
-Preserve the source camera, framing and perspective.
-Use accurate material colour, soft directional daylight, restrained warm practical light and natural texture.
-No CGI gloss, artificial blur, excessive HDR or text.
-No new windows, doors, walls, niches, beams, columns or skylights. No changed camera or perspective. No duplicated or distorted furniture, no floating objects, no clutter, no oversized furniture blocking walkways.`;
+  const scaleText = [dimensionsText, scalePlanText, bedText, radiatorsText].filter(Boolean).join('\n\n');
   const architectureLock = `ARCHITECTURE LOCK — HIGHEST PRIORITY
-This is the SAME physical room, not a new room. The room envelope is locked; furniture, finishes, lighting and styling can change, but do not redesign the architecture.
+This is the SAME physical room, not a new room. This is a cosmetic renovation only. The source image is a photograph of the actual room; do not redesign its architecture.
 LOCKED INVARIANTS — do not violate any of these:
 - Camera: same position, eye height, focal length, perspective, horizon, framing, crop and aspect ratio. Same left/right and top/bottom composition. No zoom, pan, tilt, room widening or narrowing.
 - Room volume: same width, depth, ceiling height, wall planes, floor plane, soffits, beams, columns, niches and arches. Do not add, remove, move, resize, open or close any wall, window, door, niche, beam, column, arch, cove, ceiling recess, skylight or room volume.
 - Windows: same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Do not add a second window. Do not widen, raise, lower or move the window.
 - Doors: same count, size, position, frame, handle and swing. Do not add a doorway, hallway or second room.
 - Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobe, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Preserve their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves, add niches, change the ceiling line, add beams or columns.
-- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe and vent. New lights may use only existing points; do not add new recessed, cove, track or wall lights. TVs, wall-mounted decor and loose shelves may be removed or replaced according to the plan; their electrical points stay.
-- Mirrors and reflections are reflections, not openings. If a mirrored wardrobe is visible, preserve its visible portion and update the reflection plausibly; do not hide it, crop it out, remove it, or turn it into a window, door or new room.
+- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights may use only existing points; do not add new recessed, cove, track or wall lights.
+- Mirrors and reflections are reflections, not openings: do not turn a mirrored wardrobe or mirror reflection into a window, door or new room.
 - If a design idea conflicts with any locked invariant, keep the architecture and change the finish or decor instead.`;
 
   if (iteration) {
@@ -369,42 +312,28 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
     ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
   ].filter(Boolean).join(' ');
-  const effectiveArtDirection = conceptActive ? concept.artDirection : artDirection;
-  const effectiveFraming = conceptActive ? concept.framing : framingNote;
-  const workspaceBlock = conceptActive ? concept.workspace : '';
-  const lightingBlock = conceptActive ? concept.lighting : '';
-  const materialCharacter = conceptActive ? '' : (materialsDirective || 'Use the materials from the design thesis with believable roughness, grain, weave and controlled reflections. Avoid generic flat wood/linen/plaster and glossy CGI.');
-  const cleanupText = rules.cleanup.replace(/Replace only the radiator body with[^.]*\./gi, '');
 
   return `${roles}
 
-IMAGE AUTHORITY
-Image 1 controls camera position, perspective, framing, room proportions and all visible architectural boundaries. Any additional image is a style/material reference only: use its mood, palette, materials and light; never its layout, architecture or camera. If they disagree, follow Image 1.
-
 TASK
-Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a furniture and finish redesign in the selected style.
-This is not a new room and not a structural renovation: the walls, windows, doors, ceiling, room volume and camera must remain identical to the source. Furniture and fixtures follow the FURNITURE MODE and FURNITURE PLAN, and every item must fit the stated dimensions.
-The result must feel like a completed designer renovation: calm, editorial and inhabited, not a moodboard, a sterile furniture showroom or an empty staged flat.
+Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a cosmetic renovation in the selected style.
+This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.
+The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
 This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
 
 ${architectureLock}
-${conceptActive
-  ? `\n${concept.artDirection}\n`
-  : (artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK, the room dimensions or the furniture plan, keep the architecture, dimensions and furniture plan.\n${artDirection}\n` : '')}
-${geometryText ? `\n${geometryText}\n` : ''}
-${layoutPlan ? `\nFURNITURE PLAN — HARD DIMENSIONS (OVERRIDES ART DIRECTION)\n${layoutPlan}\nUse exactly these furniture sizes, positions and walkways. Do not show furniture larger than the plan or block the stated walkways. If the ART DIRECTION suggests a larger item or a different position, follow this plan and shrink or remove the conflicting item. Keep the room the same physical width and do not widen it. The plan describes the WHOLE room, not the whole frame: the camera may see only part of it. Do not force out-of-frame items into the shot; omit them instead of cramming or moving them. The plan defines sizes and positions only; for materials, colours and furniture form, follow ART DIRECTION and MATERIAL CHARACTER.\n` : ''}
-${programLock}
-${effectiveFraming ? `\nVISIBLE COMPOSITION — DO NOT CRAM\n${effectiveFraming}\nThe camera sees only part of the room. Do not force every planned item into the frame; items outside the frame may be omitted. Do not move furniture just to make it visible. The image must read as a natural photo of the room, not a catalog of everything that fits.\nIMPORTANT: this exception applies ONLY to furniture and decor. NEVER hide, crop out, remove, move or repaint doors, windows, walls, ceiling, radiator, mirrored wardrobe or the room envelope. The door, window and visible mirror wardrobe must remain where they are in the source, even if the composition becomes tighter.\n` : ''}
+${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
+${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY
-${layoutPlan ? 'the room envelope: walls, windows, doors, ceiling, floor level, plumbing, electrical points and the source camera.' : `${keep}.`}
+${keep}.
 Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.
 
 FURNITURE MODE
-${layoutPlan ? (keepFurniture ? 'Preserve existing furniture only where the plan keeps it; restyle in place.' : 'Replace and refurnish as specified by the plan.') : furnitureRule}
-${layoutPlan ? '' : `
+${furnitureRule}
+
 FURNITURE PLACEMENT
-${furniturePlacement}
-`}
+Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation; do not center it under the window if it was not there. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.
+
 CHANGE / DEEP TRANSFORMATION
 ${change}.
 If a floor product is listed below, change only its surface finish; do not change the floor plane or geometry. If no floor product is listed, preserve the existing floor. Style words such as "light oak" refer to furniture and joinery only, not to replacing the floor unless a floor product is explicitly listed. The same applies to walls: change only the surface finish when a wall finish is listed.
@@ -413,25 +342,24 @@ Keep the result functional, keep realistic dimensions, and do not block doors or
 COMPOSITION
 Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved only when furniture replacement is allowed; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
 
-${conceptActive || artDirection ? '' : `LIGHTING\n${rules.lighting}\n`}
-CLEANUP / REALISM
-${cleanupText}
+LIGHTING DESIGN — THE MAIN WOW TOOL
+${rules.lighting}
 
-RADIATOR TREATMENT — SINGLE AUTHORITY
-${radiatorsText}
-This is the only radiator treatment; ignore any conflicting radiator instruction above.
-${lightingBlock ? `\n${lightingBlock}\n` : ''}
+CLEANUP / REALISM
+${rules.cleanup}
+
 WINDOW STYLING
 ${rules.window}
 
 ROOM RULES
-${layoutPlan && room?.forbid ? room.forbid : roomRules}
+${roomRules}
 
-${conceptActive ? concept.hierarchy : hierarchyText}
+LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
+${styling}
+Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. All decor must sit inside the existing room volume; do not alter wall, floor or ceiling planes, corners, perspective, plinth or room proportions. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
 
-${densityText}
-
-${workspaceBlock ? `${workspaceBlock}\n\n` : ''}${conceptActive ? concept.humanTrace : humanTraceText}
+PINTEREST-LEVEL STYLING
+${rules.pinterest}
 ${rules.extra ? `
 EXTRA ART DIRECTION
 ${rules.extra}` : ''}
@@ -443,22 +371,20 @@ MATERIAL CONSTRAINTS — TEXT ONLY, NO PRODUCT IMAGES
 ${catalogText}
 Use these text descriptions only as constraints for finishes, colors, formats and physical scale. Match large surfaces (floor, walls, countertop, cabinet fronts) to the listed material where visible. Tile/plank patterns must match the stated format. Do not force a material into the frame if it is not visible. Choose furniture, lighting, decor and composition for the strength of the design rather than trying to depict the estimate. Small decor, plants, textiles, art and books are encouraged to complete the styling.
 
-${conceptActive || artDirection ? `STYLE FAMILY\n${style}. The ART DIRECTION above is the single specific concept; do not blend a second style or accent palette.` : `STYLE BRIEF\n${styleDesc}`}
+STYLE BRIEF
+${styleDesc}
 
 STYLE REFERENCE
 ${styleRefText}
-${hasStyleRef ? 'The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Do not transfer any architectural feature from the reference.' : ''}
-${conceptActive || artDirection ? '' : colors}
+The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Do not transfer any architectural feature from the reference.
+${colors}
 
-${conceptActive ? concept.material : `MATERIAL CHARACTER
-${materialCharacter}`}
-
-${conceptActive ? '' : `MATERIAL CLASS
+MATERIAL CLASS
 ${tier.promptName || tier.name} — ${tier.prompt}
-The selected materials already match this class; keep the rest of the room consistent with it.`}
+The selected materials already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-${outputText}`;
+${rules.photo} ${rules.avoid}`;
 }
 
 // Короткий промт для правки: один target + один референс, без полного стилевого промта.
@@ -1069,56 +995,5 @@ Image 1 — исходное фото. Image 2 — сгенерированны�
     checks,
     issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 8) : [],
     cost: data.usage?.cost ?? null,
-  };
-}
-
-export async function assessDimensions({ sourceImageUrl, renderImageUrl, roomType = '', dimensions = null, plan = '', framing = '', roomFunction = '', bedType = '', functionalZones = [], keepFeatures = [] }) {
-  const w = Number(dimensions?.width) || 0;
-  const l = Number(dimensions?.length) || 0;
-  const h = Number(dimensions?.height) || 0;
-  const zones = (Array.isArray(functionalZones) ? functionalZones : [])
-    .map(zone => `${zone.zone}${zone.items?.length ? ` (${zone.items.join(', ')})` : ''}${zone.position ? ` at ${zone.position}` : ''}`)
-    .filter(Boolean).join('; ');
-  const features = (Array.isArray(keepFeatures) ? keepFeatures : []).filter(Boolean).join('; ');
-  const system = `Ты строгий QA-инженер по эргономике и архитектуре интерьера. Image 1 — исходная/пустая комната, Image 2 — рендер.
-Верни строго JSON:
-{"accepted":true|false,"score":0-10,"authorial_quality":0-10,"checks":{"furniture_fits":true|false,"walkways_clear":true|false,"no_oversized":true|false,"room_not_widened":true|false,"program_preserved":true|false,"bed_type_preserved":true|false,"doors_windows_preserved":true|false},"issues":["..."]}
-- authorial_quality: цельная авторская композиция, свет, материалы, стилинг; не стерильный шоурум, не пустая комната и не случайный набор мебели.
-- furniture_fits: мебель по размеру соответствует комнате и плану.
-- walkways_clear: проходы не заблокированы; там, где это видно, минимум ~60 см.
-- no_oversized: нет кровати/дивана/шкафа, которые явно шире/длиннее комнаты или плана.
-- room_not_widened: комната не расширена и не растянута.
-- program_preserved: сохранена функция комнаты и зоны. Если на фото есть письменный стол/study-зона или комната teen/child, в рендере должен быть стол/рабочее место; замена стола креслом/банкеткой — ошибка.
-- bed_type_preserved: если на фото односпальная/маленькая кровать, в рендере не должно быть двуспальной/king.
-- doors_windows_preserved: те же двери и окна, на тех же местах, не скрыты и не обрезаны.
-Исключение «предмет за кадром — не ошибка» относится ТОЛЬКО к мебели и декору. Архитектура (двери, окна, стены, потолок, радиатор, объём комнаты) всегда должна быть сохранена; если дверь/окно пропали, сдвинулись или скрыты — doors_windows_preserved=false.
-Не придумывай проблемы. Только JSON.`;
-  const user = `Комната: ${roomType || 'room'}. Функция: ${roomFunction || 'не указана'}. Размеры: ${w}×${l}×${h} м. Тип кровати: ${bedType || 'не указан'}. Зоны: ${zones || 'не указаны'}. Сохранить features: ${features || 'нет'}. План на всю комнату: ${plan || 'нет'}. Что видит камера: ${framing || 'определи по фото'}. Оцени видимую композицию и архитектуру.`;
-  const { parsed, cost } = await visionJson({ system, user, images: [sourceImageUrl, renderImageUrl] });
-  const checks = {
-    furniture_fits: parsed.checks?.furniture_fits === true,
-    walkways_clear: parsed.checks?.walkways_clear === true,
-    no_oversized: parsed.checks?.no_oversized === true,
-    room_not_widened: parsed.checks?.room_not_widened === true,
-    program_preserved: parsed.checks?.program_preserved === true,
-    bed_type_preserved: parsed.checks?.bed_type_preserved === true,
-    doors_windows_preserved: parsed.checks?.doors_windows_preserved === true,
-  };
-  const quality = Math.max(0, Math.min(10, Number(parsed.authorial_quality) || 0));
-  const accepted = checks.furniture_fits
-    && checks.walkways_clear
-    && checks.no_oversized
-    && checks.room_not_widened
-    && checks.program_preserved
-    && checks.bed_type_preserved
-    && checks.doors_windows_preserved
-    && quality >= 7;
-  return {
-    accepted,
-    score: Math.max(0, Math.min(10, Number(parsed.score) || 0)),
-    quality,
-    checks,
-    issues: Array.isArray(parsed.issues) ? parsed.issues.map(String).slice(0, 6) : [],
-    cost: cost ?? null,
   };
 }

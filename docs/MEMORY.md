@@ -27,8 +27,6 @@
 - Модель/промт очистки берутся из `cleanup.config.v1`, но флаг `cleanup.enabled` ручную кнопку не блокирует.
 - Если очистка падает, показывается ошибка; молчаливого перехода на оригинал больше нет.
 - Старый автоматический cleanup в `jobs.js` остался, но по умолчанию `cleanup.enabled=false`, поэтому без precleaned shell он не срабатывает.
-- Арт-директор не обязан сохранять старую планировку/сантехнику: он проектирует новую планировку под размеры. Очистка может как сохранять fixtures (дефолтный room-aware промт), так и очищать комнату полностью (кастомный промт из админки) — это выбор пользователя/админа.
-- Оригинал читает **только арт-директор** (и QA-анализ). Дизайн-модель получает только shell (если он есть) + style ref; оригинал в генерацию не передаётся, иначе модель смешивает старую мебель/отделку с новой планировкой.
 
 ## Промт и стиль
 
@@ -41,16 +39,11 @@
   - `swatches` — material board с палитрой, без архитектуры.
 - Активны 8 стилей (миграция `028`): **Скандинавский**, **Джапанди**, **Ваби-саби**, **Органик модерн**, **Тёплый минимализм**, **Биофильный**, **Современная классика**, **Средиземноморский модерн**. Всего 15: `minimal` и `neo` удалены миграцией `030` после проверки использования; `modern` сохранён, им пользуются 8 старых комнат. Референсы `neo` перенесены на `heritage`.
 - У активных стилей заполнены подробные briefs; у scandi/japandi — по 6 свотчей. Swatch board генерируется `src/styleswatch.js`.
-- **Арт-директор** (`src/artdirector.js`): vision читает **оригинал**, получает SCALE PLAN и проектирует новую планировку под размеры. Возвращает `room_function`, `bed_type`, `existing_fixtures`, `functional_zones`, `keep_features`, `layout_items` (type, description, width/depth/height cm, position, clearance), `layout_plan` (вся комната), `framing_note` (что видит камера), `ART DIRECTION`. В промт идут `ART DIRECTION`, `FURNITURE PLAN`, `PROGRAM LOCK` и `VISIBLE COMPOSITION`; архитектуру (двери/окна/стены) нельзя скрывать. Пустой shell арт-директору не нужен. Отключается `ART_DIRECTION_ENABLED=0`; стоимость входит в `renders.cost_usd`.
-- **Валидатор планировки** (`layoutCorrection` в `src/scaleplan.js`): детерминированно проверяет боковые проходы кровати (<60 см), шкаф на боковой/задней стене, предмет напротив кровати; при противоречии добавляет `LAYOUT CORRECTION` и корректирует ширину кровати/убирает шкаф. Арт-директору доверяем инвентаризацию и описание, но не арифметику.
-- **Промт разгружен**: один источник геометрии (`FURNITURE PLAN` после валидатора), один свет (из `ART DIRECTION`), `VISUAL HIERARCHY` + `CONTROLLED DENSITY`, `HUMAN TRACE` (книга + чашка), `MATERIAL CHARACTER`, короткий `OUTPUT` с сохранением камеры. Legacy `pinterest`/`photo`/`avoid` не инжектятся.
-- **Офисная концепция**: для `Кабинет` + `Скандинавский` включён `roomtypes.concept` «THE NORDIC COLLECTOR'S STUDY»: deep ink-blue стена, oak desk, cognac leather кресло, крупный графический арт, functional workspace (monitor/keyboard/mouse), task lamp, эргономичное кресло, oak bookcase. Заменяет generic art direction/hierarchy/material/lighting/human trace; размеры/позиции — из `FURNITURE PLAN`.
-- **QA размеров и качества** (`assessDimensions`): после базового рендера проверяет габариты, проходы, функцию, тип кровати, двери/окна и `authorial_quality` (>=7). При провале — retry с `DIMENSION / QUALITY CORRECTION`; если модель не FLUX, добавляется fallback-рендер на FLUX. Отключается `DIMENSION_QA_ENABLED=0`; стоимость — `renders.meta.cost_breakdown.dimension_qa`.
-- **Логи**: админка «Логи» показывает `ART DIRECTION`, план, framing, таблицу объектов и «Промт дизайнера»; кабинет — «Авторский бриф» со списком объектов (описание + размеры + проход).
-- **Себестоимость полной генерации**: `renders.cost_usd` = сумма всех запросов, разбивка в `renders.meta.cost_breakdown` (`art_direction`, `cleanup`, `design`, `design_retry`, `architecture_qa`, `product_qa`, `render_analysis`, `dimension_qa`, `failed`). Кабинет показывает итог и разбивку; схема — `docs/GENERATION-FLOW.md`.
+- **Арт-директор** (`src/artdirector.js`): vision читает реальное фото и пишет bespoke-направление (палитра, focal point, feature wall, материалы, свет, текстиль, декор). Вставляется в промт блоком `ART DIRECTION`. Отключается `ART_DIRECTION_ENABLED=0`; стоимость входит в `renders.cost_usd`.
+- **Себестоимость полной генерации**: `renders.cost_usd` = сумма всех запросов, разбивка в `renders.meta.cost_breakdown` (`art_direction`, `cleanup`, `design`, `design_retry`, `architecture_qa`, `product_qa`, `render_analysis`, `failed`). Кабинет показывает итог и разбивку; схема — `docs/GENERATION-FLOW.md`.
 - **Кабинет**: в истории комнаты есть полноэкранный просмотр рендера (кнопка `Expand`, Escape закрывает), себестоимость по версии и сумма по комнате.
 - Пользовательские фото-референсы в режимах `text`/`swatches` игнорируются (`meta.user_style_ref_ignored`).
-- Основная модель рендера: **FLUX 3 Image 1K** (`black-forest-labs/flux-3-image`, `app_settings`/`.env`; миграция `031`; код-дефолт `src/modelconfig.js`). `FLUX 3 Image Klein` — только очистка; `isCleanupModel()` не даёт использовать его для дизайна. Vision: `google/gemini-3-flash-preview`.
+- Основная модель рендера: **FLUX 3 Image 1K** (`black-forest-labs/flux-3-image`, `app_settings`/`.env`; код-дефолт `src/modelconfig.js`). Vision: `google/gemini-3-flash-preview`.
 - QA архитектуры **выключен** по умолчанию (`ARCHITECTURE_QA_ENABLED=0`). Не включать без прямой просьбы.
 
 ## Генерация и 429
@@ -84,17 +77,16 @@
 - VPS: `/root/remontvision`, Docker Compose, `app` + `db`.
 - Публично: `https://www.remontvision.ru`.
 - Деплой: push в `main` → GitHub Actions → VPS.
-- Прод обновляется пушем в `main` (GitHub Actions → VPS); последний деплой — layout-first, QA размеров, объекты в логах.
-- Задеплоено: арт-директор, 8 активных стилей (`028`), `use_catalog=false` по умолчанию, `estimate-room` с типом комнаты и стилями, UI-тюнинг, FLUX 3 Image 1K, разбивка себестоимости, удаление `minimal`/`neo` (`030`), layout-first (`layout_items`/`layout_plan`/`framing_note`), QA размеров, «живые» детали, объекты в логах.
+- Прод обновляется пушем в `main` (GitHub Actions → VPS); последний деплой — арт-директор, FLUX 1K, себестоимость, полноэкранный кабинет, дедупликация стилей.
+- Задеплоено: арт-директор, 8 активных стилей (`028`), `use_catalog=false` по умолчанию, `estimate-room` с типом комнаты и стилями, UI-тюнинг (бриф комнаты, «Дополнительно», авторский бриф на результате), FLUX 3 Image 1K, разбивка себестоимости, удаление `minimal`/`neo` (`030`).
 - Текущая модель рендера: **FLUX 3 Image 1K**; прогон 10 сценариев — 10/10 ok, $0.5093, vision-QA в среднем style 9.20 / photo 8.70 / arch 9.80 / scale 8.80 / authorial 8.20.
 - Миграции: `001`–`030` (`029` фиксирует FLUX 3 Image 1K; `030` удаляет `minimal`/`neo` только если они не используются комнатами).
-- Тесты: `npm test` — 64 теста. Frontend: `cd web && npm run lint && npm run build`.
+- Тесты: `npm test` — 56 тестов. Frontend: `cd web && npm run lint && npm run build`.
 - Размеры комнаты/кровати, `scalePlan` и radiator-cover блоки подключены к `buildPrompt`; скандинавский style brief — в `styles.prompt_description`.
 - Scale plan исправлен: детская — кровать 90–140 см (не king), спальня 3.0 м — 160 см, проходы считаются от реального запаса по бокам (`side = (width - bedWidth/100) / 2`).
 - Ширина/длина/высота комнаты спрашиваются у пользователя для всех типов; длина кровати — только для спальни/детской, по умолчанию 2.0 м, для остальных комнат игнорируется.
 - `POST /api/estimate-room` через `analyzeRoomBrief()` оценивает размеры, определяет тип комнаты и предлагает 2–3 стиля; бриф запускается автоматически при загрузке фото (401 молча игнорируется) и по кнопке, заполняет форму. Пользователь проверяет и правит.
-- Каталог в дизайне принудительно отключён: `jobs.js`/`server.js` всегда используют `useCatalog=false`, товары и product refs в промт не попадают. `rooms.use_catalog` default false; миграция `032` также ставит `keep_furniture=false` по умолчанию для новых комнат.
-- «Оставить мебель» по умолчанию **выключено** (frontend initial/reset/accept, server fallback, `rooms.keep_furniture` default false). Пользователь может включить вручную.
+- Демо-каталог/смета по умолчанию выключены: `use_catalog=false` (frontend, server fallback, `rooms.use_catalog` default, миграция `028`).
 - 7 новых стилей 2026 добавлены в `027_trend_styles.sql`; миграция `028` активирует кураторский набор из 8 (scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean).
 - Типы комнат: справочник в `app_settings.roomtypes.config.v1`, админка «Комнаты», дефолты в `src/roomtypes.js`; `/api/room-types` отдаёт только активные.
 - Health: `GET /api/health`.

@@ -1028,9 +1028,8 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const bool = (value, fallback = true) => value === undefined || value === null || value === ''
     ? fallback
     : !(value === false || value === 0 || value === '0' || value === 'false' || value === 'off');
-  const keepFurniture = bool(req.body.keep_furniture, false);
-  // Каталог не участвует в дизайне: всегда свободный дизайн без товаров.
-  const useCatalog = false;
+  const keepFurniture = bool(req.body.keep_furniture, true);
+  const useCatalog = bool(req.body.use_catalog, false);
   const optionalMeasure = (value, min, max) => {
     const raw = String(value ?? '').replace(',', '.').trim();
     if (!raw) return null;
@@ -1107,7 +1106,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     budget: room.budget,
     price_tier: room.price_tier || 'comfort',
     keep_furniture: room.keep_furniture !== false,
-    use_catalog: false,
+    use_catalog: room.use_catalog !== false,
     status: room.status,
     error: room.error,
     notice: room.notice || null,
@@ -1129,16 +1128,6 @@ app.get('/api/rooms/:id', h(async (req, res) => {
         featureWall: render.meta.art_direction.featureWall || '',
         lighting: render.meta.art_direction.lighting || '',
         mood: render.meta.art_direction.mood || '',
-        layoutPlan: render.meta.art_direction.layoutPlan || '',
-        framingNote: render.meta.art_direction.framingNote || '',
-        layoutItems: render.meta.art_direction.layoutItems || [],
-      } : null,
-      dimension_qa: render.meta?.dimension_qa ? {
-        accepted: render.meta.dimension_qa.accepted === true,
-        score: render.meta.dimension_qa.score ?? null,
-        quality: render.meta.dimension_qa.quality ?? null,
-        checks: render.meta.dimension_qa.checks || {},
-        issues: render.meta.dimension_qa.issues || [],
       } : null,
       product_qa: render.meta?.product_qa ? {
         status: render.meta.product_qa.status,
