@@ -9,7 +9,7 @@ import { generateGridImage, sliceGrid, drawGridOverlay, checkGridCell } from './
 import { supportsResolution } from './modelcaps.js';
 import { composeCard, drawBboxOverlay } from './searchthumbs.js';
 import { searchWeb, searchImagesByImage, isAllowedDomain } from './yandexsearch.js';
-import { extractPrice, filtersHash, mergeResults } from './searchutil.js';
+import { extractPrice, filtersHash, mergeResults, sortPricedFirst } from './searchutil.js';
 import { enrichSearchResults, withBuyKeyword } from './searchparse.js';
 import { getBuffer, putBuffer } from './storage.js';
 
@@ -460,13 +460,13 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       concurrency: cfg.price_check_concurrency,
     })
     : byDomain;
-  const filtered = checked.filter(r => {
+  const filtered = sortPricedFirst(checked.filter(r => {
     const p = r.price;
     if (p == null) return true;
     if (priceFrom != null && p < priceFrom) return false;
     if (priceTo != null && p > priceTo) return false;
     return true;
-  });
+  }));
 
   await q.clearSearchResults(objectId);
   await q.clearSearchCache(objectId);

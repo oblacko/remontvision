@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { canonicalUrl, extractPrice, filtersHash, mergeResults } = await import('../src/searchutil.js');
+const { canonicalUrl, extractPrice, filtersHash, mergeResults, sortPricedFirst } = await import('../src/searchutil.js');
 
 test('canonicalUrl strips fragment and tracking', () => {
   assert.equal(
@@ -85,4 +85,15 @@ test('extractPrice finds ruble amounts and ignores missing prices', () => {
   assert.equal(extractPrice('Кресло 5 000 руб.'), 5000);
   assert.equal(extractPrice('Цена по запросу'), null);
   assert.equal(extractPrice(''), null);
+});
+
+test('sortPricedFirst moves priced rows to the top stably', () => {
+  const rows = [
+    { id: 1, price: null },
+    { id: 2, price: 12990 },
+    { id: 3, price: null },
+    { id: 4, price: 5490 },
+  ];
+  const sorted = sortPricedFirst(rows);
+  assert.deepEqual(sorted.map(r => r.id), [2, 4, 1, 3]);
 });

@@ -92,3 +92,8 @@ export function mergeResults(textResults = [], visualResults = [], { limit = 30 
 
   return merged;
 }
+
+// Стабильно поднимает строки с ценой наверх, сохраняя порядок внутри групп.
+export function sortPricedFirst(rows = []) {
+  return [...rows].sort((a, b) => Number(a?.price == null) - Number(b?.price == null));
+}

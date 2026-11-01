@@ -633,7 +633,8 @@ export const q = {
        f.checked_at || null,
        f.raw != null ? JSON.stringify(f.raw) : null]).then(r => r.rows[0]),
   searchResultsForObject: objectId =>
-    pool.query(`SELECT * FROM search_results WHERE object_id = $1 ORDER BY match_score DESC NULLS LAST`, [objectId]).then(r => r.rows),
+    pool.query(`SELECT * FROM search_results WHERE object_id = $1
+                ORDER BY (price IS NOT NULL) DESC, match_score DESC NULLS LAST, id`, [objectId]).then(r => r.rows),
   clearSearchResults: objectId =>
     pool.query(`DELETE FROM search_results WHERE object_id = $1`, [objectId]),
   clearSearchCache: objectId =>
