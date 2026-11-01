@@ -58,6 +58,7 @@ type RequestLine = {
   provider: string
   kind: string
   model?: string
+  rate?: 'day' | 'night'
   count: number
   unit_cost_usd: number
   cost_usd: number
@@ -67,7 +68,7 @@ type SearchResponse = {
   cost_usd?: number
   requests?: RequestLine[]
   requests_count?: number
-  request_unit_cost_usd?: number
+  request_rates_usd?: { web: number; image: number; night: boolean }
 }
 
 const labUrl = (path: string | null | undefined) => {
@@ -143,7 +144,7 @@ const readRequests = (value: unknown): RequestLine[] => {
 
 const requestLabel = (request: RequestLine) => {
   const kind = request.kind === 'web_search'
-    ? 'Yandex web'
+    ? `Yandex web${request.rate ? ` (${request.rate === 'night' ? 'ночь' : 'день'})` : ''}`
     : request.kind === 'image_search_by_image'
       ? 'Yandex image'
       : request.kind === 'vision'

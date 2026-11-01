@@ -11,7 +11,9 @@ type SearchConfig = {
   grid_resolution: string; grid_aspect: string
   domains: string[]; region: string; search_limit: number; max_objects: number
   max_run_cost_usd: number; cache_ttl_hours: number; visual_enabled: boolean
-  yandex_request_cost_usd: number
+  yandex_web_cost_usd: number
+  yandex_web_night_cost_usd: number
+  yandex_image_cost_usd: number
 }
 type PromptRow = { id: number; kind: string; version: number; prompt: string; active: boolean }
 type PromptList = { vision: PromptRow[]; grid: PromptRow[]; cell: PromptRow[] }
@@ -370,20 +372,44 @@ export function SearchLab({ api, readJson }: SearchLabProps) {
               />
             </div>
             <div>
-              <label className="eyebrow mb-2 block">Yandex, $ за запрос</label>
+              <label className="eyebrow mb-2 block">Yandex web, $/запрос (день)</label>
               <input
                 type="number"
                 min={0}
                 max={1}
                 step={0.0001}
-                value={config.yandex_request_cost_usd}
-                onChange={e => setConfig({ ...config, yandex_request_cost_usd: Number(e.target.value) })}
+                value={config.yandex_web_cost_usd}
+                onChange={e => setConfig({ ...config, yandex_web_cost_usd: Number(e.target.value) })}
+                className={numberClass}
+              />
+            </div>
+            <div>
+              <label className="eyebrow mb-2 block">Yandex web, $/запрос (ночь)</label>
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.0001}
+                value={config.yandex_web_night_cost_usd}
+                onChange={e => setConfig({ ...config, yandex_web_night_cost_usd: Number(e.target.value) })}
+                className={numberClass}
+              />
+            </div>
+            <div>
+              <label className="eyebrow mb-2 block">Yandex image, $/запрос</label>
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.0001}
+                value={config.yandex_image_cost_usd}
+                onChange={e => setConfig({ ...config, yandex_image_cost_usd: Number(e.target.value) })}
                 className={numberClass}
               />
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Цена запроса Yandex берётся из тарифа; 0 — считать бесплатным (количество запросов всё равно пишется в журнал). Стоимость vision/grid/ячеек берётся из фактического ответа OpenRouter.
+            Тариф Yandex Search API: web-поиск $4/1000 днём и $3/1000 ночью (00:00–07:59 UTC+3), image-поиск $7.5/1000, без НДС. Ошибки и auth-ошибки не тарифицируются. Стоимость vision/grid/ячеек берётся из фактического ответа OpenRouter.
           </p>
 
           <label className="block">

@@ -16,7 +16,10 @@ export const DEFAULT_SEARCH_CONFIG = {
   max_run_cost_usd: 2.0,
   cache_ttl_hours: 24,
   visual_enabled: true,
-  yandex_request_cost_usd: Number(process.env.YANDEX_REQUEST_COST_USD || 0),
+  // Тариф Yandex Search API, USD за один запрос (без НДС). День/ночь — 00:00–07:59 UTC+3.
+  yandex_web_cost_usd: Number(process.env.YANDEX_WEB_COST_USD || 0.004),
+  yandex_web_night_cost_usd: Number(process.env.YANDEX_WEB_NIGHT_COST_USD || 0.003),
+  yandex_image_cost_usd: Number(process.env.YANDEX_IMAGE_COST_USD || 0.0075),
 };
 
 const BOOLEAN_KEYS = ['enabled', 'visual_enabled'];
@@ -97,7 +100,9 @@ export function validateSearchConfig(input = {}, base = DEFAULT_SEARCH_CONFIG) {
   if ('max_objects' in input) out.max_objects = Math.max(1, Math.min(20, Math.round(num(input.max_objects, DEFAULT_SEARCH_CONFIG.max_objects))));
   if ('max_run_cost_usd' in input) out.max_run_cost_usd = Math.max(0.01, Math.min(10, num(input.max_run_cost_usd, DEFAULT_SEARCH_CONFIG.max_run_cost_usd)));
   if ('cache_ttl_hours' in input) out.cache_ttl_hours = Math.max(1, Math.min(168, Math.round(num(input.cache_ttl_hours, DEFAULT_SEARCH_CONFIG.cache_ttl_hours))));
-  if ('yandex_request_cost_usd' in input) out.yandex_request_cost_usd = Math.max(0, Math.min(1, num(input.yandex_request_cost_usd, DEFAULT_SEARCH_CONFIG.yandex_request_cost_usd)));
+  for (const key of ['yandex_web_cost_usd', 'yandex_web_night_cost_usd', 'yandex_image_cost_usd']) {
+    if (key in input) out[key] = Math.max(0, Math.min(1, num(input[key], DEFAULT_SEARCH_CONFIG[key])));
+  }
   return out;
 }
 

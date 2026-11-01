@@ -130,5 +130,5 @@
 - Промты версионируются в `search_prompts` (`searchprompts.js`), активная версия снапшотится в `search_jobs.prompts`.
 - Артефакты: `search-lab/<jobId>-...`, отдаются через `/search-lab/:file` под админом.
 - bbox = `[x,y,w,h]` 0..1. `search_by_image` = `POST /v2/image/search_by_image`; live-проверка на VPS (локально нет `YANDEX_SEARCH_API_KEY`).
-- Учёт запросов: каждый шаг пишет в `search_steps.output.requests` массив `{provider, kind, model, count, unit_cost_usd, cost_usd}` + `requests_count` и `cost_usd`; стоимость vision/grid/ячеек — фактическая из OpenRouter, Yandex — по цене `yandex_request_cost_usd` (env `YANDEX_REQUEST_COST_USD`, задаётся в админке). Сумма поиска добавляется в `search_jobs.cost_usd`.
+- Учёт запросов: каждый шаг пишет в `search_steps.output.requests` массив `{provider, kind, model, rate, count, unit_cost_usd, cost_usd}` + `requests_count` и `cost_usd`; стоимость vision/grid/ячеек — фактическая из OpenRouter, Yandex — по тарифу: web день `$0.004`, ночь `$0.003` (00:00–07:59 UTC+3), image `$0.0075` за запрос (env `YANDEX_WEB_COST_USD`/`YANDEX_WEB_NIGHT_COST_USD`/`YANDEX_IMAGE_COST_USD`, правятся в админке). Сумма поиска добавляется в `search_jobs.cost_usd`.
 - Старый procurement и `/api/renders/:id/procurement` не тронуты; пользовательский запуск нового поиска — отдельная задача.

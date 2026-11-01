@@ -53,10 +53,15 @@ test('rejects resolution not supported by grid model', () => {
   }));
 });
 
-test('normalizes yandex request cost', () => {
-  assert.equal(validateSearchConfig({ yandex_request_cost_usd: -5 }).yandex_request_cost_usd, 0);
-  assert.equal(validateSearchConfig({ yandex_request_cost_usd: 0.001 }).yandex_request_cost_usd, 0.001);
-  assert.equal(validateSearchConfig({ yandex_request_cost_usd: 5 }).yandex_request_cost_usd, 1);
+test('normalizes yandex request costs', () => {
+  const patch = validateSearchConfig({
+    yandex_web_cost_usd: -5,
+    yandex_web_night_cost_usd: 0.003,
+    yandex_image_cost_usd: 5,
+  });
+  assert.equal(patch.yandex_web_cost_usd, 0);
+  assert.equal(patch.yandex_web_night_cost_usd, 0.003);
+  assert.equal(patch.yandex_image_cost_usd, 1);
 });
 
 test('settings key is search.v1', () => {

@@ -374,7 +374,9 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   const source = filters.source || 'both';
   const priceFrom = filters.price_from == null ? null : Number(filters.price_from);
   const priceTo = filters.price_to == null ? null : Number(filters.price_to);
-  const requestUnitCost = Math.max(0, Number(cfg.yandex_request_cost_usd) || 0);
+  const yandexNight = (new Date().getUTCHours() + 3) % 24 < 8;
+  const webUnitCost = Math.max(0, Number(yandexNight ? cfg.yandex_web_night_cost_usd : cfg.yandex_web_cost_usd) || 0);
+  const imageUnitCost = Math.max(0, Number(cfg.yandex_image_cost_usd) || 0);
   const requests = [];
 
   const hash = filtersHash({
@@ -405,9 +407,10 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     requests.push({
       provider: 'yandex',
       kind: 'web_search',
+      rate: yandexNight ? 'night' : 'day',
       count: 1,
-      unit_cost_usd: requestUnitCost,
-      cost_usd: requestUnitCost,
+      unit_cost_usd: webUnitCost,
+      cost_usd: webUnitCost,
       request_id: text.request_id || null,
     });
     textRows = text.results.map(row => ({
@@ -424,8 +427,8 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       provider: 'yandex',
       kind: 'image_search_by_image',
       count: 1,
-      unit_cost_usd: requestUnitCost,
-      cost_usd: requestUnitCost,
+      unit_cost_usd: imageUnitCost,
+      cost_usd: imageUnitCost,
       cbir_id: vis.cbir_id || null,
     });
     visualRows = vis.images.map(img => ({
@@ -485,7 +488,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     cached: false,
     requests,
     requests_count: requests.length,
-    request_unit_cost_usd: requestUnitCost,
+    request_rates_usd: { web: webUnitCost, image: imageUnitCost, night: yandexNight },
     cost_usd: searchCost,
   };
 
@@ -499,7 +502,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     object_id: objectId,
     step: 'search',
     status: 'done',
-    input: { filters, request_unit_cost_usd: requestUnitCost },
+    input: { filters, request_rates_usd: { web: webUnitCost, image: imageUnitCost, night: yandexNight } },
     output: { count: results.length, requests, requests_count: requests.length, cost_usd: searchCost },
     cost_usd: searchCost,
   });

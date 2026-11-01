@@ -13,7 +13,7 @@
 - По умолчанию поиск идёт по всем сайтам; allowlist применяется локально (`isAllowedDomain`) только если пользователь явно добавил домены.
 - Промты зрения/сетки/проверки ячейки версионируются в `search_prompts`; job снапшотит активные версии.
 - v1 без удаления фона: Mode A = кроп → белая карточка 1024²; `@imgly/background-removal` отложен.
-- Каждый шаг сохраняет артефакты в `search-lab/<jobId>-...` и стоимость в `search_steps`. Разбивка по запросам: `output.requests[]` + `requests_count`; OpenRouter — фактическая цена, Yandex — `yandex_request_cost_usd` (env `YANDEX_REQUEST_COST_USD`).
+- Каждый шаг сохраняет артефакты в `search-lab/<jobId>-...` и стоимость в `search_steps`. Разбивка по запросам: `output.requests[]` + `requests_count`; OpenRouter — фактическая цена, Yandex — по тарифу Search API: web `$0.004` днём / `$0.003` ночью (00:00–07:59 UTC+3), image `$0.0075` за запрос (`YANDEX_WEB_COST_USD`/`YANDEX_WEB_NIGHT_COST_USD`/`YANDEX_IMAGE_COST_USD`).
 
 ## Цель
 
