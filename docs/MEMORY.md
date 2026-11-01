@@ -125,7 +125,7 @@
 ## Search Lab (тестовый стенд поиска)
 
 - Админка → вкладка «Поиск (лаб)» (`web/src/components/SearchLab.tsx` + `SearchPipeline.tsx`). Только `x-admin-key`, без кредитов.
-- Пайплайн: vision (`searchvision`) → Mode A кропы (`searchthumbs`) или Mode B сетка FLUX Klein 21:9 (`searchgrid`) → миниатюры 1024² → поиск (`searchservice`): Yandex web + `search_by_image`, merge/dedup, локальный allowlist, кэш.
+- Пайплайн: vision (`searchvision`) → Mode A кропы (`searchthumbs`) или Mode B сетка FLUX Klein 21:9 (`searchgrid`) → миниатюры 1024² → поиск (`searchservice`): Yandex web + `search_by_image`, merge/dedup, allowlist только для явно заданных доменов (пусто = искать везде), кэш.
 - Конфиг `search.v1` в `app_settings` (`searchconfig.js`): модели, aspect, домены, лимиты, TTL. Дефолт grid: `black-forest-labs/flux-3-image-klein`, 1K, 21:9. Vision: `google/gemini-3.1-pro-preview` (env `SEARCH_VISION_MODEL`).
 - Промты версионируются в `search_prompts` (`searchprompts.js`), активная версия снапшотится в `search_jobs.prompts`.
 - Артефакты: `search-lab/<jobId>-...`, отдаются через `/search-lab/:file` под админом.

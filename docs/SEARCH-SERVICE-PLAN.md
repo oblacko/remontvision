@@ -10,7 +10,7 @@
 - Visual search: `POST /v2/image/search_by_image` (не `search-images-by-pic`); live-проверка отложена — локально нет `YANDEX_SEARCH_API_KEY`.
 - Grid: FLUX `black-forest-labs/flux-3-image-klein`, `1K`, aspect `21:9` (5:2 не поддерживается), нарезка 2×5.
 - bbox: `[x, y, w, h]`, нормированные 0..1 (совместимо с `cropReference`).
-- Поиск идёт по всем сайтам; allowlist доменов применяется локально (`isAllowedDomain`).
+- По умолчанию поиск идёт по всем сайтам; allowlist применяется локально (`isAllowedDomain`) только если пользователь явно добавил домены.
 - Промты зрения/сетки/проверки ячейки версионируются в `search_prompts`; job снапшотит активные версии.
 - v1 без удаления фона: Mode A = кроп → белая карточка 1024²; `@imgly/background-removal` отложен.
 - Каждый шаг сохраняет артефакты в `search-lab/<jobId>-...` и стоимость в `search_steps`.

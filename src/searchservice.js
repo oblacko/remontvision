@@ -328,9 +328,10 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   const cfg = job.config || getSearchConfig();
 
   const query = String(filters.query || object.search_query || object.label || '').trim();
-  const domains = Array.isArray(filters.domains) && filters.domains.length
-    ? filters.domains.map(String)
-    : cfg.domains;
+  // Пустой список доменов = искать везде; allowlist применяется только если домены заданы явно.
+  const domains = Array.isArray(filters.domains)
+    ? filters.domains.map(d => String(d).toLowerCase().trim()).filter(Boolean)
+    : [];
   const region = String(filters.region || cfg.region || '213');
   const period = filters.period || 'all';
   const sort = filters.sort || 'relevance';
@@ -385,7 +386,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
 
   const merged = mergeResults(textRows, visualRows, { limit: cfg.search_limit });
   const filtered = merged
-    .filter(r => isAllowedDomain(r.url, domains))
+    .filter(r => domains.length === 0 || isAllowedDomain(r.url, domains))
     .filter(r => {
       const p = r.price;
       if (p == null) return true;

@@ -754,7 +754,7 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                   <span className="text-xs font-medium text-muted-foreground">Домены</span>
                   <div className="flex flex-wrap gap-1.5">
                     {filters.domains.length === 0 && (
-                      <span className="text-xs text-muted-foreground">Все домены</span>
+                      <span className="text-xs text-muted-foreground">Все домены (поиск везде)</span>
                     )}
                     {filters.domains.map(domain => (
                       <span
