@@ -110,7 +110,8 @@ export async function processVisionStep(jobId) {
 
   const { buffer, mime } = await readJobImage(job);
   const cfg = job.config || getSearchConfig();
-  const prompt = (job.prompts?.vision?.prompt) || getActivePrompt('vision').prompt;
+  const activeVision = getActivePrompt('vision');
+  const prompt = activeVision?.prompt || job.prompts?.vision?.prompt;
   const vision = await parseSearchImage(buffer.toString('base64'), mime, {
     model: cfg.vision_model,
     prompt,
@@ -155,7 +156,7 @@ export async function processVisionStep(jobId) {
     stage: 'vision',
     photo_quality: vision.photo_quality,
     vision_raw: vision.raw,
-    prompts: job.prompts,
+    prompts: { ...(job.prompts || {}), vision: activeVision },
     cost_usd: (Number(job.cost_usd) || 0) + cost,
     finished_at: new Date().toISOString(),
   });
@@ -217,7 +218,9 @@ export async function processGridStep(jobId) {
   if (!job) throw new Error('Поиск не найден');
   const objects = await q.searchObjectsForJob(jobId);
   const cfg = job.config || getSearchConfig();
-  const prompt = job.prompts?.grid?.prompt;
+  const activeGrid = getActivePrompt('grid');
+  const activeCell = getActivePrompt('cell');
+  const prompt = activeGrid?.prompt || job.prompts?.grid?.prompt;
 
   const grid = await generateGridImage(
     objects.map(o => ({
@@ -263,7 +266,7 @@ export async function processGridStep(jobId) {
     await putArtifact(cellKey, cell.buffer, 'image/jpeg');
 
     const check = await checkGridCell(cell.buffer, obj?.label || '', {
-      prompt: job.prompts?.cell?.prompt,
+      prompt: activeCell?.prompt || job.prompts?.cell?.prompt,
       model: cfg.vision_model,
     });
     cost += Number(check.cost) || 0;
@@ -295,6 +298,7 @@ export async function processGridStep(jobId) {
     status: 'done',
     stage: 'grid',
     mode: 'B',
+    prompts: { ...(job.prompts || {}), grid: activeGrid, cell: activeCell },
     cost_usd: (Number(job.cost_usd) || 0) + cost,
     finished_at: new Date().toISOString(),
   });
