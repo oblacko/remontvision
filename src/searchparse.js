@@ -65,7 +65,9 @@ export async function enrichSearchResults(results, { limit = 6, concurrency = 3 
           price,
           currency: page.currency || row.currency || 'RUB',
           availability: availability.status,
-          price_source: page.price == null ? 'snippet' : 'jsonld',
+          price_source: page.price == null
+            ? (row.price == null ? null : 'snippet')
+            : (page.price_source || 'jsonld'),
           checked_at: checkedAt(),
         },
       };

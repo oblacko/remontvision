@@ -117,6 +117,35 @@ function meta(html, key) {
   return '';
 }
 
+function microdata(html, prop) {
+  const patterns = [
+    new RegExp(`itemprop=["']${prop}["'][^>]*(?:content|href)=["']([^"']+)["']`, 'i'),
+    new RegExp(`(?:content|href)=["']([^"']+)["'][^>]*itemprop=["']${prop}["']`, 'i'),
+  ];
+  for (const re of patterns) { const m = html.match(re); if (m) return decode(m[1]); }
+  return '';
+}
+
+function pageText(html) {
+  return decode(String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' '));
+}
+
+function priceFromText(html) {
+  const text = pageText(html);
+  const m = text.match(/(?:цена|стоимость)[^\d]{0,40}(\d[\d\s]{2,})\s*(?:₽|руб)/i);
+  return m ? m[1] : '';
+}
+
+function availabilityFromText(html) {
+  const text = pageText(html);
+  if (/нет в наличии|нет в продаже|распродано|закончился/i.test(text)) return 'OutOfStock';
+  if (/под заказ|предзаказ|ожидается/i.test(text)) return 'PreOrder';
+  if (/в наличии|есть в наличии/i.test(text)) return 'InStock';
+  return '';
+}
+
 function jsonLd(html) {
   const out = [];
   const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -327,15 +356,33 @@ export function parseProductHtml(html, pageUrl = '') {
   const description = decode(ld?.description || meta(html, 'og:description') || meta(html, 'description') || '');
   const imageRaw = firstImage(ld?.image) || meta(html, 'og:image') || meta(html, 'twitter:image');
   const imageUrl = imageRaw ? new URL(imageRaw, pageUrl || undefined).toString() : '';
-  const price = parsePrice(offers?.price ?? offers?.lowPrice ?? offers?.priceSpecification?.price ?? meta(html, 'product:price:amount') ?? meta(html, 'og:price:amount'));
+  const jsonLdPrice = offers?.price ?? offers?.lowPrice ?? offers?.priceSpecification?.price;
+  const metaPrice = meta(html, 'product:price:amount') || meta(html, 'og:price:amount') || meta(html, 'product:price');
+  const microPrice = microdata(html, 'price');
+  const textPrice = priceFromText(html);
+  let priceValue = jsonLdPrice;
+  let priceSource = priceValue != null ? 'jsonld' : null;
+  if (priceValue == null && metaPrice) { priceValue = metaPrice; priceSource = 'meta'; }
+  if (priceValue == null && microPrice) { priceValue = microPrice; priceSource = 'microdata'; }
+  if (priceValue == null && textPrice) { priceValue = textPrice; priceSource = 'text'; }
+  const price = parsePrice(priceValue);
+  if (!price) priceSource = null;
   const currency = String(offers?.priceCurrency || meta(html, 'product:price:currency') || 'RUB').toUpperCase();
-  const availability = String(offers?.availability || ld?.offers?.availability || '');
+  const availability = String(
+    offers?.availability ||
+    ld?.offers?.availability ||
+    meta(html, 'product:availability') ||
+    meta(html, 'og:availability') ||
+    microdata(html, 'availability') ||
+    availabilityFromText(html)
+  );
   const dimensions = extractDimensions(html, ld, description);
   return {
     name: title.replace(/\s*[|—–-]\s*(купить|интернет-магазин|официальный сайт|catalog|каталог).*$/i, '').trim().slice(0, 200),
     brand: String(brand || '').slice(0, 80),
     description: description.slice(0, 1200),
     price,
+    price_source: priceSource,
     currency,
     image_url: imageUrl,
     source_url: pageUrl,
@@ -372,6 +419,7 @@ export async function inspectProductUrl(rawUrl, { timeoutMs = 25_000 } = {}) {
     brand: data.brand,
     description: data.description,
     price: data.price,
+    price_source: data.price_source,
     currency: data.currency,
     category,
     image_url: data.image_url,

@@ -60,3 +60,26 @@ test('infers category and price tier', () => {
   assert.equal(inferTier('sofa', 180000), 'premium');
   assert.equal(inferTier('sofa', 300000), 'atelier');
 });
+
+test('falls back to microdata price and availability', () => {
+  const p = parseProductHtml(`<html><body><div itemscope itemtype="https://schema.org/Product">
+    <span itemprop="name">Кресло</span>
+    <span itemprop="price" content="54990">54 990 ₽</span>
+    <link itemprop="availability" href="https://schema.org/OutOfStock">
+    </div></body></html>`, 'https://x.test/p');
+  assert.equal(p.price, 54990);
+  assert.equal(p.price_source, 'microdata');
+  assert.equal(p.availability, 'https://schema.org/OutOfStock');
+});
+
+test('falls back to text price and availability', () => {
+  const p = parseProductHtml('<html><body><div>Цена: 12 990 ₽</div><div>Нет в наличии</div></body></html>', 'https://x.test/p');
+  assert.equal(p.price, 12990);
+  assert.equal(p.price_source, 'text');
+  assert.equal(p.availability, 'OutOfStock');
+});
+
+test('keeps jsonld price source', () => {
+  const p = parseProductHtml(HTML, 'https://shop.example.com/sofa');
+  assert.equal(p.price_source, 'jsonld');
+});
