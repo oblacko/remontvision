@@ -577,8 +577,19 @@ export const q = {
       .then(r => r.rows[0] || null);
   },
   listSearchJobs: (limit = 50) =>
-    pool.query(`SELECT id, source, mode, status, error, cost_usd, created_at, finished_at
+    pool.query(`SELECT id, source, mode, status, error, cost_usd, created_at, started_at, finished_at
                 FROM search_jobs ORDER BY created_at DESC LIMIT $1`, [limit]).then(r => r.rows),
+  claimNextSearchJob: () =>
+    pool.query(`UPDATE search_jobs SET status = 'processing', started_at = now()
+                WHERE id = (SELECT id FROM search_jobs WHERE status = 'queued'
+                            ORDER BY created_at LIMIT 1)
+                RETURNING *`).then(r => r.rows[0] || null),
+  requeueProcessingSearchJobs: () =>
+    pool.query(`UPDATE search_jobs SET status = 'queued' WHERE status = 'processing'`)
+      .then(r => r.rowCount),
+  searchStepsForJob: jobId =>
+    pool.query(`SELECT * FROM search_steps WHERE job_id = $1 ORDER BY created_at`, [jobId])
+      .then(r => r.rows),
   createSearchObject: f =>
     pool.query(`INSERT INTO search_objects (job_id, idx, category, label, description, color, material, style, hex, size, search_query, bbox, confidence, visibility, status)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
