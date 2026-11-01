@@ -451,6 +451,22 @@ export function mapResult(row) {
   };
 }
 
+export async function searchResultsDto(objectId) {
+  const rows = await q.searchResultsForObject(objectId);
+  return rows.map(row => ({
+    id: row.id,
+    source: row.source,
+    store: row.store,
+    url: row.canonical_url,
+    title: row.title,
+    image_url: row.image_url,
+    price: row.price == null ? null : Number(row.price),
+    currency: row.currency,
+    match_score: row.match_score == null ? null : Number(row.match_score),
+    checked_at: row.checked_at,
+  }));
+}
+
 export async function searchJobDto(jobId) {
   const job = await q.getSearchJob(jobId);
   if (!job) return null;
