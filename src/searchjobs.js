@@ -30,10 +30,10 @@ export function startSearchWorker() {
 
   setInterval(async () => {
     if (running >= 1) return;
+    running++;
     try {
       const row = await q.claimNextSearchJob();
       if (!row) return;
-      running++;
       try {
         await processVisionStep(row.id);
       } catch (e) {
@@ -43,11 +43,11 @@ export function startSearchWorker() {
           finished_at: new Date().toISOString(),
         });
         log({ event: 'search_job_error', job_id: row.id, error: String(e.message || e).slice(0, 300) });
-      } finally {
-        running--;
       }
     } catch (e) {
       log({ event: 'search_worker_error', error: String(e.message || e).slice(0, 300) });
+    } finally {
+      running--;
     }
   }, 2000);
 

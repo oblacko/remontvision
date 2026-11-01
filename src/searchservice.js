@@ -245,7 +245,9 @@ export async function processGridStep(jobId) {
 
   const cells = await sliceGrid(gridBuffer);
   let cost = Number(grid.cost) || 0;
-  const cap = cfg.max_run_cost_usd == null ? Infinity : Number(cfg.max_run_cost_usd);
+  const cap = cfg.max_run_cost_usd == null
+    ? Infinity
+    : Math.max(0, Number(cfg.max_run_cost_usd) - Number(job.cost_usd || 0));
   const cellOutput = [];
   const processed = new Set();
   for (const cell of cells) {
@@ -384,6 +386,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     });
 
   await q.clearSearchResults(objectId);
+  await q.clearSearchCache(objectId);
   const results = [];
   for (const row of filtered) {
     const saved = await q.upsertSearchResult({

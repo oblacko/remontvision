@@ -634,6 +634,8 @@ export const q = {
     pool.query(`SELECT * FROM search_results WHERE object_id = $1 ORDER BY match_score DESC NULLS LAST`, [objectId]).then(r => r.rows),
   clearSearchResults: objectId =>
     pool.query(`DELETE FROM search_results WHERE object_id = $1`, [objectId]),
+  clearSearchCache: objectId =>
+    pool.query(`DELETE FROM search_cache WHERE object_id = $1`, [objectId]),
   logSearchStep: f =>
     pool.query(`INSERT INTO search_steps (job_id, object_id, step, status, input, output, prompt, cost_usd, error)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
