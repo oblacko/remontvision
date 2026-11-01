@@ -12,7 +12,7 @@ export const DEFAULT_SEARCH_CONFIG = {
   domains: [...DEFAULT_PROCUREMENT_DOMAINS],
   region: '213',
   search_limit: 30,
-  max_objects: 10,
+  max_objects: 12,
   max_run_cost_usd: 2.0,
   cache_ttl_hours: 24,
   visual_enabled: true,

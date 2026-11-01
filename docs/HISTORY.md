@@ -12,10 +12,11 @@
 - Учёт стоимости по запросам: `search_steps.output.requests` хранит `{provider, kind, model, rate, count, unit_cost_usd, cost_usd}` и `requests_count`; vision/grid/ячейки — фактическая цена OpenRouter, Yandex — по тарифу Search API: web `$0.004` днём / `$0.003` ночью (00:00–07:59 UTC+3), image `$0.0075` за запрос, настраивается через `YANDEX_WEB_COST_USD`/`YANDEX_WEB_NIGHT_COST_USD`/`YANDEX_IMAGE_COST_USD`. Сумма поиска входит в `search_jobs.cost_usd`; UI показывает разбивку в журнале шагов и под результатами.
 - Новые модули: `searchconfig`, `searchprompts`, `searchutil`, `searchvision`, `searchgrid`, `searchthumbs`, `searchservice`, `searchjobs`; миграция `031_search.sql`. Старый procurement и `/api/renders/:id/procurement` не тронуты.
 - Mode A: bbox расширяется на 10% перед кропом, чтобы предмет не обрезался в край; карточки объектов в UI компактные, по 6 в ряд.
+- Vision теперь обязательно добавляет отделку: стены (`wall_covering` — панорамные обои/фотообои/обои/краска) и пол (`floor_covering` — ламинат/инженерная доска/паркет/керамогранит/винил/ковролин), до 12 позиций. Новая версия промта — миграция `033`.
 - Текстовый поиск дополняется ключом «купить» (`search.v1.buy_keyword`), иначе Яндекс отдаёт галереи вместо карточек.
 - Парсер карточек `src/searchparse.js`: для топ-N товарных URL загружает HTML (SSRF-safe) и достаёт цену/наличие из JSON-LD, OpenGraph, микроразметки или текста; в `search_results` добавлены `availability` и `price_source` (миграция `032`), в UI — бейдж наличия.
 - Ограничения v1: без удаления фона; visual search ищет без `site` и фильтруется локально; live-проверка `search_by_image` отложена до VPS (локально нет ключей).
-- Тестов 105; `npm test`, `tsc -b`, `vite build` зелёные. `npm run lint` сохраняет прежние ошибки `ui/*`/`Admin.tsx`.
+- Тестов 107; `npm test`, `tsc -b`, `vite build` зелёные. `npm run lint` сохраняет прежние ошибки `ui/*`/`Admin.tsx`.
 
 ## 2026-10-30 — себестоимость генерации, полноэкранный кабинет и дедупликация стилей
 

@@ -15,6 +15,7 @@
 - v1 без удаления фона: Mode A = кроп с отступом 10% → белая карточка 1024²; `@imgly/background-removal` отложен.
 - Текстовый запрос дополняется ключом «купить» (`buy_keyword`), иначе Яндекс отдаёт галереи.
 - Цена и наличие уточняются парсером карточек (`searchparse.js`) для топ-N товарных URL; в `search_results` — `availability`/`price_source` (миграция `032`).
+- Vision обязательно включает отделку: стены (`wall_covering` — панорамные обои/фотообои/обои/краска) и пол (`floor_covering` — ламинат/паркет/керамогранит/винил/ковролин), до 12 позиций; новая версия промта — миграция `033`.
 - Каждый шаг сохраняет артефакты в `search-lab/<jobId>-...` и стоимость в `search_steps`. Разбивка по запросам: `output.requests[]` + `requests_count`; OpenRouter — фактическая цена, Yandex — по тарифу Search API: web `$0.004` днём / `$0.003` ночью (00:00–07:59 UTC+3), image `$0.0075` за запрос (`YANDEX_WEB_COST_USD`/`YANDEX_WEB_NIGHT_COST_USD`/`YANDEX_IMAGE_COST_USD`).
 
 ## Цель

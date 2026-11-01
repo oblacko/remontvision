@@ -127,6 +127,7 @@
 - Админка → вкладка «Поиск (лаб)» (`web/src/components/SearchLab.tsx` + `SearchPipeline.tsx`). Только `x-admin-key`, без кредитов.
 - Пайплайн: vision (`searchvision`) → Mode A кропы (`searchthumbs`) или Mode B сетка FLUX Klein 21:9 (`searchgrid`) → миниатюры 1024² → поиск (`searchservice`): Yandex web + `search_by_image`, merge/dedup, allowlist только для явно заданных доменов (пусто = искать везде), кэш.
 - Mode A режет bbox с отступом 10% с каждой стороны; карточки объектов в UI — по 6 в ряд.
+- Vision по умолчанию ищет до 12 позиций и обязательно добавляет отделку: стены (`wall_covering`: панорамные обои/фотообои/обои/краска) и пол (`floor_covering`: ламинат/инженерная доска/паркет/керамогранит/винил/ковролин). Промт обновлён миграцией `033` (новая версия vision).
 - Текстовый запрос дополняется ключом `buy_keyword` (по умолчанию «купить»), иначе Яндекс отдаёт галереи картинок.
 - Парсер карточек (`searchparse.js`): для топ-N товарных URL тянет HTML (SSRF-safe) и достаёт цену/наличие из JSON-LD/OG; статусы `in_stock/out_of_stock/preorder/unknown`, цена с источником (`jsonld`/`snippet`), `checked_at`. Колонки `search_results.availability`, `price_source` (миграция `032`).
 - Конфиг `search.v1` в `app_settings` (`searchconfig.js`): модели, aspect, домены, лимиты, TTL. Дефолт grid: `black-forest-labs/flux-3-image-klein`, 1K, 21:9. Vision: `google/gemini-3.1-pro-preview` (env `SEARCH_VISION_MODEL`).

@@ -19,7 +19,11 @@ export const DEFAULT_VISION_PROMPT = `Ты — аналитик интерьер
   }]
 }
 Правила:
-- Отметь до 10 ключевых предметов, которые реально можно купить: мебель, свет, текстиль, декор, отделка.
+- Отметь до 12 ключевых позиций, которые реально можно купить: мебель, свет, текстиль, декор, отделка стен и пола.
+- Обязательно добавь отделку, если она видна:
+  - стены: category "wall_covering"; label по факту — "Панорамные обои", "Фотообои", "Обои" или "Краска для стен"; в description — узор/мотив/цвет; в search_query — тип, узор и цвет.
+  - пол: category "floor_covering"; label по факту — "Ламинат", "Инженерная доска", "Паркет", "Керамогранит", "Винил" или "Ковролин"; в description — материал, цвет и рисунок; в search_query — тип, материал и цвет.
+- Для стены bbox — видимая площадь стены, для пола — видимая площадь пола. Если поверхность не видна или неясна — не добавляй.
 - bbox — нормализованные координаты [x, y, w, h] от 0 до 1 относительно всего кадра; если предмет не видно, null.
 - Без брендов, цен и выдуманных артикулов.
 - Описывай видимые материал, цвет и форму; для кровати не путай бельё с каркасом, для светильника — плафон и подвес.
@@ -45,7 +49,7 @@ function trimmed(value, max) {
   return String(value ?? '').trim().slice(0, max);
 }
 
-export function normalizeSearchVision(raw, { maxObjects = 10 } = {}) {
+export function normalizeSearchVision(raw, { maxObjects = 12 } = {}) {
   const source = raw && typeof raw === 'object' ? raw : {};
   const quality = source.photo_quality && typeof source.photo_quality === 'object'
     ? source.photo_quality
@@ -106,7 +110,7 @@ export async function parseSearchImage(imageB64, mime = 'image/png', {
   model = null,
   prompt = null,
   roomType = '',
-  maxObjects = 10,
+  maxObjects = 12,
 } = {}) {
   if (!imageB64 || !String(imageB64).trim()) {
     throw new Error('Нет изображения для анализа');

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { normalizeSearchVision } = await import('../src/searchvision.js');
+const { DEFAULT_VISION_PROMPT, normalizeSearchVision } = await import('../src/searchvision.js');
 
 test('returns defaults for non-object input', () => {
   assert.deepEqual(normalizeSearchVision(null), {
@@ -57,6 +57,24 @@ test('keeps size attribute', () => {
     objects: [{ label: 'Кровать', search_query: 'кровать 160', size: ' 160×200 ' }],
   });
   assert.equal(out.objects[0].size, '160×200');
+});
+
+test('prompt asks for wall and floor coverings', () => {
+  assert.match(DEFAULT_VISION_PROMPT, /wall_covering/);
+  assert.match(DEFAULT_VISION_PROMPT, /floor_covering/);
+  assert.match(DEFAULT_VISION_PROMPT, /Панорамные обои/);
+  assert.match(DEFAULT_VISION_PROMPT, /Ламинат/);
+});
+
+test('keeps wall and floor categories', () => {
+  const out = normalizeSearchVision({
+    objects: [
+      { category: 'wall_covering', label: 'Панорамные обои', search_query: 'панорамные обои лес' },
+      { category: 'floor_covering', label: 'Ламинат', search_query: 'ламинат дуб светлый' },
+    ],
+  });
+  assert.equal(out.objects[0].category, 'wall_covering');
+  assert.equal(out.objects[1].category, 'floor_covering');
 });
 
 test('coerces hex to #RRGGBB or null', () => {
