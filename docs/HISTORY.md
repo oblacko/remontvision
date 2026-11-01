@@ -9,9 +9,10 @@
 - Добавлена админская вкладка «Поиск (лаб)»: загрузка фото или выбор рендера → vision-разбор до 10 объектов с bbox → оверлей «что видит зрение» → режим A (кроп по bbox) или режим B (FLUX 3 Klein, сетка 21:9 2×5, нарезка, vision-проверка ячеек) → миниатюры 1024² на белом фоне с описанием из зрения.
 - Поиск по объекту: текстовый Yandex Search API + `POST /v2/image/search_by_image`; слияние и дедуп по canonical URL; локальная фильтрация по заданным доменам (пусто = искать везде); фильтры цены, региона, периода, сортировки, источника; кэш 24 ч.
 - Промты зрения/сетки/проверки ячейки хранятся версиями в `search_prompts`; job снапшотит активные версии. Артефакты шагов и стоимость — в `search-lab/...` и `search_steps`.
+- Учёт стоимости по запросам: `search_steps.output.requests` хранит `{provider, kind, model, count, unit_cost_usd, cost_usd}` и `requests_count`; vision/grid/ячейки — фактическая цена OpenRouter, Yandex — по настраиваемой `yandex_request_cost_usd` (env `YANDEX_REQUEST_COST_USD`). Сумма поиска входит в `search_jobs.cost_usd`; UI показывает разбивку в журнале шагов и под результатами.
 - Новые модули: `searchconfig`, `searchprompts`, `searchutil`, `searchvision`, `searchgrid`, `searchthumbs`, `searchservice`, `searchjobs`; миграция `031_search.sql`. Старый procurement и `/api/renders/:id/procurement` не тронуты.
 - Ограничения v1: без удаления фона; visual search ищет без `site` и фильтруется локально; live-проверка `search_by_image` отложена до VPS (локально нет ключей).
-- Тестов 91; `npm test`, `tsc -b`, `vite build` зелёные. `npm run lint` сохраняет прежние ошибки `ui/*`/`Admin.tsx`.
+- Тестов 97; `npm test`, `tsc -b`, `vite build` зелёные. `npm run lint` сохраняет прежние ошибки `ui/*`/`Admin.tsx`.
 
 ## 2026-10-30 — себестоимость генерации, полноэкранный кабинет и дедупликация стилей
 

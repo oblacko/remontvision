@@ -166,7 +166,15 @@ export async function processVisionStep(jobId) {
     step: 'vision',
     status: 'done',
     input: { mime },
-    output: { overlay_path: overlayKey, objects_count: vision.objects.length },
+    output: {
+      overlay_path: overlayKey,
+      objects_count: vision.objects.length,
+      requests: [
+        { provider: 'openrouter', kind: 'vision', model: cfg.vision_model, count: 1, unit_cost_usd: cost, cost_usd: cost },
+      ],
+      requests_count: 1,
+      cost_usd: cost,
+    },
     prompt,
     cost_usd: cost,
   });
@@ -213,7 +221,13 @@ export async function processCropsStep(jobId) {
     mode: 'A',
     finished_at: new Date().toISOString(),
   });
-  await q.logSearchStep({ job_id: jobId, step: 'crops', status: 'done', output: { crops } });
+  await q.logSearchStep({
+    job_id: jobId,
+    step: 'crops',
+    status: 'done',
+    output: { crops, requests: [], requests_count: 0, cost_usd: 0 },
+    cost_usd: 0,
+  });
 
   return searchJobDto(jobId);
 }
@@ -251,7 +265,10 @@ export async function processGridStep(jobId) {
   await putArtifact(overlayKey, overlay, 'image/png');
 
   const cells = await sliceGrid(gridBuffer);
-  let cost = Number(grid.cost) || 0;
+  const gridCost = Number(grid.cost) || 0;
+  let cost = gridCost;
+  let cellChecks = 0;
+  let cellCost = 0;
   const cap = cfg.max_run_cost_usd == null
     ? Infinity
     : Math.max(0, Number(cfg.max_run_cost_usd) - Number(job.cost_usd || 0));
@@ -274,6 +291,8 @@ export async function processGridStep(jobId) {
       prompt: activeCell?.prompt || job.prompts?.cell?.prompt,
       model: cfg.vision_model,
     });
+    cellChecks += 1;
+    cellCost += Number(check.cost) || 0;
     cost += Number(check.cost) || 0;
 
     const card = await composeCard(cell.buffer);
@@ -311,7 +330,24 @@ export async function processGridStep(jobId) {
     job_id: jobId,
     step: 'grid',
     status: 'done',
-    output: { grid_path: gridKey, grid_overlay_path: overlayKey, cells: cellOutput },
+    output: {
+      grid_path: gridKey,
+      grid_overlay_path: overlayKey,
+      cells: cellOutput,
+      requests: [
+        { provider: 'openrouter', kind: 'grid_image', model: cfg.grid_model, count: 1, unit_cost_usd: gridCost, cost_usd: gridCost },
+        {
+          provider: 'openrouter',
+          kind: 'cell_check',
+          model: cfg.vision_model,
+          count: cellChecks,
+          unit_cost_usd: cellChecks > 0 ? cellCost / cellChecks : 0,
+          cost_usd: cellCost,
+        },
+      ],
+      requests_count: 1 + cellChecks,
+      cost_usd: cost,
+    },
     prompt,
     cost_usd: cost,
   });
@@ -338,6 +374,8 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   const source = filters.source || 'both';
   const priceFrom = filters.price_from == null ? null : Number(filters.price_from);
   const priceTo = filters.price_to == null ? null : Number(filters.price_to);
+  const requestUnitCost = Math.max(0, Number(cfg.yandex_request_cost_usd) || 0);
+  const requests = [];
 
   const hash = filtersHash({
     query,
@@ -352,7 +390,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
 
   if (!filters.force) {
     const cached = await q.getSearchCache(objectId, hash);
-    if (cached) return { ...cached.payload, cached: true };
+    if (cached) return { ...cached.payload, cached: true, cost_usd: 0, requests: [], requests_count: 0 };
   }
 
   let textRows = [];
@@ -364,6 +402,14 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       period: PERIOD[period] || PERIOD.all,
       sortMode: SORT[sort] || SORT.relevance,
     });
+    requests.push({
+      provider: 'yandex',
+      kind: 'web_search',
+      count: 1,
+      unit_cost_usd: requestUnitCost,
+      cost_usd: requestUnitCost,
+      request_id: text.request_id || null,
+    });
     textRows = text.results.map(row => ({
       ...row,
       price: extractPrice(`${row.title || ''} ${row.snippet || ''}`),
@@ -374,6 +420,14 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   if (cfg.visual_enabled && source !== 'text' && object.thumbnail_path) {
     const thumb = await getBuffer(object.thumbnail_path);
     const vis = await searchImagesByImage({ imageB64: thumb.toString('base64') });
+    requests.push({
+      provider: 'yandex',
+      kind: 'image_search_by_image',
+      count: 1,
+      unit_cost_usd: requestUnitCost,
+      cost_usd: requestUnitCost,
+      cbir_id: vis.cbir_id || null,
+    });
     visualRows = vis.images.map(img => ({
       url: img.pageUrl || img.url,
       title: img.pageTitle || '',
@@ -383,6 +437,8 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       raw: img,
     }));
   }
+
+  const searchCost = requests.reduce((sum, item) => sum + (Number(item.cost_usd) || 0), 0);
 
   const merged = mergeResults(textRows, visualRows, { limit: cfg.search_limit });
   const filtered = merged
@@ -427,20 +483,25 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     },
     results,
     cached: false,
+    requests,
+    requests_count: requests.length,
+    request_unit_cost_usd: requestUnitCost,
+    cost_usd: searchCost,
   };
 
   if (results.length > 0) {
     await q.setSearchCache(objectId, hash, payload, cfg.cache_ttl_hours);
   }
 
+  await q.updateSearchJob(jobId, { cost_usd: (Number(job.cost_usd) || 0) + searchCost });
   await q.logSearchStep({
     job_id: jobId,
     object_id: objectId,
     step: 'search',
     status: 'done',
-    input: { filters },
-    output: { count: results.length },
-    cost_usd: null,
+    input: { filters, request_unit_cost_usd: requestUnitCost },
+    output: { count: results.length, requests, requests_count: requests.length, cost_usd: searchCost },
+    cost_usd: searchCost,
   });
 
   return payload;

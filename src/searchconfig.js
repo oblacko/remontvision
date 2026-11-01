@@ -16,6 +16,7 @@ export const DEFAULT_SEARCH_CONFIG = {
   max_run_cost_usd: 2.0,
   cache_ttl_hours: 24,
   visual_enabled: true,
+  yandex_request_cost_usd: Number(process.env.YANDEX_REQUEST_COST_USD || 0),
 };
 
 const BOOLEAN_KEYS = ['enabled', 'visual_enabled'];
@@ -96,6 +97,7 @@ export function validateSearchConfig(input = {}, base = DEFAULT_SEARCH_CONFIG) {
   if ('max_objects' in input) out.max_objects = Math.max(1, Math.min(20, Math.round(num(input.max_objects, DEFAULT_SEARCH_CONFIG.max_objects))));
   if ('max_run_cost_usd' in input) out.max_run_cost_usd = Math.max(0.01, Math.min(10, num(input.max_run_cost_usd, DEFAULT_SEARCH_CONFIG.max_run_cost_usd)));
   if ('cache_ttl_hours' in input) out.cache_ttl_hours = Math.max(1, Math.min(168, Math.round(num(input.cache_ttl_hours, DEFAULT_SEARCH_CONFIG.cache_ttl_hours))));
+  if ('yandex_request_cost_usd' in input) out.yandex_request_cost_usd = Math.max(0, Math.min(1, num(input.yandex_request_cost_usd, DEFAULT_SEARCH_CONFIG.yandex_request_cost_usd)));
   return out;
 }
 

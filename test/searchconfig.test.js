@@ -53,6 +53,12 @@ test('rejects resolution not supported by grid model', () => {
   }));
 });
 
+test('normalizes yandex request cost', () => {
+  assert.equal(validateSearchConfig({ yandex_request_cost_usd: -5 }).yandex_request_cost_usd, 0);
+  assert.equal(validateSearchConfig({ yandex_request_cost_usd: 0.001 }).yandex_request_cost_usd, 0.001);
+  assert.equal(validateSearchConfig({ yandex_request_cost_usd: 5 }).yandex_request_cost_usd, 1);
+});
+
 test('settings key is search.v1', () => {
   assert.equal(SEARCH_SETTINGS_KEY, 'search.v1');
 });

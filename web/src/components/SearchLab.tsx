@@ -11,6 +11,7 @@ type SearchConfig = {
   grid_resolution: string; grid_aspect: string
   domains: string[]; region: string; search_limit: number; max_objects: number
   max_run_cost_usd: number; cache_ttl_hours: number; visual_enabled: boolean
+  yandex_request_cost_usd: number
 }
 type PromptRow = { id: number; kind: string; version: number; prompt: string; active: boolean }
 type PromptList = { vision: PromptRow[]; grid: PromptRow[]; cell: PromptRow[] }
@@ -368,7 +369,22 @@ export function SearchLab({ api, readJson }: SearchLabProps) {
                 className={numberClass}
               />
             </div>
+            <div>
+              <label className="eyebrow mb-2 block">Yandex, $ за запрос</label>
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.0001}
+                value={config.yandex_request_cost_usd}
+                onChange={e => setConfig({ ...config, yandex_request_cost_usd: Number(e.target.value) })}
+                className={numberClass}
+              />
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Цена запроса Yandex берётся из тарифа; 0 — считать бесплатным (количество запросов всё равно пишется в журнал). Стоимость vision/grid/ячеек берётся из фактического ответа OpenRouter.
+          </p>
 
           <label className="block">
             <span className="eyebrow mb-2 block">Домены (через запятую)</span>

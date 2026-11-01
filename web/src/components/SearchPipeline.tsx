@@ -54,6 +54,21 @@ type ObjectFilters = {
   region: string; period: 'all' | 'day' | '2weeks' | 'month'
   sort: 'relevance' | 'time'; source: 'both' | 'text' | 'visual'
 }
+type RequestLine = {
+  provider: string
+  kind: string
+  model?: string
+  count: number
+  unit_cost_usd: number
+  cost_usd: number
+}
+type SearchResponse = {
+  results: SearchResult[]
+  cost_usd?: number
+  requests?: RequestLine[]
+  requests_count?: number
+  request_unit_cost_usd?: number
+}
 
 const labUrl = (path: string | null | undefined) => {
   if (!path) return null
@@ -118,6 +133,42 @@ function AuthImage({ src, alt, className, api }: AuthImageProps) {
 }
 const money = (v: number | null) => v === null ? '—' : `${new Intl.NumberFormat('ru-RU').format(Math.round(v))} ₽`
 const usd = (v: number) => `$${(Number(v) || 0).toFixed(4)}`
+
+const readRequests = (value: unknown): RequestLine[] => {
+  if (!value || typeof value !== 'object') return []
+  const raw = (value as { requests?: unknown }).requests
+  if (!Array.isArray(raw)) return []
+  return raw.filter((item): item is RequestLine => Boolean(item) && typeof item === 'object')
+}
+
+const requestLabel = (request: RequestLine) => {
+  const kind = request.kind === 'web_search'
+    ? 'Yandex web'
+    : request.kind === 'image_search_by_image'
+      ? 'Yandex image'
+      : request.kind === 'vision'
+        ? 'Vision'
+        : request.kind === 'grid_image'
+          ? 'Grid image'
+          : request.kind === 'cell_check'
+            ? 'Cell check'
+            : request.kind
+  return request.model ? `${kind} · ${request.model}` : kind
+}
+
+function RequestBreakdown({ requests }: { requests: RequestLine[] }) {
+  if (requests.length === 0) return null
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+      {requests.map((request, index) => (
+        <li key={`${request.kind}-${index}`} className="flex flex-wrap justify-between gap-2 font-mono">
+          <span>{requestLabel(request)} × {request.count}</span>
+          <span>{usd(request.unit_cost_usd)} → {usd(request.cost_usd)}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 const readJson = async <T,>(r: Response): Promise<T> => {
   const data = await r.json().catch(() => ({}))
@@ -192,6 +243,7 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
   const [resultsBusy, setResultsBusy] = useState(false)
   const [resultsError, setResultsError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
+  const [searchMeta, setSearchMeta] = useState<{ cost_usd: number; requests: RequestLine[]; requests_count: number } | null>(null)
 
   const apiRef = useRef(api)
   const onCostRef = useRef(onCost)
@@ -345,6 +397,7 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
     setResults([])
     setResultsError('')
     setHasSearched(false)
+    setSearchMeta(null)
   }
 
   const addDomain = () => {
@@ -388,9 +441,22 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
           }),
         })
         : await apiRef.current(path)
-      const data = await readJson<{ results: SearchResult[] }>(response)
+      const data = await readJson<SearchResponse>(response)
       setResults(data.results ?? [])
+      setSearchMeta({
+        cost_usd: Number(data.cost_usd) || 0,
+        requests: Array.isArray(data.requests) ? data.requests : [],
+        requests_count: Number(data.requests_count) || 0,
+      })
       setHasSearched(true)
+      try {
+        const fresh = await readJson<SearchJob>(
+          await apiRef.current(`/api/admin/search/jobs/${encodeURIComponent(job.id)}`),
+        )
+        applyJob(fresh)
+      } catch {
+        // обновление шапки не критично — результаты уже показаны
+      }
     } catch (e) {
       setResultsError(errorText(e, 'Не удалось выполнить поиск'))
       setHasSearched(true)
@@ -894,6 +960,15 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                 </p>
               )}
 
+              {searchMeta && (searchMeta.requests_count > 0 || searchMeta.cost_usd > 0) && (
+                <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">
+                    Запросов: {searchMeta.requests_count} · итого {usd(searchMeta.cost_usd)}
+                  </p>
+                  <RequestBreakdown requests={searchMeta.requests} />
+                </div>
+              )}
+
               {results.length > 0 && (
                 <ul className="divide-y divide-border rounded-lg border border-border">
                   {results.map(result => (
@@ -956,6 +1031,7 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                     <div className="space-y-0.5">
                       <p className="font-medium text-foreground">{step.step}</p>
                       <p className="text-xs text-muted-foreground">{formatDate(step.created_at)}</p>
+                      <RequestBreakdown requests={readRequests(step.output)} />
                       {step.error && (
                         <p className="text-xs text-destructive">{step.error}</p>
                       )}
