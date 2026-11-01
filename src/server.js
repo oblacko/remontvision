@@ -32,7 +32,7 @@ import { startProcurementWorker } from './procurementjobs.js';
 import { getProcurementConfig, getProcurementDefaults, saveProcurementConfig, resetProcurementConfig, loadProcurementConfig } from './procurementconfig.js';
 import { createSearchJob, processVisionStep, processGridStep, processCropsStep, processObjectSearch, searchJobDto, searchResultsDto } from './searchservice.js';
 import { startSearchWorker } from './searchjobs.js';
-import { getSearchConfig, getSearchDefaults, saveSearchConfig, resetSearchConfig, loadSearchConfig } from './searchconfig.js';
+import { getSearchConfig, saveSearchConfig, resetSearchConfig, loadSearchConfig } from './searchconfig.js';
 import { listSearchPrompts, createPromptVersion, activatePromptVersion, loadSearchPrompts, seedSearchPrompts, DEFAULT_SEARCH_PROMPTS, PROMPT_KINDS } from './searchprompts.js';
 import { getStyleConfig, getStyleDefaults, saveStyleConfig, resetStyleConfig, loadStyleConfig } from './styleconfig.js';
 import { imageSize, detectImageExt } from './imagesize.js';
@@ -908,7 +908,10 @@ async function runSearchStep(req, res, stage, processFn) {
   }
 }
 
-app.post('/api/admin/search/jobs', upload.single('photo'), h(async (req, res) => {
+app.post('/api/admin/search/jobs', (req, res, next) => {
+  if (!requireAdmin(req, res)) return;
+  next();
+}, upload.single('photo'), h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   let id;
   if (req.file) {
