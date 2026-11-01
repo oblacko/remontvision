@@ -38,6 +38,21 @@ test('validates grid resolution against provided grid model', () => {
   }));
 });
 
+test('clears resolution for models without resolution support', () => {
+  const patch = validateSearchConfig({
+    grid_model: 'black-forest-labs/flux.2-pro',
+    grid_resolution: '4K',
+  });
+  assert.equal(patch.grid_resolution, '');
+});
+
+test('rejects resolution not supported by grid model', () => {
+  assert.throws(() => validateSearchConfig({
+    grid_model: 'black-forest-labs/flux-3-image-klein',
+    grid_resolution: '8K',
+  }));
+});
+
 test('settings key is search.v1', () => {
   assert.equal(SEARCH_SETTINGS_KEY, 'search.v1');
 });

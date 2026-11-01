@@ -73,14 +73,20 @@ export function validateSearchConfig(input = {}, base = DEFAULT_SEARCH_CONFIG) {
   if ('grid_resolution' in input) {
     const resolution = String(input.grid_resolution ?? '').trim();
     const resolutions = modelCaps(gridModel).resolutions;
-    if (resolution && resolutions.length > 0 && !resolutions.includes(resolution)) {
-      throw new Error(`resolution для grid: ${resolutions.join(', ')}`);
+    if (resolutions.length === 0) {
+      out.grid_resolution = '';
+    } else {
+      if (resolution && !resolutions.includes(resolution)) {
+        throw new Error(`resolution для grid: ${resolutions.join(', ')}`);
+      }
+      out.grid_resolution = resolution;
     }
-    out.grid_resolution = resolution;
   } else if (out.grid_model && base?.grid_resolution) {
     const resolution = String(base.grid_resolution ?? '').trim();
     const resolutions = modelCaps(gridModel).resolutions;
-    if (resolution && resolutions.length > 0 && !resolutions.includes(resolution)) {
+    if (resolutions.length === 0) {
+      out.grid_resolution = '';
+    } else if (resolution && !resolutions.includes(resolution)) {
       throw new Error(`resolution для grid: ${resolutions.join(', ')}`);
     }
   }

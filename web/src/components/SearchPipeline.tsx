@@ -60,6 +60,62 @@ const labUrl = (path: string | null | undefined) => {
   if (path.startsWith('/')) return path
   return `/search-lab/${path.split('/').pop()}`
 }
+
+const isAuthArtifact = (src: string) => src.startsWith('/search-lab/') || src.startsWith('/renders/')
+
+type AuthImageProps = {
+  src: string
+  alt: string
+  className: string
+  api: SearchApi
+}
+
+function AuthImage({ src, alt, className, api }: AuthImageProps) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (!isAuthArtifact(src)) return
+    let cancelled = false
+    let objectUrl: string | null = null
+    setUrl(null)
+    setFailed(false)
+
+    const load = async () => {
+      try {
+        const response = await api(src)
+        if (!response.ok) throw new Error(String(response.status))
+        const blob = await response.blob()
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      } catch {
+        if (!cancelled) setFailed(true)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [src, api])
+
+  if (!isAuthArtifact(src)) {
+    return <img src={src} alt={alt} className={className} loading="lazy" />
+  }
+  if (!url || failed) {
+    return (
+      <span
+        className={`${className} block bg-muted`}
+        role="img"
+        aria-label={failed ? alt : undefined}
+      />
+    )
+  }
+  return <img src={url} alt={alt} className={className} />
+}
 const money = (v: number | null) => v === null ? '—' : `${new Intl.NumberFormat('ru-RU').format(Math.round(v))} ₽`
 const usd = (v: number) => `$${(Number(v) || 0).toFixed(4)}`
 
@@ -494,11 +550,11 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
             <figure className="space-y-2">
               <figcaption className="text-sm font-medium text-foreground">Исходное фото</figcaption>
               {sourceUrl ? (
-                <img
+                <AuthImage
                   src={sourceUrl}
                   alt="Исходное фото"
                   className="w-full rounded-lg border border-border bg-muted object-contain"
-                  loading="lazy"
+                  api={api}
                 />
               ) : (
                 <div className="flex h-40 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
@@ -510,11 +566,11 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
             <figure className="space-y-2">
               <figcaption className="text-sm font-medium text-foreground">Разметка объектов</figcaption>
               {overlayUrl ? (
-                <img
+                <AuthImage
                   src={overlayUrl}
                   alt="Разметка объектов"
                   className="w-full rounded-lg border border-border bg-muted object-contain"
-                  loading="lazy"
+                  api={api}
                 />
               ) : (
                 <div className="flex h-40 items-center justify-center rounded-lg border border-border bg-muted text-xs text-muted-foreground">
@@ -529,22 +585,22 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
               {gridUrl && (
                 <figure className="space-y-2">
                   <figcaption className="text-sm font-medium text-foreground">Сетка</figcaption>
-                  <img
+                  <AuthImage
                     src={gridUrl}
                     alt="Сетка"
                     className="w-full rounded-lg border border-border bg-muted object-contain"
-                    loading="lazy"
+                    api={api}
                   />
                 </figure>
               )}
               {gridOverlayUrl && (
                 <figure className="space-y-2">
                   <figcaption className="text-sm font-medium text-foreground">Разметка сетки</figcaption>
-                  <img
+                  <AuthImage
                     src={gridOverlayUrl}
                     alt="Разметка сетки"
                     className="w-full rounded-lg border border-border bg-muted object-contain"
-                    loading="lazy"
+                    api={api}
                   />
                 </figure>
               )}
@@ -575,11 +631,11 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                     >
                       <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
                         {thumbnail ? (
-                          <img
+                          <AuthImage
                             src={thumbnail}
                             alt={object.label}
                             className="h-full w-full object-cover"
-                            loading="lazy"
+                            api={api}
                           />
                         ) : (
                           <ImageIcon className="size-6 text-muted-foreground" aria-hidden="true" />

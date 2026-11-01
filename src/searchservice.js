@@ -6,6 +6,7 @@ import { parseSearchImage } from './searchvision.js';
 import { getSearchConfig } from './searchconfig.js';
 import { getActivePrompt } from './searchprompts.js';
 import { generateGridImage, sliceGrid, drawGridOverlay, checkGridCell } from './searchgrid.js';
+import { supportsResolution } from './modelcaps.js';
 import { composeCard, drawBboxOverlay } from './searchthumbs.js';
 import { searchWeb, searchImagesByImage, isAllowedDomain } from './yandexsearch.js';
 import { extractPrice, filtersHash, mergeResults } from './searchutil.js';
@@ -229,7 +230,7 @@ export async function processGridStep(jobId) {
     {
       prompt,
       model: cfg.grid_model,
-      resolution: cfg.grid_resolution,
+      resolution: supportsResolution(cfg.grid_model) && cfg.grid_resolution ? cfg.grid_resolution : null,
       aspect: cfg.grid_aspect,
     }
   );
