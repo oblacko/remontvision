@@ -64,6 +64,7 @@
 - Покрытие неполное: hero/свет/ковры/пол/часть текстиля находятся; стены/потолок/плинтус и часть магазинов дают fallback-ссылку.
 - Дубликаты items исправлены: перед созданием позиций run очищается от старых items. Старый битый run и лишние кредиты возвращены.
 - Смета, площади и количества не считаются. В таблицах есть nullable `quantity`, `unit`, `measurement_status`.
+- План замены procurement на «ИИ-поиск товаров по фото»: [docs/SEARCH-SERVICE-PLAN.md](SEARCH-SERVICE-PLAN.md).
 
 ## Платежи
 
@@ -120,3 +121,13 @@
 - Не менять активные стили и настройки поиска без подтверждения.
 - Не сохранять секреты в репозиторий и в этот файл.
 - Если требование противоречит текущему коду — сначала спросить, потом менять.
+
+## Search Lab (тестовый стенд поиска)
+
+- Админка → вкладка «Поиск (лаб)» (`web/src/components/SearchLab.tsx` + `SearchPipeline.tsx`). Только `x-admin-key`, без кредитов.
+- Пайплайн: vision (`searchvision`) → Mode A кропы (`searchthumbs`) или Mode B сетка FLUX Klein 21:9 (`searchgrid`) → миниатюры 1024² → поиск (`searchservice`): Yandex web + `search_by_image`, merge/dedup, локальный allowlist, кэш.
+- Конфиг `search.v1` в `app_settings` (`searchconfig.js`): модели, aspect, домены, лимиты, TTL. Дефолт grid: `black-forest-labs/flux-3-image-klein`, 1K, 21:9. Vision: `google/gemini-3.1-pro-preview` (env `SEARCH_VISION_MODEL`).
+- Промты версионируются в `search_prompts` (`searchprompts.js`), активная версия снапшотится в `search_jobs.prompts`.
+- Артефакты: `search-lab/<jobId>-...`, отдаются через `/search-lab/:file` под админом.
+- bbox = `[x,y,w,h]` 0..1. `search_by_image` = `POST /v2/image/search_by_image`; live-проверка на VPS (локально нет `YANDEX_SEARCH_API_KEY`).
+- Старый procurement и `/api/renders/:id/procurement` не тронуты; пользовательский запуск нового поиска — отдельная задача.

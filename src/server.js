@@ -30,6 +30,10 @@ import { canBindProduct, canReplaceWithProduct, productTarget } from './productp
 import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
 import { startProcurementWorker } from './procurementjobs.js';
 import { getProcurementConfig, getProcurementDefaults, saveProcurementConfig, resetProcurementConfig, loadProcurementConfig } from './procurementconfig.js';
+import { createSearchJob, processVisionStep, processGridStep, processCropsStep, processObjectSearch, searchJobDto, searchResultsDto } from './searchservice.js';
+import { startSearchWorker } from './searchjobs.js';
+import { getSearchConfig, saveSearchConfig, resetSearchConfig, loadSearchConfig } from './searchconfig.js';
+import { listSearchPrompts, createPromptVersion, activatePromptVersion, loadSearchPrompts, seedSearchPrompts, DEFAULT_SEARCH_PROMPTS, PROMPT_KINDS } from './searchprompts.js';
 import { getStyleConfig, getStyleDefaults, saveStyleConfig, resetStyleConfig, loadStyleConfig } from './styleconfig.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 
@@ -826,6 +830,149 @@ app.post('/api/admin/settings/procurement/reset', h(async (req, res) => {
   res.json({ ok: true, config });
 }));
 
+// ---------- поисковая лаборатория: только админ ----------
+app.get('/api/admin/search/config', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(getSearchConfig());
+}));
+
+app.put('/api/admin/search/config', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const config = await saveSearchConfig(req.body?.config || req.body || {});
+  res.json({ ok: true, config });
+}));
+
+app.post('/api/admin/search/config/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const config = await resetSearchConfig();
+  res.json({ ok: true, config });
+}));
+
+app.get('/api/admin/search/prompts', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({
+    vision: await listSearchPrompts('vision'),
+    grid: await listSearchPrompts('grid'),
+    cell: await listSearchPrompts('cell'),
+  });
+}));
+
+app.post('/api/admin/search/prompts', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const kind = String(req.body?.kind || '');
+  const prompt = String(req.body?.prompt || '');
+  try {
+    const created = await createPromptVersion(kind, prompt);
+    return res.status(201).json(created);
+  } catch (e) {
+    return res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/search/prompts/:id/activate', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const kind = String(req.body?.kind || '');
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Некорректный id промта' });
+  try {
+    return res.json(await activatePromptVersion(kind, id));
+  } catch (e) {
+    return res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/search/prompts/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const prompts = {};
+  for (const kind of PROMPT_KINDS) {
+    const created = await createPromptVersion(kind, DEFAULT_SEARCH_PROMPTS[kind]);
+    prompts[kind] = await activatePromptVersion(kind, created.id);
+  }
+  res.json(prompts);
+}));
+
+async function runSearchStep(req, res, stage, processFn) {
+  if (!requireAdmin(req, res)) return;
+  const job = await q.getSearchJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Поиск не найден' });
+  const id = req.params.id;
+  await q.updateSearchJob(id, {
+    status: 'processing',
+    stage,
+    error: null,
+    started_at: new Date().toISOString(),
+  });
+  void processFn(id).catch(async (e) => {
+    const error = String(e.message || e).slice(0, 300);
+    await q.updateSearchJob(id, {
+      status: 'failed',
+      error,
+      finished_at: new Date().toISOString(),
+    }).catch(() => {});
+    log({ event: 'search_step_error', step: stage, job_id: id, error });
+  });
+  return res.status(202).json(await searchJobDto(id));
+}
+
+app.post('/api/admin/search/jobs', (req, res, next) => {
+  if (!requireAdmin(req, res)) return;
+  next();
+}, upload.single('photo'), h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  let id;
+  if (req.file) {
+    const photoPath = await saveUpload(req.file, 'search-lab');
+    id = await createSearchJob({ source: 'photo', photoPath });
+  } else if (req.body?.render_id) {
+    const render = await q.getRender(String(req.body.render_id));
+    if (!render) return res.status(404).json({ error: 'Рендер не найден' });
+    id = await createSearchJob({ source: 'render', renderId: render.id });
+  } else {
+    return res.status(400).json({ error: 'Нужно фото или render_id' });
+  }
+  return res.status(201).json(await searchJobDto(id));
+}));
+
+app.get('/api/admin/search/jobs/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const job = await searchJobDto(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Поиск не найден' });
+  res.json(job);
+}));
+
+app.post('/api/admin/search/jobs/:id/vision', h(async (req, res) =>
+  runSearchStep(req, res, 'vision', processVisionStep)));
+
+app.post('/api/admin/search/jobs/:id/grid', h(async (req, res) =>
+  runSearchStep(req, res, 'grid', processGridStep)));
+
+app.post('/api/admin/search/jobs/:id/crops', h(async (req, res) =>
+  runSearchStep(req, res, 'crops', processCropsStep)));
+
+app.post('/api/admin/search/jobs/:id/objects/:objId/search', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const job = await q.getSearchJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Поиск не найден' });
+  const objId = Number(req.params.objId);
+  if (!Number.isSafeInteger(objId)) return res.status(400).json({ error: 'Некорректный объект' });
+  const object = await q.getSearchObject(objId);
+  if (!object || object.job_id !== job.id) return res.status(404).json({ error: 'Объект не найден' });
+  const out = await processObjectSearch(req.params.id, objId, req.body || {});
+  return res.json(out);
+}));
+
+app.get('/api/admin/search/jobs/:id/objects/:objId/search', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const job = await q.getSearchJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Поиск не найден' });
+  const objId = Number(req.params.objId);
+  if (!Number.isSafeInteger(objId)) return res.status(400).json({ error: 'Некорректный объект' });
+  const object = await q.getSearchObject(objId);
+  if (!object || object.job_id !== job.id) return res.status(404).json({ error: 'Объект не найден' });
+  const out = await searchResultsDto(objId);
+  return res.json({ object_id: objId, results: out });
+}));
+
 app.get('/api/admin/settings/proxy', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json(getProxyState({ masked: true }));
@@ -1176,6 +1323,10 @@ app.get('/renders/:file', h(async (req, res) => serveStored(req, res, 'renders',
 app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products', req.params.file)));
 app.get('/procurement/:file', h(async (req, res) => serveStored(req, res, 'procurement', req.params.file)));
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
+app.get('/search-lab/:file', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  await serveStored(req, res, 'search-lab', req.params.file);
+}));
 
 // Переход из сметы к товару: логируем клик и уводим на реальную страницу/поиск.
 app.get('/go/:id', h(async (req, res) => {
@@ -1411,6 +1562,9 @@ async function main() {
   await loadPromptConfig(); // редактируемые правила промта из app_settings
   await loadCleanupConfig(); // очистка комнаты: модель/промт из app_settings
   await loadProcurementConfig(); // подбор товаров: слои, лимиты, домены
+  await loadSearchConfig();      // поиск: модели, домены, лимиты из app_settings
+  await seedSearchPrompts();     // версии промтов vision/grid/cell
+  await loadSearchPrompts();     // активные версии в память
   await loadStyleConfig(); // источник стиля: текст/свотчи
   await loadRoomTypes();   // типы комнат: справочник и промты из app_settings
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
@@ -1427,6 +1581,7 @@ async function main() {
     log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
     startWorker();
     startProcurementWorker();
+    startSearchWorker();
   });
 }
 

@@ -587,6 +587,41 @@ export async function generateFromText({ prompt, aspectRatio = '3:2' }) {
   throw lastErr || new Error('text image generation failed');
 }
 
+// Генерация по тексту с явной моделью и разрешением; делит глобальный image-slot с рендером.
+export async function generateTextImage({ prompt, aspectRatio = '21:9', model, resolution = null }) {
+  if (!model) throw new Error('generateTextImage: нужна модель');
+  if (!prompt) throw new Error('generateTextImage: пустой промпт');
+  const body = {
+    model,
+    prompt,
+    aspect_ratio: aspectRatio,
+    ...(resolution ? { resolution } : {}),
+  };
+  const r = await withImageSlot(() => fetch(`${BASE}/images`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(150_000),
+  }));
+  const data = await r.json().catch(() => ({}));
+  const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
+  if (!r.ok) {
+    const err = new Error(`/images ${r.status}: ${JSON.stringify(data).slice(0, 500)}`);
+    err.cost = cost;
+    throw err;
+  }
+  const b64 =
+    data.choices?.[0]?.message?.images?.[0]?.image_url?.url?.match(/base64,(.+)$/)?.[1] ||
+    data.data?.[0]?.b64_json;
+  if (!b64) {
+    const err = new Error('/images: нет картинки в ответе');
+    err.cost = cost;
+    throw err;
+  }
+  log({ event: 'text_image_endpoint', model, endpoint: '/images', aspect_ratio: aspectRatio, resolution, cost_usd: cost || null });
+  return { b64, cost: cost || null, model, endpoint: `${BASE}/images` };
+}
+
 // Оценка стилевого референса: стиль, комната, красота, наличие материалов.
 export async function scoreStyleReference(imageB64, mime, { style, roomType } = {}) {
   const sys = `Ты арт-директор интерьерного сервиса. Оцени изображение как референс стиля.
