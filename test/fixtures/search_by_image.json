@@ -1,0 +1,16 @@
+{
+  "images": [
+    {
+      "url": "https://example.ru/img/sofa-1.jpg",
+      "format": "IMAGE_FORMAT_JPEG",
+      "width": 1000,
+      "height": 1000,
+      "passage": "Диван прямой трёхместный, серый велюр, на деревянных ножках.",
+      "host": "example.ru",
+      "page_title": "Диван прямой трёхместный — Example",
+      "page_url": "https://example.ru/product/1"
+    }
+  ],
+  "page": "0",
+  "id": "cbir-test"
+}
