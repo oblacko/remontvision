@@ -567,7 +567,7 @@ export const q = {
   getSearchJob: id =>
     pool.query(`SELECT * FROM search_jobs WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   updateSearchJob: (id, patch) => {
-    const cols = ['status', 'stage', 'error', 'photo_quality', 'vision_raw', 'prompts', 'config', 'cost_usd', 'started_at', 'finished_at', 'mode'];
+    const cols = ['status', 'stage', 'error', 'photo_path', 'photo_quality', 'vision_raw', 'prompts', 'config', 'cost_usd', 'started_at', 'finished_at', 'mode'];
     const jsonCols = new Set(['photo_quality', 'vision_raw', 'prompts', 'config']);
     const keys = Object.keys(patch).filter(k => cols.includes(k));
     if (!keys.length) return Promise.resolve(null);
@@ -582,10 +582,12 @@ export const q = {
   claimNextSearchJob: () =>
     pool.query(`UPDATE search_jobs SET status = 'processing', started_at = now()
                 WHERE id = (SELECT id FROM search_jobs WHERE status = 'queued'
-                            ORDER BY created_at LIMIT 1)
+                            ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED)
                 RETURNING *`).then(r => r.rows[0] || null),
   requeueProcessingSearchJobs: () =>
-    pool.query(`UPDATE search_jobs SET status = 'queued' WHERE status = 'processing'`)
+    pool.query(`UPDATE search_jobs SET status = 'queued'
+                WHERE status = 'processing'
+                  AND started_at < now() - interval '10 minutes'`)
       .then(r => r.rowCount),
   searchStepsForJob: jobId =>
     pool.query(`SELECT * FROM search_steps WHERE job_id = $1 ORDER BY created_at`, [jobId])

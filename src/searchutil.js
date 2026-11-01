@@ -30,6 +30,13 @@ export function canonicalUrl(rawUrl) {
   return `https://${host}${parsed.pathname}${query}`;
 }
 
+export function extractPrice(text) {
+  const match = String(text || '').match(/(\d[\d\s]{2,})\s*(?:₽|руб)/i);
+  if (!match) return null;
+  const value = Number(match[1].replace(/\s+/g, ''));
+  return Number.isFinite(value) ? value : null;
+}
+
 export function filtersHash(filters = {}) {
   const {
     query = null,
@@ -73,6 +80,8 @@ export function mergeResults(textResults = [], visualResults = [], { limit = 30 
         title: row.title || row.page_title || '',
         snippet: row.snippet || row.passage || '',
         source,
+        image_url: row.image_url || null,
+        price: row.price ?? null,
         raw: row,
       });
     }

@@ -8,7 +8,7 @@ import { getActivePrompt } from './searchprompts.js';
 import { generateGridImage, sliceGrid, drawGridOverlay, checkGridCell } from './searchgrid.js';
 import { composeCard, drawBboxOverlay } from './searchthumbs.js';
 import { searchWeb, searchImagesByImage, isAllowedDomain } from './yandexsearch.js';
-import { canonicalUrl, filtersHash, mergeResults } from './searchutil.js';
+import { extractPrice, filtersHash, mergeResults } from './searchutil.js';
 import { getBuffer, putBuffer } from './storage.js';
 
 const PERIOD = {
@@ -65,8 +65,8 @@ async function cropByBbox(buffer, bbox) {
   const y = Math.max(0, Math.min(1, Number(box[1]) || 0));
   const w = Math.max(0, Math.min(1, Number(box[2]) || 0));
   const h = Math.max(0, Math.min(1, Number(box[3]) || 0));
-  const left = Math.round(x * W);
-  const top = Math.round(y * H);
+  const left = Math.max(0, Math.min(W - 1, Math.round(x * W)));
+  const top = Math.max(0, Math.min(H - 1, Math.round(y * H)));
   const width = Math.max(1, Math.min(W - left, Math.round(w * W)));
   const height = Math.max(1, Math.min(H - top, Math.round(h * H)));
   return sharp(buffer, { failOn: 'none' })
@@ -113,10 +113,14 @@ export async function processVisionStep(jobId) {
   const vision = await parseSearchImage(buffer.toString('base64'), mime, {
     model: cfg.vision_model,
     prompt,
+    maxObjects: cfg.max_objects,
   });
 
   const sourceKey = `search-lab/${jobId}-source.${extForMime(mime)}`;
   await putArtifact(sourceKey, buffer, mime);
+  if (job.source === 'photo') {
+    await q.updateSearchJob(jobId, { photo_path: sourceKey });
+  }
 
   await q.deleteSearchObjectsForJob(jobId);
   for (const obj of vision.objects) {
@@ -241,9 +245,18 @@ export async function processGridStep(jobId) {
 
   const cells = await sliceGrid(gridBuffer);
   let cost = Number(grid.cost) || 0;
+  const cap = cfg.max_run_cost_usd == null ? Infinity : Number(cfg.max_run_cost_usd);
   const cellOutput = [];
+  const processed = new Set();
   for (const cell of cells) {
     const obj = objects.find(o => Number(o.idx) === cell.index) || null;
+    if (cost >= cap) {
+      if (obj) {
+        await q.updateSearchObject(obj.id, { status: 'skipped' });
+        processed.add(obj.id);
+      }
+      continue;
+    }
 
     const cellKey = `search-lab/${jobId}-cell-${cell.index}.jpg`;
     await putArtifact(cellKey, cell.buffer, 'image/jpeg');
@@ -265,9 +278,16 @@ export async function processGridStep(jobId) {
         cell_check: check,
         status: check.ok ? 'ready' : 'rejected',
       });
+      processed.add(obj.id);
     }
 
     cellOutput.push({ index: cell.index, cell_path: cellKey, thumb_path: thumbKey, check });
+  }
+
+  for (const object of objects) {
+    if (!processed.has(object.id)) {
+      await q.updateSearchObject(object.id, { status: 'skipped' });
+    }
   }
 
   await q.updateSearchJob(jobId, {
@@ -332,7 +352,10 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       period: PERIOD[period] || PERIOD.all,
       sortMode: SORT[sort] || SORT.relevance,
     });
-    textRows = text.results;
+    textRows = text.results.map(row => ({
+      ...row,
+      price: extractPrice(`${row.title || ''} ${row.snippet || ''}`),
+    }));
   }
 
   let visualRows = [];
@@ -360,22 +383,23 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       return true;
     });
 
+  await q.clearSearchResults(objectId);
+  const results = [];
   for (const row of filtered) {
-    await q.upsertSearchResult({
+    const saved = await q.upsertSearchResult({
       object_id: objectId,
       source: row.source,
       provider: 'yandex',
       store: hostOf(row.url),
       canonical_url: row.url,
       title: row.title,
-      image_url: row.image_url || row.raw?.image_url || null,
+      image_url: row.image_url || null,
       price: row.price ?? null,
       currency: 'RUB',
       raw: row.raw,
     });
+    if (saved) results.push(mapResult(saved));
   }
-
-  const results = (await q.searchResultsForObject(objectId)).map(mapResult);
   const payload = {
     object_id: objectId,
     query,
@@ -392,7 +416,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     cached: false,
   };
 
-  if (filtered.length > 0) {
+  if (results.length > 0) {
     await q.setSearchCache(objectId, hash, payload, cfg.cache_ttl_hours);
   }
 
