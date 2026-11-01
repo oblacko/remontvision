@@ -1334,11 +1334,11 @@ export default function Admin() {
           {tab === 'proxy' && (
             <div className="mt-8 max-w-3xl">
               <p className="eyebrow">Прокси для OpenRouter</p>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Нужен, если OpenRouter блокирует IP сервера. Сохраняется в app_settings и применяется без рестарта. Пустое поле выключает прокси, даже если HTTPS_PROXY задан в env.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Нужен, если OpenRouter блокирует IP сервера. Поддерживаются http(s):// и socks5://. Сохраняется в app_settings и применяется без рестарта. Пустое поле выключает прокси, даже если HTTPS_PROXY задан в env.</p>
               <form onSubmit={e => { e.preventDefault(); void saveProxy() }} className="mt-6 space-y-4 border p-4">
                 <div>
                   <label htmlFor="proxy-url" className="eyebrow mb-2 block">URL прокси</label>
-                  <input id="proxy-url" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="http://user:pass@host:port" className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
+                  <input id="proxy-url" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="socks5://user:pass@host:port или http://user:pass@host:port" className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
                   <p className="mt-2 text-xs text-muted-foreground">Env-фолбэк: {proxyEnv ? <span className="font-mono">{proxyEnv}</span> : 'не задан'}. Пароль в URL маскируется; чтобы изменить — введите новый URL целиком.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">

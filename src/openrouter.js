@@ -12,7 +12,8 @@ import { buildScalePlan } from './scaleplan.js';
 const BASE = 'https://openrouter.ai/api/v1';
 
 const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
-if (proxyUrl) {
+// SOCKS5 env-прокси применяет src/proxy.js через node-fetch; undici ProxyAgent его не умеет.
+if (proxyUrl && !/^socks5h?:/i.test(proxyUrl)) {
   const { setGlobalDispatcher, ProxyAgent } = await import('undici');
   setGlobalDispatcher(new ProxyAgent(proxyUrl));
   console.log(`[openrouter] используется прокси: ${proxyUrl.replace(/\/\/.*@/, '//***@')}`);
