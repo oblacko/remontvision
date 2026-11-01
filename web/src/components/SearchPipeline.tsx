@@ -613,6 +613,12 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
               <span className="text-xs text-muted-foreground">{job.objects.length} шт.</span>
             </div>
 
+            {job.status === 'done' && job.objects.length > 0 && job.objects.every(object => !object.thumbnail_url) && (
+              <p className="rounded-lg border border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+                Миниатюр нет: у объектов не найден bbox. Нажмите «Сгенерировать сетку» — режим B нарежет товары из ИИ-сетки.
+              </p>
+            )}
+
             {job.objects.length === 0 ? (
               <p className="rounded-lg border border-border bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
                 Объекты ещё не распознаны.

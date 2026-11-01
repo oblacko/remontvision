@@ -171,12 +171,17 @@ export async function processVisionStep(jobId) {
     cost_usd: cost,
   });
 
+  // Сразу режем bbox на миниатюры, чтобы не заставлять пользователя жать ещё одну кнопку.
+  if (vision.objects.some(o => Array.isArray(o.bbox))) {
+    return processCropsStep(jobId);
+  }
   return searchJobDto(jobId);
 }
 
 export async function processCropsStep(jobId) {
   const job = await q.getSearchJob(jobId);
   if (!job) throw new Error('Поиск не найден');
+  await q.updateSearchJob(jobId, { status: 'processing', stage: 'crops' });
   const objects = await q.searchObjectsForJob(jobId);
   const { buffer } = await readJobImage(job);
 
