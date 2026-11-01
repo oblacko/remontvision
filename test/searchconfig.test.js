@@ -64,6 +64,19 @@ test('normalizes yandex request costs', () => {
   assert.equal(patch.yandex_image_cost_usd, 1);
 });
 
+test('normalizes buy keyword and price check limits', () => {
+  const patch = validateSearchConfig({
+    buy_keyword: '  купить  ',
+    price_check_enabled: 'off',
+    price_check_limit: 100,
+    price_check_concurrency: 0,
+  });
+  assert.equal(patch.buy_keyword, 'купить');
+  assert.equal(patch.price_check_enabled, false);
+  assert.equal(patch.price_check_limit, 20);
+  assert.equal(patch.price_check_concurrency, 1);
+});
+
 test('settings key is search.v1', () => {
   assert.equal(SEARCH_SETTINGS_KEY, 'search.v1');
 });

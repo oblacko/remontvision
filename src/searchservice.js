@@ -10,6 +10,7 @@ import { supportsResolution } from './modelcaps.js';
 import { composeCard, drawBboxOverlay } from './searchthumbs.js';
 import { searchWeb, searchImagesByImage, isAllowedDomain } from './yandexsearch.js';
 import { extractPrice, filtersHash, mergeResults } from './searchutil.js';
+import { enrichSearchResults, withBuyKeyword } from './searchparse.js';
 import { getBuffer, putBuffer } from './storage.js';
 
 const PERIOD = {
@@ -66,10 +67,16 @@ async function cropByBbox(buffer, bbox) {
   const y = Math.max(0, Math.min(1, Number(box[1]) || 0));
   const w = Math.max(0, Math.min(1, Number(box[2]) || 0));
   const h = Math.max(0, Math.min(1, Number(box[3]) || 0));
-  const left = Math.max(0, Math.min(W - 1, Math.round(x * W)));
-  const top = Math.max(0, Math.min(H - 1, Math.round(y * H)));
-  const width = Math.max(1, Math.min(W - left, Math.round(w * W)));
-  const height = Math.max(1, Math.min(H - top, Math.round(h * H)));
+  // Vision часто режет предмет вплотную — расширяем bbox на 10% с каждой стороны.
+  const pad = 0.1;
+  const px = Math.max(0, x - w * pad);
+  const py = Math.max(0, y - h * pad);
+  const pw = Math.min(1 - px, w * (1 + pad * 2));
+  const ph = Math.min(1 - py, h * (1 + pad * 2));
+  const left = Math.max(0, Math.min(W - 1, Math.round(px * W)));
+  const top = Math.max(0, Math.min(H - 1, Math.round(py * H)));
+  const width = Math.max(1, Math.min(W - left, Math.round(pw * W)));
+  const height = Math.max(1, Math.min(H - top, Math.round(ph * H)));
   return sharp(buffer, { failOn: 'none' })
     .extract({ left, top, width, height })
     .jpeg({ quality: 90 })
@@ -397,8 +404,10 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
 
   let textRows = [];
   if (source !== 'visual') {
+    // Без «купить» Яндекс часто отдаёт галереи картинок вместо карточек товара.
+    const textQuery = withBuyKeyword(query, cfg.buy_keyword);
     const text = await searchWeb({
-      query,
+      query: textQuery,
       region,
       limit: cfg.search_limit,
       period: PERIOD[period] || PERIOD.all,
@@ -444,15 +453,20 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   const searchCost = requests.reduce((sum, item) => sum + (Number(item.cost_usd) || 0), 0);
 
   const merged = mergeResults(textRows, visualRows, { limit: cfg.search_limit });
-  const filtered = merged
-    .filter(r => domains.length === 0 || isAllowedDomain(r.url, domains))
-    .filter(r => {
-      const p = r.price;
-      if (p == null) return true;
-      if (priceFrom != null && p < priceFrom) return false;
-      if (priceTo != null && p > priceTo) return false;
-      return true;
-    });
+  const byDomain = merged.filter(r => domains.length === 0 || isAllowedDomain(r.url, domains));
+  const checked = cfg.price_check_enabled && cfg.price_check_limit > 0
+    ? await enrichSearchResults(byDomain, {
+      limit: cfg.price_check_limit,
+      concurrency: cfg.price_check_concurrency,
+    })
+    : byDomain;
+  const filtered = checked.filter(r => {
+    const p = r.price;
+    if (p == null) return true;
+    if (priceFrom != null && p < priceFrom) return false;
+    if (priceTo != null && p > priceTo) return false;
+    return true;
+  });
 
   await q.clearSearchResults(objectId);
   await q.clearSearchCache(objectId);
@@ -467,7 +481,10 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       title: row.title,
       image_url: row.image_url || null,
       price: row.price ?? null,
-      currency: 'RUB',
+      currency: row.currency || 'RUB',
+      availability: row.availability || null,
+      price_source: row.price_source || null,
+      checked_at: row.checked_at || null,
       raw: row.raw,
     });
     if (saved) results.push(mapResult(saved));
@@ -520,6 +537,8 @@ export function mapResult(row) {
     image_url: row.image_url,
     price: row.price == null ? null : Number(row.price),
     currency: row.currency,
+    availability: row.availability || null,
+    price_source: row.price_source || null,
     match_score: row.match_score == null ? null : Number(row.match_score),
     checked_at: row.checked_at,
   };
@@ -536,6 +555,8 @@ export async function searchResultsDto(objectId) {
     image_url: row.image_url,
     price: row.price == null ? null : Number(row.price),
     currency: row.currency,
+    availability: row.availability || null,
+    price_source: row.price_source || null,
     match_score: row.match_score == null ? null : Number(row.match_score),
     checked_at: row.checked_at,
   }));

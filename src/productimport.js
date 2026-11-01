@@ -287,12 +287,12 @@ function similarity(a, b) {
   return common / (A.size + B.size - common);
 }
 
-async function fetchPage(rawUrl) {
+async function fetchPage(rawUrl, timeoutMs = 25_000) {
   let url = await assertPublicUrl(rawUrl);
   for (let i = 0; i <= 3; i++) {
     const r = await fetch(url, {
       redirect: 'manual',
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: {
         'user-agent': 'Mozilla/5.0 (compatible; remontvision-import/1.0; +https://www.remontvision.ru)',
         accept: 'text/html,application/xhtml+xml',
@@ -348,8 +348,8 @@ export function parseProductHtml(html, pageUrl = '') {
   };
 }
 
-export async function inspectProductUrl(rawUrl) {
-  const { url, html } = await fetchPage(rawUrl);
+export async function inspectProductUrl(rawUrl, { timeoutMs = 25_000 } = {}) {
+  const { url, html } = await fetchPage(rawUrl, timeoutMs);
   const data = parseProductHtml(html, url);
   const category = inferCategory(`${data.name} ${data.description} ${data.brand}`);
   const host = new URL(url).hostname.replace(/^www\./, '');

@@ -11,6 +11,8 @@ type SearchConfig = {
   grid_resolution: string; grid_aspect: string
   domains: string[]; region: string; search_limit: number; max_objects: number
   max_run_cost_usd: number; cache_ttl_hours: number; visual_enabled: boolean
+  buy_keyword: string; price_check_enabled: boolean
+  price_check_limit: number; price_check_concurrency: number
   yandex_web_cost_usd: number
   yandex_web_night_cost_usd: number
   yandex_image_cost_usd: number
@@ -275,6 +277,15 @@ export function SearchLab({ api, readJson }: SearchLabProps) {
               />
               <span className="font-medium">Визуальный поиск (search_by_image)</span>
             </label>
+            <label className="flex items-center gap-3 border p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={config.price_check_enabled}
+                onChange={e => setConfig({ ...config, price_check_enabled: e.target.checked })}
+                className="size-4 accent-primary"
+              />
+              <span className="font-medium">Парсить цену и наличие со страниц результатов</span>
+            </label>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -345,6 +356,37 @@ export function SearchLab({ api, readJson }: SearchLabProps) {
                 max={20}
                 value={config.max_objects}
                 onChange={e => setConfig({ ...config, max_objects: Number(e.target.value) })}
+                className={numberClass}
+              />
+            </div>
+            <div>
+              <label className="eyebrow mb-2 block">Ключ «купить»</label>
+              <input
+                value={config.buy_keyword}
+                onChange={e => setConfig({ ...config, buy_keyword: e.target.value })}
+                className={`${inputClass} font-mono text-xs`}
+                placeholder="купить"
+              />
+            </div>
+            <div>
+              <label className="eyebrow mb-2 block">Проверять страниц</label>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={config.price_check_limit}
+                onChange={e => setConfig({ ...config, price_check_limit: Number(e.target.value) })}
+                className={numberClass}
+              />
+            </div>
+            <div>
+              <label className="eyebrow mb-2 block">Парсить параллельно</label>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={config.price_check_concurrency}
+                onChange={e => setConfig({ ...config, price_check_concurrency: Number(e.target.value) })}
                 className={numberClass}
               />
             </div>

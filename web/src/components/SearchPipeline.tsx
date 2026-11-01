@@ -47,6 +47,7 @@ type SearchJob = {
 type SearchResult = {
   id: number; source: string; store: string | null; url: string; title: string
   image_url: string | null; price: number | null; currency: string
+  availability: string | null; price_source: string | null
   match_score: number | null; checked_at: string | null
 }
 type ObjectFilters = {
@@ -133,6 +134,12 @@ function AuthImage({ src, alt, className, api }: AuthImageProps) {
   return <img src={url} alt={alt} className={className} />
 }
 const money = (v: number | null) => v === null ? '—' : `${new Intl.NumberFormat('ru-RU').format(Math.round(v))} ₽`
+const availabilityLabel = (status: string | null) => {
+  if (status === 'in_stock') return 'В наличии'
+  if (status === 'out_of_stock') return 'Нет в наличии'
+  if (status === 'preorder') return 'Под заказ'
+  return null
+}
 const usd = (v: number) => `$${(Number(v) || 0).toFixed(4)}`
 
 const readRequests = (value: unknown): RequestLine[] => {
@@ -691,14 +698,14 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                 Объекты ещё не распознаны.
               </p>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {job.objects.map(object => {
                   const thumbnail = labUrl(object.thumbnail_url)
                   const active = object.id === selectedId
                   return (
                     <article
                       key={object.id}
-                      className={`flex flex-col gap-3 rounded-xl border p-3 transition-colors ${
+                      className={`flex flex-col gap-2 rounded-lg border p-2 transition-colors ${
                         active ? 'border-primary bg-primary/5' : 'border-border bg-background'
                       }`}
                     >
@@ -994,10 +1001,16 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                           {result.match_score !== null && (
                             <Badge variant="secondary">{Math.round(result.match_score)}%</Badge>
                           )}
+                          {availabilityLabel(result.availability) && (
+                            <Badge variant={result.availability === 'out_of_stock' ? 'destructive' : 'secondary'}>
+                              {availabilityLabel(result.availability)}
+                            </Badge>
+                          )}
                         </div>
                         <p className="line-clamp-2 text-sm font-medium text-foreground">{result.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {result.store || 'Магазин не указан'}
+                          {result.price_source === 'jsonld' ? ' · цена с карточки' : result.price_source === 'snippet' ? ' · цена из сниппета' : ''}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end justify-between gap-2">
