@@ -24,6 +24,20 @@ test('saveConfig rejects unsupported grid aspect', () => {
   assert.throws(() => validateSearchConfig({ grid_aspect: '5:2' }));
 });
 
+test('validates aspect against provided grid model', () => {
+  assert.throws(() => validateSearchConfig({
+    grid_model: 'openai/gpt-image-1',
+    grid_aspect: '7:5',
+  }));
+});
+
+test('validates grid resolution against provided grid model', () => {
+  assert.throws(() => validateSearchConfig({
+    grid_model: 'google/gemini-3.1-flash-image-preview',
+    grid_resolution: '2K',
+  }));
+});
+
 test('settings key is search.v1', () => {
   assert.equal(SEARCH_SETTINGS_KEY, 'search.v1');
 });

@@ -895,17 +895,23 @@ async function runSearchStep(req, res, stage, processFn) {
   if (!requireAdmin(req, res)) return;
   const job = await q.getSearchJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Поиск не найден' });
-  await q.updateSearchJob(req.params.id, { status: 'processing', stage });
-  try {
-    return res.json(await processFn(req.params.id));
-  } catch (e) {
-    await q.updateSearchJob(req.params.id, {
+  const id = req.params.id;
+  await q.updateSearchJob(id, {
+    status: 'processing',
+    stage,
+    error: null,
+    started_at: new Date().toISOString(),
+  });
+  void processFn(id).catch(async (e) => {
+    const error = String(e.message || e).slice(0, 300);
+    await q.updateSearchJob(id, {
       status: 'failed',
-      error: String(e.message || e).slice(0, 300),
+      error,
       finished_at: new Date().toISOString(),
-    });
-    throw e;
-  }
+    }).catch(() => {});
+    log({ event: 'search_step_error', step: stage, job_id: id, error });
+  });
+  return res.status(202).json(await searchJobDto(id));
 }
 
 app.post('/api/admin/search/jobs', (req, res, next) => {

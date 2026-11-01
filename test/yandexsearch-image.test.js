@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const {
   normalizeImageSearchResults,
+  normalizeImageSearchXml,
   buildSearchByImageBody,
   buildSearchWebBody,
 } = await import('../src/yandexsearch.js');
@@ -35,6 +36,46 @@ test('normalizeImageSearchResults maps image fields', () => {
   });
   assert.equal(camel[0].pageUrl, 'https://example.ru/product/2');
   assert.equal(camel[0].pageTitle, 'Диван два');
+});
+
+const IMAGE_XML = `<?xml version="1.0" encoding="utf-8"?>
+<yandexsearch>
+  <response>
+    <images>
+      <image>
+        <url>https://cdn.example.ru/img/one.jpg</url>
+        <pageUrl>https://example.ru/product/one</pageUrl>
+        <pageTitle>Первый товар</pageTitle>
+        <host>example.ru</host>
+        <passage>Первый товар с диваном.</passage>
+        <width>640</width>
+        <height>480</height>
+      </image>
+      <image>
+        <url>https://cdn.example.ru/img/two.jpg</url>
+        <page_url>https://example.ru/product/two</page_url>
+        <page_title>Второй товар</page_title>
+        <host>example.ru</host>
+        <width>800</width>
+        <height>600</height>
+      </image>
+    </images>
+  </response>
+</yandexsearch>`;
+
+test('normalizeImageSearchXml maps image nodes and falls back for rawData', () => {
+  const rows = normalizeImageSearchXml(IMAGE_XML);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].url, 'https://cdn.example.ru/img/one.jpg');
+  assert.equal(rows[0].pageUrl, 'https://example.ru/product/one');
+  assert.equal(rows[0].pageTitle, 'Первый товар');
+  assert.equal(rows[1].pageUrl, 'https://example.ru/product/two');
+  assert.equal(rows[1].pageTitle, 'Второй товар');
+  assert.equal(rows[1].width, 800);
+  assert.equal(rows[1].height, 600);
+
+  const decoded = normalizeImageSearchXml(Buffer.from(IMAGE_XML, 'utf8').toString('base64'));
+  assert.equal(decoded.length, 2);
 });
 
 test('buildSearchByImageBody sets data and page', () => {

@@ -19,7 +19,6 @@ export const DEFAULT_SEARCH_CONFIG = {
 };
 
 const BOOLEAN_KEYS = ['enabled', 'visual_enabled'];
-const STRING_KEYS = ['grid_resolution'];
 const MODEL_KEYS = ['vision_model', 'grid_model'];
 
 let cache = clone(DEFAULT_SEARCH_CONFIG);
@@ -49,7 +48,7 @@ function validateModel(key, value) {
   return model;
 }
 
-export function validateSearchConfig(input = {}) {
+export function validateSearchConfig(input = {}, base = DEFAULT_SEARCH_CONFIG) {
   const out = {};
   for (const key of BOOLEAN_KEYS) {
     if (key in input) out[key] = bool(input[key], DEFAULT_SEARCH_CONFIG[key]);
@@ -57,16 +56,33 @@ export function validateSearchConfig(input = {}) {
   for (const key of MODEL_KEYS) {
     if (key in input) out[key] = validateModel(key, input[key]);
   }
-  for (const key of STRING_KEYS) {
-    if (key in input) out[key] = String(input[key] ?? '').trim();
-  }
+  const gridModel = String(out.grid_model || base?.grid_model || DEFAULT_SEARCH_CONFIG.grid_model);
   if ('grid_aspect' in input) {
     const aspect = String(input.grid_aspect ?? '').trim();
-    const caps = modelCaps(DEFAULT_SEARCH_CONFIG.grid_model);
+    const caps = modelCaps(gridModel);
     if (!caps.aspects.includes(aspect)) {
       throw new Error(`aspect_ratio для grid: ${caps.aspects.join(', ')}`);
     }
     out.grid_aspect = aspect;
+  } else if (out.grid_model && base?.grid_aspect) {
+    const caps = modelCaps(gridModel);
+    if (!caps.aspects.includes(String(base.grid_aspect))) {
+      throw new Error(`aspect_ratio для grid: ${caps.aspects.join(', ')}`);
+    }
+  }
+  if ('grid_resolution' in input) {
+    const resolution = String(input.grid_resolution ?? '').trim();
+    const resolutions = modelCaps(gridModel).resolutions;
+    if (resolution && resolutions.length > 0 && !resolutions.includes(resolution)) {
+      throw new Error(`resolution для grid: ${resolutions.join(', ')}`);
+    }
+    out.grid_resolution = resolution;
+  } else if (out.grid_model && base?.grid_resolution) {
+    const resolution = String(base.grid_resolution ?? '').trim();
+    const resolutions = modelCaps(gridModel).resolutions;
+    if (resolution && resolutions.length > 0 && !resolutions.includes(resolution)) {
+      throw new Error(`resolution для grid: ${resolutions.join(', ')}`);
+    }
   }
   if ('domains' in input) out.domains = normalizeDomains(input.domains);
   if ('region' in input) out.region = String(input.region ?? '').trim() || DEFAULT_SEARCH_CONFIG.region;
@@ -90,9 +106,13 @@ export async function loadSearchConfig() {
     const { q } = await import('./db.js');
     const rows = await q.settingsByKeys([SEARCH_SETTINGS_KEY]);
     const raw = rows.find(r => r.key === SEARCH_SETTINGS_KEY)?.value;
-    cache = raw
-      ? clone({ ...DEFAULT_SEARCH_CONFIG, ...validateSearchConfig(JSON.parse(raw)) })
-      : clone(DEFAULT_SEARCH_CONFIG);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const base = { ...DEFAULT_SEARCH_CONFIG, ...parsed };
+      cache = clone({ ...DEFAULT_SEARCH_CONFIG, ...validateSearchConfig(parsed, base) });
+    } else {
+      cache = clone(DEFAULT_SEARCH_CONFIG);
+    }
   } catch {
     cache = clone(DEFAULT_SEARCH_CONFIG);
   }
@@ -100,7 +120,8 @@ export async function loadSearchConfig() {
 }
 
 export async function saveSearchConfig(patch) {
-  const next = clone({ ...cache, ...validateSearchConfig(patch) });
+  const base = { ...cache, ...patch };
+  const next = clone({ ...cache, ...validateSearchConfig(patch, base) });
   const { q } = await import('./db.js');
   await q.setSetting(SEARCH_SETTINGS_KEY, JSON.stringify(next));
   cache = next;
@@ -115,7 +136,8 @@ export async function resetSearchConfig() {
 }
 
 export function setSearchConfigForTests(patch) {
-  cache = clone({ ...DEFAULT_SEARCH_CONFIG, ...validateSearchConfig(patch) });
+  const base = { ...cache, ...patch };
+  cache = clone({ ...DEFAULT_SEARCH_CONFIG, ...validateSearchConfig(patch, base) });
 }
 
 export function searchConfigHash(config = getSearchConfig()) {

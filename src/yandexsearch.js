@@ -199,6 +199,51 @@ export function normalizeImageSearchResults(json) {
     .filter(row => row.url || row.pageUrl);
 }
 
+function decodeXmlSource(value) {
+  const raw = String(value ?? '');
+  if (!raw) return '';
+  if (raw.trim().startsWith('<')) return raw;
+  const decoded = Buffer.from(raw, 'base64').toString('utf8');
+  return decoded.includes('<') ? decoded : raw;
+}
+
+function collectImageNodes(node, out) {
+  if (Array.isArray(node)) {
+    for (const item of node) collectImageNodes(item, out);
+    return;
+  }
+  if (!node || typeof node !== 'object') return;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'image' || key === 'img') {
+      for (const item of asArray(value)) {
+        if (item && typeof item === 'object') out.push(item);
+      }
+      continue;
+    }
+    collectImageNodes(value, out);
+  }
+}
+
+export function normalizeImageSearchXml(xml) {
+  const source = decodeXmlSource(xml);
+  if (!source) return [];
+  const parsed = parser.parse(source.replace(/<\/?hlword>/gi, ''));
+  const nodes = [];
+  collectImageNodes(parsed, nodes);
+  return nodes
+    .map(node => ({
+      url: clean(node?.url ?? node?.['@_url']) || null,
+      format: clean(node?.format) || null,
+      width: toNumberOrNull(node?.width ?? node?.['@_width']),
+      height: toNumberOrNull(node?.height ?? node?.['@_height']),
+      host: clean(node?.host) || null,
+      pageUrl: clean(node?.pageUrl ?? node?.page_url) || null,
+      pageTitle: clean(node?.pageTitle ?? node?.page_title) || null,
+      passage: clean(node?.passage) || null,
+    }))
+    .filter(row => row.url || row.pageUrl);
+}
+
 function yandexKeys(apiKey, folderId) {
   if (!apiKey || !folderId) throw new Error('Yandex Search не настроен: YANDEX_SEARCH_API_KEY/YANDEX_FOLDER_ID');
 }
@@ -326,8 +371,15 @@ export async function searchImagesByImage({
   if (!response.ok) throw new Error(`Yandex image search ${response.status}: ${text.slice(0, 500)}`);
   let data = {};
   try { data = JSON.parse(text); } catch { throw new Error(`Yandex image search: некорректный JSON ${text.slice(0, 300)}`); }
+  const rawData = data.rawData ?? data.raw_data;
+  let images = [];
+  if (Array.isArray(data.images)) {
+    images = normalizeImageSearchResults(data);
+  } else if (rawData) {
+    images = normalizeImageSearchXml(rawData);
+  }
   return {
-    images: normalizeImageSearchResults(data),
+    images,
     page: data.page ?? null,
     cbir_id: data.id ?? null,
     latency_ms: Date.now() - started,

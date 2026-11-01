@@ -125,6 +125,8 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
   const [job, setJob] = useState<SearchJob | null>(null)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [renderId, setRenderId] = useState('')
+  const [openingRender, setOpeningRender] = useState(false)
   const [acting, setActing] = useState(false)
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -238,6 +240,29 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
     }
   }
 
+  const openRender = async () => {
+    const id = renderId.trim()
+    if (!id) return
+
+    setOpeningRender(true)
+    setError('')
+    try {
+      const data = await readJson<SearchJob>(
+        await apiRef.current('/api/admin/search/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ render_id: id }),
+        }),
+      )
+      applyJob(data)
+      onJobCreated?.(data.id)
+    } catch (e) {
+      setError(errorText(e, 'Не удалось открыть рендер'))
+    } finally {
+      setOpeningRender(false)
+    }
+  }
+
   const runStep = async (step: 'vision' | 'grid' | 'crops') => {
     if (!job) return
     setActing(true)
@@ -341,27 +366,52 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
   return (
     <section className="space-y-6">
       {!jobId && !job && (
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:bg-muted/60">
-          <span className="flex size-11 items-center justify-center rounded-full bg-background text-muted-foreground">
-            {uploading ? <LoaderCircle className="size-5 animate-spin" aria-hidden="true" /> : <Upload className="size-5" aria-hidden="true" />}
-          </span>
-          <span className="space-y-1">
-            <span className="block text-sm font-medium text-foreground">
-              {uploading ? 'Загружаем фото…' : 'Загрузить фото комнаты'}
+        <>
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center transition-colors hover:bg-muted/60">
+            <span className="flex size-11 items-center justify-center rounded-full bg-background text-muted-foreground">
+              {uploading ? <LoaderCircle className="size-5 animate-spin" aria-hidden="true" /> : <Upload className="size-5" aria-hidden="true" />}
             </span>
-            <span className="block text-xs text-muted-foreground">JPEG, PNG или WebP</span>
-          </span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            disabled={uploading}
-            onChange={upload}
-          />
-        </label>
+            <span className="space-y-1">
+              <span className="block text-sm font-medium text-foreground">
+                {uploading ? 'Загружаем фото…' : 'Загрузить фото комнаты'}
+              </span>
+              <span className="block text-xs text-muted-foreground">JPEG, PNG или WebP</span>
+            </span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              disabled={uploading}
+              onChange={upload}
+            />
+          </label>
+
+          <div className="rounded-xl border border-border bg-background p-4 shadow-sm">
+            <p className="text-sm font-medium text-foreground">Или откройте существующий рендер</p>
+            <p className="mt-1 text-xs text-muted-foreground">Вставьте ID рендера из кабинета.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={renderId}
+                onChange={event => setRenderId(event.target.value)}
+                placeholder="render_id"
+                disabled={openingRender}
+              />
+              <Button
+                variant="outline"
+                disabled={openingRender || !renderId.trim()}
+                onClick={() => void openRender()}
+              >
+                {openingRender
+                  ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  : <ExternalLink className="size-4" aria-hidden="true" />}
+                Открыть рендер
+              </Button>
+            </div>
+          </div>
+        </>
       )}
 
-      {(loading || uploading) && !job && (
+      {(loading || uploading || openingRender) && !job && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
           Загружаем данные поиска…

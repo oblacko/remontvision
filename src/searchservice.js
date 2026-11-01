@@ -118,9 +118,7 @@ export async function processVisionStep(jobId) {
 
   const sourceKey = `search-lab/${jobId}-source.${extForMime(mime)}`;
   await putArtifact(sourceKey, buffer, mime);
-  if (job.source === 'photo') {
-    await q.updateSearchJob(jobId, { photo_path: sourceKey });
-  }
+  await q.updateSearchJob(jobId, { photo_path: sourceKey });
 
   await q.deleteSearchObjectsForJob(jobId);
   for (const obj of vision.objects) {
@@ -323,6 +321,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   const domains = Array.isArray(filters.domains) && filters.domains.length
     ? filters.domains.map(String)
     : cfg.domains;
+  const region = String(filters.region || cfg.region || '213');
   const period = filters.period || 'all';
   const sort = filters.sort || 'relevance';
   const source = filters.source || 'both';
@@ -334,7 +333,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     domains,
     price_from: priceFrom,
     price_to: priceTo,
-    region: cfg.region,
+    region,
     period,
     sort,
     source,
@@ -349,7 +348,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   if (source !== 'visual') {
     const text = await searchWeb({
       query,
-      region: cfg.region,
+      region,
       limit: cfg.search_limit,
       period: PERIOD[period] || PERIOD.all,
       sortMode: SORT[sort] || SORT.relevance,
@@ -410,7 +409,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       domains,
       price_from: priceFrom,
       price_to: priceTo,
-      region: cfg.region,
+      region,
       period,
       sort,
       source,
@@ -474,11 +473,11 @@ export async function searchJobDto(jobId) {
   const steps = await q.searchStepsForJob(jobId);
 
   let sourceUrl = null;
-  if (job.source === 'render' && job.render_id) {
+  if (job.photo_path) {
+    sourceUrl = `/search-lab/${path.basename(job.photo_path)}`;
+  } else if (job.source === 'render' && job.render_id) {
     const render = await q.getRender(job.render_id);
     sourceUrl = `/renders/${path.basename(render?.image_path || '')}`;
-  } else if (job.photo_path) {
-    sourceUrl = `/search-lab/${path.basename(job.photo_path)}`;
   }
 
   return {
