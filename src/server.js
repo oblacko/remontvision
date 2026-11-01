@@ -1416,7 +1416,12 @@ async function main() {
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }
-  await assertConfig();     // проверка slug'ов моделей до приёма трафика
+  // Проверка моделей не должна ронять сайт, если OpenRouter/прокси временно недоступны.
+  try {
+    await assertConfig();
+  } catch (e) {
+    log({ event: 'config_warning', error: String(e.message || e).slice(0, 300) });
+  }
   if (!ADMIN_KEY) console.log('[warn] ADMIN_KEY не задан — админка каталога открыта не будет');
   app.listen(PORT, () => {
     log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
