@@ -556,4 +556,108 @@ export const q = {
       [styleId, productId, sort, roomType]).then(r => r.rows[0]),
   deleteStyleProduct: (styleId, productId) =>
     pool.query(`DELETE FROM style_products WHERE style_id = $1 AND product_id = $2`, [styleId, productId]).then(r => r.rowCount > 0),
+
+  // поиск (search lab)
+  createSearchJob: f =>
+    pool.query(`INSERT INTO search_jobs (id, user_id, source, render_id, photo_path, mode, status, photo_quality, prompts, config)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [f.id, f.user_id ?? null, f.source || 'photo', f.render_id || null, f.photo_path || null,
+       f.mode || 'A', f.status || 'queued', JSON.stringify(f.photo_quality || {}),
+       JSON.stringify(f.prompts || {}), JSON.stringify(f.config || {})]),
+  getSearchJob: id =>
+    pool.query(`SELECT * FROM search_jobs WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  updateSearchJob: (id, patch) => {
+    const cols = ['status', 'stage', 'error', 'photo_quality', 'vision_raw', 'prompts', 'config', 'cost_usd', 'started_at', 'finished_at', 'mode'];
+    const jsonCols = new Set(['photo_quality', 'vision_raw', 'prompts', 'config']);
+    const keys = Object.keys(patch).filter(k => cols.includes(k));
+    if (!keys.length) return Promise.resolve(null);
+    const set = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+    return pool.query(`UPDATE search_jobs SET ${set} WHERE id = $1 RETURNING *`,
+      [id, ...keys.map(k => jsonCols.has(k) && patch[k] != null ? JSON.stringify(patch[k]) : patch[k])])
+      .then(r => r.rows[0] || null);
+  },
+  listSearchJobs: (limit = 50) =>
+    pool.query(`SELECT id, source, mode, status, error, cost_usd, created_at, finished_at
+                FROM search_jobs ORDER BY created_at DESC LIMIT $1`, [limit]).then(r => r.rows),
+  createSearchObject: f =>
+    pool.query(`INSERT INTO search_objects (job_id, idx, category, label, description, color, material, style, hex, size, search_query, bbox, confidence, visibility, status)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [f.job_id, f.idx || 0, f.category || null, f.label, f.description || null, f.color || null,
+       f.material || null, f.style || null, f.hex || null, f.size || null, f.search_query || null,
+       f.bbox != null ? JSON.stringify(f.bbox) : null, f.confidence ?? null,
+       f.visibility || 'seen', f.status || 'pending']).then(r => r.rows[0]),
+  searchObjectsForJob: jobId =>
+    pool.query(`SELECT * FROM search_objects WHERE job_id = $1 ORDER BY idx`, [jobId]).then(r => r.rows),
+  getSearchObject: id =>
+    pool.query(`SELECT * FROM search_objects WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  updateSearchObject: (id, patch) => {
+    const cols = ['thumbnail_path', 'thumbnail_mode', 'cell_check', 'status', 'search_query', 'bbox'];
+    const jsonCols = new Set(['cell_check', 'bbox']);
+    const keys = Object.keys(patch).filter(k => cols.includes(k));
+    if (!keys.length) return Promise.resolve(null);
+    const set = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+    return pool.query(`UPDATE search_objects SET ${set} WHERE id = $1 RETURNING *`,
+      [id, ...keys.map(k => jsonCols.has(k) && patch[k] != null ? JSON.stringify(patch[k]) : patch[k])])
+      .then(r => r.rows[0] || null);
+  },
+  deleteSearchObjectsForJob: jobId =>
+    pool.query(`DELETE FROM search_objects WHERE job_id = $1`, [jobId]),
+  upsertSearchResult: f =>
+    pool.query(`INSERT INTO search_results (object_id, source, provider, store, canonical_url, title, image_url, image_path, price, currency, match_score, score_breakdown, checked_at, raw)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+                ON CONFLICT (object_id, canonical_url) DO UPDATE SET
+                  source = EXCLUDED.source, provider = EXCLUDED.provider, store = EXCLUDED.store,
+                  title = EXCLUDED.title, image_url = EXCLUDED.image_url, image_path = EXCLUDED.image_path,
+                  price = EXCLUDED.price, currency = EXCLUDED.currency, match_score = EXCLUDED.match_score,
+                  score_breakdown = EXCLUDED.score_breakdown, checked_at = EXCLUDED.checked_at, raw = EXCLUDED.raw
+                RETURNING *`,
+      [f.object_id, f.source || 'text', f.provider || 'yandex', f.store || null, f.canonical_url,
+       f.title || null, f.image_url || null, f.image_path || null, f.price ?? null, f.currency || 'RUB',
+       f.match_score ?? null,
+       f.score_breakdown != null ? JSON.stringify(f.score_breakdown) : null,
+       f.checked_at || null,
+       f.raw != null ? JSON.stringify(f.raw) : null]).then(r => r.rows[0]),
+  searchResultsForObject: objectId =>
+    pool.query(`SELECT * FROM search_results WHERE object_id = $1 ORDER BY match_score DESC NULLS LAST`, [objectId]).then(r => r.rows),
+  clearSearchResults: objectId =>
+    pool.query(`DELETE FROM search_results WHERE object_id = $1`, [objectId]),
+  logSearchStep: f =>
+    pool.query(`INSERT INTO search_steps (job_id, object_id, step, status, input, output, prompt, cost_usd, error)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [f.job_id, f.object_id ?? null, f.step, f.status || 'running',
+       f.input != null ? JSON.stringify(f.input) : null,
+       f.output != null ? JSON.stringify(f.output) : null,
+       f.prompt || null, f.cost_usd ?? null, f.error || null]),
+  getSearchCache: (objectId, filtersHash) =>
+    pool.query(`SELECT payload FROM search_cache
+                WHERE object_id = $1 AND filters_hash = $2 AND expires_at > now()`, [objectId, filtersHash])
+      .then(r => r.rows[0] ? r.rows[0].payload : null),
+  setSearchCache: (objectId, filtersHash, payload, ttlHours) =>
+    pool.query(`INSERT INTO search_cache (object_id, filters_hash, payload, expires_at)
+                VALUES ($1,$2,$3, now() + ($4 || ' hours')::interval)
+                ON CONFLICT (object_id, filters_hash) DO UPDATE SET
+                  payload = EXCLUDED.payload, expires_at = EXCLUDED.expires_at`,
+      [objectId, filtersHash, JSON.stringify(payload), String(ttlHours)]),
+  logSearchClick: ({ resultId, userId = null, ipHash = null }) =>
+    pool.query(`INSERT INTO search_clicks (result_id, user_id, ip_hash) VALUES ($1,$2,$3)`,
+      [resultId, userId, ipHash]),
+  listSearchPrompts: kind =>
+    pool.query(`SELECT id, kind, version, prompt, active FROM search_prompts
+                WHERE kind = $1 ORDER BY version DESC`, [kind]).then(r => r.rows),
+  createSearchPromptVersion: (kind, prompt) =>
+    withTransaction(async client => {
+      const { rows } = await client.query(
+        `SELECT COALESCE(MAX(version), 0) + 1 AS version FROM search_prompts WHERE kind = $1`, [kind]);
+      const ins = await client.query(
+        `INSERT INTO search_prompts (kind, version, prompt, active) VALUES ($1,$2,$3,false) RETURNING *`,
+        [kind, rows[0].version, prompt]);
+      return ins.rows[0];
+    }),
+  activateSearchPromptVersion: (kind, id) =>
+    withTransaction(async client => {
+      await client.query(`UPDATE search_prompts SET active = false WHERE kind = $1`, [kind]);
+      const { rows } = await client.query(
+        `UPDATE search_prompts SET active = true WHERE id = $2 AND kind = $1 RETURNING *`, [kind, id]);
+      return rows[0] || null;
+    }),
 };
