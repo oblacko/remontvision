@@ -121,6 +121,21 @@ const presentationLabel = (status?: GenItem['presentation_status']) => status ==
   : status === 'matched' ? 'Похожий по рендеру' : 'Подобран к дизайну'
 
 const stepLabels = ['Фото', 'Стиль', 'Результат', 'Смета'] as const
+
+const BASE_GEN_STAGES = [
+  { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик' },
+  { key: 'analyzing', label: 'Анализ фото', hint: 'Разбираем комнату, свет и материалы' },
+  { key: 'rendering', label: 'Генерация кадра', hint: 'Модель рисует изображение — обычно 30–90 секунд' },
+  { key: 'matching', label: 'Подбор товаров', hint: 'Собираем смету и проверяем результат' },
+  { key: 'done', label: 'Готово', hint: 'Открываем визуализацию' },
+] as const
+
+const EDIT_GEN_STAGES = [
+  { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик' },
+  { key: 'rendering', label: 'Применяем правку', hint: 'Модель перерисовывает кадр по референсам' },
+  { key: 'matching', label: 'Проверка', hint: 'Сверяем результат с исходником' },
+  { key: 'done', label: 'Готово', hint: 'Открываем новую версию' },
+] as const
 const defaultRoomTypes = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое']
 
 function stepIndex(step: Step): number {
@@ -183,7 +198,9 @@ export function GenerationPanel({
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
   const [refineText, setRefineText] = useState('')
-  const [progress, setProgress] = useState(0)
+  const [genStage, setGenStage] = useState('queued')
+  const [genMode, setGenMode] = useState<'base' | 'edit'>('base')
+  const [elapsed, setElapsed] = useState(0)
   const [lightbox, setLightbox] = useState(false)
   const [roomId, setRoomId] = useState('')
   const [genError, setGenError] = useState('')
@@ -314,7 +331,8 @@ export function GenerationPanel({
 
   useEffect(() => {
     if (step !== 'generating') return
-    const interval = window.setInterval(() => setProgress(value => value < 94 ? Math.min(94, value + 2) : value), 700)
+    const started = Date.now()
+    const interval = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
     return () => window.clearInterval(interval)
   }, [step])
 
@@ -551,6 +569,7 @@ export function GenerationPanel({
         setStep(iterations.length ? 'result' : 'style')
         return null
       }
+      if (d.status) setGenStage(d.status)
       if (d.status === 'done') return d
       if (d.status === 'error') {
         setGenError(d.error || 'Генерация не удалась')
@@ -566,7 +585,8 @@ export function GenerationPanel({
     const measureCount = [roomWidthM, roomLengthM, roomHeightM].filter(value => value.trim()).length
     if (measureCount > 0 && measureCount < 3) { setPhotoError('Заполните ширину, длину и высоту комнаты или оставьте все три поля пустыми'); setStep('photo'); return }
     if (busy) return
-    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setRefineText(''); setProgress(3); setStep('generating')
+    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setRefineText('')
+    setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
     try {
       const isBase = !roomId || Boolean(refFile && refFile !== usedRef)
       let id = roomId
@@ -647,7 +667,7 @@ export function GenerationPanel({
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
       setOpenHistory(next.id)
-      setProgress(100)
+      setGenStage('done')
       setStep('result')
       clearEditRefs()
       await onRefreshUser()
@@ -670,12 +690,17 @@ export function GenerationPanel({
     loadedRoomRef.current = ''
     clearEditRefs()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
-    setRefineText(''); setGenError(''); setProgress(0); setRoomId(''); setBusy(false); setCreditOpen(false)
+    setRefineText(''); setGenError(''); setGenStage('queued'); setElapsed(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     if (photoInput.current) photoInput.current.value = ''
     if (refInput.current) refInput.current.value = ''
   }
 
   const activeStep = stepIndex(step)
+  const genStages = genMode === 'edit' ? EDIT_GEN_STAGES : BASE_GEN_STAGES
+  const genStageIndex = Math.max(0, genStages.findIndex(item => item.key === genStage))
+  const genStageInfo = genStages[genStageIndex]
+  const genPercent = Math.round(((genStageIndex + 1) / genStages.length) * 100)
+  const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
 
   return (
     <div className="gen-overlay" data-open={open} role="dialog" aria-modal="true" aria-label="Генератор дизайна интерьера">
@@ -927,14 +952,33 @@ export function GenerationPanel({
         )}
 
         {step === 'generating' && (
-          <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-16 text-center" role="status" aria-live="polite">
-            <LoaderCircle className="size-10 animate-spin text-primary-text motion-reduce:animate-none" />
-            <h3 className="display-title mt-8 text-4xl">{productBinding ? 'Привязываем товар' : 'Создаём ваш дизайн'}</h3>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">{productBinding ? 'Меняем только выбранный объект, затем проверяем сходство, архитектуру и качество кадра.' : 'Рисуем визуализацию без каталожных карточек, подбираем отделку и собираем палитру комнаты.'}</p>
-            <div className="mt-8 h-1 w-full overflow-hidden bg-border" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-              <div className="h-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />
+          <div className="mx-auto max-w-xl py-16" role="status" aria-live="polite">
+            <div className="flex items-start gap-4">
+              <LoaderCircle className="mt-1 size-8 shrink-0 animate-spin text-primary-text motion-reduce:animate-none" />
+              <div>
+                <h3 className="display-title text-3xl">{productBinding ? 'Привязываем товар' : genMode === 'edit' ? 'Применяем правку' : 'Создаём ваш дизайн'}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{genStageInfo.hint}</p>
+              </div>
             </div>
-            <p className="mt-3 font-mono text-sm">{progress}%</p>
+            <div className="mt-8 h-1 w-full overflow-hidden bg-border" role="progressbar" aria-valuenow={genPercent} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${genPercent}%` }} />
+            </div>
+            <ol className="mt-6 space-y-2.5">
+              {genStages.map((item, index) => {
+                const done = index < genStageIndex
+                const active = index === genStageIndex
+                return (
+                  <li key={item.key} className={`flex items-center gap-3 text-sm ${done || active ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {done ? <Check className="size-4 shrink-0 text-primary-text" /> : active ? <LoaderCircle className="size-4 shrink-0 animate-spin text-primary-text motion-reduce:animate-none" /> : <span className="size-4 shrink-0 rounded-full border" />}
+                    <span>{item.label}</span>
+                    {active && <span className="ml-auto font-mono text-[11px] text-muted-foreground">сейчас</span>}
+                  </li>
+                )
+              })}
+            </ol>
+            <p className="mt-6 text-xs leading-5 text-muted-foreground">
+              Прошло {elapsedLabel}. {elapsed >= 120 ? 'Идёт дольше обычного — не закрывайте окно.' : 'Можно переключиться на другую вкладку, процесс продолжится.'}
+            </p>
           </div>
         )}
 
