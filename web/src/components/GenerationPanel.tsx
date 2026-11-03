@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
+  Clipboard,
   Download,
   Expand,
   Info,
@@ -56,6 +57,7 @@ type EditRefDraft = {
   id: string
   file: File | null
   url: string
+  urlDraft: string
   preview: string | null
   name: string
   description: string
@@ -63,7 +65,7 @@ type EditRefDraft = {
 }
 
 const emptyEditRef = (): EditRefDraft => ({
-  id: crypto.randomUUID(), file: null, url: '', preview: null, name: '', description: '', drag: false,
+  id: crypto.randomUUID(), file: null, url: '', urlDraft: '', preview: null, name: '', description: '', drag: false,
 })
 
 type RoomResult = {
@@ -500,8 +502,36 @@ export function GenerationPanel({
     setEditRefs(prev => prev.map(ref => {
       if (ref.id !== id) return ref
       if (ref.preview) releaseUrl(ref.preview)
-      return { ...ref, file: null, url: clean, preview: null, name: 'Референс по ссылке' }
+      return { ...ref, file: null, url: clean, urlDraft: '', preview: null, name: 'Референс по ссылке' }
     }))
+  }
+
+  const clearEditRefSource = (id: string) => setEditRefs(prev => prev.map(ref => {
+    if (ref.id !== id) return ref
+    if (ref.preview) releaseUrl(ref.preview)
+    return { ...ref, file: null, url: '', urlDraft: '', preview: null, name: '' }
+  }))
+
+  const pasteEditRef = async (id: string) => {
+    try {
+      if (navigator.clipboard?.read) {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          const type = item.types.find(value => value.startsWith('image/'))
+          if (type) {
+            const blob = await item.getType(type)
+            const ext = type.split('/')[1] || 'png'
+            setEditRefFile(id, new File([blob], `clipboard.${ext}`, { type }))
+            return
+          }
+        }
+      }
+      const text = (await navigator.clipboard?.readText())?.trim() || ''
+      if (/^https?:\/\//i.test(text)) { setEditRefUrl(id, text); return }
+      setGenError('В буфере нет картинки или ссылки')
+    } catch {
+      setGenError('Браузер не дал доступ к буферу. Вставьте ссылку в поле или перетащите файл.')
+    }
   }
 
   async function pollRoom(id: string): Promise<RoomResult | null> {
@@ -1037,50 +1067,91 @@ export function GenerationPanel({
                                 const text = event.clipboardData.getData('text').trim()
                                 if (/^https?:\/\//i.test(text)) { event.preventDefault(); addEditRefFromUrl(text) }
                               }} placeholder="Общий комментарий к правке (необязательно)" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                              {editRefs.map((ref, refIndex) => (
-                                <div
-                                  key={ref.id}
-                                  className={`rounded-none border border-dashed p-2 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
-                                  onDragOver={(event) => { event.preventDefault(); updateEditRef(ref.id, { drag: true }) }}
-                                  onDragLeave={() => updateEditRef(ref.id, { drag: false })}
-                                  onDrop={(event) => {
-                                    event.preventDefault(); updateEditRef(ref.id, { drag: false })
-                                    const file = event.dataTransfer.files?.[0]
-                                    if (file) { setEditRefFile(ref.id, file); return }
-                                    const text = event.dataTransfer.getData('text').trim()
-                                    if (/^https?:\/\//i.test(text)) setEditRefUrl(ref.id, text)
-                                  }}
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[11px] text-muted-foreground">Референс {refIndex + 1}</span>
-                                    <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-7 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
+                              {editRefs.map((ref, refIndex) => {
+                                const hasSource = Boolean(ref.file || ref.url)
+                                const validDraft = /^https?:\/\/\S+$/i.test(ref.urlDraft.trim())
+                                return (
+                                  <div
+                                    key={ref.id}
+                                    className={`rounded-none border border-dashed p-2 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
+                                    onDragOver={(event) => { event.preventDefault(); updateEditRef(ref.id, { drag: true }) }}
+                                    onDragLeave={() => updateEditRef(ref.id, { drag: false })}
+                                    onDrop={(event) => {
+                                      event.preventDefault(); updateEditRef(ref.id, { drag: false })
+                                      const file = event.dataTransfer.files?.[0]
+                                      if (file) { setEditRefFile(ref.id, file); return }
+                                      const text = event.dataTransfer.getData('text').trim()
+                                      if (/^https?:\/\//i.test(text)) setEditRefUrl(ref.id, text)
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-[11px] text-muted-foreground">Референс {refIndex + 1} · файл, ссылка или буфер</span>
+                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-7 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
+                                    </div>
+                                    <div className="mt-2 space-y-2">
+                                      {hasSource ? (
+                                        <div className="flex items-center gap-2">
+                                          {ref.preview ? (
+                                            <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border object-cover" />
+                                          ) : (
+                                            <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</a>
+                                          )}
+                                          <div className="min-w-0 flex-1">
+                                            <p className="truncate text-xs">{ref.url || ref.name || 'Референс'}</p>
+                                            <p className="text-[11px] text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
+                                          </div>
+                                          <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center border" title="Заменить файл" aria-label="Заменить файл">
+                                            <Upload className="size-4 text-primary-text" />
+                                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
+                                          </label>
+                                          <button type="button" onClick={() => pasteEditRef(ref.id)} className="flex size-9 shrink-0 items-center justify-center border" title="Вставить из буфера" aria-label="Вставить из буфера"><Clipboard className="size-4" /></button>
+                                          <button type="button" onClick={() => clearEditRefSource(ref.id)} className="flex size-9 shrink-0 items-center justify-center border text-destructive" title="Заменить источник" aria-label="Заменить источник"><X className="size-4" /></button>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          <div className="flex flex-wrap gap-2">
+                                            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border px-3 text-xs">
+                                              <Upload className="size-4 text-primary-text" /> Выбрать файл
+                                              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
+                                            </label>
+                                            <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 items-center gap-2 border px-3 text-xs">
+                                              <Clipboard className="size-4 text-primary-text" /> Вставить из буфера
+                                            </button>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <input
+                                              value={ref.urlDraft}
+                                              onChange={(event) => updateEditRef(ref.id, { urlDraft: event.target.value })}
+                                              onKeyDown={(event) => {
+                                                if (event.key === 'Enter') {
+                                                  event.preventDefault()
+                                                  if (validDraft) setEditRefUrl(ref.id, ref.urlDraft)
+                                                }
+                                              }}
+                                              placeholder="…или вставьте ссылку https://"
+                                              className="h-10 min-w-0 flex-1 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
+                                            />
+                                            <button type="button" disabled={!validDraft} onClick={() => setEditRefUrl(ref.id, ref.urlDraft)} className="min-h-10 border border-foreground px-3 text-xs transition-colors hover:bg-foreground hover:text-background disabled:opacity-40">Добавить</button>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <input
+                                        value={ref.description}
+                                        onChange={(event) => updateEditRef(ref.id, { description: event.target.value })}
+                                        onPaste={(event) => {
+                                          const file = event.clipboardData.files?.[0]
+                                          if (file) { event.preventDefault(); setEditRefFile(ref.id, file); return }
+                                          const text = event.clipboardData.getData('text').trim()
+                                          if (!ref.file && !ref.url && /^https?:\/\//i.test(text)) { event.preventDefault(); setEditRefUrl(ref.id, text) }
+                                        }}
+                                        placeholder="Что изменить, например: замените шторы"
+                                        className="h-10 min-w-0 w-full border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                                    {ref.preview ? (
-                                      <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border object-cover" />
-                                    ) : ref.url ? (
-                                      <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</a>
-                                    ) : (
-                                      <label className="flex h-12 shrink-0 cursor-pointer items-center justify-center gap-1 border px-3 text-xs">
-                                        <Upload className="size-4 text-primary-text" /> Файл
-                                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
-                                      </label>
-                                    )}
-                                    <input
-                                      value={ref.description}
-                                      onChange={(event) => updateEditRef(ref.id, { description: event.target.value })}
-                                      onPaste={(event) => {
-                                        const file = event.clipboardData.files?.[0]
-                                        if (file) { event.preventDefault(); setEditRefFile(ref.id, file); return }
-                                        const text = event.clipboardData.getData('text').trim()
-                                        if (!ref.file && !ref.url && /^https?:\/\//i.test(text)) { event.preventDefault(); setEditRefUrl(ref.id, text) }
-                                      }}
-                                      placeholder="Что изменить, например: замените шторы"
-                                      className="h-10 min-w-0 flex-1 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
-                                    />
-                                  </div>
-                                </div>
-                              ))}
+                                )
+                              })}
+                              <p className="text-[11px] leading-4 text-muted-foreground">Можно выбрать файл, перетащить его в блок, вставить картинку или ссылку из буфера — либо вставить ссылку в поле «https://».</p>
                               <button type="button" onClick={addEditRef} disabled={editRefs.length >= 4} className="inline-flex min-h-10 items-center justify-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                                 <Upload className="size-4 text-primary-text" /> Добавить референс
                               </button>
