@@ -356,6 +356,7 @@ export async function enqueueRenderWithCredit({
   editTarget = null,
   refPath = null,
   refProductId = null,
+  editRefs = null,
 }) {
   const iteration = Boolean(parentRenderId);
   const out = await withTransaction(async client => {
@@ -383,9 +384,9 @@ export async function enqueueRenderWithCredit({
     }
 
     await client.query(
-      `INSERT INTO renders (id, room_id, parent_render_id, request_text, request_ip, edit_target, ref_path, ref_product_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'queued')`,
-      [id, roomId, parentRenderId, requestText, requestIp, editTarget, refPath, refProductId]);
+      `INSERT INTO renders (id, room_id, parent_render_id, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'queued')`,
+      [id, roomId, parentRenderId, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null]);
 
     if (chargedUserId) {
       await client.query(

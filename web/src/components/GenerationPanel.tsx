@@ -52,6 +52,20 @@ type RoomBrief = {
   furniture?: string[]
   reasoning?: string
 }
+type EditRefDraft = {
+  id: string
+  file: File | null
+  url: string
+  preview: string | null
+  name: string
+  description: string
+  drag: boolean
+}
+
+const emptyEditRef = (): EditRefDraft => ({
+  id: crypto.randomUUID(), file: null, url: '', preview: null, name: '', description: '', drag: false,
+})
+
 type RoomResult = {
   id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
   room_width_m?: number | null; room_length_m?: number | null; room_height_m?: number | null; bed_length_m?: number | null;
@@ -162,11 +176,7 @@ export function GenerationPanel({
   const [refUrl, setRefUrl] = useState('')
   const [refUrlDraft, setRefUrlDraft] = useState('')
   const [usedRef, setUsedRef] = useState<File | null>(null)
-  const [editRefPhoto, setEditRefPhoto] = useState<string | null>(null)
-  const [editRefFile, setEditRefFile] = useState<File | null>(null)
-  const [editRefName, setEditRefName] = useState('')
-  const [editRefUrl, setEditRefUrl] = useState('')
-  const [editRefDrag, setEditRefDrag] = useState(false)
+  const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
@@ -183,7 +193,6 @@ export function GenerationPanel({
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const refInput = useRef<HTMLInputElement>(null)
-  const editRefInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
   const loadedRoomRef = useRef('')
 
@@ -442,36 +451,57 @@ export function GenerationPanel({
     if (refInput.current) refInput.current.value = ''
   }
 
-  const clearEditRef = () => {
-    releaseUrl(editRefPhoto)
-    setEditRefPhoto(null)
-    setEditRefFile(null)
-    setEditRefName('')
-    setEditRefUrl('')
-    if (editRefInput.current) editRefInput.current.value = ''
+  const clearEditRefs = () => {
+    setEditRefs(prev => {
+      prev.forEach(ref => { if (ref.preview) releaseUrl(ref.preview) })
+      return []
+    })
   }
 
-  const acceptEditRef = (nextFile?: File) => {
+  const addEditRef = () => setEditRefs(prev => prev.length >= 4 ? prev : [...prev, emptyEditRef()])
+
+  const addEditRefFromFile = (nextFile?: File) => {
     if (!nextFile || !nextFile.type.startsWith('image/')) return
     if (nextFile.size > 15 * 1024 * 1024) { setGenError('Референс больше 15 МБ'); return }
-    releaseUrl(editRefPhoto)
-    const url = URL.createObjectURL(nextFile)
-    rememberUrl(url)
-    setEditRefPhoto(url)
-    setEditRefFile(nextFile)
-    setEditRefName(nextFile.name)
-    setEditRefUrl('')
+    const preview = URL.createObjectURL(nextFile)
+    rememberUrl(preview)
+    setEditRefs(prev => prev.length >= 4 ? prev : [...prev, { ...emptyEditRef(), file: nextFile, preview, name: nextFile.name }])
   }
 
-  const acceptEditRefUrl = (url: string) => {
-    const clean = url.trim()
+  const addEditRefFromUrl = (value: string) => {
+    const clean = value.trim()
     if (!/^https?:\/\//i.test(clean)) return
-    releaseUrl(editRefPhoto)
-    setEditRefPhoto(null)
-    setEditRefFile(null)
-    setEditRefName('Референс по ссылке')
-    setEditRefUrl(clean)
-    if (editRefInput.current) editRefInput.current.value = ''
+    setEditRefs(prev => prev.length >= 4 ? prev : [...prev, { ...emptyEditRef(), url: clean, name: 'Референс по ссылке' }])
+  }
+
+  const removeEditRef = (id: string) => setEditRefs(prev => {
+    const target = prev.find(ref => ref.id === id)
+    if (target?.preview) releaseUrl(target.preview)
+    return prev.filter(ref => ref.id !== id)
+  })
+
+  const updateEditRef = (id: string, patch: Partial<EditRefDraft>) => setEditRefs(prev => prev.map(ref => ref.id === id ? { ...ref, ...patch } : ref))
+
+  const setEditRefFile = (id: string, nextFile?: File) => {
+    if (!nextFile || !nextFile.type.startsWith('image/')) return
+    if (nextFile.size > 15 * 1024 * 1024) { setGenError('Референс больше 15 МБ'); return }
+    const preview = URL.createObjectURL(nextFile)
+    rememberUrl(preview)
+    setEditRefs(prev => prev.map(ref => {
+      if (ref.id !== id) return ref
+      if (ref.preview) releaseUrl(ref.preview)
+      return { ...ref, file: nextFile, url: '', preview, name: nextFile.name }
+    }))
+  }
+
+  const setEditRefUrl = (id: string, value: string) => {
+    const clean = value.trim()
+    if (!/^https?:\/\//i.test(clean)) return
+    setEditRefs(prev => prev.map(ref => {
+      if (ref.id !== id) return ref
+      if (ref.preview) releaseUrl(ref.preview)
+      return { ...ref, file: null, url: clean, preview: null, name: 'Референс по ссылке' }
+    }))
   }
 
   async function pollRoom(id: string): Promise<RoomResult | null> {
@@ -500,7 +530,7 @@ export function GenerationPanel({
     }
   }
 
-  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string }) {
+  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }> }) {
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     const measureCount = [roomWidthM, roomLengthM, roomHeightM].filter(value => value.trim()).length
@@ -539,7 +569,15 @@ export function GenerationPanel({
         fd.append('text', request)
         if (edit?.target) fd.append('target', edit.target)
         if (edit?.productId) fd.append('product_id', String(edit.productId))
-        if (edit?.parentId) fd.append('parent_id', edit.parentId)
+        if (edit?.parentId)         fd.append('parent_id', edit.parentId)
+        const refs = edit?.refs || []
+        if (refs.length) {
+          fd.append('ref_meta', JSON.stringify(refs.map(ref => ({
+            description: ref.description || '',
+            ...(ref.url ? { url: ref.url } : {}),
+          }))))
+          refs.forEach(ref => { if (ref.file) fd.append('refs', ref.file) })
+        }
         if (edit?.refFile) fd.append('ref', edit.refFile)
         if (!edit?.refFile && edit?.refUrl) fd.append('ref_url', edit.refUrl)
         const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
@@ -581,7 +619,7 @@ export function GenerationPanel({
       setOpenHistory(next.id)
       setProgress(100)
       setStep('result')
-      clearEditRef()
+      clearEditRefs()
       await onRefreshUser()
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось выполнить генерацию')
@@ -600,7 +638,7 @@ export function GenerationPanel({
     setCustomOpen(false); setAdvancedOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
     loadedRoomRef.current = ''
-    clearEditRef()
+    clearEditRefs()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
     setRefineText(''); setGenError(''); setProgress(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     if (photoInput.current) photoInput.current.value = ''
@@ -995,50 +1033,70 @@ export function GenerationPanel({
                             <div className="mt-3 flex flex-col gap-2">
                               <input value={refineText} onChange={(event) => setRefineText(event.target.value)} onPaste={(event) => {
                                 const file = event.clipboardData.files?.[0]
-                                if (file) { event.preventDefault(); acceptEditRef(file); return }
+                                if (file) { event.preventDefault(); addEditRefFromFile(file); return }
                                 const text = event.clipboardData.getData('text').trim()
-                                if (/^https?:\/\//i.test(text)) { event.preventDefault(); acceptEditRefUrl(text) }
-                              }} placeholder="Опишите правку. Можно вставить сюда ссылку на референс…" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                              <div
-                                className={`rounded-none border border-dashed p-2 transition-colors ${editRefDrag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
-                                onDragOver={(event) => { event.preventDefault(); setEditRefDrag(true) }}
-                                onDragLeave={() => setEditRefDrag(false)}
-                                onDrop={(event) => {
-                                  event.preventDefault(); setEditRefDrag(false)
-                                  const file = event.dataTransfer.files?.[0]
-                                  if (file) { acceptEditRef(file); return }
-                                  const text = event.dataTransfer.getData('text').trim()
-                                  if (/^https?:\/\//i.test(text)) acceptEditRefUrl(text)
+                                if (/^https?:\/\//i.test(text)) { event.preventDefault(); addEditRefFromUrl(text) }
+                              }} placeholder="Общий комментарий к правке (необязательно)" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
+                              {editRefs.map((ref, refIndex) => (
+                                <div
+                                  key={ref.id}
+                                  className={`rounded-none border border-dashed p-2 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
+                                  onDragOver={(event) => { event.preventDefault(); updateEditRef(ref.id, { drag: true }) }}
+                                  onDragLeave={() => updateEditRef(ref.id, { drag: false })}
+                                  onDrop={(event) => {
+                                    event.preventDefault(); updateEditRef(ref.id, { drag: false })
+                                    const file = event.dataTransfer.files?.[0]
+                                    if (file) { setEditRefFile(ref.id, file); return }
+                                    const text = event.dataTransfer.getData('text').trim()
+                                    if (/^https?:\/\//i.test(text)) setEditRefUrl(ref.id, text)
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] text-muted-foreground">Референс {refIndex + 1}</span>
+                                    <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-7 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
+                                  </div>
+                                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    {ref.preview ? (
+                                      <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border object-cover" />
+                                    ) : ref.url ? (
+                                      <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</a>
+                                    ) : (
+                                      <label className="flex h-12 shrink-0 cursor-pointer items-center justify-center gap-1 border px-3 text-xs">
+                                        <Upload className="size-4 text-primary-text" /> Файл
+                                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
+                                      </label>
+                                    )}
+                                    <input
+                                      value={ref.description}
+                                      onChange={(event) => updateEditRef(ref.id, { description: event.target.value })}
+                                      onPaste={(event) => {
+                                        const file = event.clipboardData.files?.[0]
+                                        if (file) { event.preventDefault(); setEditRefFile(ref.id, file); return }
+                                        const text = event.clipboardData.getData('text').trim()
+                                        if (!ref.file && !ref.url && /^https?:\/\//i.test(text)) { event.preventDefault(); setEditRefUrl(ref.id, text) }
+                                      }}
+                                      placeholder="Что изменить, например: замените шторы"
+                                      className="h-10 min-w-0 flex-1 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                              <button type="button" onClick={addEditRef} disabled={editRefs.length >= 4} className="inline-flex min-h-10 items-center justify-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+                                <Upload className="size-4 text-primary-text" /> Добавить референс
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!refineText.trim() && !editRefs.some(ref => ref.file || ref.url)}
+                                onClick={() => {
+                                  const refs = editRefs.filter(ref => ref.file || ref.url).map(ref => ({
+                                    file: ref.file || undefined,
+                                    url: ref.url || undefined,
+                                    description: ref.description.trim(),
+                                  }))
+                                  startGeneration(refineText.trim() || 'Применить правки по референсам', item.styleName, { parentId: item.id, refs })
                                 }}
-                                onPaste={(event) => {
-                                  const file = event.clipboardData.files?.[0]
-                                  if (file) { event.preventDefault(); acceptEditRef(file); return }
-                                  const text = event.clipboardData.getData('text').trim()
-                                  if (/^https?:\/\//i.test(text)) { event.preventDefault(); acceptEditRefUrl(text) }
-                                }}
+                                className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
                               >
-                                {editRefPhoto ? (
-                                  <div className="flex items-center gap-2">
-                                    <img src={editRefPhoto} alt="" className="h-12 w-12 border object-cover" />
-                                    <span className="min-w-0 flex-1 truncate text-xs">{editRefName}</span>
-                                    <button type="button" onClick={clearEditRef} className="flex size-8 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
-                                  </div>
-                                ) : editRefUrl ? (
-                                  <div className="flex items-center gap-2">
-                                    <span className="flex size-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</span>
-                                    <a href={editRefUrl} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-xs underline underline-offset-2">{editRefUrl}</a>
-                                    <button type="button" onClick={clearEditRef} className="flex size-8 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
-                                  </div>
-                                ) : (
-                                  <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center gap-1 text-center">
-                                    <Upload className="size-4 text-primary-text" />
-                                    <span className="text-xs">Перетащите, вставьте из буфера или нажмите</span>
-                                    <span className="text-[11px] leading-4 text-muted-foreground">файл JPG/PNG/WebP или ссылка на референс</span>
-                                    <input ref={editRefInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptEditRef(event.target.files?.[0])} />
-                                  </label>
-                                )}
-                              </div>
-                              <button type="button" disabled={!refineText.trim()} onClick={() => startGeneration(refineText.trim(), item.styleName, { parentId: item.id, refFile: editRefFile || undefined, refUrl: editRefUrl || undefined })} className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                                 Перегенерировать <RotateCcw className="size-4" />
                               </button>
                             </div>

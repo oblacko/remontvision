@@ -47,6 +47,80 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # Отдельный сервис каталога (импорт фидов + векторный поиск) со своей БД.
+  catalog-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: catalog
+      POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog}
+      POSTGRES_DB: catalog
+    volumes:
+      - catalogdata:/var/lib/postgresql/data
+      - ./catalog-service/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog -d catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  catalog:
+    build:
+      context: ./catalog-service
+      args:
+        INSTALL_ML: ${CATALOG_INSTALL_ML:-0}
+    environment:
+      CATALOG_DATABASE_URL: postgresql://catalog:${CATALOG_DB_PASSWORD:-catalog}@catalog-db:5432/catalog
+      CATALOG_SERVICE_TOKEN: ${CATALOG_SERVICE_TOKEN:-change-me}
+      EMBEDDER: ${CATALOG_EMBEDDER:-torch}
+      EMBED_MODEL: ${CATALOG_EMBED_MODEL:-vit_base_patch14_dinov2.lvd142m}
+      EMBED_DIM: ${CATALOG_EMBED_DIM:-768}
+      EMBED_CONCURRENCY: ${CATALOG_EMBED_CONCURRENCY:-8}
+      COLOR_RERANK_WEIGHT: ${CATALOG_COLOR_RERANK_WEIGHT:-0.3}
+      COLOR_RERANK_POOL: ${CATALOG_COLOR_RERANK_POOL:-100}
+      QUERY_DIR: /app/data/queries
+      IMAGE_CACHE_DIR: /app/data/images
+      # AI-сетка (как в приложении): vision + FLUX через OpenRouter.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE: ${OPENROUTER_BASE:-https://openrouter.ai/api/v1}
+      SEARCH_VISION_MODEL: ${SEARCH_VISION_MODEL:-google/gemini-3.1-pro-preview}
+      SEARCH_GRID_MODEL: ${SEARCH_GRID_MODEL:-black-forest-labs/flux-3-image-klein}
+      SEARCH_GRID_ASPECT: ${SEARCH_GRID_ASPECT:-21:9}
+      SEARCH_GRID_RESOLUTION: ${SEARCH_GRID_RESOLUTION:-1K}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    volumes:
+      # Кэш весов HF/timm переживает рестарты, иначе модель качается заново.
+      - catalogcache:/root/.cache
+      # Сохранённые картинки запросов для разбора.
+      - catalogfiles:/app/data
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+    # Для локального тестирования/админки: только localhost.
+    # На VPS при желании уберите этот порт — доступ из сети compose остаётся.
+    ports:
+      - "127.0.0.1:8000:8000"
+    # Наружу не публикуем: доступ только из сети compose.
+
 volumes:
   appdata:
   pgdata:
+  catalogdata:
+  catalogcache:
+  catalogfiles:

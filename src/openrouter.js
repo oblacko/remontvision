@@ -85,6 +85,7 @@ async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = TIME
 }
 
 let INPUT_REFS_OK = true;
+const INPUT_REFS_BY_MODEL = new Map();
 export const supportsInputRefs = () => INPUT_REFS_OK;
 
 export async function listImageModels() {
@@ -92,10 +93,12 @@ export async function listImageModels() {
   const r = await fetch(`${BASE}/images/models`, { headers: headers() });
   if (!r.ok) throw new Error(`models: ${r.status} ${await r.text()}`);
   const data = await r.json();
-  return (data.data || data.models || []).map(m => ({
+  const models = (data.data || data.models || []).map(m => ({
     id: m.id,
     input_refs: Boolean(m.supported_parameters?.input_references),
   }));
+  for (const model of models) INPUT_REFS_BY_MODEL.set(model.id, model.input_refs);
+  return models;
 }
 
 // Проверка конфига при старте: неверный slug рендер-модели = каждый рендер жжёт 502.
@@ -388,10 +391,40 @@ OUTPUT
 ${rules.photo} ${rules.avoid}`;
 }
 
-// Короткий промт для правки: один target + один референс, без полного стилевого промта.
-export function buildEditPrompt({ roomType = 'Другое', target = null, instruction = '', hasRef = false, refLabel = '', refDimensions = '' }) {
+// Короткий промт для правки: один или несколько target'ов с референсами, без полного стилевого промта.
+const EDIT_INVARIANTS = `LOCKED INVARIANTS — HIGHEST PRIORITY:
+- The same physical room, camera position, eye height, focal length, perspective, framing and aspect ratio.
+- Preserve room layout, ceiling height, window placement and size, wall positions, doorways, plinth, floor plane, built-ins, niches, columns and beams.
+- Built-in shelving, wardrobe, kitchen cabinets, niches and wall panels are architecture, not furniture: preserve footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves or add niches.
+- Preserve existing electrical points: outlets, switches and ceiling light positions. Do not add new light points, coves, tracks or recesses.
+- If a design idea conflicts with a locked invariant, keep the architecture and change only the target object.
+Keep everything else exactly as in Image 1: camera, geometry, walls, floor, furniture, decor and lighting. Do not restyle the room. Do not move objects. Do not add extra furniture or fixtures.
+Photorealistic result, no text, no watermarks, no people.`;
+
+export function buildEditPrompt({ roomType = 'Другое', target = null, instruction = '', hasRef = false, refLabel = '', refDimensions = '', references = null }) {
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room';
+  const multi = Array.isArray(references) ? references.filter(r => r && (r.instruction || r.label)) : [];
+  if (multi.length) {
+    const roles = multi.map((ref, i) => {
+      const label = ref.label ? ` — ${ref.label}` : '';
+      const dims = ref.dimensions ? `, dimensions ${ref.dimensions}` : '';
+      return `Image ${i + 2} — reference for this change: ${ref.instruction || 'the requested change'}${label}${dims}.`;
+    });
+    const changes = multi.map((ref, i) => {
+      const dims = ref.dimensions ? ` and its real dimensions (${ref.dimensions})` : '';
+      return `${i + 1}. ${ref.instruction || 'Apply the change from the reference'}. Match the reference's shape, color, material and finish${dims}. Keep a size and position realistic for the room.`;
+    });
+    return `IMAGE ROLES:
+Image 1 — current interior render. Edit only the objects listed below.
+${roles.join('\n')}
+
+This is a ${roomName}.
+Apply ONLY these changes, each using its matching reference image:
+${changes.join('\n')}${instruction ? `\nAlso follow this note: ${instruction}` : ''}
+The reference images describe only their products. Ignore their backgrounds, studio lighting, camera angles, staging and photographic style; preserve the interior's own light and composition.
+${EDIT_INVARIANTS}`;
+  }
   const targetLabel = SLOT_LABELS[target] || 'the requested element';
   const roles = hasRef
     ? `IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.\nImage 2 — reference for the new ${targetLabel}${refLabel ? ` — ${refLabel}` : ''}${refDimensions ? `, dimensions ${refDimensions}` : ''}.`
@@ -402,14 +435,7 @@ This is a ${roomName}.
 Change only the ${targetLabel}. ${instruction}
 Match the reference's shape, color, material and finish${hasRef ? '' : ' from the described material'}${refDimensions ? ` and its real dimensions (${refDimensions})` : ''}. Keep the size and realistic position appropriate for the room.
 The product reference describes only the product. Ignore its background, studio lighting, camera angle, staging and photographic style; preserve the interior's own light and composition.
-LOCKED INVARIANTS — HIGHEST PRIORITY:
-- The same physical room, camera position, eye height, focal length, perspective, framing and aspect ratio.
-- Preserve room layout, ceiling height, window placement and size, wall positions, doorways, plinth, floor plane, built-ins, niches, columns and beams.
-- Built-in shelving, wardrobe, kitchen cabinets, niches and wall panels are architecture, not furniture: preserve footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves or add niches.
-- Preserve existing electrical points: outlets, switches and ceiling light positions. Do not add new light points, coves, tracks or recesses.
-- If a design idea conflicts with a locked invariant, keep the architecture and change only the target object.
-Keep everything else exactly as in Image 1: camera, geometry, walls, floor, furniture, decor and lighting. Do not restyle the room. Do not move objects. Do not add extra furniture or fixtures.
-Photorealistic result, no text, no watermarks, no people.`;
+${EDIT_INVARIANTS}`;
 }
 
 // OpenRouter принимает только фиксированные пропорции — подбираем ближайшую к реальному фото.
@@ -432,8 +458,8 @@ export function snapAspect(width, height, allowed = null) {
   return best;
 }
 
-export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio, model = null }) {
-  return generateWithModel(model || getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio });
+export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio, model = null, aspect = null }) {
+  return generateWithModel(model || getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, aspectOverride: aspect });
 }
 
 // Пустой каркас: отдельная модель/промт/разрешение из админки, только исходник, без style/product refs.
@@ -450,7 +476,8 @@ export async function generateCleanupRender({ prompt, sourceImageB64, aspectRati
 }
 
 async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, resolutionOverride = null, aspectOverride = null, allowChatFallback = null }) {
-  const productRefs = INPUT_REFS_OK ? referenceImagesB64 : [];
+  const refsOk = INPUT_REFS_BY_MODEL.has(model) ? INPUT_REFS_BY_MODEL.get(model) : INPUT_REFS_OK;
+  const productRefs = refsOk ? referenceImagesB64 : [];
   const refs = [
     { type: 'image_url', image_url: { url: sourceImageB64 } },
     ...productRefs.map(b => ({ type: 'image_url', image_url: { url: b } })),

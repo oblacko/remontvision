@@ -1,0 +1,1 @@
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS edit_refs JSONB;

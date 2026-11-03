@@ -45,7 +45,8 @@ type SearchJob = {
   vision_raw: unknown; prompts: unknown; objects: SearchObject[]; steps: SearchStep[]
 }
 type SearchResult = {
-  id: number; source: string; store: string | null; url: string; title: string
+  id: number; source: string; provider?: string | null; store: string | null; url: string; title: string
+  affiliate_url?: string | null; erid?: string | null
   image_url: string | null; price: number | null; currency: string
   availability: string | null; price_source: string | null
   match_score: number | null; checked_at: string | null
@@ -53,7 +54,7 @@ type SearchResult = {
 type ObjectFilters = {
   query: string; domains: string[]; price_from: string; price_to: string
   region: string; period: 'all' | 'day' | '2weeks' | 'month'
-  sort: 'relevance' | 'time'; source: 'both' | 'text' | 'visual'
+  sort: 'relevance' | 'time'; source: 'both' | 'text' | 'visual' | 'catalog'
 }
 type RequestLine = {
   provider: string
@@ -932,9 +933,10 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                       }))}
                       className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                     >
-                      <option value="both">Текст + изображения</option>
+                      <option value="both">Текст + изображения + каталог</option>
                       <option value="text">Только текст</option>
                       <option value="visual">Только изображения</option>
+                      <option value="catalog">Только каталог</option>
                     </select>
                   </label>
                 </div>
@@ -996,8 +998,11 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Badge variant="outline">
-                            {result.source === 'visual' ? 'визуал' : 'текст'}
+                            {result.source === 'catalog' ? 'каталог' : result.source === 'visual' ? 'визуал' : 'текст'}
                           </Badge>
+                          {result.erid && (
+                            <Badge variant="outline" className="text-[10px]">реклама · erid {result.erid}</Badge>
+                          )}
                           {result.match_score !== null && (
                             <Badge variant="secondary">{Math.round(result.match_score)}%</Badge>
                           )}
@@ -1018,9 +1023,9 @@ export function SearchPipeline({ jobId, api, onJobCreated, onCost }: SearchPipel
                           {money(result.price)}
                         </span>
                         <a
-                          href={result.url}
+                          href={result.affiliate_url || result.url}
                           target="_blank"
-                          rel="noopener nofollow"
+                          rel="noopener nofollow sponsored"
                           className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                         >
                           Открыть

@@ -616,20 +616,23 @@ export const q = {
   deleteSearchObjectsForJob: jobId =>
     pool.query(`DELETE FROM search_objects WHERE job_id = $1`, [jobId]),
   upsertSearchResult: f =>
-    pool.query(`INSERT INTO search_results (object_id, source, provider, store, canonical_url, title, image_url, image_path, price, currency, availability, price_source, match_score, score_breakdown, checked_at, raw)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+    pool.query(`INSERT INTO search_results (object_id, source, provider, store, canonical_url, title, image_url, image_path, price, currency, availability, price_source, match_score, score_breakdown, affiliate_url, erid, checked_at, raw)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
                 ON CONFLICT (object_id, canonical_url) DO UPDATE SET
                   source = EXCLUDED.source, provider = EXCLUDED.provider, store = EXCLUDED.store,
                   title = EXCLUDED.title, image_url = EXCLUDED.image_url, image_path = EXCLUDED.image_path,
                   price = EXCLUDED.price, currency = EXCLUDED.currency, availability = EXCLUDED.availability,
                   price_source = EXCLUDED.price_source, match_score = EXCLUDED.match_score,
-                  score_breakdown = EXCLUDED.score_breakdown, checked_at = EXCLUDED.checked_at, raw = EXCLUDED.raw
+                  score_breakdown = EXCLUDED.score_breakdown, affiliate_url = EXCLUDED.affiliate_url,
+                  erid = EXCLUDED.erid, checked_at = EXCLUDED.checked_at, raw = EXCLUDED.raw
                 RETURNING *`,
       [f.object_id, f.source || 'text', f.provider || 'yandex', f.store || null, f.canonical_url,
        f.title || null, f.image_url || null, f.image_path || null, f.price ?? null, f.currency || 'RUB',
        f.availability || null, f.price_source || null,
        f.match_score ?? null,
        f.score_breakdown != null ? JSON.stringify(f.score_breakdown) : null,
+       f.affiliate_url || null,
+       f.erid || null,
        f.checked_at || null,
        f.raw != null ? JSON.stringify(f.raw) : null]).then(r => r.rows[0]),
   searchResultsForObject: objectId =>

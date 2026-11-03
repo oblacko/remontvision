@@ -46,7 +46,7 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний/выбранный render |
-| POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `ref`, `ref_url`, `parent_id` |
+| POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `refs`/`ref_meta`, `ref`, `ref_url`, `parent_id` |
 | DELETE | `/api/rooms/:id` | удалить комнату и файлы (owner) |
 | POST | `/api/renders/:id/share` | создать/вернуть share token (owner) |
 
@@ -99,10 +99,12 @@ Admin: заголовок `X-Admin-Key`.
 
 ### `POST /api/rooms/:id/iterate`
 
-- `text` (обяз.) — что изменить.
+- `text` — общий комментарий к правке; обязателен, если не передан ни один референс.
+- `refs` — до 4 файлов JPG/PNG/WebP, по одному на правку.
+- `ref_meta` — JSON-массив `{ "description": "замените шторы", "url": "https://…"? }`; порядок совпадает с файлами `refs`, `url` используется вместо файла.
 - `target` — `light`, `floor`, `wall`, `backsplash`, `tile`, `cabinet`, `countertop`, `faucet`, `sink`, `toilet`, `shower`, `bathtub`, `appliance`, `outlets`, `textile`, `skirting`, `bed`, `sofa`, ….
 - `product_id` — товар-референс.
-- `ref` — файл; `ref_url` — URL.
+- `ref` — один файл (legacy); `ref_url` — один URL (legacy).
 - `parent_id` — версия для правки (по умолчанию последняя).
 
 Для `product_id` нужны активный товар, его изображение и совместимый `target`. При `keep_furniture=true` замена крупной мебели запрещена. После товарной правки vision сравнивает родителя, результат и карточку. Принятая версия получает `status=done`, а позиция — `presentation_status=verified`. При провале или недоступности QA дочерняя версия получает `status=rejected`, кредит возвращается, родитель остаётся активным, причина приходит в `GET /api/rooms/:id` → `notice`. В mock-режиме QA пропускается и товар остаётся `curated`. Безопасный результат проверки доступен в `render.product_qa`.

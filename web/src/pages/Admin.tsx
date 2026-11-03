@@ -70,7 +70,7 @@ type ImportPreview = {
 }
 const productCategories = ['bed','wardrobe','sofa','armchair','coffee_table','dining_table','dining_chair','sideboard','desk','office_chair','storage','bench','rug','floor','paint','wallpaper','tile','skirting','countertop','cabinet','faucet','sink','toilet','shower','bathtub','light','outlets','appliance','textile'] as const
 type ModelSettings = {
-  render_model: string; vision_model: string; resolution: string; aspect_ratio: string;
+  render_model: string; edit_model: string; vision_model: string; resolution: string; aspect_ratio: string;
   image_models: Array<{ id: string; input_refs: boolean }>;
 }
 type StyleDetail = { style: Style; prompt_description: string; references: StyleRef[]; products: Product[] }
@@ -217,6 +217,7 @@ export default function Admin() {
 
   const [modelSettings, setModelSettings] = useState<ModelSettings | null>(null)
   const [renderDraft, setRenderDraft] = useState('')
+  const [editDraft, setEditDraft] = useState('')
   const [visionDraft, setVisionDraft] = useState('')
   const [resolutionDraft, setResolutionDraft] = useState('1K')
   const [aspectDraft, setAspectDraft] = useState('auto')
@@ -407,7 +408,7 @@ export default function Admin() {
   const loadModels = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/models'))
-      setModelSettings(d); setRenderDraft(d.render_model); setVisionDraft(d.vision_model)
+      setModelSettings(d); setRenderDraft(d.render_model); setEditDraft(d.edit_model || ''); setVisionDraft(d.vision_model)
       const caps = capsFor(d.render_model)
       setResolutionDraft(caps.resolutions.includes(d.resolution) ? d.resolution : (caps.resolutions[0] || ''))
       setAspectDraft(caps.aspects.includes(d.aspect_ratio) ? d.aspect_ratio : (caps.aspects.includes('auto') ? 'auto' : caps.aspects[0]))
@@ -625,7 +626,7 @@ export default function Admin() {
     setModelSaving(true); setModelNotice(''); setAdminError('')
     try {
       const d = await readJson(await api('/api/admin/settings/models', {
-        method: 'PUT', body: JSON.stringify({ render_model: renderDraft, vision_model: visionDraft, resolution: resolutionDraft, aspect_ratio: aspectDraft }),
+        method: 'PUT', body: JSON.stringify({ render_model: renderDraft, edit_model: editDraft, vision_model: visionDraft, resolution: resolutionDraft, aspect_ratio: aspectDraft }),
       }))
       setModelNotice(d.warning ? `Сохранено, но проверка предупредила: ${d.warning}` : 'Модели сохранены — новые генерации будут использовать их')
       await loadModels()
@@ -1155,6 +1156,15 @@ export default function Admin() {
                       {[...modelSettings.image_models].sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}
                     </select>
                     <p className="mt-2 text-xs text-muted-foreground">{modelSettings.image_models.find(m => m.id === renderDraft)?.input_refs ? 'Поддерживает input_references — фото комнаты, референсы стиля и товаров уйдут в модель.' : 'Не заявлены input_references — фото и референсы могут не уйти. Проверьте перед включением.'}</p>
+                  </div>
+                  <div>
+                    <label htmlFor="edit-model" className="eyebrow mb-2 block">Модель редактирования</label>
+                    <select id="edit-model" value={editDraft} onChange={e => setEditDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">
+                      <option value="">Как у генерации ({renderDraft})</option>
+                      {modelSettings.image_models.some(m => m.id === editDraft) || !editDraft ? null : <option value={editDraft}>{editDraft}</option>}
+                      {[...modelSettings.image_models].sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}
+                    </select>
+                    <p className="mt-2 text-xs text-muted-foreground">Используется для правок и точечных изменений по референсам. Должна поддерживать input_references; для нескольких референсов подходит <code className="border bg-muted px-1 text-[11px]">black-forest-labs/flux-3-image-klein</code>. Пусто — берётся модель генерации.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div><label htmlFor="resolution" className="eyebrow mb-2 block">Разрешение</label>{capsFor(renderDraft).resolutions.length ? <select id="resolution" value={resolutionDraft} onChange={e => setResolutionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(renderDraft).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select> : <div className="flex h-11 items-center border bg-muted px-3 text-sm text-muted-foreground">Задаётся моделью</div>}</div>

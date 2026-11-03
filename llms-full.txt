@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-01T11:02:06.905Z
+Generated: 2026-11-03T11:38:57.745Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -393,6 +393,7 @@ Last updated: 2026-10-30
 - Share page `/s/:token` with likes/comments.
 - Payments on (Robokassa default, YooKassa fallback), refunds off. Robokassa sends fiscal `Receipt` (service, tax none) for Roboчеки СМЗ.
 - Product procurement on: 1 credit per render, Yandex Search API + store allowlist, product list only (no estimate/quantities).
+- Catalog service (2026-11-03): separate `catalog-service/` (Python/FastAPI + Postgres/pgvector) imports CPA YML feeds, vectorizes images with DINOv2 (ViT-L/14 reg4 + dino.txt), and serves vector `/search`. Remontvision uses it as an extra hybrid source in Search Lab (`search.v1.catalog_enabled`, `src/catalogclient.js`); results carry `affiliate_url`/`erid` (migration `034`). Not deployed/enabled by default.
 - Main launch blocker: no real product URLs → no real orders.
 
 ## Architecture (short)
@@ -1074,7 +1075,7 @@ URL: `/admin`
 | Стили | стили, prompt description, референсы, approve, товары стиля, генератор комплекта |
 | Промт | редактируемые правила промта |
 | Логи | фактические промты рендеров, модель, стоимость, референсы |
-| Модели | render/vision модель, resolution/aspect, проверка input refs |
+| Модели | render/edit/vision модель, resolution/aspect, проверка input refs |
 | Очистка | модель/промт/разрешение/aspect очистки комнаты, включение |
 | Прокси | URL прокси, сохранение, health-check, маска пароля |
 | Каталог | импорт по URL, массовый импорт, таблица товаров, цена/класс/статус |
@@ -1225,7 +1226,7 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
 | POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний/выбранный render |
-| POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `ref`, `ref_url`, `parent_id` |
+| POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `refs`/`ref_meta`, `ref`, `ref_url`, `parent_id` |
 | DELETE | `/api/rooms/:id` | удалить комнату и файлы (owner) |
 | POST | `/api/renders/:id/share` | создать/вернуть share token (owner) |
 
@@ -1278,10 +1279,12 @@ Admin: заголовок `X-Admin-Key`.
 
 ### `POST /api/rooms/:id/iterate`
 
-- `text` (обяз.) — что изменить.
+- `text` — общий комментарий к правке; обязателен, если не передан ни один референс.
+- `refs` — до 4 файлов JPG/PNG/WebP, по одному на правку.
+- `ref_meta` — JSON-массив `{ "description": "замените шторы", "url": "https://…"? }`; порядок совпадает с файлами `refs`, `url` используется вместо файла.
 - `target` — `light`, `floor`, `wall`, `backsplash`, `tile`, `cabinet`, `countertop`, `faucet`, `sink`, `toilet`, `shower`, `bathtub`, `appliance`, `outlets`, `textile`, `skirting`, `bed`, `sofa`, ….
 - `product_id` — товар-референс.
-- `ref` — файл; `ref_url` — URL.
+- `ref` — один файл (legacy); `ref_url` — один URL (legacy).
 - `parent_id` — версия для правки (по умолчанию последняя).
 
 Для `product_id` нужны активный товар, его изображение и совместимый `target`. При `keep_furniture=true` замена крупной мебели запрещена. После товарной правки vision сравнивает родителя, результат и карточку. Принятая версия получает `status=done`, а позиция — `presentation_status=verified`. При провале или недоступности QA дочерняя версия получает `status=rejected`, кредит возвращается, родитель остаётся активным, причина приходит в `GET /api/rooms/:id` → `notice`. В mock-режиме QA пропускается и товар остаётся `curated`. Безопасный результат проверки доступен в `render.product_qa`.
@@ -2341,7 +2344,31 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-01. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
+Дата обновления: 2026-11-03. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `afe13ad`.
+
+## 2026-11-03 — отдельная модель правок и несколько референсов за запрос
+
+- В админке «Модели» появилось поле **«Модель редактирования»** (`model.edit` в `app_settings`). Пустое значение — правки идут моделью генерации. Для правок по нескольким референсам подходит `black-forest-labs/flux-3-image-klein` (до 10 `input_references`).
+- Правка (`POST /api/rooms/:id/iterate`) принимает несколько референсов: файлы `refs` (до 4) и/или `ref_meta` — JSON-массив `{ description, url? }` с описанием каждой правки. Старые `ref`/`ref_url` продолжают работать.
+- `renders.edit_refs` (миграция `035`) хранит массив `{ path, instruction, label }`; worker подмешивает все референсы в `input_references`, а `buildEditPrompt` собирает пронумерованные изменения (Image 2…N).
+- В панели правки — список референсов: «Добавить референс», загрузка файла/URL и поле «Что изменить» (например, «замените шторы»). Несколько изменений уходят одним запросом и списывают один кредит.
+- Про «id генерации»: в OpenRouter Image API такого параметра нет, каждый запрос заново передаёт изображения. Экономия — в объединении правок в один запрос, а не в цепочке отдельных генераций.
+
+## 2026-11-03 — отдельный каталог-сервис: импорт фидов + векторный поиск (DINOv2)
+
+- Добавлен отдельный сервис `catalog-service/` (Python/FastAPI) со своей БД Postgres+pgvector: импорт CPA YML-фидов, нормализация офферов, векторизация картинок DINOv2 и поиск по сходству `/search`.
+- Хранение: одна таблица `offers` (canonical + `raw`/`params` jsonb + `color_hist`) + `feeds` + `offer_embeddings` (`vector(768)`, HNSW cosine) + `sync_jobs`. Адаптер на источник, а не отдельная таблица.
+- Импорт: SSRF-safe загрузка YML, `xml.etree`, маппинг категорий, `canonical_url` из `dl`, `affiliate_url` (trk.ppdu.ru) и `erid`; идемпотентный upsert по `(feed_id, external_id)`, эмбеддинг только для новых/изменённых картинок.
+- Эмбеддеры: `FakeEmbedder` (тесты), `HistogramEmbedder` (цвет+композиция, без torch), `TorchEmbedder` — **DINOv2 ViT-B/14 через timm, 768d** (image→image; text→image через dino.txt — следующий шаг). Спайк: `catalog-service/scripts/spike_dino.py`.
+- Локальный тест: сервис в `docker compose` (`catalog` + `catalog-db`), фид 789 загружен — **918/918 офферов с эмбеддингами и цветом**; поиск по картинке возвращает близкие офферы с ценой, CPA-ссылкой (`trk.ppdu.ru`) и `erid`. Для ручной проверки: `http://127.0.0.1:8000/` (страница поиска с выделением области) и CLI `python scripts/catalog_cli.py add-feed|sync|search`.
+- Встраивание картинок распараллелено (`EMBED_CONCURRENCY`), запись эмбеддингов — последовательно (один pg-connection).
+- Цветовой re-rank поверх DINOv2 (`COLOR_RERANK_WEIGHT`, по умолчанию 0.3): дескриптор считается по «обивочным» пикселям (цветные, средней яркости; белый фон, бельё/плед и нейтральные пиксели не доминируют), а не по всему кадру. На тесте «коричневая кровать» вариант «мокко» поднялся с 7-го на **1-е место** (без цвета первым был серый, разница по DINOv2 ~0.007).
+- Скачанные картинки кэшируются на диск (`IMAGE_CACHE_DIR=/app/data/images`) — повторная обработка больше не качает их заново; картинки запросов сохраняются в `/app/data/queries` для разбора.
+- Тест-страница `http://127.0.0.1:8000/`: загрузка фото → кнопки **«Маски (DINOv2)»** (`POST /segment`, DINOv2 patch-фичи + k-means + связные компоненты → миниатюры) и **«Сетка (ИИ)»** (`POST /grid-ai`: vision извлекает до 10 объектов, FLUX (`black-forest-labs/flux-3-image-klein`, 21:9, 1K) генерирует сетку 2×5, нарезка на 10 ячеек — как в приложении) → выбрать миниатюру → «Искать» (используется её кроп). Плюс ручное выделение области. Ограничение: DINOv2-кластеризация даёт крупные семантические зоны, а не чистые инстансы; AI-сетка — генерация (может не совпасть 1:1 с фото).
+- Remontvision: `src/catalogclient.js`, ключи `search.v1` (`catalog_enabled`, `catalog_top_k`, `catalog_min_score`), источник `catalog` в `processObjectSearch` (гибрид с Yandex), `mergeResults` с третьим источником, миграция `034` (`search_results.affiliate_url`, `erid`). Search Lab показывает бейдж «каталог» и «реклама · erid».
+- Docker Compose: сервисы `catalog` + `catalog-db` (`pgvector/pgvector:pg16`), тома `catalogdata`/`catalogcache`/`catalogfiles`; `CATALOG_INSTALL_ML=1` ставит torch. Для локального теста `catalog` слушает `127.0.0.1:8000`.
+- Тесты: `catalog-service` — 44 pytest (фид, категории, импорт/эмбеддинг, цвет, re-rank, API); remontvision — `node:test` + клиент/мердж. CI-агент не коммитит и не деплоит без команды.
+- Известное ограничение: цвет считается по эвристической маске, без сегментации поверхности; для нейтральных тканей сигнал слабее.
 
 ## 2026-11-01 — Search Lab: тестовый стенд ИИ-поиска по фото
 

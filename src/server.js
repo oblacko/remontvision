@@ -731,7 +731,7 @@ app.get('/api/admin/settings/models', h(async (req, res) => {
   const config = getModelConfig();
   const listed = await listImageModels();
   const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
-  res.json({ render_model: config.render, vision_model: config.vision, resolution: config.resolution, aspect_ratio: config.aspectRatio, image_models: imageModels });
+  res.json({ render_model: config.render, edit_model: config.edit, vision_model: config.vision, resolution: config.resolution, aspect_ratio: config.aspectRatio, image_models: imageModels });
 }));
 
 app.get('/api/admin/settings/cleanup', h(async (req, res) => {
@@ -1008,6 +1008,7 @@ app.post('/api/admin/settings/proxy/test', h(async (req, res) => {
 app.put('/api/admin/settings/models', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const renderModel = String(req.body?.render_model || '').trim();
+  const editModel = String(req.body?.edit_model || '').trim();
   const visionModel = String(req.body?.vision_model || '').trim();
   const resolution = String(req.body?.resolution || '1K').trim();
   const aspectRatio = String(req.body?.aspect_ratio || 'auto').trim();
@@ -1018,11 +1019,14 @@ app.put('/api/admin/settings/models', h(async (req, res) => {
   const imageModels = Array.isArray(listed) ? listed : (listed.models || []);
   const picked = imageModels.find(m => m.id === renderModel);
   if (!picked) return res.status(400).json({ error: 'Модель не найдена среди image-моделей OpenRouter' });
-  const saved = await saveModelConfig({ render: renderModel, vision: visionModel, resolution, aspectRatio });
+  if (editModel && !imageModels.find(m => m.id === editModel)) {
+    return res.status(400).json({ error: 'Модель редактирования не найдена среди image-моделей OpenRouter' });
+  }
+  const saved = await saveModelConfig({ render: renderModel, edit: editModel, vision: visionModel, resolution, aspectRatio });
   let warning = '';
   try { await assertConfig(); }
   catch (e) { warning = String(e.message || e).slice(0, 300); log({ event: 'model_config_warning', error: warning }); }
-  log({ event: 'model_config_saved', render_model: saved.render, vision_model: saved.vision, resolution: saved.resolution, aspect_ratio: saved.aspectRatio, input_refs: picked.input_refs });
+  log({ event: 'model_config_saved', render_model: saved.render, edit_model: saved.edit || null, vision_model: saved.vision, resolution: saved.resolution, aspect_ratio: saved.aspectRatio, input_refs: picked.input_refs });
   res.json({ ...saved, input_refs: Boolean(picked.input_refs), warning });
 }));
 
@@ -1446,13 +1450,26 @@ app.get('/s/:token/image', h(async (req, res) => {
   await serveStored(req, res, 'renders', path.basename(render.image_path));
 }));
 
-app.post('/api/rooms/:id/iterate', rateLimit, upload.single('ref'), h(async (req, res) => {
+const MAX_EDIT_REFS = 4;
+app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', maxCount: MAX_EDIT_REFS }, { name: 'ref', maxCount: 1 }]), h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const room = await q.getRoom(req.params.id);
   if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
   const text = String(req.body?.text || '').trim();
-  if (!text) return res.status(400).json({ error: 'Пустой запрос' });
   if (text.length > 500) return res.status(400).json({ error: 'Слишком длинный запрос (макс. 500 символов)' });
+  const uploaded = [...(req.files?.refs || []), ...(req.files?.ref || [])];
+  let refMeta = [];
+  if (req.body?.ref_meta) {
+    try {
+      const parsed = JSON.parse(String(req.body.ref_meta));
+      if (Array.isArray(parsed)) refMeta = parsed;
+    } catch {
+      return res.status(400).json({ error: 'Некорректные данные референсов' });
+    }
+  }
+  if (refMeta.length > MAX_EDIT_REFS) return res.status(400).json({ error: `Максимум ${MAX_EDIT_REFS} референса за запрос` });
+  const hasRefInput = uploaded.length > 0 || refMeta.some(r => r?.url) || Boolean(String(req.body?.ref_url || '').trim());
+  if (!text && !hasRefInput) return res.status(400).json({ error: 'Пустой запрос' });
   if (room.status !== 'done') return res.status(409).json({ error: 'Подождите завершения текущей задачи' });
   const requestedParentId = String(req.body?.parent_id || '').trim();
   let parent;
@@ -1487,27 +1504,46 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.single('ref'), h(async (req
     if (!SLOT_LABELS[target]) target = null;
   }
 
-  let refPath = null;
   let instruction = text;
-  if (req.file) {
-    refPath = await saveUpload(req.file, 'uploads');
-    const pastedUrl = firstImageUrl(text);
-    if (pastedUrl) instruction = text.replace(pastedUrl, '').replace(/\s+/g, ' ').trim() || 'Применить правку по референсу';
-  } else {
-    const explicitUrl = String(req.body?.ref_url || '').trim();
-    const url = explicitUrl || firstImageUrl(text);
-    if (url) {
-      try {
-        const img = await fetchRemoteImage(url);
-        refPath = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
-        // URL в тексте модели не нужен: картинка уже прикреплена.
-        instruction = text.replace(url, '').replace(/\s+/g, ' ').trim() || 'Применить правку по референсу';
-      } catch (e) {
-        log({ event: 'iterate_ref_url_error', url, error: String(e.message || e).slice(0, 200) });
-        return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}. Прикрепите файл.` });
+  const editRefs = [];
+  const addUrlRef = async (url, description) => {
+    const img = await fetchRemoteImage(url);
+    const stored = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
+    editRefs.push({ path: stored, instruction: description, label: 'URL' });
+  };
+  let fileIdx = 0;
+  try {
+    for (const meta of refMeta) {
+      const description = String(meta?.description || '').trim().slice(0, 300);
+      const url = String(meta?.url || '').trim();
+      if (url) {
+        await addUrlRef(url, description);
+      } else if (fileIdx < uploaded.length) {
+        const file = uploaded[fileIdx++];
+        const stored = await saveUpload(file, 'uploads');
+        editRefs.push({ path: stored, instruction: description, label: file.originalname || '' });
       }
     }
+    while (fileIdx < uploaded.length && editRefs.length < MAX_EDIT_REFS) {
+      const file = uploaded[fileIdx++];
+      const stored = await saveUpload(file, 'uploads');
+      editRefs.push({ path: stored, instruction: '', label: file.originalname || '' });
+    }
+    if (!editRefs.length) {
+      const explicitUrl = String(req.body?.ref_url || '').trim();
+      const url = explicitUrl || firstImageUrl(text);
+      if (url) {
+        await addUrlRef(url, '');
+        // URL в тексте модели не нужен: картинка уже прикреплена.
+        if (!explicitUrl) instruction = text.replace(url, '').replace(/\s+/g, ' ').trim();
+      }
+    }
+  } catch (e) {
+    log({ event: 'iterate_ref_url_error', error: String(e.message || e).slice(0, 200) });
+    return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}. Прикрепите файл.` });
   }
+  if (!instruction) instruction = 'Применить правки по референсам';
+  const refPath = editRefs[0]?.path || null;
 
   try {
     await enqueueRender({
@@ -1519,6 +1555,7 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.single('ref'), h(async (req
       editTarget: target || null,
       refPath,
       refProductId: refProduct ? refProduct.id : null,
+      editRefs: (editRefs.length > 1 || editRefs.some(r => r.instruction)) ? editRefs : null,
     });
   } catch (e) {
     if (e.status === 402) {

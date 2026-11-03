@@ -63,7 +63,7 @@ export function filtersHash(filters = {}) {
   return crypto.createHash('sha256').update(payload).digest('hex').slice(0, 32);
 }
 
-export function mergeResults(textResults = [], visualResults = [], { limit = 30 } = {}) {
+export function mergeResults(textResults = [], visualResults = [], { limit = 30, catalogResults = [] } = {}) {
   const merged = [];
   const seen = new Set();
 
@@ -79,14 +79,23 @@ export function mergeResults(textResults = [], visualResults = [], { limit = 30 
         url: canonical,
         title: row.title || row.page_title || '',
         snippet: row.snippet || row.passage || '',
-        source,
+        source: row.source || source,
+        provider: row.provider || (source === 'catalog' ? 'feed' : 'yandex'),
         image_url: row.image_url || null,
         price: row.price ?? null,
-        raw: row,
+        currency: row.currency || 'RUB',
+        availability: row.availability || null,
+        affiliate_url: row.affiliate_url || null,
+        erid: row.erid || null,
+        store: row.store || null,
+        match_score: row.match_score ?? null,
+        raw: row.raw || row,
       });
     }
   };
 
+  // Каталог первым: у него реальные URL/цены и партнёрская ссылка.
+  append(catalogResults, 'catalog');
   append(visualResults, 'visual');
   append(textResults, 'text');
 

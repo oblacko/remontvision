@@ -11,6 +11,8 @@ import { composeCard, drawBboxOverlay } from './searchthumbs.js';
 import { searchWeb, searchImagesByImage, isAllowedDomain } from './yandexsearch.js';
 import { extractPrice, filtersHash, mergeResults, sortPricedFirst } from './searchutil.js';
 import { enrichSearchResults, withBuyKeyword } from './searchparse.js';
+import { searchCatalog } from './catalogclient.js';
+import { log } from './openrouter.js';
 import { getBuffer, putBuffer } from './storage.js';
 
 const PERIOD = {
@@ -379,6 +381,9 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   const period = filters.period || 'all';
   const sort = filters.sort || 'relevance';
   const source = filters.source || 'both';
+  const runText = source === 'text' || source === 'both';
+  const runVisual = source === 'visual' || source === 'both';
+  const runCatalog = source === 'catalog' || source === 'both';
   const priceFrom = filters.price_from == null ? null : Number(filters.price_from);
   const priceTo = filters.price_to == null ? null : Number(filters.price_to);
   const yandexNight = (new Date().getUTCHours() + 3) % 24 < 8;
@@ -403,7 +408,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   }
 
   let textRows = [];
-  if (source !== 'visual') {
+  if (runText) {
     // Без «купить» Яндекс часто отдаёт галереи картинок вместо карточек товара.
     const textQuery = withBuyKeyword(query, cfg.buy_keyword);
     const text = await searchWeb({
@@ -429,7 +434,7 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
   }
 
   let visualRows = [];
-  if (cfg.visual_enabled && source !== 'text' && object.thumbnail_path) {
+  if (cfg.visual_enabled && runVisual && object.thumbnail_path) {
     const thumb = await getBuffer(object.thumbnail_path);
     const vis = await searchImagesByImage({ imageB64: thumb.toString('base64') });
     requests.push({
@@ -450,16 +455,61 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     }));
   }
 
+  let catalogRows = [];
+  if (cfg.catalog_enabled && runCatalog && object.thumbnail_path) {
+    try {
+      const thumb = await getBuffer(object.thumbnail_path);
+      const found = await searchCatalog({
+        image: thumb,
+        text: query || undefined,
+        filters: { categories: object.category ? [object.category] : undefined },
+        topK: cfg.catalog_top_k,
+        minScore: cfg.catalog_min_score,
+      }, { baseUrl: cfg.catalog_service_url || undefined });
+      catalogRows = found.results.map(r => ({
+        url: r.canonical_url || r.affiliate_url,
+        canonical_url: r.canonical_url || r.affiliate_url,
+        title: r.name || '',
+        snippet: '',
+        source: 'catalog',
+        provider: 'feed',
+        image_url: r.picture_url || null,
+        price: r.price ?? null,
+        currency: r.currency || 'RUB',
+        availability: r.availability || null,
+        affiliate_url: r.affiliate_url || null,
+        erid: r.erid || null,
+        store: r.merchant || null,
+        match_score: r.score ?? null,
+        raw: r,
+      }));
+      requests.push({
+        provider: 'catalog',
+        kind: 'vector_search',
+        count: 1,
+        unit_cost_usd: 0,
+        cost_usd: 0,
+      });
+    } catch (e) {
+      // Каталог — дополнительный источник: при сбое продолжаем с Яндексом.
+      log({ event: 'catalog_search_error', job_id: jobId, object_id: objectId, error: String(e.message || e).slice(0, 200) });
+    }
+  }
+
   const searchCost = requests.reduce((sum, item) => sum + (Number(item.cost_usd) || 0), 0);
 
-  const merged = mergeResults(textRows, visualRows, { limit: cfg.search_limit });
+  const merged = mergeResults(textRows, visualRows, { limit: cfg.search_limit, catalogResults: catalogRows });
   const byDomain = merged.filter(r => domains.length === 0 || isAllowedDomain(r.url, domains));
-  const checked = cfg.price_check_enabled && cfg.price_check_limit > 0
-    ? await enrichSearchResults(byDomain, {
+  // У офферов каталога цена/наличие уже из фида — не открываем их карточки повторно.
+  const catalogChecked = byDomain.filter(r => r.source === 'catalog');
+  const enrichTargets = byDomain.filter(r => r.source !== 'catalog');
+  const enriched = cfg.price_check_enabled && cfg.price_check_limit > 0
+    ? await enrichSearchResults(enrichTargets, {
       limit: cfg.price_check_limit,
       concurrency: cfg.price_check_concurrency,
     })
-    : byDomain;
+    : enrichTargets;
+  const checked = [...catalogChecked, ...enriched];
   const filtered = sortPricedFirst(checked.filter(r => {
     const p = r.price;
     if (p == null) return true;
@@ -475,8 +525,8 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
     const saved = await q.upsertSearchResult({
       object_id: objectId,
       source: row.source,
-      provider: 'yandex',
-      store: hostOf(row.url),
+      provider: row.provider || 'yandex',
+      store: row.store || hostOf(row.url),
       canonical_url: row.url,
       title: row.title,
       image_url: row.image_url || null,
@@ -484,6 +534,9 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
       currency: row.currency || 'RUB',
       availability: row.availability || null,
       price_source: row.price_source || null,
+      match_score: row.match_score ?? null,
+      affiliate_url: row.affiliate_url || null,
+      erid: row.erid || null,
       checked_at: row.checked_at || null,
       raw: row.raw,
     });
@@ -531,8 +584,11 @@ export function mapResult(row) {
   return {
     id: row.id,
     source: row.source,
+    provider: row.provider,
     store: row.store,
     url: row.canonical_url,
+    affiliate_url: row.affiliate_url || null,
+    erid: row.erid || null,
     title: row.title,
     image_url: row.image_url,
     price: row.price == null ? null : Number(row.price),
@@ -546,20 +602,7 @@ export function mapResult(row) {
 
 export async function searchResultsDto(objectId) {
   const rows = await q.searchResultsForObject(objectId);
-  return rows.map(row => ({
-    id: row.id,
-    source: row.source,
-    store: row.store,
-    url: row.canonical_url,
-    title: row.title,
-    image_url: row.image_url,
-    price: row.price == null ? null : Number(row.price),
-    currency: row.currency,
-    availability: row.availability || null,
-    price_source: row.price_source || null,
-    match_score: row.match_score == null ? null : Number(row.match_score),
-    checked_at: row.checked_at,
-  }));
+  return rows.map(mapResult);
 }
 
 export async function searchJobDto(jobId) {

@@ -104,6 +104,24 @@ test('edit prompt is short, target-specific and reference-aware', () => {
   assert.doesNotMatch(prompt, /KEEP EXACTLY/);
 });
 
+test('edit prompt supports multiple references with per-reference instructions', () => {
+  const prompt = buildEditPrompt({
+    roomType: 'Гостиная',
+    instruction: 'Сохранить общий свет',
+    references: [
+      { instruction: 'Заменить шторы', label: 'шторы.png' },
+      { instruction: 'Заменить диван', label: 'диван.png', dimensions: '220×90 см' },
+    ],
+  });
+  assert.match(prompt, /Image 2 — reference for this change: Заменить шторы/);
+  assert.match(prompt, /Image 3 — reference for this change: Заменить диван/);
+  assert.match(prompt, /1\. Заменить шторы/);
+  assert.match(prompt, /2\. Заменить диван/);
+  assert.match(prompt, /220×90 см/);
+  assert.match(prompt, /Сохранить общий свет/);
+  assert.match(prompt, /Keep everything else exactly as in Image 1/);
+});
+
 test('design pass excludes hero products and keeps preserved furniture out of replacements', () => {
   const sofa = { ...PRODUCT, id: 2, category: 'sofa', name: 'Диван «Тест»', image_url: '/catalog/sofa.webp' };
   const light = { ...PRODUCT, id: 3, category: 'light', name: 'Свет «Тест»', image_url: '/catalog/light.webp' };

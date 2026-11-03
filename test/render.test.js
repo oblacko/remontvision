@@ -5,7 +5,7 @@ process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.IMAGE_MIN_GAP_MS = '0';
 process.env.RENDER_MODEL = 'test/model';
 
-const { generateRender, assessProductEdit, parseRender, estimateRoomDimensions, snapAspect } = await import('../src/openrouter.js');
+const { generateRender, listImageModels, assessProductEdit, parseRender, estimateRoomDimensions, snapAspect } = await import('../src/openrouter.js');
 const { supportsResolution, modelCaps } = await import('../src/modelcaps.js');
 
 const SOURCE = 'data:image/jpeg;base64,SOURCE';
@@ -34,6 +34,25 @@ test('source image is the first input_reference in the main /images payload', as
   assert.equal(captured.body.input_references[0].image_url.url, SOURCE);
   assert.equal(captured.body.input_references[1].image_url.url, REF);
   assert.equal(out.b64, 'abc');
+});
+
+test('input references follow the selected model capabilities', async () => {
+  const calls = [];
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('/images/models')) {
+      return json({ data: [
+        { id: 'refs/model', supported_parameters: { input_references: {} } },
+        { id: 'no-refs/model', supported_parameters: {} },
+      ] });
+    }
+    calls.push(JSON.parse(opts.body));
+    return json({ data: [{ b64_json: 'abc' }] });
+  };
+  await listImageModels();
+  await generateRender({ prompt: 'x', sourceImageB64: SOURCE, referenceImagesB64: [REF], aspectRatio: '1:1', model: 'refs/model' });
+  await generateRender({ prompt: 'x', sourceImageB64: SOURCE, referenceImagesB64: [REF], aspectRatio: '1:1', model: 'no-refs/model' });
+  assert.equal(calls[0].input_references.length, 2);
+  assert.equal(calls[1].input_references.length, 1);
 });
 
 test('render never makes more than two external calls', async () => {

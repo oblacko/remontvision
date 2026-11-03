@@ -20,13 +20,18 @@ export const DEFAULT_SEARCH_CONFIG = {
   price_check_enabled: true,
   price_check_limit: 6,
   price_check_concurrency: 3,
+  // Векторный каталог из CPA-фидов (отдельный catalog-service).
+  catalog_enabled: false,
+  catalog_service_url: process.env.CATALOG_SERVICE_URL || '',
+  catalog_top_k: 10,
+  catalog_min_score: 0.5,
   // Тариф Yandex Search API, USD за один запрос (без НДС). День/ночь — 00:00–07:59 UTC+3.
   yandex_web_cost_usd: Number(process.env.YANDEX_WEB_COST_USD || 0.004),
   yandex_web_night_cost_usd: Number(process.env.YANDEX_WEB_NIGHT_COST_USD || 0.003),
   yandex_image_cost_usd: Number(process.env.YANDEX_IMAGE_COST_USD || 0.0075),
 };
 
-const BOOLEAN_KEYS = ['enabled', 'visual_enabled', 'price_check_enabled'];
+const BOOLEAN_KEYS = ['enabled', 'visual_enabled', 'price_check_enabled', 'catalog_enabled'];
 const MODEL_KEYS = ['vision_model', 'grid_model'];
 
 let cache = clone(DEFAULT_SEARCH_CONFIG);
@@ -107,6 +112,9 @@ export function validateSearchConfig(input = {}, base = DEFAULT_SEARCH_CONFIG) {
   if ('buy_keyword' in input) out.buy_keyword = String(input.buy_keyword ?? '').trim().slice(0, 40);
   if ('price_check_limit' in input) out.price_check_limit = Math.max(0, Math.min(20, Math.round(num(input.price_check_limit, DEFAULT_SEARCH_CONFIG.price_check_limit))));
   if ('price_check_concurrency' in input) out.price_check_concurrency = Math.max(1, Math.min(5, Math.round(num(input.price_check_concurrency, DEFAULT_SEARCH_CONFIG.price_check_concurrency))));
+  if ('catalog_service_url' in input) out.catalog_service_url = String(input.catalog_service_url ?? '').trim().slice(0, 300);
+  if ('catalog_top_k' in input) out.catalog_top_k = Math.max(1, Math.min(100, Math.round(num(input.catalog_top_k, DEFAULT_SEARCH_CONFIG.catalog_top_k))));
+  if ('catalog_min_score' in input) out.catalog_min_score = Math.max(-1, Math.min(1, num(input.catalog_min_score, DEFAULT_SEARCH_CONFIG.catalog_min_score)));
   for (const key of ['yandex_web_cost_usd', 'yandex_web_night_cost_usd', 'yandex_image_cost_usd']) {
     if (key in input) out[key] = Math.max(0, Math.min(1, num(input[key], DEFAULT_SEARCH_CONFIG[key])));
   }
@@ -171,5 +179,8 @@ export function searchConfigHash(config = getSearchConfig()) {
     search_limit: config.search_limit,
     max_objects: config.max_objects,
     visual_enabled: config.visual_enabled,
+    catalog_enabled: config.catalog_enabled,
+    catalog_top_k: config.catalog_top_k,
+    catalog_min_score: config.catalog_min_score,
   })).digest('hex').slice(0, 32);
 }

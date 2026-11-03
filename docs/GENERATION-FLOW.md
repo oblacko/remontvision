@@ -97,6 +97,7 @@ flowchart TD
 | Правила промта | `app_settings.prompt.rules.v1` + дефолты `src/promptconfig.js` | light, cleanup, windows, pinterest, photo, avoid |
 | Арт-директор | `buildArtDirection(photo, roomType, styleDescription, dimensions)` → vision | блок `ART DIRECTION` в промте, `renders.meta.art_direction` |
 | Модель дизайна | `app_settings.model.render` > `RENDER_MODEL` > код-дефолт | `generateRender`, `renders.model` |
+| Модель правок | `app_settings.model.edit` > `EDIT_MODEL`; пусто → модель дизайна | iterate/`generateRender`, `renders.model` |
 | Разрешение/aspect | `app_settings.model.resolution/aspect_ratio` > env | image-запрос, `snapAspect` по фото |
 | Vision-модель | `app_settings.model.vision` > `VISION_MODEL` | арт-директор, бриф, анализ рендера, QA |
 | Очистка | `app_settings.cleanup.config.v1` (`src/cleanupconfig.js`) | `generateCleanupRender`, shell |

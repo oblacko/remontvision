@@ -2,6 +2,7 @@
 // Админка может переключать render-модель без рестарта; следующая генерация уже использует новую.
 const DEFAULTS = {
   render: process.env.RENDER_MODEL || 'black-forest-labs/flux-3-image',
+  edit: process.env.EDIT_MODEL || '',
   vision: process.env.VISION_MODEL || 'google/gemini-3-flash-preview',
   resolution: process.env.RENDER_RESOLUTION || '1K',
   aspectRatio: process.env.RENDER_ASPECT_RATIO || 'auto',
@@ -15,9 +16,10 @@ export function getModelConfig() {
 export async function loadModelConfig() {
   try {
     const { q } = await import('./db.js');
-    const rows = await q.settingsByKeys(['model.render', 'model.vision', 'model.resolution', 'model.aspect_ratio']);
+    const rows = await q.settingsByKeys(['model.render', 'model.edit', 'model.vision', 'model.resolution', 'model.aspect_ratio']);
     for (const row of rows) {
       if (row.key === 'model.render' && row.value) state.render = row.value;
+      if (row.key === 'model.edit') state.edit = row.value || '';
       if (row.key === 'model.vision' && row.value) state.vision = row.value;
       if (row.key === 'model.resolution' && row.value) state.resolution = row.value;
       if (row.key === 'model.aspect_ratio' && row.value) state.aspectRatio = row.value;
@@ -26,13 +28,15 @@ export async function loadModelConfig() {
   return getModelConfig();
 }
 
-export async function saveModelConfig({ render, vision, resolution, aspectRatio }) {
+export async function saveModelConfig({ render, edit, vision, resolution, aspectRatio }) {
   if (render) state.render = render;
+  if (edit !== undefined) state.edit = String(edit || '');
   if (vision) state.vision = vision;
   if (resolution) state.resolution = resolution;
   if (aspectRatio) state.aspectRatio = aspectRatio;
   const { q } = await import('./db.js');
   await q.setSetting('model.render', state.render);
+  await q.setSetting('model.edit', state.edit);
   await q.setSetting('model.vision', state.vision);
   await q.setSetting('model.resolution', state.resolution);
   await q.setSetting('model.aspect_ratio', state.aspectRatio);

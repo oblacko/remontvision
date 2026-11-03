@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<yml_catalog date="2026-11-03 10:09">
+  <shop>
+    <name>Pampadu</name>
+    <categories>
+      <category id="47">Диваны</category>
+      <category id="49">Шкафы</category>
+      <category id="50">Кровати</category>
+      <category id="51">Столы</category>
+    </categories>
+    <offers>
+      <offer id="534277" available="true">
+        <price>39700</price>
+        <oldprice>70999</oldprice>
+        <currencyId>RUB</currencyId>
+        <categoryId>50</categoryId>
+        <url>https://trk.ppdu.ru/click/Zcz4xpcT?erid=2SDnjbstwzi&amp;dl=https%3A%2F%2FDIVANBOSS.RU%2Fkrovati%2Fboss-layn%2F</url>
+        <picture>https://divanboss.ru/upload/iblock/4e7/Frame-6260.jpg</picture>
+        <name>Босс Лайн Кровать+ПМ 160*200 Велюр Монолит латте</name>
+        <description>С подъемным механизмом</description>
+        <delivery>true</delivery>
+        <param name="Цвет">Латте</param>
+        <param name="Длина">223</param>
+        <param name="Ширина">176</param>
+        <param name="Высота">113</param>
+        <param name="Материал">ДСП, ППУ, ЛДСП</param>
+      </offer>
+      <offer id="534278" available="false">
+        <price>12990</price>
+        <currencyId>RUB</currencyId>
+        <categoryId>47</categoryId>
+        <url>https://trk.ppdu.ru/click/abc?erid=2SDxyz&amp;dl=https%3A%2F%2Fdivanboss.ru%2Fdivany%2Ftest%2F</url>
+        <picture>/upload/iblock/rel/sofa.jpg</picture>
+        <name>Диван прямой Тест</name>
+        <vendor>DivanBoss</vendor>
+        <param name="Цвет">Серый</param>
+      </offer>
+    </offers>
+  </shop>
+</yml_catalog>

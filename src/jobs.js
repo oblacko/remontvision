@@ -160,22 +160,55 @@ async function processRender(renderId) {
       if (parent?.image_path) sourceStored = parent.image_path;
       meta.source_used = 'parent';
       if (parent) parentItems = await q.itemsForRender(parent.id);
-      const ref = await editReference(render);
-      editProduct = ref?.product || null;
+      const manualRefs = Array.isArray(render.edit_refs) ? render.edit_refs.filter(r => r && r.path) : [];
+      const editRefs = [];
+      for (const ref of manualRefs) {
+        try {
+          const buf = await getBuffer(ref.path);
+          editRefs.push({
+            b64: await bufferToDataUrl(buf),
+            label: String(ref.label || '').slice(0, 120),
+            instruction: String(ref.instruction || '').slice(0, 300),
+            product: null,
+          });
+        } catch (e) {
+          log({ event: 'edit_ref_read_error', render_id: renderId, path: ref.path, error: String(e.message || e).slice(0, 200) });
+        }
+      }
+      if (!manualRefs.length || render.ref_product_id) {
+        const ref = await editReference(render);
+        if (ref) editRefs.push({ b64: ref.b64, label: ref.label, instruction: '', product: ref.product || null });
+      }
+      editProduct = editRefs.find(r => r.product)?.product || null;
       if (render.ref_product_id && !editProduct) throw new Error('Не удалось загрузить изображение товара для привязки');
-      if (ref) referenceImagesB64.push(ref.b64);
+      referenceImagesB64 = editRefs.map(r => r.b64);
       imageMap = [
         { role: 'current interior render', label: 'edit only the target object' },
-        ...(ref ? [{ role: 'reference image', label: ref.label }] : []),
+        ...editRefs.map(r => ({ role: 'reference image', label: r.instruction || r.label || '' })),
       ];
-      prompt = buildEditPrompt({
-        roomType,
-        target: render.edit_target,
-        instruction: render.request_text,
-        hasRef: Boolean(ref),
-        refLabel: ref?.label || '',
-        refDimensions: editProduct?.dimensions?.text || '',
-      });
+      const describeRefs = editRefs.length > 1 || editRefs.some(r => r.instruction);
+      if (!render.ref_product_id && describeRefs) {
+        prompt = buildEditPrompt({
+          roomType,
+          target: render.edit_target,
+          instruction: render.request_text,
+          references: editRefs.map(r => ({
+            instruction: r.instruction,
+            label: r.label,
+            dimensions: r.product?.dimensions?.text || '',
+          })),
+        });
+      } else {
+        const primary = editRefs[0] || null;
+        prompt = buildEditPrompt({
+          roomType,
+          target: render.edit_target,
+          instruction: render.request_text,
+          hasRef: Boolean(primary),
+          refLabel: primary?.label || '',
+          refDimensions: editProduct?.dimensions?.text || '',
+        });
+      }
       meta.refs = imageMap.map((m, i) => ({ index: i + 1, ...m }));
       meta.parent_render_id = render.parent_render_id || null;
     } else {
@@ -293,8 +326,9 @@ async function processRender(renderId) {
       const originalDataUrl = await bufferToDataUrl(originalBuf);
       const { width, height } = imageSize(originalBuf);
       targetRatio = width / height;
-      const renderModel = getModelConfig().render;
-      const aspectRatio = snapAspect(width, height, modelCaps(renderModel).aspects);
+      const editModel = getModelConfig().edit || null;
+      const activeModel = iteration && editModel ? editModel : getModelConfig().render;
+      const aspectRatio = snapAspect(width, height, modelCaps(activeModel).aspects);
       let designBuf = originalBuf;
       let cleanupCost = 0;
 
@@ -347,6 +381,7 @@ async function processRender(renderId) {
         sourceImageB64: srcB64,
         referenceImagesB64,
         aspectRatio,
+        ...(iteration ? { aspect: aspectRatio, model: editModel } : {}),
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
       addCost('design', out.cost);
@@ -608,7 +643,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -621,6 +656,7 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     editTarget,
     refPath,
     refProductId,
+    editRefs,
   });
   return id;
 }
