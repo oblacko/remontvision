@@ -976,6 +976,16 @@ export function GenerationPanel({
               )}
             </div>
 
+            <div className="mt-6 border p-4">
+              <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className="flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
+                <span>
+                  <span className="block text-sm font-medium">Подобрать реальные товары</span>
+                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">{useCatalog ? 'После генерации покажем товары Hoff со ссылками и ценами. На картинку не влияет, выбор запоминается.' : 'Интерьер без подбора товаров. Включите, если нужны ссылки и цены.'}</span>
+                </span>
+              </button>
+            </div>
+
             <div className="mt-8 border">
               <button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(v => !v)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                 <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}{useCatalog ? ' · товары' : ''}</span>
@@ -997,17 +1007,12 @@ export function GenerationPanel({
                   </div>
                   <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description}</p>
 
-                  <div className="mt-6 grid gap-px border bg-border sm:grid-cols-2">
+                  <div className="mt-6 grid gap-px border bg-border">
                     <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${keepFurniture ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
                       <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
                       <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Сохраняем существующую мебель и планировку. Можно обновить отделку.' : 'Меняем мебель и отделку, сохраняя архитектуру, окна и двери.'}</span></span>
                     </button>
-                    <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${useCatalog ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
-                      <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
-                      <span><span className="block text-sm font-medium">Подобрать реальные товары</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'После генерации покажем товары Hoff со ссылками. На картинку не влияет.' : 'AI свободно проектирует интерьер. Товары и ссылки не собираются.'}</span></span>
-                    </button>
                   </div>
-                  <p className="mt-3 text-[11px] leading-5 text-muted-foreground">Очистка комнаты применяется автоматически, когда «Оставить мебель» выключено.</p>
                 </div>
               )}
             </div>
