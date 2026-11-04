@@ -1345,7 +1345,11 @@ export function GenerationPanel({
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
                 <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
-                <button type="button" onClick={openProcurement} className="action-primary min-h-14 px-8 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
+                {(realOfferCount > 0 || current.items.length > 0) ? (
+                  <button type="button" onClick={() => setStep('estimates')} className="action-primary min-h-14 px-8 text-base">Смета и товары <ArrowRight className="size-5" /></button>
+                ) : (
+                  <button type="button" onClick={openProcurement} className="action-primary min-h-14 px-8 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
+                )}
               </div>
             </div>
           </div>
