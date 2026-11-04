@@ -82,17 +82,6 @@ type ArtDirection = {
 }
 type DimensionsEstimate = { width: number; length: number; height: number; confidence?: 'low' | 'medium' | 'high' }
 type LensInfo = { focal_length_mm?: number | null; type?: 'wide' | 'normal' | 'tele' | null; distortion?: 'strong' | 'mild' | 'none' | null; correction?: string; confidence?: 'low' | 'medium' | 'high' }
-type RoomBrief = {
-  roomType?: string
-  width?: number | null
-  length?: number | null
-  height?: number | null
-  confidence?: string
-  styles?: string[]
-  architecture?: { windows?: number | null; doors?: number | null; builtins?: string[]; radiators?: boolean; ceiling?: string }
-  furniture?: string[]
-  reasoning?: string
-}
 type EditRefDraft = {
   id: string
   file: File | null
@@ -202,15 +191,6 @@ export function GenerationPanel({
   const [step, setStep] = useState<Step>('photo')
   const [roomType, setRoomType] = useState<string | null>(null)
   const [roomTypes, setRoomTypes] = useState<string[]>(defaultRoomTypes)
-  const [roomWidthM, setRoomWidthM] = useState('')
-  const [roomLengthM, setRoomLengthM] = useState('')
-  const [roomHeightM, setRoomHeightM] = useState('')
-  const [bedLengthM, setBedLengthM] = useState('')
-  const [dimensionOrientation, setDimensionOrientation] = useState('')
-  const [estimateBusy, setEstimateBusy] = useState(false)
-  const [estimateError, setEstimateError] = useState('')
-  const [estimateNote, setEstimateNote] = useState('')
-  const [brief, setBrief] = useState<RoomBrief | null>(null)
   const [stylePresets, setStylePresets] = useState<StylePreset[]>(defaultStylePresets)
   const [photo, setPhoto] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -337,12 +317,6 @@ export function GenerationPanel({
         setStyle(d.style || null)
         setRoomType(d.room_type || null)
         if (d.room_type) setRoomTypes(prev => prev.includes(d.room_type) ? prev : [...prev, d.room_type])
-        setRoomWidthM(d.room_width_m != null ? String(d.room_width_m) : '')
-        setRoomLengthM(d.room_length_m != null ? String(d.room_length_m) : '')
-        setRoomHeightM(d.room_height_m != null ? String(d.room_height_m) : '')
-        const loadedBedRoom = d.room_type === 'Спальня' || d.room_type === 'Детская'
-        setBedLengthM(d.bed_length_m != null ? String(d.bed_length_m) : (loadedBedRoom ? '2' : ''))
-        setDimensionOrientation(d.dimension_orientation || '')
         setPriceTier(d.price_tier || 'comfort')
         setKeepFurniture(d.keep_furniture !== false)
         setPhoto(d.photo_url || null)
@@ -418,12 +392,9 @@ export function GenerationPanel({
     setPhotoError(''); setGenError('')
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setRoomType(null)
-    setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
-    setEstimateNote(''); setEstimateError(''); setBrief(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
     setKeepFurniture(true)
-    // Автобриф намеренно не запускаем: тип и размеры задаются вручную,
-    // при необходимости — кнопкой «Определить по фото».
+    // Габариты и объектив оценивает архитектор по фото — пользователь их не вводит.
   }
 
   const cleanupRoom = async (): Promise<File | null> => {
@@ -449,58 +420,6 @@ export function GenerationPanel({
       setCleanupBusy(false)
     }
   }
-
-  const estimateBrief = async (sourceFile: File, { auto = false } = {}) => {
-    if (!sourceFile || estimateBusy) return
-    setEstimateBusy(true); setEstimateError(''); setEstimateNote('')
-    try {
-      const fd = new FormData()
-      fd.append('photo', sourceFile)
-      fd.append('room_type', auto ? '' : (roomType || 'Другое'))
-      const r = await fetch('/api/estimate-room', { method: 'POST', body: fd })
-      const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { if (!auto) onRequireLogin(); return }
-      if (!r.ok) throw new Error(d.error || 'Не удалось оценить комнату')
-      const currentRoomType = auto ? null : roomType
-      const guessedRoomType = d.room_type_guess && roomTypes.includes(d.room_type_guess) ? d.room_type_guess : null
-      const effectiveRoomType = currentRoomType || guessedRoomType
-      if (guessedRoomType) setRoomType(prev => prev || guessedRoomType)
-      if (d.width_m) setRoomWidthM(prev => auto && prev ? prev : String(d.width_m))
-      if (d.length_m) setRoomLengthM(prev => auto && prev ? prev : String(d.length_m))
-      if (d.height_m) setRoomHeightM(prev => auto && prev ? prev : String(d.height_m))
-      if (d.bed_present && (effectiveRoomType === 'Спальня' || effectiveRoomType === 'Детская')) setBedLengthM(prev => auto && prev ? prev : '2')
-      const confidence = d.confidence === 'high' ? 'высокая' : d.confidence === 'medium' ? 'средняя' : 'низкая'
-      const suggestedStyles = Array.isArray(d.style_suggestions)
-        ? d.style_suggestions
-            .map((item: { name?: string }) => item?.name)
-            .filter((name: string | undefined): name is string => Boolean(name) && stylePresets.some(p => p.name === name))
-            .slice(0, 3)
-        : []
-      if (suggestedStyles.length) setStyle(prev => prev || suggestedStyles[0])
-      setBrief({
-        roomType: guessedRoomType || undefined,
-        width: d.width_m ?? null,
-        length: d.length_m ?? null,
-        height: d.height_m ?? null,
-        confidence: d.confidence,
-        styles: suggestedStyles,
-        architecture: d.architecture && typeof d.architecture === 'object' ? d.architecture : undefined,
-        furniture: Array.isArray(d.existing_furniture) ? d.existing_furniture.filter((x: unknown): x is string => typeof x === 'string') : [],
-        reasoning: typeof d.reasoning === 'string' ? d.reasoning : undefined,
-      })
-      if (d.width_m || d.length_m || d.height_m) {
-        setEstimateNote(`Оценка по фото, уверенность: ${confidence}. Проверьте и поправьте при необходимости.`)
-      } else {
-        setEstimateNote('Не удалось уверенно определить размеры — введите их вручную.')
-      }
-    } catch (e) {
-      if (!auto) setEstimateError(e instanceof Error ? e.message : 'Не удалось оценить комнату')
-    } finally {
-      setEstimateBusy(false)
-    }
-  }
-
-  const estimateDimensions = () => { if (file) void estimateBrief(file) }
 
   const acceptRef = (nextFile?: File) => {
     if (!nextFile || !nextFile.type.startsWith('image/')) return
@@ -646,8 +565,6 @@ export function GenerationPanel({
   async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }> }) {
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
-    const measureCount = [roomWidthM, roomLengthM, roomHeightM].filter(value => value.trim()).length
-    if (measureCount > 0 && measureCount < 3) { setPhotoError('Заполните ширину, длину и высоту комнаты или оставьте все три поля пустыми'); setStep('photo'); return }
     if (busy) return
     setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setRefineText('')
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
@@ -665,11 +582,7 @@ export function GenerationPanel({
         fd.append('style', styleName)
         fd.append('room_type', roomType)
         if (cleanupFile) fd.append('cleanup_photo', cleanupFile)
-        if (roomWidthM.trim()) fd.append('room_width_m', roomWidthM.replace(',', '.'))
-        if (roomLengthM.trim()) fd.append('room_length_m', roomLengthM.replace(',', '.'))
-        if (roomHeightM.trim()) fd.append('room_height_m', roomHeightM.replace(',', '.'))
-        if (isBedRoom) fd.append('bed_length_m', (bedLengthM.trim() || '2').replace(',', '.'))
-        if (dimensionOrientation.trim()) fd.append('dimension_orientation', dimensionOrientation.trim())
+        if (isBedRoom) fd.append('bed_length_m', '2')
         fd.append('price_tier', priceTier)
         fd.append('keep_furniture', usingCleaned ? '0' : (keepFurniture ? '1' : '0'))
         fd.append('use_catalog', useCatalog ? '1' : '0')
@@ -771,8 +684,6 @@ export function GenerationPanel({
     releaseUrl(refPhoto)
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
-    setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
-    setEstimateNote(''); setEstimateError(''); setEstimateBusy(false); setBrief(null)
     setStyle(null); setPriceTier('comfort'); setKeepFurniture(true)
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setCustomOpen(false); setAdvancedOpen(false)
@@ -865,56 +776,9 @@ export function GenerationPanel({
                   <p className="eyebrow">Тип комнаты</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">Чтобы в дизайне не появились предметы из другого помещения.</p>
                   <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setBedLengthM(type === 'Спальня' || type === 'Детская' ? '2' : ''); setCleaned(null); setCleanupRequested(false); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
+                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setCleaned(null); setCleanupRequested(false); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
                   </div>
                 </div>
-              )}
-              {photo && (estimateBusy || brief) && (
-                <div className="mt-5 border p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="eyebrow">Бриф комнаты</p>
-                    {estimateBusy ? (
-                      <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />Смотрим фото…</span>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">Уверенность: {brief?.confidence === 'high' ? 'высокая' : brief?.confidence === 'medium' ? 'средняя' : 'низкая'}</span>
-                    )}
-                  </div>
-                  {brief && (
-                    <>
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                        {brief.roomType && <span className="border bg-muted px-2 py-1">Тип: {brief.roomType}</span>}
-                        {brief.width && brief.length && <span className="border bg-muted px-2 py-1">{brief.width} × {brief.length} м</span>}
-                        {brief.height && <span className="border bg-muted px-2 py-1">Потолок {brief.height} м</span>}
-                        {brief.architecture?.windows != null && <span className="border bg-muted px-2 py-1">Окон: {brief.architecture.windows}</span>}
-                        {brief.architecture?.doors != null && <span className="border bg-muted px-2 py-1">Дверей: {brief.architecture.doors}</span>}
-                        {brief.architecture?.radiators && <span className="border bg-muted px-2 py-1">Радиатор</span>}
-                      </div>
-                      {brief.styles?.length ? <p className="mt-3 text-xs leading-5 text-muted-foreground">Подойдут стили: <span className="text-foreground">{brief.styles.join(', ')}</span>. Первый уже выбран.</p> : null}
-                      {brief.reasoning ? <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{brief.reasoning}</p> : null}
-                    </>
-                  )}
-                </div>
-              )}
-              {photo && roomType && (
-                <details className="mt-5 border p-4">
-                  <summary className="cursor-pointer text-sm font-medium">Размеры для сметы · не влияет на картинку</summary>
-                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="eyebrow">Точные размеры <span className="ml-1 font-normal text-muted-foreground">необязательно</span></p>
-                      <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">Нужны только для расчёта материалов и количеств. В генерацию не передаются: модель сохраняет пропорции по фото.</p>
-                    </div>
-                    <button type="button" disabled={!file || estimateBusy} onClick={() => void estimateDimensions()} className="action-secondary min-h-9 px-3 text-xs disabled:opacity-40">{estimateBusy ? 'Определяем…' : 'Определить по фото'}</button>
-                  </div>
-                  {estimateNote && <p className="mt-3 border border-primary/30 bg-primary/5 px-3 py-2 text-xs leading-5 text-muted-foreground">{estimateNote}</p>}
-                  {estimateError && <p className="mt-3 text-xs text-destructive" role="alert">{estimateError}</p>}
-                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <label className="block"><span className="eyebrow mb-1 block">Ширина, м</span><input value={roomWidthM} onChange={event => setRoomWidthM(event.target.value)} inputMode="decimal" placeholder="3.0" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
-                    <label className="block"><span className="eyebrow mb-1 block">Длина, м</span><input value={roomLengthM} onChange={event => setRoomLengthM(event.target.value)} inputMode="decimal" placeholder="6.0" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
-                    <label className="block"><span className="eyebrow mb-1 block">Высота, м</span><input value={roomHeightM} onChange={event => setRoomHeightM(event.target.value)} inputMode="decimal" placeholder="2.5" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
-                  </div>
-                  {isBedRoom && <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Для спальни и детской длина кровати 2,0 м подставляется автоматически.</p>}
-                  <label className="mt-3 block"><span className="eyebrow mb-1 block">Ориентация размеров</span><textarea value={dimensionOrientation} onChange={event => setDimensionOrientation(event.target.value)} rows={2} placeholder="Например: ширина — стена с окном, длина — от двери до окна" className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
-                </details>
               )}
               <div className="mt-4" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
                 {photoError && <p className="mb-3 text-sm text-destructive" role="alert">{photoError}</p>}
