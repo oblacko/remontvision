@@ -14,7 +14,6 @@ import {
   RotateCcw,
   Share2,
   Search,
-  SlidersHorizontal,
   Upload,
   X,
   Zap,
@@ -207,7 +206,6 @@ export function GenerationPanel({
   const [keepFurniture, setKeepFurniture] = useState(true)
   const [useCatalog] = useState(true)
   const [customOpen, setCustomOpen] = useState(false)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
   const [refFile, setRefFile] = useState<File | null>(null)
   const [refName, setRefName] = useState('')
@@ -686,7 +684,7 @@ export function GenerationPanel({
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setStyle(null); setPriceTier('comfort'); setKeepFurniture(true)
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
-    setCustomOpen(false); setAdvancedOpen(false)
+    setCustomOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
     loadedRoomRef.current = ''
     clearEditRefs()
@@ -772,6 +770,17 @@ export function GenerationPanel({
                 </div>
               )}
               {photo && (
+                <div className="mt-3 border p-4">
+                  <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(value => !value)} className="flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
+                    <span>
+                      <span className="block text-sm font-medium">Оставить мебель</span>
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{keepFurniture ? 'Сохраняем существующую мебель и планировку, обновляем отделку.' : 'Меняем мебель и отделку, сохраняя архитектуру, окна и двери.'}</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+              {photo && (
                 <div className="mt-5">
                   <p className="eyebrow">Тип комнаты</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">Чтобы в дизайне не появились предметы из другого помещения.</p>
@@ -851,37 +860,6 @@ export function GenerationPanel({
                       </div>
                     </>
                   )}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-8 border">
-              <button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(v => !v)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}</span>
-                <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {advancedOpen && (
-                <div className="border-t border-foreground/25 p-4">
-                  <div className="flex items-end justify-between gap-4">
-                    <div><p className="eyebrow">Класс материалов</p><p className="mt-1 text-xs text-muted-foreground">Уровень отделки и мебели. Смета не собирается, пока каталог выключен.</p></div>
-                    <output className="text-lg font-light">{tierName(priceTier)}</output>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-px border bg-border">
-                    {priceTiers.map(item => (
-                      <button key={item.key} type="button" aria-pressed={priceTier === item.key} onClick={() => setPriceTier(item.key)} className={`min-h-16 bg-background px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${priceTier === item.key ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>
-                        <span className="block text-sm font-medium">{item.name}</span>
-                        <span className="mt-1 block text-[11px] leading-4 opacity-70">{item.short}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-muted-foreground">{priceTiers.find(item => item.key === priceTier)?.description}</p>
-
-                  <div className="mt-6 grid gap-px border bg-border">
-                    <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${keepFurniture ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
-                      <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
-                      <span><span className="block text-sm font-medium">Оставить мебель</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{keepFurniture ? 'Сохраняем существующую мебель и планировку. Можно обновить отделку.' : 'Меняем мебель и отделку, сохраняя архитектуру, окна и двери.'}</span></span>
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
