@@ -155,7 +155,7 @@ const stepLabels = ['Фото', 'Стиль', 'Результат', 'Итог'] 
 const BASE_GEN_STAGES = [
   { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик' },
   { key: 'analyzing', label: 'Анализ фото', hint: 'Разбираем комнату, свет и материалы' },
-  { key: 'rendering', label: 'Генерация кадра', hint: 'Модель рисует изображение — обычно 30–90 секунд' },
+  { key: 'rendering', label: 'Генерация кадра', hint: 'Модель рисует изображение — обычно 1–4 минуты' },
   { key: 'matching', label: 'Разбор и товары', hint: 'Архитектор смотрит кадр, даёт подсказки и ищет товары в каталоге' },
   { key: 'done', label: 'Готово', hint: 'Открываем визуализацию' },
 ] as const
@@ -538,8 +538,8 @@ export function GenerationPanel({
   async function pollRoom(id: string): Promise<RoomResult | null> {
     const started = Date.now()
     while (true) {
-      if (Date.now() - started > 180000) {
-        setGenError('Генерация идёт слишком долго. Попробуйте ещё раз.')
+      if (Date.now() - started > 20 * 60 * 1000) {
+        setGenError('Генерация идёт дольше 20 минут. Проверьте кабинет — результат может появиться позже.')
         setStep(iterations.length ? 'result' : 'style')
         return null
       }
@@ -931,7 +931,7 @@ export function GenerationPanel({
               })}
             </ol>
             <p className="mt-6 text-xs leading-5 text-muted-foreground">
-              Прошло {elapsedLabel}. {elapsed >= 120 ? 'Идёт дольше обычного — не закрывайте окно.' : 'Можно переключиться на другую вкладку, процесс продолжится.'}
+              Прошло {elapsedLabel}. {elapsed >= 180 ? 'Идёт дольше обычного — можно не закрывать окно, результат сохранится в кабинете.' : 'Можно переключиться на другую вкладку, процесс продолжится.'}
             </p>
           </div>
         )}
