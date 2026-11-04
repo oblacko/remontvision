@@ -647,6 +647,7 @@ export function GenerationPanel({
         if (!file) throw new Error('Для новой генерации нужно фото комнаты')
         let cleanupFile = cleaned?.file || null
         if (cleanupRequested && !cleanupFile) cleanupFile = await cleanupRoom()
+        if (cleanupRequested && !cleanupFile) setGenError('Очистка не удалась — генерируем по оригиналу. Можно выключить очистку и попробовать снова.')
         const usingCleaned = Boolean(cleanupFile)
         const fd = new FormData()
         fd.append('photo', file)
