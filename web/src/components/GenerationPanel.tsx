@@ -35,6 +35,11 @@ type Surface = {
 type ElectricalItem = { title: string; text: string }
 type Suggestion = { target: string; label: string; product_id: number; image_url?: string | null }
 type ArchitectHint = { target?: string; action: string; why?: string; priority?: 'high' | 'medium' | 'low' }
+type ArchitectLayer = {
+  key: string; label: string; current?: string; impact: number
+  effort?: 'low' | 'medium' | 'high'; risk?: 'low' | 'medium' | 'high'
+  preserve?: string; actions?: { target?: string; action: string; why?: string }[]
+}
 type Architect = {
   room?: {
     type?: string; style?: string; lighting?: string
@@ -47,6 +52,7 @@ type Architect = {
   strengths?: string[]
   issues?: string[]
   hints?: ArchitectHint[]
+  layers?: ArchitectLayer[]
   electrical?: ElectricalItem[]
   summary?: { concept?: string; palette?: string; materials?: string; electrical?: string; next_steps?: string[] } | null
 }
@@ -268,6 +274,7 @@ export function GenerationPanel({
     .map(v => (typeof v === 'string' ? v : v?.label || ''))
     .filter(Boolean)
   const architect = current?.analysis?.architect || null
+  const architectLayers = architect?.layers || []
   const productMatches = current?.analysis?.products || []
   const realOfferCount = productMatches.reduce((sum, match) => sum + match.offers.length, 0)
   const demoEstimate = (current?.items.length ?? 0) > 0 && current!.items.every(item => !item.direct_url)
@@ -1140,7 +1147,7 @@ export function GenerationPanel({
                     </dl>
                   </section>
                 ) : null}
-                {architect && (architect.hints?.length || architect.strengths?.length || architect.palette?.length) ? (
+                {architect && (architect.layers?.length || architect.hints?.length || architect.strengths?.length || architect.palette?.length) ? (
                   <section className="mt-6 border p-4" aria-labelledby="architect-review">
                     <p id="architect-review" className="eyebrow">Разбор архитектора</p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">По готовому изображению: что получилось, что улучшить, свет и розетки.</p>
@@ -1164,7 +1171,46 @@ export function GenerationPanel({
                         ))}
                       </ul>
                     ) : null}
-                    {architect.hints?.length ? (
+                    {architectLayers.length ? (
+                      <div className="mt-4">
+                        <p className="eyebrow">Что влияет на интерьер</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Сначала то, что даст больше эффекта. Нажмите действие — оно уйдёт в точечную правку.</p>
+                        <div className="mt-3 grid gap-3">
+                          {architectLayers.map((layer, index) => (
+                            <div key={`layer-${layer.key}-${index}`} className="border border-foreground/20 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-medium">{index + 1}. {layer.label}</p>
+                                <span className={`border px-2 py-0.5 text-[10px] uppercase tracking-wide ${layer.impact >= 0.7 ? 'border-primary/40 bg-primary/5 text-primary-text' : 'border-foreground/20 text-muted-foreground'}`}>
+                                  {layer.impact >= 0.7 ? 'сильное влияние' : layer.impact >= 0.4 ? 'среднее влияние' : 'точечно'}
+                                </span>
+                              </div>
+                              {layer.current ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{layer.current}</p> : null}
+                              <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground">
+                                <span>эффект {Math.round((layer.impact || 0) * 100)}%</span>
+                                <span>усилие: {layer.effort === 'low' ? 'низкое' : layer.effort === 'high' ? 'высокое' : 'среднее'}</span>
+                                <span>риск: {layer.risk === 'low' ? 'низкий' : layer.risk === 'high' ? 'высокий' : 'средний'}</span>
+                              </div>
+                              {layer.preserve ? <p className="mt-1 text-[11px] leading-5 text-muted-foreground">Не трогать: {layer.preserve}</p> : null}
+                              {layer.actions?.length ? (
+                                <div className="mt-2 grid gap-2">
+                                  {layer.actions.map((action, actionIndex) => (
+                                    <button
+                                      key={`layer-action-${layer.key}-${actionIndex}`}
+                                      type="button"
+                                      onClick={() => startGeneration(action.action, current.styleName, { target: action.target || layer.key, parentId: current.id })}
+                                      className="flex flex-col items-start gap-1 border border-foreground/20 px-3 py-2 text-left text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                      <span className="font-medium">{action.action}</span>
+                                      {action.why ? <span className="text-muted-foreground">{action.why}</span> : null}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : architect.hints?.length ? (
                       <div className="mt-4">
                         <p className="eyebrow">Что улучшить</p>
                         <div className="mt-2 grid gap-2">

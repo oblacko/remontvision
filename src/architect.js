@@ -17,6 +17,9 @@ export const ARCHITECT_CATEGORIES = [
 const CATEGORY_SET = new Set(ARCHITECT_CATEGORIES);
 const VISIBILITY = new Set(['seen', 'hidden', 'not_seen']);
 const PRIORITY = new Set(['high', 'medium', 'low']);
+export const LAYER_KEYS = ['walls', 'floor', 'furniture', 'light', 'ceiling', 'textile', 'decor', 'storage', 'appliances', 'art'];
+const LAYER_SET = new Set(LAYER_KEYS);
+const LAYER_EFFORT = new Set(['low', 'medium', 'high']);
 
 const clampText = (value, max = 300) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const asArray = value => (Array.isArray(value) ? value : []);
@@ -123,6 +126,35 @@ function normalizeTextList(value, limit = 6) {
   return asArray(value).map(item => clampText(item, 240)).filter(Boolean).slice(0, limit);
 }
 
+function normalizeLayers(parsed) {
+  return asArray(parsed.layers).map(item => {
+    if (!item || typeof item !== 'object') return null;
+    const key = clampText(item.key, 40).toLowerCase();
+    if (!LAYER_SET.has(key)) return null;
+    const actions = asArray(item.actions).map(action => {
+      if (!action || typeof action !== 'object') return null;
+      const text = clampText(action.action, 200);
+      if (!text) return null;
+      return {
+        target: clampText(action.target, 60) || key,
+        action: text,
+        why: clampText(action.why, 240),
+      };
+    }).filter(Boolean).slice(0, 4);
+    const impact = Number(item.impact);
+    return {
+      key,
+      label: clampText(item.label, 60) || key,
+      current: clampText(item.current, 240),
+      impact: Number.isFinite(impact) ? Math.max(0, Math.min(1, impact)) : 0,
+      effort: LAYER_EFFORT.has(item.effort) ? item.effort : 'medium',
+      risk: LAYER_EFFORT.has(item.risk) ? item.risk : 'medium',
+      preserve: clampText(item.preserve, 200),
+      actions,
+    };
+  }).filter(Boolean).sort((a, b) => b.impact - a.impact).slice(0, 8);
+}
+
 export function normalizeArchitect(parsed = {}) {
   const source = parsed && typeof parsed === 'object' ? parsed : {};
   const items = normalizeItems(source);
@@ -139,6 +171,7 @@ export function normalizeArchitect(parsed = {}) {
     strengths: normalizeTextList(source.strengths),
     issues: normalizeTextList(source.issues),
     hints: normalizeHints(source),
+    layers: normalizeLayers(source),
     electrical: normalizeElectrical(source),
     summary: source.summary && typeof source.summary === 'object' ? {
       concept: clampText(source.summary.concept, 400),
@@ -173,15 +206,26 @@ const SYSTEM = `Ты — архитектор интерьера и товаро
   "strengths": ["что получилось хорошо"],
   "issues": ["что объективно не так"],
   "hints": [{"target":"sofa|walls|light|...","action":"что сделать","why":"зачем","priority":"high|medium|low"}],
+  "layers": [{
+    "key":"walls|floor|furniture|light|ceiling|textile|decor|storage|appliances|art",
+    "label":"Стены",
+    "current":"что сейчас: цвет, материал, состояние",
+    "impact":0.0,
+    "effort":"low|medium|high",
+    "risk":"low|medium|high",
+    "preserve":"что нельзя трогать",
+    "actions":[{"target":"walls","action":"конкретная правка","why":"что это даст дизайну"}]
+  }],
   "electrical": [{"title":"Розетки у кровати","text":"где и на какой высоте"}],
   "summary": {"concept":"...","palette":"...","materials":"...","electrical":"...","next_steps":["..."]}
 }
 Правила:
-- Все тексты для пользователя — строго на русском: strengths, issues, hints.action, hints.why, electrical.title, electrical.text и summary. Никаких английских формулировок в этих полях.
+- Все тексты для пользователя — строго на русском: strengths, issues, hints.action, hints.why, layers.label, layers.current, layers.preserve, layers.actions.action, layers.actions.why, electrical.title, electrical.text и summary. Никаких английских формулировок в этих полях.
 - bbox нормирован 0..1: [x, y, ширина, высота].
 - category — только из списка: ${ARCHITECT_CATEGORIES.join(', ')}.
 - Если предмета нет в кадре — не выдумывай его.
 - hints — максимум 6, каждая привязана к конкретному объекту или поверхности.
+- layers — карта того, что влияет на интерьер. Сначала стены, пол, крупная мебель, свет, потолок, текстиль и декор, но порядок определяется реальным влиянием: impact 0..1, сортировка по убыванию. Для каждого слоя — что сейчас, что можно изменить, усилие, риск и что нельзя трогать. actions — максимум 4 конкретные точечные правки.
 - electrical — практичные рекомендации по розеткам, выключателям и свету, без проекта электроснабжения.
 - summary заполняй только для финального разбора; для промежуточного оставь null.
 - Никаких цен и ссылок: товары подберёт каталог.`;

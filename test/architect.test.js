@@ -32,6 +32,21 @@ test('normalizeArchitect validates palette, hints and limits their count', () =>
   assert.equal(out.hints[0].priority, 'high');
 });
 
+test('normalizeArchitect sorts editable layers by impact and keeps only valid keys', () => {
+  const out = normalizeArchitect({
+    layers: [
+      { key: 'textile', label: 'Текстиль', impact: 0.3, actions: [{ action: 'Заменить шторы' }] },
+      { key: 'walls', label: 'Стены', impact: 0.9, actions: [{ target: 'walls', action: 'Покрасить в тёплый белый', why: 'Больше света' }] },
+      { key: 'ufo', label: 'НЛО', impact: 1 },
+    ],
+  });
+  assert.equal(out.layers.length, 2);
+  assert.equal(out.layers[0].key, 'walls');
+  assert.equal(out.layers[0].impact, 0.9);
+  assert.equal(out.layers[0].actions[0].action, 'Покрасить в тёплый белый');
+  assert.equal(out.layers[1].key, 'textile');
+});
+
 test('reviewDesign returns parsed-compatible data sorted by visible area', async () => {
   const vision = async () => ({
     parsed: {
