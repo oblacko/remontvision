@@ -4,7 +4,7 @@ import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } fr
 import { SearchLab } from '@/components/SearchLab'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'rooms' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'render' | 'procurement' | 'search' | 'proxy' | 'catalog'
+type Tab = 'users' | 'packs' | 'rooms' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'render' | 'articles' | 'procurement' | 'search' | 'proxy' | 'catalog'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -253,6 +253,10 @@ export default function Admin() {
   const [renderConfig, setRenderConfig] = useState<{ product_refs_enabled: boolean; max_products: number } | null>(null)
   const [renderBusy, setRenderBusy] = useState(false)
   const [renderNotice, setRenderNotice] = useState('')
+  const [articles, setArticles] = useState<Array<{ id: number; slug: string; title: string; style?: string | null; room_type?: string | null; status: string; created_at: string }>>([])
+  const [articleBusy, setArticleBusy] = useState(false)
+  const [articleNotice, setArticleNotice] = useState('')
+  const [articleForm, setArticleForm] = useState({ style: 'Скандинавский', room_type: 'Спальня', tier: 'comfort', title: '' })
   const [procurementConfig, setProcurementConfig] = useState<ProcurementConfig | null>(null)
   const [procurementBusy, setProcurementBusy] = useState(false)
   const [procurementNotice, setProcurementNotice] = useState('')
@@ -516,6 +520,30 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
     finally { setCleanupBusy(false) }
   }
+  const loadArticles = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/articles'))
+      setArticles(Array.isArray(d.articles) ? d.articles : [])
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const generateArticle = async () => {
+    setArticleBusy(true); setArticleNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/articles/generate', { method: 'POST', body: JSON.stringify(articleForm) }))
+      setArticleNotice(`Статья создана: ${d.article?.title || ''}`)
+      await loadArticles()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setArticleBusy(false) }
+  }
+  const publishArticle = async (id: number) => {
+    try { await api('/api/admin/articles/' + id + '/publish', { method: 'POST' }); await loadArticles() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const deleteArticle = async (id: number) => {
+    if (!confirm('Удалить статью?')) return
+    try { await api('/api/admin/articles/' + id, { method: 'DELETE' }); await loadArticles() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
   const loadRender = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/render'))
@@ -679,7 +707,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'render') loadRender(); if (tab === 'procurement') loadProcurement() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'render') loadRender(); if (tab === 'articles') { loadArticles(); if (!styles.length) loadStyles() } if (tab === 'procurement') loadProcurement() }, [authed, tab])
   useEffect(() => { if (authed) void loadRoomTypes() }, [authed])
   useEffect(() => {
     if (!authed) return
@@ -869,7 +897,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['rooms', 'Комнаты'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['render', 'Генерация'], ['procurement', 'Поиск'], ['search', 'Поиск (лаб)'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['rooms', 'Комнаты'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['render', 'Генерация'], ['articles', 'Статьи'], ['procurement', 'Поиск'], ['search', 'Поиск (лаб)'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -1345,6 +1373,26 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground">Источник — catalog-service (Hoff). Включать только после A/B-проверки, что качество не проседает.</p>
                 </div>
               ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
+            </div>
+          )}
+
+          {tab === 'articles' && (
+            <div className="mt-8 max-w-5xl">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div><p className="eyebrow">Lookbook-статьи</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Генерирует статью: рендер-обложка + палитра + реальные товары Hoff + текст. Черновик можно опубликовать — страница появится на /articles/:slug.</p></div>
+                <button type="button" disabled={articleBusy} onClick={() => void generateArticle()} className="action-primary">{articleBusy ? 'Генерируем…' : 'Сгенерировать статью'}</button>
+              </div>
+              {articleNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{articleNotice}</p>}
+              <div className="mt-6 grid gap-3 sm:grid-cols-4">
+                <label><span className="eyebrow mb-2 block">Стиль</span><select value={articleForm.style} onChange={e => setArticleForm({ ...articleForm, style: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm">{styles.filter(s => s.active).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></label>
+                <label><span className="eyebrow mb-2 block">Комната</span><select value={articleForm.room_type} onChange={e => setArticleForm({ ...articleForm, room_type: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm">{roomTypes.filter(r => r.active).map(r => <option key={r.name} value={r.name}>{r.name}</option>)}</select></label>
+                <label><span className="eyebrow mb-2 block">Класс</span><select value={articleForm.tier} onChange={e => setArticleForm({ ...articleForm, tier: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm"><option value="start">Старт</option><option value="comfort">Комфорт</option><option value="premium">Премиум</option><option value="atelier">Ателье</option></select></label>
+                <label><span className="eyebrow mb-2 block">Заголовок (опц.)</span><input value={articleForm.title} onChange={e => setArticleForm({ ...articleForm, title: e.target.value })} placeholder="авто" className="h-11 w-full border bg-background px-3 text-sm" /></label>
+              </div>
+              <div className="mt-8 divide-y border-y">
+                {articles.map(a => <div key={a.id} className="flex flex-wrap items-center gap-3 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.title}</p><p className="truncate text-xs text-muted-foreground">/{a.slug} · {a.style || '—'} · {a.room_type || '—'} · {a.status}</p></div>{a.status === 'published' ? <a href={`/articles/${a.slug}`} target="_blank" rel="noopener" className="text-xs underline">открыть</a> : <button type="button" onClick={() => void publishArticle(a.id)} className="text-xs underline">опубликовать</button>}<button type="button" onClick={() => void deleteArticle(a.id)} className="text-xs text-destructive underline">удалить</button></div>)}
+                {!articles.length && <p className="py-6 text-sm text-muted-foreground">Статей пока нет.</p>}
+              </div>
             </div>
           )}
 

@@ -383,6 +383,26 @@ export const q = {
   },
   deletePack: id => pool.query(`DELETE FROM credit_packs WHERE id = $1`, [id]).then(r => r.rowCount > 0),
 
+  // lookbook-статьи (контент-движок)
+  createArticle: f =>
+    pool.query(`INSERT INTO articles (slug, title, style, room_type, tier, cover_path, palette, body, products, status, meta)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [f.slug, f.title, f.style || null, f.room_type || null, f.tier || null, f.cover_path || null,
+       JSON.stringify(f.palette || []), JSON.stringify(f.body || {}), JSON.stringify(f.products || []),
+       f.status || 'draft', JSON.stringify(f.meta || {})]).then(r => r.rows[0]),
+  listArticles: () =>
+    pool.query(`SELECT id, slug, title, style, room_type, tier, cover_path, status, created_at, published_at
+                FROM articles ORDER BY created_at DESC`).then(r => r.rows),
+  articleById: id =>
+    pool.query(`SELECT * FROM articles WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  articleBySlug: slug =>
+    pool.query(`SELECT * FROM articles WHERE slug = $1 AND status = 'published'`, [slug]).then(r => r.rows[0] || null),
+  publishArticle: id =>
+    pool.query(`UPDATE articles SET status = 'published', published_at = COALESCE(published_at, now())
+                WHERE id = $1 RETURNING *`, [id]).then(r => r.rows[0] || null),
+  deleteArticle: id =>
+    pool.query(`DELETE FROM articles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
+
   // подбор товаров по рендеру
   renderOwnedByUser: (renderId, userId) =>
     pool.query(`SELECT r.* FROM renders r JOIN rooms rm ON rm.id = r.room_id

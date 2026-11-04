@@ -27,6 +27,7 @@ import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
 import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
+import { generateArticle, articlePage } from './articles.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
 import { startProcurementWorker } from './procurementjobs.js';
@@ -797,6 +798,43 @@ app.post('/api/admin/settings/render/reset', h(async (req, res) => {
   }
 }));
 
+// ---------- lookbook-статьи (контент-движок) ----------
+app.get('/api/admin/articles', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ articles: await q.listArticles() });
+}));
+
+app.post('/api/admin/articles/generate', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const article = await generateArticle({
+      style: req.body?.style || 'Скандинавский',
+      roomType: req.body?.room_type || 'Спальня',
+      tier: req.body?.tier || 'comfort',
+      title: req.body?.title || '',
+    });
+    log({ event: 'article_generated', id: article.id, slug: article.slug, style: article.style, room_type: article.room_type });
+    res.json({ article });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/articles/:id/publish', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const article = await q.publishArticle(Number(req.params.id));
+  if (!article) return res.status(404).json({ error: 'Статья не найдена' });
+  log({ event: 'article_published', id: article.id, slug: article.slug });
+  res.json({ article });
+}));
+
+app.delete('/api/admin/articles/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const removed = await q.deleteArticle(Number(req.params.id));
+  if (!removed) return res.status(404).json({ error: 'Статья не найдена' });
+  res.json({ ok: true });
+}));
+
 app.get('/api/admin/settings/prompt', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json({ config: getPromptConfig(), defaults: getPromptDefaults() });
@@ -1356,6 +1394,12 @@ app.get('/renders/:file', h(async (req, res) => serveStored(req, res, 'renders',
 app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products', req.params.file)));
 app.get('/procurement/:file', h(async (req, res) => serveStored(req, res, 'procurement', req.params.file)));
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
+app.get('/covers/:file', h(async (req, res) => serveStored(req, res, 'covers', req.params.file)));
+app.get('/articles/:slug', h(async (req, res) => {
+  const article = await q.articleBySlug(String(req.params.slug || ''));
+  if (!article) return res.status(404).send('Статья не найдена');
+  res.type('html').send(articlePage(article));
+}));
 app.get('/search-lab/:file', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   await serveStored(req, res, 'search-lab', req.params.file);
