@@ -3,7 +3,14 @@
 // вставляется в промт генерации отдельным блоком ART DIRECTION.
 import { visionJson } from './openrouter.js';
 import { roomTypeByName } from './roomtypes.js';
-import { ALLOWED_CATEGORIES } from './searchvision.js';
+
+// Категории, которые арт-директор может просить из каталога. Локальный список,
+// чтобы не зависеть от searchvision.js (он может отличаться в разных сборках).
+const PRODUCT_PLAN_CATEGORIES = [
+  'bed', 'sofa', 'dining_table', 'coffee_table', 'armchair', 'light', 'rug',
+  'decor', 'decor_art', 'appliance', 'faucet', 'sink', 'shower', 'bathtub',
+  'toilet', 'cabinet', 'sideboard', 'desk', 'office_chair', 'storage', 'curtain', 'mirror',
+];
 
 export const ART_DIRECTION_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.ART_DIRECTION_ENABLED ?? 'true'));
 // Модель арт-директора. Пусто — VISION_MODEL (админка/модели). Можно задать
@@ -36,7 +43,7 @@ function normalizeProductPlan(value) {
   return value.map(item => {
     if (!item || typeof item !== 'object') return null;
     const category = String(item.category || '').trim();
-    if (!ALLOWED_CATEGORIES.includes(category) || category === 'other') return null;
+    if (!PRODUCT_PLAN_CATEGORIES.includes(category)) return null;
     const query = clampText(item.query || item.label || '', 200);
     if (!query) return null;
     return {
