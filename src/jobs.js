@@ -6,14 +6,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, assessArchitecture, parseRender, matchCatalog, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
-import { curateProducts, referenceImagesDetailed } from './curate.js';
-import { designProducts } from './productpipeline.js';
+import { referenceImagesDetailed } from './curate.js';
+import { reviewDesign } from './architect.js';
+import { matchDesignOffers } from './designoffers.js';
 import { getRenderConfig } from './renderconfig.js';
 import { pickHoffProducts, loadProductImages } from './productpicker.js';
-import { roomTypeByName } from './roomtypes.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
@@ -22,8 +22,6 @@ import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
 import { buildArtDirection } from './artdirector.js';
-
-const ARCHITECTURE_QA_ENABLED = /^(1|true|yes|on)$/i.test(process.env.ARCHITECTURE_QA_ENABLED || '');
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -87,7 +85,6 @@ async function processRender(renderId) {
   const room = await q.getRoom(render.room_id);
   const iteration = Boolean(render.request_text);
   const roomType = room.room_type || 'Другое';
-  const roomTypeInfo = roomTypeByName(roomType);
   const priceTier = normalizeTier(room.price_tier || 'comfort');
   const keepFurniture = room.keep_furniture !== false;
   const useCatalog = room.use_catalog !== false;
@@ -111,7 +108,7 @@ async function processRender(renderId) {
     cleanup: null,
     design: null,
     design_retry: null,
-    architecture_qa: null,
+    architect_review: null,
     product_qa: null,
     render_analysis: null,
     failed: null,
@@ -132,7 +129,6 @@ async function processRender(renderId) {
 
     let prompt;
     let artDirectionCost = 0;
-    let curated = [];
     let styleInfo = null;
     let imageMap = [];
     let meta = {
@@ -216,22 +212,6 @@ async function processRender(renderId) {
     } else {
       styleInfo = await q.styleByName(room.style);
       const styleMode = getStyleConfig().mode;
-      const stylePreferred = styleInfo ? await q.styleProducts(styleInfo.id, roomType) : [];
-      const allowed = new Set(roomTypeInfo?.categories || []);
-      const preferred = useCatalog ? stylePreferred.filter(p => p.active !== false && (
-        p.style_room_type === roomType ||
-        (!p.style_room_type && (!allowed.size || allowed.has(p.category)))
-      )) : [];
-
-      curated = useCatalog ? await curateProducts({
-        style: room.style,
-        budget: room.budget,
-        priceTier,
-        roomType,
-        preferredIds: preferred.map(p => p.id),
-        allowedCategories: roomTypeInfo?.categories || null,
-        seed: room.id,
-      }) : [];
 
       let styleUserRef = false;
       const styleRefUrls = [];
@@ -322,7 +302,7 @@ async function processRender(renderId) {
         style: room.style,
         priceTier,
         budget: room.budget,
-        products: designProducts(curated),
+        products: [],
         palette: room.palette || 'none',
         accent: room.accent || 'none',
         hasStyleRef: styleRefUrls.length > 0,
@@ -338,7 +318,6 @@ async function processRender(renderId) {
       });
 
       referenceImagesB64 = [...styleRefUrls, ...productRefsDetailed.map(r => r.b64)];
-      meta.product_ids = curated.map(p => Number(p.id));
       meta.style_id = styleInfo?.id || null;
       meta.style_reference_mode = styleMode;
       meta.user_style_ref_ignored = Boolean(room.style_ref_path && styleMode !== 'reference');
@@ -359,7 +338,6 @@ async function processRender(renderId) {
       stage = 'rendering';
       await q.setRoomStatus('rendering', room.id);
       const originalBuf = await getBuffer(sourceStored);
-      const originalDataUrl = await bufferToDataUrl(originalBuf);
       const { width, height } = imageSize(originalBuf);
       targetRatio = width / height;
       const editModel = getModelConfig().edit || null;
@@ -421,56 +399,7 @@ async function processRender(renderId) {
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
       addCost('design', out.cost);
-      let architectureQa = null;
-      if (ARCHITECTURE_QA_ENABLED && !iteration) {
-        try {
-          const outBuf = Buffer.from(out.b64, 'base64');
-          const outExt = detectImageExt(outBuf);
-          const outMime = MIME_BY_EXT[outExt] || 'image/png';
-          architectureQa = await assessArchitecture({
-            sourceImageUrl: originalDataUrl,
-            renderImageUrl: `data:${outMime};base64,${out.b64}`,
-          });
-          cost += architectureQa.cost || 0;
-          addCost('architecture_qa', architectureQa.cost);
-          log({ event: 'architecture_qa', room_id: room.id, render_id: renderId, accepted: architectureQa.accepted, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: architectureQa.cost ?? null });
-          if (!architectureQa.accepted) {
-            const retryPrompt = `${prompt}
-
-ARCHITECTURE CORRECTION — HARD REQUIREMENT
-The previous attempt failed architecture QA: ${architectureQa.issues.join('; ') || 'the room geometry changed'}.
-Regenerate the SAME room with the exact source architecture. Do not add, remove, move or resize any window, door, wall, ceiling, niche, beam, column, skylight, built-in or room volume. Keep the same camera, proportions and functional zones. This correction overrides any conflicting styling instruction.`;
-            out = await generateRender({
-              prompt: retryPrompt,
-              sourceImageB64: srcB64,
-              referenceImagesB64,
-              aspectRatio,
-              model: 'openai/gpt-image-2',
-            });
-            imageB64 = out.b64; cost += out.cost || 0; model = out.model || model;
-            addCost('design_retry', out.cost);
-            const retryBuf = Buffer.from(out.b64, 'base64');
-            const retryExt = detectImageExt(retryBuf);
-            const retryMime = MIME_BY_EXT[retryExt] || 'image/png';
-            architectureQa = await assessArchitecture({
-              sourceImageUrl: originalDataUrl,
-              renderImageUrl: `data:${retryMime};base64,${out.b64}`,
-            });
-            cost += architectureQa.cost || 0;
-            addCost('architecture_qa', architectureQa.cost);
-            log({ event: 'architecture_qa_retry', room_id: room.id, render_id: renderId, accepted: architectureQa.accepted, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: architectureQa.cost ?? null });
-            if (!architectureQa.accepted) {
-              throw new Error(`Не удалось сохранить архитектуру комнаты: ${architectureQa.issues.slice(0, 3).join('; ') || 'геометрия изменилась'}`);
-            }
-          }
-        } catch (e) {
-          if (String(e.message || '').startsWith('Не удалось сохранить архитектуру')) throw e;
-          log({ event: 'architecture_qa_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-          throw new Error(`Не удалось проверить архитектуру комнаты: ${String(e.message || e).slice(0, 300)}`);
-        }
-      }
-      meta.architecture_qa = architectureQa;
-      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, curated: curated.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
+      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
     }
 
     const rawBytes = Buffer.from(imageB64, 'base64');
@@ -529,74 +458,65 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
       log({ event: 'product_qa_done', room_id: room.id, render_id: renderId, product_id: editProduct.id, status: productQa.status, checks: productQa.checks, cost_usd: productQa.cost ?? null });
     }
 
-    // Разбор готовой визуализации: материалы, поверхности → RAL, электрика, быстрые правки.
+    // Один разбор архитектора вместо parseRender + matchCatalog + buildAnalysis + architecture QA.
     stage = 'matching';
     await q.setRoomStatus('matching', room.id);
     let parsed = { items: [], surfaces: [], visible: [], electrical: [] };
+    let architectReview = null;
+    let productMatches = [];
     let visionCost = null;
     if (!MOCK_MODE) {
+      const imageDataUrl = `data:${MIME_BY_EXT[ext] || 'image/jpeg'};base64,${bytes.toString('base64')}`;
       try {
-        parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
-        visionCost = parsed.cost;
-        addCost('render_analysis', visionCost);
-        log({ event: 'render_analysis', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length });
+        const reviewed = await reviewDesign({
+          imageDataUrl,
+          roomType,
+          style: room.style,
+          priceTier,
+          mode: 'hints',
+        });
+        if (reviewed) {
+          parsed = reviewed.parsed;
+          architectReview = reviewed.architect;
+          visionCost = reviewed.cost;
+          addCost('architect_review', reviewed.cost);
+          log({ event: 'architect_review', room_id: room.id, render_id: renderId, items: architectReview.items.length, surfaces: architectReview.surfaces.length, hints: architectReview.hints.length, cost_usd: reviewed.cost ?? null });
+        }
       } catch (e) {
-        log({ event: 'render_analysis_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        log({ event: 'architect_review_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+      }
+      if (!architectReview) {
+        try {
+          parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
+          visionCost = parsed.cost;
+          addCost('render_analysis', visionCost);
+          log({ event: 'render_analysis_fallback', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length });
+        } catch (e) {
+          log({ event: 'render_analysis_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
       }
     }
 
-    const allProducts = useCatalog ? await q.allProducts() : [];
-
-    let matched = [];
-    if (useCatalog) {
-      try { matched = matchCatalog(parsed.items, allProducts); }
-      catch (e) { log({ event: 'render_match_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) }); }
+    if (useCatalog && architectReview?.items?.length) {
+      try {
+        productMatches = await matchDesignOffers({ items: architectReview.items, roomType, topK: 3 });
+        const offers = productMatches.reduce((sum, match) => sum + match.offers.length, 0);
+        log({ event: 'design_offers_matched', room_id: room.id, render_id: renderId, items: productMatches.length, offers });
+      } catch (e) {
+        log({ event: 'design_offers_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+      }
     }
 
     await q.clearItems(render.id);
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
       if (parent) await q.copyItems(parent.id, render.id);
-    } else {
-      for (const p of curated) await q.saveItem(render.id, p.id, null);
-    }
-    const finalItemsBeforeMatch = await q.itemsForRender(render.id);
-    const categoryGroup = category => (category === 'paint' || category === 'wallpaper')
-      ? ['paint', 'wallpaper']
-      : [category];
-    const groupForTarget = target => {
-      if (!target) return null;
-      if (target === 'wall') return ['paint', 'wallpaper'];
-      if (target === 'backsplash' || target === 'tile') return ['tile'];
-      return [target];
-    };
-    const presentGroups = new Set(finalItemsBeforeMatch.map(p => categoryGroup(p.category).join('|')));
-    if (iteration) {
       if (editProduct) {
+        const categoryGroup = category => (category === 'paint' || category === 'wallpaper')
+          ? ['paint', 'wallpaper']
+          : [category];
         // Быстрая подсказка/товарный референс: фиксируем именно этот товар в смете.
         await q.replaceItemByCategories(render.id, categoryGroup(editProduct.category), editProduct.id, 1, productQa?.accepted ? 'verified' : 'curated');
-      } else if (render.edit_target) {
-        const targetGroup = groupForTarget(render.edit_target);
-        const match = matched.find(m => targetGroup.includes(m.product.category));
-        if (match) await q.replaceItemByCategories(render.id, targetGroup, match.product.id, match.score);
-      } else {
-        // Правка без target: не переписываем смету родителя, только дополняем недостающие группы.
-        for (const m of matched) {
-          const group = categoryGroup(m.product.category).join('|');
-          if (!presentGroups.has(group)) { await q.saveItem(render.id, m.product.id, m.score); presentGroups.add(group); }
-        }
-      }
-    } else {
-      // Первый рендер: curated — источник сметы, но не доказательство точного совпадения.
-      // Vision только добавляет то, чего не было в подборке, и не подменяет выбранный товар.
-      for (const m of matched) {
-        const group = categoryGroup(m.product.category).join('|');
-        if (!presentGroups.has(group)) { await q.saveItem(render.id, m.product.id, m.score); presentGroups.add(group); }
-      }
-    }
-    if (useCatalog && !iteration && !curated.length && !matched.length && MOCK_MODE) {
-      for (const p of allProducts.filter(p => ['light', 'floor', 'paint', 'outlets'].includes(p.category)).slice(0, 4)) {
-        await q.saveItem(render.id, p.id, 0.9);
       }
     }
 
@@ -606,13 +526,15 @@ Regenerate the SAME room with the exact source architecture. Do not add, remove,
     const analysis = buildAnalysis({
       roomType,
       parsed,
-      products: allProducts,
+      products: [],
       currentProducts: finalItems,
       priceTier,
       style: room.style,
     });
+    if (architectReview) analysis.architect = architectReview;
+    if (productMatches.length) analysis.products = productMatches;
     await q.setRenderAnalysis(renderId, analysis);
-    log({ event: 'render_matched', room_id: room.id, render_id: renderId, parsed_items: parsed.items.length, matched: matched.length, curated: curated.length, suggestions: analysis.suggestions.length });
+    log({ event: 'render_analyzed', room_id: room.id, render_id: renderId, items: parsed.items.length, architect_hints: architectReview?.hints?.length || 0, product_items: productMatches.length, suggestions: analysis.suggestions.length });
 
     const totalCost = sumCostBreakdown();
     await q.setRenderMeta(renderId, {

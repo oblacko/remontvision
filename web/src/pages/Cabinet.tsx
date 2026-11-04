@@ -8,7 +8,7 @@ type Me = { email: string; balance: number }
 type Consents = { offer: boolean; personal: boolean; transfer: boolean }
 type CostBreakdown = {
   art_direction?: number | null; cleanup?: number | null; design?: number | null; design_retry?: number | null;
-  architecture_qa?: number | null; product_qa?: number | null; render_analysis?: number | null; failed?: number | null;
+  architect_review?: number | null; architecture_qa?: number | null; product_qa?: number | null; render_analysis?: number | null; failed?: number | null;
 }
 type GenRow = {
   id: string; room_id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
@@ -19,9 +19,12 @@ type GenRow = {
 type CreditRow = { id: number; delta: number; reason: string; payment_id: number | null; render_id: string | null; note: string | null; created_at: string }
 type Pack = { id: string; title: string; credits: number; price_kopecks: number }
 type GenItem = { name: string; price: number; qty: number; unit: string; url: string; link_label?: string; direct_url?: boolean; source?: string; match_score?: number; presentation_status?: 'curated' | 'matched' | 'verified' }
+type ProductOffer = { id: string; name: string; price: number | null; currency: string; merchant?: string | null; url: string | null; image_url?: string | null; erid?: string | null }
+type ProductMatch = { item: { label: string; category: string }; offers: ProductOffer[]; note?: string }
+type RoomAnalysis = { products?: ProductMatch[] } | null
 type RoomData = {
   id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; keep_furniture?: boolean; use_catalog?: boolean; status: string; error: string | null;
-  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; cost_usd?: number | null; cost_breakdown?: CostBreakdown | null } | null;
+  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; cost_usd?: number | null; cost_breakdown?: CostBreakdown | null; analysis?: RoomAnalysis } | null;
   items: GenItem[]; total: number; prices_as_of: string | null;
 }
 type RoomGroup = { roomId: string; style: string; versions: GenRow[]; latest: GenRow; image: string | null; credits: number; costUsd: number }
@@ -47,7 +50,7 @@ const statusLabel = (status: string) => status === 'done' ? 'готово' : sta
 const usd = (value?: number | null) => typeof value === 'number' ? `$${value.toFixed(4)}` : '—'
 const COST_LABELS: Record<string, string> = {
   art_direction: 'арт-директор', cleanup: 'очистка', design: 'дизайн', design_retry: 'дизайн-ретрай',
-  architecture_qa: 'QA архитектуры', product_qa: 'QA товара', render_analysis: 'анализ рендера', failed: 'ошибка запроса',
+  architect_review: 'разбор архитектора', architecture_qa: 'QA архитектуры', product_qa: 'QA товара', render_analysis: 'анализ рендера', failed: 'ошибка запроса',
 }
 const costRows = (breakdown?: CostBreakdown | null) => Object.entries(breakdown || {})
   .filter(([, value]) => typeof value === 'number' && value > 0)
@@ -328,6 +331,8 @@ export default function Cabinet() {
     )
   }
 
+  const realProducts = roomData?.render?.analysis?.products || []
+  const realOfferCount = realProducts.reduce((sum, match) => sum + match.offers.length, 0)
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b bg-background">
@@ -425,7 +430,8 @@ export default function Cabinet() {
                 )}
                 <div className="mt-6 grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-[11px] text-muted-foreground">Подбор по уровню, а не по сумме</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p><p className="mt-1 text-[11px] text-muted-foreground">Смета ориентировочная</p>{roomData.prices_as_of && <p className="mt-1 text-[11px] text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
                 <div className="mt-6"><p className="eyebrow">Версии</p><div className="mt-3 flex flex-wrap gap-2">{selectedRoom.versions.map((v, index) => <button key={v.id} type="button" onClick={() => selectVersion(v.id)} className={`min-h-10 border px-3 text-xs ${selectedRenderId === v.id ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>Версия {selectedRoom.versions.length - index} · {v.request_text ? 'правка' : 'базовая'} · {statusLabel(v.status)}</button>)}</div></div>
-                {roomData.use_catalog === false && <p className="mt-6 border-y py-4 text-sm text-muted-foreground">Каталог был отключён для этой генерации — смета не формировалась.</p>}
+                {realProducts.length > 0 && <div className="mt-6"><p className="eyebrow">Реальные товары · {realOfferCount}</p><div className="mt-3 space-y-5">{realProducts.map((match, index) => <div key={`${match.item.category}-${index}`}><div className="flex items-baseline justify-between gap-3 border-b pb-2"><p className="text-sm font-medium">{match.item.label}</p><span className="text-xs text-muted-foreground">{match.offers.length ? `${match.offers.length} в каталоге` : 'нет в каталоге'}</span></div>{match.offers.length ? <div className="mt-3 grid gap-3 sm:grid-cols-2">{match.offers.map(offer => <a key={offer.id} href={offer.url || '#'} target="_blank" rel={offer.url ? 'noopener nofollow sponsored' : 'noopener nofollow'} className="flex min-w-0 gap-3 border p-2 transition-colors hover:border-foreground">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="size-16 shrink-0 object-cover" loading="lazy" /> : <div className="flex size-16 shrink-0 items-center justify-center bg-muted text-[10px] text-muted-foreground">нет фото</div>}<div className="min-w-0"><p className="line-clamp-2 text-xs font-medium leading-5">{offer.name}</p><p className="mt-1 text-xs">{offer.price === null ? 'цена не указана' : rub(offer.price)}{offer.merchant ? ` · ${offer.merchant}` : ''}</p>{offer.erid ? <p className="text-[10px] text-muted-foreground">реклама · erid {offer.erid}</p> : null}</div></a>)}</div> : <p className="mt-2 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}</div>)}</div></div>}
+                {roomData.use_catalog === false && <p className="mt-6 border-y py-4 text-sm text-muted-foreground">Товары были отключены для этой генерации — подборка не формировалась.</p>}
                 {roomData.items.length > 0 && <div className="mt-6"><p className="eyebrow">Товары и смета</p><div className="mt-3 divide-y border-y">{roomData.items.map((item, i) => <div key={`${item.name}-${i}`} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 py-3 text-sm"><span>{item.name}</span><span className="font-medium">{rub(item.price * item.qty)}</span><span className="col-span-2 text-xs text-muted-foreground">{rub(item.price)} × {item.qty} {item.unit}{` · ${item.presentation_status === 'verified' ? 'Проверен на рендере' : item.presentation_status === 'matched' ? 'Похожий по рендеру' : 'Подобран к дизайну'}`}{item.source ? ` · ${item.source}` : ''}{item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}</span></div>)}</div></div>}
                 {roomData.error && <p className="mt-4 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{roomData.error}</p>}
               </>

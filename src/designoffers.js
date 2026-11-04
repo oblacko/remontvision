@@ -83,7 +83,7 @@ export async function matchDesignOffers({
           room_type: roomType,
         },
         topK: size,
-      });
+      }, { timeoutMs: 8_000 });
       const offers = (Array.isArray(results) ? results : []).map(normalizeOffer).filter(Boolean);
       return {
         item: {

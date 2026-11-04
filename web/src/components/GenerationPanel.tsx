@@ -34,7 +34,38 @@ type Surface = {
 }
 type ElectricalItem = { title: string; text: string }
 type Suggestion = { target: string; label: string; product_id: number; image_url?: string | null }
-type Analysis = { surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[]; visible?: Array<{ label?: string; bbox?: number[]; area?: number } | string> }
+type ArchitectHint = { target?: string; action: string; why?: string; priority?: 'high' | 'medium' | 'low' }
+type Architect = {
+  room?: {
+    type?: string; style?: string; lighting?: string
+    walls?: { color?: string; material?: string } | null
+    floor?: { color?: string; material?: string } | null
+    ceiling?: { color?: string; material?: string } | null
+  }
+  palette?: { name: string; hex: string; where?: string }[]
+  items?: { key?: string; label: string; category: string; bbox?: number[] | null }[]
+  strengths?: string[]
+  issues?: string[]
+  hints?: ArchitectHint[]
+  electrical?: ElectricalItem[]
+  summary?: { concept?: string; palette?: string; materials?: string; electrical?: string; next_steps?: string[] } | null
+}
+type ProductOffer = {
+  id: string; name: string; price: number | null; currency: string
+  merchant?: string | null; url: string | null; image_url?: string | null
+  erid?: string | null; score?: number | null
+}
+type ProductMatch = {
+  item: { key?: string; label: string; category: string; bbox?: number[] | null }
+  offers: ProductOffer[]
+  note?: string
+}
+type Analysis = {
+  surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[]
+  visible?: Array<{ label?: string; bbox?: number[]; area?: number } | string>
+  architect?: Architect | null
+  products?: ProductMatch[]
+}
 type ArtDirection = {
   palette?: { hex?: string | null; name?: string }[]
   focalPoint?: string
@@ -184,7 +215,7 @@ export function GenerationPanel({
   const [style, setStyle] = useState<string | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
   const [keepFurniture, setKeepFurniture] = useState(true)
-  const [useCatalog, setUseCatalog] = useState(false)
+  const [useCatalog, setUseCatalog] = useState(true)
   const [customOpen, setCustomOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
@@ -230,6 +261,9 @@ export function GenerationPanel({
   const visibleHints = (current?.analysis?.visible || [])
     .map(v => (typeof v === 'string' ? v : v?.label || ''))
     .filter(Boolean)
+  const architect = current?.analysis?.architect || null
+  const productMatches = current?.analysis?.products || []
+  const realOfferCount = productMatches.reduce((sum, match) => sum + match.offers.length, 0)
   const demoEstimate = (current?.items.length ?? 0) > 0 && current!.items.every(item => !item.direct_url)
 
   const rememberUrl = (url: string) => { urls.current.push(url) }
@@ -912,7 +946,7 @@ export function GenerationPanel({
 
             <div className="mt-8 border">
               <button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(v => !v)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}{useCatalog ? ' · каталог' : ''}</span>
+                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}{useCatalog ? ' · товары' : ''}</span>
                 <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`} />
               </button>
               {advancedOpen && (
@@ -938,7 +972,7 @@ export function GenerationPanel({
                     </button>
                     <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className={`flex min-h-24 gap-3 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${useCatalog ? 'bg-foreground text-background' : 'bg-background hover:bg-muted'}`}>
                       <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
-                      <span><span className="block text-sm font-medium">Использовать каталог</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'Подбираем реальные товары, показываем смету и ссылки.' : 'AI свободно проектирует интерьер. Смета и товары не собираются.'}</span></span>
+                      <span><span className="block text-sm font-medium">Подобрать реальные товары</span><span className="mt-1 block text-[11px] leading-4 opacity-75">{useCatalog ? 'После генерации покажем товары Hoff со ссылками. На картинку не влияет.' : 'AI свободно проектирует интерьер. Товары и ссылки не собираются.'}</span></span>
                     </button>
                   </div>
                   <p className="mt-3 text-[11px] leading-5 text-muted-foreground">Очистка комнаты применяется автоматически, когда «Оставить мебель» выключено.</p>
@@ -1032,8 +1066,14 @@ export function GenerationPanel({
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm">
-                  <span className="text-muted-foreground">{current.useCatalog === false ? 'Каталог отключён · смета не формируется' : `Класс «${tierName(current.priceTier)}» · подборка ${rub(current.total)}`}</span>
-                  <span className="text-muted-foreground">{current.useCatalog === false ? 'Свободный дизайн' : 'Итог ориентировочный'}</span>
+                  <span className="text-muted-foreground">
+                    {realOfferCount > 0
+                      ? `Класс «${tierName(current.priceTier)}» · товары: ${realOfferCount} ${realOfferCount === 1 ? 'предложение' : 'предложений'}`
+                      : current.useCatalog === false
+                        ? 'Товары отключены · подборка не формируется'
+                        : `Класс «${tierName(current.priceTier)}» · подборка ${rub(current.total)}`}
+                  </span>
+                  <span className="text-muted-foreground">{realOfferCount > 0 ? 'Реальные товары Hoff' : current.useCatalog === false ? 'Свободный дизайн' : 'Итог ориентировочный'}</span>
                 </div>
                 {current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
                   <section className="mt-6 border p-4" aria-labelledby="art-direction">
@@ -1055,6 +1095,50 @@ export function GenerationPanel({
                       {current.artDirection.lighting ? <div><dt className="eyebrow">Свет</dt><dd className="mt-1">{current.artDirection.lighting}</dd></div> : null}
                       {current.artDirection.mood ? <div><dt className="eyebrow">Настроение</dt><dd className="mt-1">{current.artDirection.mood}</dd></div> : null}
                     </dl>
+                  </section>
+                ) : null}
+                {architect && (architect.hints?.length || architect.strengths?.length || architect.palette?.length) ? (
+                  <section className="mt-6 border p-4" aria-labelledby="architect-review">
+                    <p id="architect-review" className="eyebrow">Разбор архитектора</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">По готовому изображению: что получилось, что улучшить, свет и розетки.</p>
+                    {architect.palette?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {architect.palette.map((color, index) => (
+                          <span key={`${color.hex}-${index}`} className="inline-flex items-center gap-2 border bg-background px-2 py-1 text-[11px]">
+                            <span className="size-4 shrink-0 border" style={{ background: color.hex }} aria-hidden="true" />
+                            {color.name}{color.where ? ` · ${color.where}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {architect.strengths?.length ? (
+                      <ul className="mt-4 grid gap-1 text-sm">
+                        {architect.strengths.map((item, index) => (
+                          <li key={`strength-${index}`} className="flex items-baseline gap-2">
+                            <Check className="mt-0.5 size-3.5 shrink-0 text-primary-text" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {architect.hints?.length ? (
+                      <div className="mt-4">
+                        <p className="eyebrow">Что улучшить</p>
+                        <div className="mt-2 grid gap-2">
+                          {architect.hints.map((hint, index) => (
+                            <button
+                              key={`hint-${index}`}
+                              type="button"
+                              onClick={() => startGeneration(hint.action, current.styleName, { target: hint.target || undefined, parentId: current.id })}
+                              className="flex flex-col items-start gap-1 border border-foreground/20 px-3 py-2 text-left text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <span className="font-medium">{hint.action}</span>
+                              {hint.why ? <span className="text-muted-foreground">{hint.why}</span> : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </section>
                 ) : null}
                 {visibleHints.length ? (
@@ -1283,29 +1367,59 @@ export function GenerationPanel({
               <div className="space-y-8">
                 <section aria-labelledby="gen-products">
                   <h4 id="gen-products" className="eyebrow mb-4">Товары по дизайну</h4>
-                  {demoEstimate && (
-                    <p className="mb-4 border border-foreground/20 bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-                      Демо-подборка: это пример состава и цен, а не товары конкретного магазина. Ссылки ведут на похожие позиции.
-                    </p>
-                  )}
-                  <div className="divide-y border-y">
-                    {current.items.length ? current.items.map((item, index) => (
-                      <div key={`${item.name}-${index}`} className="estimate-row grid gap-x-4 gap-y-1 py-3.5 text-sm">
-                        <span>{item.name}</span>
-                        <span className="row-span-2 self-center font-medium">{rub(item.price * item.qty)}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {rub(item.price)} × {item.qty} {item.unit}
-                          {` · ${presentationLabel(item.presentation_status)}`}
-                          {item.source ? ` · ${item.source}` : ''}
-                          {item.price_tier ? ` · ${tierName(item.price_tier)}` : ''}
-                          {item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}
-                        </span>
+                  {productMatches.length ? (
+                    <div className="space-y-6">
+                      {productMatches.map((match, index) => (
+                        <div key={`${match.item.category}-${index}`}>
+                          <div className="flex items-baseline justify-between gap-3 border-b pb-2">
+                            <p className="text-sm font-medium">{match.item.label}</p>
+                            <span className="text-xs text-muted-foreground">{match.offers.length ? `${match.offers.length} в каталоге` : 'нет в каталоге'}</span>
+                          </div>
+                          {match.offers.length ? (
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              {match.offers.map(offer => (
+                                <a key={offer.id} href={offer.url || '#'} target="_blank" rel={offer.url ? 'noopener nofollow sponsored' : 'noopener nofollow'} className="group flex min-w-0 flex-col border transition-colors hover:border-foreground">
+                                  <div className="aspect-[4/3] overflow-hidden bg-muted">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет фото</div>}</div>
+                                  <div className="flex flex-1 flex-col p-3">
+                                    <p className="line-clamp-2 text-xs font-medium leading-5">{offer.name}</p>
+                                    <div className="mt-2 flex items-center justify-between gap-2"><span className="text-sm font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</span><span className="truncate text-[11px] text-muted-foreground">{offer.merchant}</span></div>
+                                    {offer.erid ? <p className="mt-1 text-[10px] text-muted-foreground">реклама · erid {offer.erid}</p> : null}
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          ) : <p className="mt-2 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}
+                        </div>
+                      ))}
+                      <p className="text-xs leading-5 text-muted-foreground">Цены и наличие — на момент подбора. Перед покупкой сверьте размеры, цвет и условия магазина.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {demoEstimate && (
+                        <p className="mb-4 border border-foreground/20 bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+                          Демо-подборка: это пример состава и цен, а не товары конкретного магазина. Ссылки ведут на похожие позиции.
+                        </p>
+                      )}
+                      <div className="divide-y border-y">
+                        {current.items.length ? current.items.map((item, index) => (
+                          <div key={`${item.name}-${index}`} className="estimate-row grid gap-x-4 gap-y-1 py-3.5 text-sm">
+                            <span>{item.name}</span>
+                            <span className="row-span-2 self-center font-medium">{rub(item.price * item.qty)}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {rub(item.price)} × {item.qty} {item.unit}
+                              {` · ${presentationLabel(item.presentation_status)}`}
+                              {item.source ? ` · ${item.source}` : ''}
+                              {item.price_tier ? ` · ${tierName(item.price_tier)}` : ''}
+                              {item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}
+                            </span>
+                          </div>
+                        )) : <p className="py-4 text-sm text-muted-foreground">{current.useCatalog === false ? 'Товары отключены для этой генерации.' : 'Товары не собраны — попробуйте сгенерировать ещё раз.'}</p>}
                       </div>
-                    )) : <p className="py-4 text-sm text-muted-foreground">Подборка не сформирована — попробуйте изменить запрос.</p>}
-                  </div>
-                  <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка · класс «{tierName(current.priceTier)}»</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
-                  <p className="mt-1 text-right text-xs text-muted-foreground">{demoEstimate ? 'Демо-оценка, не оферта' : 'Смета ориентировочная'}</p>
-                  {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
+                      <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка · класс «{tierName(current.priceTier)}»</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
+                      <p className="mt-1 text-right text-xs text-muted-foreground">{demoEstimate ? 'Демо-оценка, не оферта' : 'Смета ориентировочная'}</p>
+                      {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
+                    </>
+                  )}
                 </section>
 
                 <section aria-labelledby="gen-ral">

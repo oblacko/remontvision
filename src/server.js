@@ -1248,7 +1248,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
     ? fallback
     : !(value === false || value === 0 || value === '0' || value === 'false' || value === 'off');
   const keepFurniture = bool(req.body.keep_furniture, true);
-  const useCatalog = bool(req.body.use_catalog, false);
+  const useCatalog = bool(req.body.use_catalog, true);
   const optionalMeasure = (value, min, max) => {
     const raw = String(value ?? '').replace(',', '.').trim();
     if (!raw) return null;
