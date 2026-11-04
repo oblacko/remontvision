@@ -251,7 +251,7 @@ async function processRender(renderId) {
             roomType,
             style: room.style,
             styleDescription: styleInfo?.prompt_description || '',
-            dimensions: roomDimensions,
+            dimensions: null,
             keepFurniture,
           });
           if (ad?.text) {
@@ -312,7 +312,7 @@ async function processRender(renderId) {
         keepFurniture,
         useCatalog,
         imageMap,
-        dimensions: roomDimensions,
+        dimensions: null,
         artDirection,
         productRefs: productRefsDetailed.length > 0,
       });

@@ -850,11 +850,12 @@ export function GenerationPanel({
                 </div>
               )}
               {photo && roomType && (
-                <div className="mt-5 border p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <details className="mt-5 border p-4">
+                  <summary className="cursor-pointer text-sm font-medium">Размеры для сметы · не влияет на картинку</summary>
+                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="eyebrow">Размеры комнаты <span className="ml-1 font-normal text-muted-foreground">необязательно</span></p>
-                      <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">Укажите реальные ширину, длину и высоту — модель точнее подберёт мебель и проходы. Заполняйте все три поля вместе.</p>
+                      <p className="eyebrow">Точные размеры <span className="ml-1 font-normal text-muted-foreground">необязательно</span></p>
+                      <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">Нужны только для расчёта материалов и количеств. В генерацию не передаются: модель сохраняет пропорции по фото.</p>
                     </div>
                     <button type="button" disabled={!file || estimateBusy} onClick={() => void estimateDimensions()} className="action-secondary min-h-9 px-3 text-xs disabled:opacity-40">{estimateBusy ? 'Определяем…' : 'Определить по фото'}</button>
                   </div>
@@ -867,7 +868,7 @@ export function GenerationPanel({
                   </div>
                   {isBedRoom && <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Для спальни и детской длина кровати 2,0 м подставляется автоматически.</p>}
                   <label className="mt-3 block"><span className="eyebrow mb-1 block">Ориентация размеров</span><textarea value={dimensionOrientation} onChange={event => setDimensionOrientation(event.target.value)} rows={2} placeholder="Например: ширина — стена с окном, длина — от двери до окна" className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
-                </div>
+                </details>
               )}
               <div className="mt-4" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
                 {photoError && <p className="mb-3 text-sm text-destructive" role="alert">{photoError}</p>}
