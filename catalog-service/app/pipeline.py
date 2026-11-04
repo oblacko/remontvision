@@ -86,6 +86,7 @@ def build_offer(feed_id: int, parsed, hash_value: str) -> Offer:
         raw=dict(parsed.raw or {}),
         status="active",
         content_hash=hash_value,
+        supplier_category_id=getattr(parsed, "supplier_category_id", None),
     )
 
 
@@ -100,6 +101,13 @@ def import_offers(repo, feed_id: int, parsed_offers) -> ImportResult:
             result.created += 1
             continue
         if existing.content_hash == hash_value:
+            if (
+                existing.category != offer.category
+                or existing.supplier_category_id != offer.supplier_category_id
+            ):
+                repo.update_category(
+                    existing.id, offer.category, offer.supplier_category_id
+                )
             result.unchanged += 1
             continue
         # Картинка изменилась — старый эмбеддинг больше не валиден.
@@ -129,11 +137,17 @@ def _prepare_embedding(offer, embedder, fetch_image):
 
 
 def embed_pending(
-    repo, embedder, fetch_image, limit: int = 100, concurrency: int = 16
+    repo,
+    embedder,
+    fetch_image,
+    limit: int = 100,
+    concurrency: int = 16,
+    feed_id: int | None = None,
+    category: str | None = None,
 ) -> EmbedResult:
     """Скачивает и эмбеддит картинки параллельно, пишет в репозиторий по очереди."""
     result = EmbedResult()
-    offers = repo.list_without_embedding(limit)
+    offers = repo.list_without_embedding(limit, feed_id=feed_id, category=category)
     if not offers:
         return result
     outcomes = []
@@ -170,11 +184,13 @@ def embed_all(
     batch: int = 100,
     max_batches: int = 1000,
     concurrency: int = 16,
+    feed_id: int | None = None,
+    category: str | None = None,
 ) -> EmbedResult:
     """Векторизует все ожидающие офферы партиями, пока есть прогресс."""
     total = EmbedResult()
     for _ in range(max_batches):
-        res = embed_pending(repo, embedder, fetch_image, batch, concurrency)
+        res = embed_pending(repo, embedder, fetch_image, batch, concurrency, feed_id, category)
         total.embedded += res.embedded
         total.skipped += res.skipped
         total.failed += res.failed
@@ -203,11 +219,16 @@ def _prepare_color(offer, fetch_image):
 
 
 def backfill_colors(
-    repo, fetch_image, limit: int = 200, concurrency: int = 16
+    repo,
+    fetch_image,
+    limit: int = 200,
+    concurrency: int = 16,
+    feed_id: int | None = None,
+    category: str | None = None,
 ) -> ColorResult:
     """Досчитывает цветовые дескрипторы для офферов без них."""
     result = ColorResult()
-    offers = repo.list_without_color(limit)
+    offers = repo.list_without_color(limit, feed_id=feed_id, category=category)
     if not offers:
         return result
     outcomes = []
@@ -231,11 +252,17 @@ def backfill_colors(
 
 
 def backfill_all_colors(
-    repo, fetch_image, batch: int = 200, max_batches: int = 1000, concurrency: int = 16
+    repo,
+    fetch_image,
+    batch: int = 200,
+    max_batches: int = 1000,
+    concurrency: int = 16,
+    feed_id: int | None = None,
+    category: str | None = None,
 ) -> ColorResult:
     total = ColorResult()
     for _ in range(max_batches):
-        res = backfill_colors(repo, fetch_image, batch, concurrency)
+        res = backfill_colors(repo, fetch_image, batch, concurrency, feed_id, category)
         total.colored += res.colored
         total.skipped += res.skipped
         total.failed += res.failed

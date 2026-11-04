@@ -30,6 +30,7 @@ class ParsedOffer:
     erid: str | None
     params: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
+    supplier_category_id: str | None = None
 
 
 def _text(node) -> str:
@@ -93,11 +94,65 @@ def _merchant_from_url(url: str | None, fallback: str | None) -> str | None:
     return host.lower().removeprefix("www.") or None
 
 
+def _category_paths(names: dict[str, str], parent: dict[str, str | None]):
+    cache: dict[str, list[str]] = {}
+
+    def path_of(cat_id: str) -> list[str]:
+        if cat_id in cache:
+            return cache[cat_id]
+        chain: list[str] = []
+        seen: set[str] = set()
+        current = cat_id
+        while current and current not in seen:
+            seen.add(current)
+            chain.append(names.get(current, current))
+            current = parent.get(current)
+        chain.reverse()
+        cache[cat_id] = chain
+        return chain
+
+    return path_of
+
+
+def parse_categories(xml_bytes: bytes, feed_id: int) -> list[dict]:
+    """Дерево категорий поставщика: id, parent, путь, внутренняя категория."""
+    if not xml_bytes:
+        return []
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError:
+        return []
+    names: dict[str, str] = {}
+    parent: dict[str, str | None] = {}
+    for category in root.iter("category"):
+        cat_id = category.get("id")
+        if not cat_id:
+            continue
+        names[cat_id] = (category.text or "").strip()
+        parent[cat_id] = category.get("parentId")
+    path_of = _category_paths(names, parent)
+    rows = []
+    for cat_id, name in names.items():
+        path = " > ".join(path_of(cat_id))
+        rows.append(
+            {
+                "feed_id": feed_id,
+                "external_id": cat_id,
+                "name": name,
+                "parent_external_id": parent.get(cat_id),
+                "path": path,
+                "internal_category": categories.map_category_path(path, name),
+            }
+        )
+    return rows
+
+
 def parse_yml(
     xml_bytes: bytes,
     *,
     source_url: str = "",
     merchant: str | None = None,
+    root_category_id: str | None = None,
 ) -> list[ParsedOffer]:
     """Разбирает YML. Пустой/битый фид → пустой список, без исключения."""
     if not xml_bytes:
@@ -108,19 +163,41 @@ def parse_yml(
         return []
 
     categories_by_id: dict[str, str] = {}
+    parent_by_id: dict[str, str | None] = {}
+    children_by_parent: dict[str, list[str]] = {}
     for category in root.iter("category"):
         cat_id = category.get("id")
-        if cat_id:
-            categories_by_id[cat_id] = (category.text or "").strip()
+        if not cat_id:
+            continue
+        categories_by_id[cat_id] = (category.text or "").strip()
+        parent = category.get("parentId")
+        parent_by_id[cat_id] = parent
+        if parent:
+            children_by_parent.setdefault(parent, []).append(cat_id)
+    path_of = _category_paths(categories_by_id, parent_by_id)
+
+    allowed: set[str] | None = None
+    if root_category_id:
+        allowed = set()
+        stack = [str(root_category_id)]
+        while stack:
+            current = stack.pop()
+            if current in allowed:
+                continue
+            allowed.add(current)
+            stack.extend(children_by_parent.get(current, []))
 
     offers: list[ParsedOffer] = []
     for node in root.iter("offer"):
         external_id = (node.get("id") or "").strip()
         if not external_id:
             continue
-        name = _text(node.find("name"))
         category_id = _text(node.find("categoryId"))
+        if allowed is not None and category_id not in allowed:
+            continue
+        name = _text(node.find("name"))
         category_raw = categories_by_id.get(category_id)
+        category_path = " > ".join(path_of(category_id)) if category_id else ""
         affiliate_url = _text(node.find("url")) or None
         canonical_url, erid = (
             decode_target_url(affiliate_url) if affiliate_url else (None, None)
@@ -145,8 +222,9 @@ def parse_yml(
             ParsedOffer(
                 external_id=external_id,
                 merchant=_merchant_from_url(canonical_url, merchant),
-                category=categories.map_category(category_raw or "", name),
+                category=categories.map_category_path(category_path, name),
                 category_raw=category_raw,
+                supplier_category_id=category_id or None,
                 name=name,
                 vendor=_text(node.find("vendor")) or None,
                 model=_text(node.find("model")) or None,
@@ -163,6 +241,7 @@ def parse_yml(
                 raw={
                     "id": external_id,
                     "categoryId": category_id,
+                    "categoryPath": category_path,
                     "available": available,
                     "price": _text(node.find("price")),
                     "oldprice": _text(node.find("oldprice")),

@@ -30,6 +30,19 @@ class FeedIn(BaseModel):
     url: str
     format: str = "yml"
     adapter: str = "pampadu_yml"
+    root_category_id: str | None = None
+
+
+class FeedPatch(BaseModel):
+    name: str | None = None
+    url: str | None = None
+    active: bool | None = None
+    root_category_id: str | None = None
+
+
+class EmbedIn(BaseModel):
+    feed_id: int | None = None
+    category: str | None = None
 
 
 class FiltersIn(BaseModel):
@@ -39,12 +52,32 @@ class FiltersIn(BaseModel):
     merchant: str | None = None
 
 
+class ProductIn(BaseModel):
+    label: str | None = None
+    description: str | None = None
+    color: str | None = None
+    material: str | None = None
+    size: str | None = None
+    category: str | None = None
+    product_type: str | None = None
+    search_query: str | None = None
+    hex: str | None = None
+
+
 class SearchIn(BaseModel):
     image_b64: str | None = None
     text: str | None = None
     filters: FiltersIn = Field(default_factory=FiltersIn)
+    product: ProductIn | None = None
     top_k: int = 10
     min_score: float = 0.0
+
+
+class SearchTextIn(BaseModel):
+    query: str = ""
+    filters: FiltersIn = Field(default_factory=FiltersIn)
+    product: ProductIn | None = None
+    top_k: int = 20
 
 
 class SegmentIn(BaseModel):
@@ -54,6 +87,28 @@ class SegmentIn(BaseModel):
 
 class GridAiIn(BaseModel):
     image_b64: str
+    verify: bool = True
+    objects: list[dict] | None = None
+
+
+class VisionIn(BaseModel):
+    image_b64: str
+
+
+class VisionSearchIn(BaseModel):
+    image_b64: str
+    top_k: int = 5
+
+
+class SegmentHeadIn(BaseModel):
+    image_b64: str
+    max_items: int = 15
+
+
+class MaskAtIn(BaseModel):
+    image_b64: str
+    x: float
+    y: float
 
 
 def _decode_image(image_b64: str) -> bytes:
@@ -77,6 +132,7 @@ def _feed_dict(feed: Feed) -> dict:
         "last_synced_at": feed.last_synced_at,
         "offer_count": feed.offer_count,
         "error": feed.error,
+        "root_category_id": feed.root_category_id,
     }
 
 
@@ -201,10 +257,22 @@ def create_app(
             "embedder": settings.embedder,
         }
 
+    @app.get("/categories", dependencies=[Depends(verify_token)])
+    def list_categories():
+        from .categories import INTERNAL_LABELS
+
+        return [{"key": key, "label": label} for key, label in INTERNAL_LABELS.items()]
+
     @app.post("/feeds", dependencies=[Depends(verify_token)])
     def create_feed(body: FeedIn):
         saved = repo.upsert_feed(
-            Feed(name=body.name, url=body.url, format=body.format, adapter=body.adapter)
+            Feed(
+                name=body.name,
+                url=body.url,
+                format=body.format,
+                adapter=body.adapter,
+                root_category_id=body.root_category_id,
+            )
         )
         return _feed_dict(saved)
 
@@ -212,26 +280,80 @@ def create_app(
     def list_feeds():
         return [_feed_dict(f) for f in repo.list_feeds()]
 
-    def run_sync(feed: Feed, job_id: str):
+    @app.patch("/feeds/{feed_id}", dependencies=[Depends(verify_token)])
+    def patch_feed(feed_id: int, body: FeedPatch):
+        feed = repo.get_feed(feed_id)
+        if not feed:
+            raise HTTPException(status_code=404, detail="Feed not found")
+        for key, value in body.model_dump(exclude_unset=True).items():
+            setattr(feed, key, value)
+        return _feed_dict(repo.upsert_feed(feed))
+
+    def run_feed(feed: Feed, embed: bool, job_id: str):
         try:
             raw = fetcher(feed.url)
-            parsed = feed_parser.parse_yml(raw, source_url=feed.url)
+            category_rows = feed_parser.parse_categories(raw, feed.id)
+            repo.upsert_categories(category_rows)
+            parsed = feed_parser.parse_yml(
+                raw, source_url=feed.url, root_category_id=feed.root_category_id
+            )
             imported = pipeline.import_offers(repo, feed.id, parsed)
-            embedded = pipeline.embed_all(
-                repo, embedder, image_fetcher, concurrency=settings.embed_concurrency
-            )
-            colored = pipeline.backfill_all_colors(
-                repo, image_fetcher, concurrency=settings.embed_concurrency
-            )
-            feed.offer_count = len(parsed)
-            feed.error = None
-            feed.last_synced_at = datetime.now(timezone.utc).isoformat()
-            repo.upsert_feed(feed)
-            app.state.jobs[job_id] = {
+            result = {
                 "status": "done",
                 "created": imported.created,
                 "updated": imported.updated,
                 "unchanged": imported.unchanged,
+            }
+            if embed:
+                embedded = pipeline.embed_all(
+                    repo,
+                    embedder,
+                    image_fetcher,
+                    concurrency=settings.embed_concurrency,
+                    feed_id=feed.id,
+                )
+                colored = pipeline.backfill_all_colors(
+                    repo,
+                    image_fetcher,
+                    concurrency=settings.embed_concurrency,
+                    feed_id=feed.id,
+                )
+                result.update(
+                    embedded=embedded.embedded,
+                    skipped=embedded.skipped,
+                    failed=embedded.failed,
+                    colored=colored.colored,
+                    color_failed=colored.failed,
+                )
+            feed.offer_count = len(parsed)
+            feed.error = None
+            feed.last_synced_at = datetime.now(timezone.utc).isoformat()
+            repo.upsert_feed(feed)
+            app.state.jobs[job_id] = result
+        except Exception as exc:  # noqa: BLE001
+            feed.error = str(exc)[:300]
+            repo.upsert_feed(feed)
+            app.state.jobs[job_id] = {"status": "failed", "error": str(exc)[:300]}
+
+    def run_embed(feed: Feed | None, category: str | None, job_id: str):
+        try:
+            embedded = pipeline.embed_all(
+                repo,
+                embedder,
+                image_fetcher,
+                concurrency=settings.embed_concurrency,
+                feed_id=feed.id if feed else None,
+                category=category,
+            )
+            colored = pipeline.backfill_all_colors(
+                repo,
+                image_fetcher,
+                concurrency=settings.embed_concurrency,
+                feed_id=feed.id if feed else None,
+                category=category,
+            )
+            app.state.jobs[job_id] = {
+                "status": "done",
                 "embedded": embedded.embedded,
                 "skipped": embedded.skipped,
                 "failed": embedded.failed,
@@ -239,19 +361,44 @@ def create_app(
                 "color_failed": colored.failed,
             }
         except Exception as exc:  # noqa: BLE001
-            feed.error = str(exc)[:300]
-            repo.upsert_feed(feed)
             app.state.jobs[job_id] = {"status": "failed", "error": str(exc)[:300]}
+
+    def start_job(background: BackgroundTasks, fn, *args):
+        job_id = uuid.uuid4().hex
+        app.state.jobs[job_id] = {"status": "queued"}
+        background.add_task(fn, *args, job_id)
+        return {"job_id": job_id, "status": "queued"}
 
     @app.post("/feeds/{feed_id}/sync", dependencies=[Depends(verify_token)])
     def sync_feed(feed_id: int, background: BackgroundTasks):
         feed = repo.get_feed(feed_id)
         if not feed:
             raise HTTPException(status_code=404, detail="Feed not found")
-        job_id = uuid.uuid4().hex
-        app.state.jobs[job_id] = {"status": "queued"}
-        background.add_task(run_sync, feed, job_id)
-        return {"job_id": job_id, "status": "queued"}
+        return start_job(background, run_feed, feed, True)
+
+    @app.post("/feeds/{feed_id}/import", dependencies=[Depends(verify_token)])
+    def import_feed(feed_id: int, background: BackgroundTasks):
+        feed = repo.get_feed(feed_id)
+        if not feed:
+            raise HTTPException(status_code=404, detail="Feed not found")
+        return start_job(background, run_feed, feed, False)
+
+    @app.post("/feeds/{feed_id}/embed", dependencies=[Depends(verify_token)])
+    def embed_feed(feed_id: int, background: BackgroundTasks):
+        feed = repo.get_feed(feed_id)
+        if not feed:
+            raise HTTPException(status_code=404, detail="Feed not found")
+        return start_job(background, run_embed, feed, None)
+
+    @app.post("/embed", dependencies=[Depends(verify_token)])
+    def embed_all_feeds(background: BackgroundTasks, body: EmbedIn | None = None):
+        feed = None
+        if body and body.feed_id is not None:
+            feed = repo.get_feed(body.feed_id)
+            if not feed:
+                raise HTTPException(status_code=404, detail="Feed not found")
+        category = body.category if body else None
+        return start_job(background, run_embed, feed, category)
 
     @app.get("/feeds/{feed_id}/status", dependencies=[Depends(verify_token)])
     def feed_status(feed_id: int):
@@ -281,10 +428,60 @@ def create_app(
         from . import gridai
 
         try:
-            items = gridai.generate_products(image_bytes)
+            items = gridai.generate_products(
+                image_bytes, verify=body.verify, objects=body.objects
+            )
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=503, detail=f"AI-сетка недоступна: {exc}")
         return {"items": items, "mode": "grid-ai"}
+
+    @app.post("/vision", dependencies=[Depends(verify_token)])
+    def vision_endpoint(body: VisionIn):
+        image_bytes = _decode_image(body.image_b64)
+        from . import gridai
+
+        try:
+            return gridai.vision_full(image_bytes)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=503, detail=f"Vision недоступен: {exc}")
+
+    @app.post("/vision-search", dependencies=[Depends(verify_token)])
+    def vision_search_endpoint(body: VisionSearchIn):
+        image_bytes = _decode_image(body.image_b64)
+        try:
+            return search.vision_search(
+                repo, image_bytes, top_k=max(1, min(20, body.top_k))
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=503, detail=f"Vision-поиск недоступен: {exc}"
+            )
+
+    @app.post("/segment-head", dependencies=[Depends(verify_token)])
+    def segment_head_endpoint(body: SegmentHeadIn):
+        image_bytes = _decode_image(body.image_b64)
+        from . import segmentation_head
+
+        try:
+            result = segmentation_head.segment(
+                image_bytes, embedder, max_items=max(1, min(30, body.max_items))
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=503, detail=f"Сегментация недоступна: {exc}"
+            )
+        return {**result, "mode": "segment-head"}
+
+    @app.post("/mask-at", dependencies=[Depends(verify_token)])
+    def mask_at_endpoint(body: MaskAtIn):
+        image_bytes = _decode_image(body.image_b64)
+        from . import segmentation_head
+
+        try:
+            result = segmentation_head.mask_at(image_bytes, embedder, body.x, body.y)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=503, detail=f"Маска недоступна: {exc}")
+        return result
 
     @app.post("/search", dependencies=[Depends(verify_token)])
     def search_endpoint(body: SearchIn):
@@ -312,6 +509,8 @@ def create_app(
                 min_score=body.min_score,
                 color_weight=settings.color_rerank_weight,
                 rerank_pool=settings.color_rerank_pool,
+                product=body.product.model_dump() if body.product else None,
+                attr_weight=settings.attr_rerank_weight,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
@@ -320,6 +519,38 @@ def create_app(
             "query_saved": saved_query,
             "model": embedder.model,
             "dim": embedder.dim,
+            "query": {
+                "product": body.product.model_dump() if body.product else None,
+                "filters": body.filters.model_dump(),
+                "color_weight": settings.color_rerank_weight,
+                "attr_weight": settings.attr_rerank_weight,
+                "top_k": body.top_k,
+            },
+        }
+
+    @app.post("/search-text", dependencies=[Depends(verify_token)])
+    def search_text_endpoint(body: SearchTextIn):
+        filters = search.SearchFilters(
+            categories=body.filters.categories,
+            price_min=body.filters.price_min,
+            price_max=body.filters.price_max,
+            merchant=body.filters.merchant,
+        )
+        results = search.search_by_keywords(
+            repo,
+            query=body.query,
+            filters=filters,
+            product=body.product.model_dump() if body.product else None,
+            top_k=body.top_k,
+        )
+        return {
+            "results": results,
+            "query": {
+                "query": body.query,
+                "product": body.product.model_dump() if body.product else None,
+                "filters": body.filters.model_dump(),
+                "top_k": body.top_k,
+            },
         }
 
     @app.get("/offers/{offer_id}", dependencies=[Depends(verify_token)])

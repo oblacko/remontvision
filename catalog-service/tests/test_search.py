@@ -126,3 +126,96 @@ def test_color_rerank_puts_matching_color_first():
     )
     assert res[0]['offer_id'] == brown.id
     assert 'dino_score' in res[0] and 'color_score' in res[0]
+
+
+def test_attribute_rerank_prefers_matching_offer():
+    from app.models import Offer
+
+    repo = MemoryOfferRepository()
+
+    def make(eid, name, params):
+        return Offer(feed_id=1, external_id=eid, name=name, params=params,
+                     category='bed', price=100, currency='RUB',
+                     availability='in_stock', picture_url='https://cdn.test/x.jpg')
+
+    brown = repo.upsert_offer(make('brown', 'Кровать мокко', {'Цвет': 'Мокко'}))
+    gray = repo.upsert_offer(make('gray', 'Кровать серый', {'Цвет': 'Серый'}))
+    repo.put_embedding(brown.id, 'fake', 8, [1.0] * 8)
+    repo.put_embedding(gray.id, 'fake', 8, [1.0] * 8)
+
+    res = search.search_offers(
+        repo, FakeEmbedder(dim=8), image_bytes=_solid((120, 80, 40)),
+        top_k=2, min_score=-1.0,
+        product={'color': 'коричневый', 'label': 'Кровать'},
+        attr_weight=0.6, color_weight=0.0, rerank_pool=10,
+    )
+    assert res[0]['offer_id'] == brown.id
+    assert 'attr_score' in res[0]
+
+
+def test_search_filters_by_product_type():
+    from app.models import Offer
+
+    repo = MemoryOfferRepository()
+
+    def make(eid, name, params):
+        return Offer(feed_id=1, external_id=eid, name=name, params=params,
+                     category='bed', price=100, currency='RUB',
+                     availability='in_stock', picture_url='https://cdn.test/x.jpg')
+
+    soft = repo.upsert_offer(make('soft', 'Кровать мягкая', {'Цвет': 'капучино', 'Тип обивки': 'велюр'}))
+    wood = repo.upsert_offer(make('wood', 'Кровать деревянная', {'Цвет': 'капучино', 'Материал каркаса': 'ЛДСП'}))
+    repo.put_embedding(soft.id, 'fake', 8, [1.0] * 8)
+    repo.put_embedding(wood.id, 'fake', 8, [1.0] * 8)
+
+    res = search.search_offers(
+        repo, FakeEmbedder(dim=8), image_bytes=_solid((120, 80, 40)),
+        top_k=2, min_score=-1.0,
+        product={'color': 'коричневый', 'product_type': 'мягкая', 'label': 'Кровать'},
+        attr_weight=0.5, color_weight=0.0, rerank_pool=10,
+    )
+    ids = [r['offer_id'] for r in res]
+    assert soft.id in ids
+    assert wood.id not in ids
+
+
+def test_category_fallback_when_filter_has_no_results():
+    from app.models import Offer
+
+    repo = MemoryOfferRepository()
+
+    def make(eid, category):
+        return Offer(feed_id=1, external_id=eid, name=eid, category=category,
+                     price=100, currency='RUB', availability='in_stock',
+                     picture_url='https://cdn.test/x.jpg')
+
+    a = repo.upsert_offer(make('a', 'bed'))
+    b = repo.upsert_offer(make('b', 'sofa'))
+    repo.put_embedding(a.id, 'fake', 8, [1.0] * 8)
+    repo.put_embedding(b.id, 'fake', 8, [1.0] * 8)
+
+    res = search.search_offers(
+        repo, FakeEmbedder(dim=8), image_bytes=_solid((120, 80, 40)),
+        top_k=2, min_score=-1.0,
+        filters=search.SearchFilters(categories=['curtain']),
+    )
+    assert res
+    assert all(r.get('category_fallback') for r in res)
+
+
+def test_text_search_by_keywords_and_category():
+    from app.models import Offer
+
+    repo = MemoryOfferRepository()
+
+    def make(eid, name, category, params):
+        return Offer(feed_id=1, external_id=eid, name=name, category=category,
+                     params=params, price=100, currency='RUB',
+                     availability='in_stock', picture_url='https://cdn.test/x.jpg')
+
+    mokko = repo.upsert_offer(make('m', 'Кровать мокко велюр', 'bed', {'Цвет': 'Мокко'}))
+    gray = repo.upsert_offer(make('g', 'Кровать серый велюр', 'bed', {'Цвет': 'Серый'}))
+    res = search.search_by_keywords(repo, query='мокко', top_k=5)
+    assert res and res[0]['offer_id'] == mokko.id
+    res2 = search.search_by_keywords(repo, query='', filters=search.SearchFilters(categories=['bed']), product={'color': 'серый'}, top_k=5)
+    assert res2 and res2[0]['offer_id'] == gray.id

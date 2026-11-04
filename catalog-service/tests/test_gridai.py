@@ -35,3 +35,15 @@ def test_slice_grid_returns_ten_cells():
     assert len(items) == 10
     assert items[0]["label"] == "item0"
     assert items[9]["thumb_b64"]
+
+
+def test_slice_grid_includes_product_attributes():
+    image = Image.new('RGB', (2100, 900), (255, 255, 255))
+    buf = io.BytesIO()
+    image.save(buf, format='PNG')
+    products = [
+        {'label': 'Кровать', 'color': 'беж', 'material': 'дуб', 'category': 'bed'}
+        for _ in range(10)
+    ]
+    items = gridai.slice_grid(buf.getvalue(), labels=[f'i{i}' for i in range(10)], products=products)
+    assert items[0]['product'] == {'label': 'Кровать', 'color': 'беж', 'material': 'дуб', 'category': 'bed'}

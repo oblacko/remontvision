@@ -30,6 +30,7 @@ class Settings:
     embed_concurrency: int
     color_rerank_weight: float
     color_rerank_pool: int
+    attr_rerank_weight: float
     max_feed_bytes: int
     http_timeout_s: float
 
@@ -49,6 +50,7 @@ def get_settings() -> Settings:
         embed_concurrency=_int("EMBED_CONCURRENCY", 16),
         color_rerank_weight=_float("COLOR_RERANK_WEIGHT", 0.3),
         color_rerank_pool=_int("COLOR_RERANK_POOL", 100),
+        attr_rerank_weight=_float("ATTR_RERANK_WEIGHT", 0.25),
         max_feed_bytes=_int("MAX_FEED_BYTES", 300_000_000),
         http_timeout_s=_float("HTTP_TIMEOUT_S", 30.0),
     )

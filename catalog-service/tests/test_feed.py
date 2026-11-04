@@ -59,4 +59,41 @@ def test_parse_malformed_feed_returns_empty():
 def test_category_mapping():
     assert categories.map_category("Кровати", "") == "bed"
     assert categories.map_category("", "Диван прямой") == "sofa"
-    assert categories.map_category("Книги", "Роман") is None
+    assert categories.map_category("Книги", "Роман") == "other"
+
+
+def test_parse_yml_filters_by_root_category_subtree():
+    xml = b"""<?xml version="1.0"?><yml_catalog><shop>
+    <categories>
+      <category id="625">\xd0\xa1\xd0\xbf\xd0\xb0\xd0\xbb\xd1\x8c\xd0\xbd\xd1\x8f</category>
+      <category id="687" parentId="625">\xd0\x9a\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb0\xd1\x82\xd0\xb8</category>
+      <category id="624">\xd0\x93\xd0\xbe\xd1\x81\xd1\x82\xd0\xb8\xd0\xbd\xd0\xb0\xd1\x8f</category>
+      <category id="633" parentId="624">\xd0\x94\xd0\xb8\xd0\xb2\xd0\xb0\xd0\xbd\xd1\x8b</category>
+    </categories>
+    <offers>
+      <offer id="1" available="true"><price>100</price><categoryId>687</categoryId><name>\xd0\x9a\xd1\x80\xd0\xbe\xd0\xb2\xd0\xb0\xd1\x82\xd1\x8c</name><picture>https://cdn.test/1.jpg</picture></offer>
+      <offer id="2" available="true"><price>200</price><categoryId>633</categoryId><name>\xd0\x94\xd0\xb8\xd0\xb2\xd0\xb0\xd0\xbd</name><picture>https://cdn.test/2.jpg</picture></offer>
+    </offers></shop></yml_catalog>"""
+    offers = feed.parse_yml(xml, source_url="x", root_category_id="625")
+    assert [o.external_id for o in offers] == ["1"]
+    assert len(feed.parse_yml(xml, source_url="x")) == 2
+
+
+def test_path_mapping_specific_cases():
+    m = categories.map_category_path
+    assert m('Кухня > Обеденные группы > Кухонные столы') == 'dining_table'
+    assert m('Товары для дома > Посуда > Столовая посуда > Тарелки > Обеденные тарелки') == 'tableware'
+    assert m('Спальня > Туалетные столики и банкетки > Туалетные столики в спальню') == 'dressing_table'
+    assert m('Товары для дома > Декор > Декор для стен > Картины и репродукции') == 'decor_art'
+    assert m('Товары для дома > Текстиль > Текстиль для ванной > Полотенца для ванной') == 'bath_textile'
+    assert m('Спальня > Спальные гарнитуры') == 'furniture_set'
+
+
+def test_tumba_maps_to_sideboard():
+    assert categories.map_category_path('Спальня > Тумбы и комоды > Тумбы для спальни') == 'sideboard'
+    assert categories.map_category_path('Гостиная > Мебель для гостиных > Тумбы под ТВ') == 'sideboard'
+
+
+def test_kitchen_wall_cabinets_map_to_cabinet():
+    assert categories.map_category_path('Кухня > Кухонные шкафы > Шкафы навесные') == 'cabinet'
+    assert categories.map_category_path('Спальня > Шкафы > Шкафы для одежды') == 'wardrobe'

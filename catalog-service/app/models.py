@@ -16,6 +16,7 @@ class Feed:
     last_synced_at: str | None = None
     offer_count: int = 0
     error: str | None = None
+    root_category_id: str | None = None
 
 
 @dataclass
@@ -44,3 +45,4 @@ class Offer:
     status: str = "active"
     content_hash: str | None = None
     color_hist: list[float] | None = None
+    supplier_category_id: str | None = None

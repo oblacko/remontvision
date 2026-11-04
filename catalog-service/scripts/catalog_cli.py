@@ -55,6 +55,7 @@ def main() -> None:
     add.add_argument("url")
     add.add_argument("--format", default="yml")
     add.add_argument("--adapter", default="pampadu_yml")
+    add.add_argument("--root-category", default=None)
 
     sync = sub.add_parser("sync")
     sync.add_argument("feed_id", type=int)

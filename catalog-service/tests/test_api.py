@@ -25,6 +25,7 @@ def settings():
         embed_concurrency=4,
         color_rerank_weight=0.0,
         color_rerank_pool=10,
+        attr_rerank_weight=0.0,
         max_feed_bytes=10_000_000,
         http_timeout_s=5.0,
     )
@@ -118,3 +119,28 @@ def test_search_without_input_is_400():
     client, _ = make_client()
     r = client.post("/search", json={}, headers=HEADERS)
     assert r.status_code == 400
+
+
+def test_import_without_embedding_then_embed():
+    def fetcher(url):
+        return FIXTURE if url == 'https://f.test/793' else b'img'
+
+    client, repo = make_client(fetcher=fetcher)
+    feed = client.post('/feeds', json={'name': 'f', 'url': 'https://f.test/793'},
+                       headers=HEADERS).json()
+    r = client.post(f'/feeds/{feed["id"]}/import', headers=HEADERS)
+    assert r.status_code == 200
+    assert len(repo.offers) == 2
+    assert repo.list_without_embedding() != []
+    r2 = client.post(f'/feeds/{feed["id"]}/embed', headers=HEADERS)
+    assert r2.status_code == 200
+    assert repo.list_without_embedding() == []
+
+
+def test_patch_feed_updates_root_category():
+    client, repo = make_client()
+    feed = client.post('/feeds', json={'name': 'f', 'url': 'https://f.test/1'},
+                       headers=HEADERS).json()
+    r = client.patch(f'/feeds/{feed["id"]}', json={'root_category_id': '625'},
+                     headers=HEADERS)
+    assert r.status_code == 200 and r.json()['root_category_id'] == '625'

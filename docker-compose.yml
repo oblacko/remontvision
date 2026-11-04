@@ -82,6 +82,7 @@ services:
       EMBED_CONCURRENCY: ${CATALOG_EMBED_CONCURRENCY:-8}
       COLOR_RERANK_WEIGHT: ${CATALOG_COLOR_RERANK_WEIGHT:-0.3}
       COLOR_RERANK_POOL: ${CATALOG_COLOR_RERANK_POOL:-100}
+      ATTR_RERANK_WEIGHT: ${CATALOG_ATTR_RERANK_WEIGHT:-0.25}
       QUERY_DIR: /app/data/queries
       IMAGE_CACHE_DIR: /app/data/images
       # AI-сетка (как в приложении): vision + FLUX через OpenRouter.

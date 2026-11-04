@@ -20,9 +20,28 @@ class OfferRepository(Protocol):
 
     def find_offer(self, feed_id: int, external_id: str) -> Offer | None: ...
 
-    def list_without_embedding(self, limit: int = 100) -> list[Offer]: ...
+    def update_category(
+        self,
+        offer_id: str,
+        category: str | None,
+        supplier_category_id: str | None,
+    ) -> None: ...
 
-    def list_without_color(self, limit: int = 100) -> list[Offer]: ...
+    def upsert_categories(self, rows: list[dict]) -> None: ...
+
+    def list_without_embedding(
+        self,
+        limit: int = 100,
+        feed_id: int | None = None,
+        category: str | None = None,
+    ) -> list[Offer]: ...
+
+    def list_without_color(
+        self,
+        limit: int = 100,
+        feed_id: int | None = None,
+        category: str | None = None,
+    ) -> list[Offer]: ...
 
     def set_color(self, offer_id: str, hist: list[float]) -> None: ...
 
@@ -38,4 +57,12 @@ class OfferRepository(Protocol):
         filters: dict,
         top_k: int,
         min_score: float,
+    ) -> list[tuple[Offer, float]]: ...
+
+    def search_text(
+        self,
+        query: str,
+        filters: dict,
+        product: dict | None,
+        top_k: int,
     ) -> list[tuple[Offer, float]]: ...
