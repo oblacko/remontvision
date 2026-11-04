@@ -208,18 +208,29 @@ export function GenerationPanel({
   const [productBinding, setProductBinding] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const [procurementOpen, setProcurementOpen] = useState(false)
+  const [procurementOpen, setProcurementOpen] = useState(() => new URLSearchParams(window.location.search).has('products'))
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const refInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
   const loadedRoomRef = useRef('')
 
+  // Панель подбора отражается в URL: перезагрузка и «назад» не теряют результат.
+  const setProductsInUrl = (on: boolean) => {
+    const url = new URL(window.location.href)
+    if (on) url.searchParams.set('products', '1')
+    else url.searchParams.delete('products')
+    window.history.replaceState(window.history.state, '', url)
+  }
+  const openProcurement = () => { setProcurementOpen(true); setProductsInUrl(true) }
+  const closeProcurement = () => { setProcurementOpen(false); setProductsInUrl(false) }
+
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
   const visibleHints = (current?.analysis?.visible || [])
     .map(v => (typeof v === 'string' ? v : v?.label || ''))
     .filter(Boolean)
+  const demoEstimate = (current?.items.length ?? 0) > 0 && current!.items.every(item => !item.direct_url)
 
   const rememberUrl = (url: string) => { urls.current.push(url) }
   const releaseUrl = (url: string | null) => {
@@ -1249,7 +1260,7 @@ export function GenerationPanel({
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
                 <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
-                <button type="button" onClick={() => setProcurementOpen(true)} className="action-primary min-h-14 px-8 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
+                <button type="button" onClick={openProcurement} className="action-primary min-h-14 px-8 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
               </div>
             </div>
           </div>
@@ -1272,6 +1283,11 @@ export function GenerationPanel({
               <div className="space-y-8">
                 <section aria-labelledby="gen-products">
                   <h4 id="gen-products" className="eyebrow mb-4">Товары по дизайну</h4>
+                  {demoEstimate && (
+                    <p className="mb-4 border border-foreground/20 bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+                      Демо-подборка: это пример состава и цен, а не товары конкретного магазина. Ссылки ведут на похожие позиции.
+                    </p>
+                  )}
                   <div className="divide-y border-y">
                     {current.items.length ? current.items.map((item, index) => (
                       <div key={`${item.name}-${index}`} className="estimate-row grid gap-x-4 gap-y-1 py-3.5 text-sm">
@@ -1288,7 +1304,7 @@ export function GenerationPanel({
                     )) : <p className="py-4 text-sm text-muted-foreground">Подборка не сформирована — попробуйте изменить запрос.</p>}
                   </div>
                   <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка · класс «{tierName(current.priceTier)}»</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
-                  <p className="mt-1 text-right text-xs text-muted-foreground">Смета ориентировочная</p>
+                  <p className="mt-1 text-right text-xs text-muted-foreground">{demoEstimate ? 'Демо-оценка, не оферта' : 'Смета ориентировочная'}</p>
                   {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
                 </section>
 
@@ -1347,7 +1363,7 @@ export function GenerationPanel({
       )}
 
       <ShareDialog renderId={current?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
-      <ProcurementPanel renderId={current?.id || ''} open={procurementOpen} onClose={() => setProcurementOpen(false)} onCreditsChanged={onRefreshUser} />
+      <ProcurementPanel renderId={current?.id || ''} open={procurementOpen} onClose={closeProcurement} onCreditsChanged={onRefreshUser} />
       {creditOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/80 p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
           <div className="w-full max-w-md border border-foreground bg-background p-6 shadow-[8px_8px_0_oklch(var(--foreground))]">

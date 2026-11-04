@@ -1,12 +1,20 @@
-// Прокси для OpenRouter: http(s) через undici, socks5 через node-fetch + SocksProxyAgent.
-// Значение хранится в app_settings (proxy.url), env HTTPS_PROXY — фолбэк.
+// Прокси нужен только для OpenRouter: остальные внешние сервисы (магазины, Yandex,
+// картинки, почта, платежи) ходят напрямую. Раньше прокси подменял global fetch,
+// из-за чего недоступный SOCKS5 ронял импорт товаров и отправку писем.
 let currentUrl = '';
 let lastTest = null;
 const originalFetch = globalThis.fetch;
 
-async function undici() {
-  return import('undici');
-}
+let undiciMod = null;
+let nodeFetchMod = null;
+let socksAgentMod = null;
+let directDispatcher = null;
+let proxyDispatcher = null;
+let socksAgentCached = null;
+
+const getUndici = () => undiciMod || (undiciMod = import('undici'));
+const getNodeFetch = () => nodeFetchMod || (nodeFetchMod = import('node-fetch').then(m => m.default));
+const getSocksAgent = () => socksAgentMod || (socksAgentMod = import('socks-proxy-agent').then(m => m.SocksProxyAgent));
 
 function isSocks(url) {
   return /^socks5h?:/i.test(String(url || ''));
@@ -37,23 +45,62 @@ export function getProxyState({ masked = false } = {}) {
   };
 }
 
+async function getDirectDispatcher() {
+  if (!directDispatcher) {
+    const { Agent } = await getUndici();
+    directDispatcher = new Agent({ connect: { timeout: 15_000 } });
+  }
+  return directDispatcher;
+}
+
+// Прямой запрос в обход прокси: undici Agent игнорирует глобальный ProxyAgent.
+// globalThis.fetch читаем на каждом вызове, чтобы тесты и патчи могли его подменять.
+export async function directFetch(input, init = {}) {
+  return globalThis.fetch(input, { ...init, dispatcher: await getDirectDispatcher() });
+}
+
+async function getProxyDispatcher() {
+  if (isSocks(currentUrl)) {
+    if (!socksAgentCached) {
+      const SocksProxyAgent = await getSocksAgent();
+      socksAgentCached = new SocksProxyAgent(currentUrl);
+    }
+    return socksAgentCached;
+  }
+  if (!proxyDispatcher) {
+    const { ProxyAgent } = await getUndici();
+    proxyDispatcher = new ProxyAgent(currentUrl);
+  }
+  return proxyDispatcher;
+}
+
+// Запрос через настроенный прокси. Используется только OpenRouter.
+export async function proxyFetch(input, init = {}) {
+  if (!currentUrl) return directFetch(input, init);
+  if (isSocks(currentUrl)) {
+    const nodeFetch = await getNodeFetch();
+    return nodeFetch(input, { ...init, agent: await getProxyDispatcher() });
+  }
+  return originalFetch(input, { ...init, dispatcher: await getProxyDispatcher() });
+}
+
 export async function applyProxy(url) {
   const clean = normalize(url);
-  if (isSocks(clean)) {
-    const { default: nodeFetch } = await import('node-fetch');
-    const { SocksProxyAgent } = await import('socks-proxy-agent');
-    const agent = new SocksProxyAgent(clean);
-    // undici не умеет SOCKS5: на время socks-режима подменяем global fetch.
-    globalThis.fetch = (input, init = {}) => nodeFetch(input, { ...init, agent });
-  } else {
-    globalThis.fetch = originalFetch;
-    const { ProxyAgent, Agent, setGlobalDispatcher } = await undici();
-    if (clean) setGlobalDispatcher(new ProxyAgent(clean));
-    else setGlobalDispatcher(new Agent());
-  }
   currentUrl = clean;
-  console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'proxy_applied', url: maskProxy(clean), protocol: isSocks(clean) ? 'socks5' : 'http' }));
+  proxyDispatcher = null;
+  socksAgentCached = null;
+  console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'proxy_applied', url: maskProxy(clean), protocol: isSocks(clean) ? 'socks5' : 'http', scope: 'openrouter' }));
   return getProxyState({ masked: true });
+}
+
+async function fetchThrough(clean, target, init = {}) {
+  if (isSocks(clean)) {
+    const nodeFetch = await getNodeFetch();
+    const SocksProxyAgent = await getSocksAgent();
+    return nodeFetch(target, { ...init, agent: new SocksProxyAgent(clean) });
+  }
+  const { ProxyAgent } = await getUndici();
+  return originalFetch(target, { ...init, dispatcher: new ProxyAgent(clean) });
 }
 
 export async function testProxy(url) {
@@ -61,26 +108,16 @@ export async function testProxy(url) {
   const started = Date.now();
   let result;
   try {
-    if (isSocks(clean)) {
-      const { default: nodeFetch } = await import('node-fetch');
-      const { SocksProxyAgent } = await import('socks-proxy-agent');
-      const agent = new SocksProxyAgent(clean);
-      const r = await nodeFetch('https://openrouter.ai/api/v1/models', {
-        agent,
-        signal: AbortSignal.timeout(15_000),
-        headers: { 'user-agent': 'remontvision-proxy-check/1.0' },
-      });
-      result = { ok: r.ok, status: r.status, ms: Date.now() - started, at: new Date().toISOString() };
-    } else {
-      const { ProxyAgent, fetch: undiciFetch } = await undici();
-      const dispatcher = clean ? new ProxyAgent(clean) : undefined;
-      const r = await undiciFetch('https://openrouter.ai/api/v1/models', {
-        dispatcher,
-        signal: AbortSignal.timeout(15_000),
-        headers: { 'user-agent': 'remontvision-proxy-check/1.0' },
-      });
-      result = { ok: r.ok, status: r.status, ms: Date.now() - started, at: new Date().toISOString() };
-    }
+    const r = clean
+      ? await fetchThrough(clean, 'https://openrouter.ai/api/v1/models', {
+          signal: AbortSignal.timeout(15_000),
+          headers: { 'user-agent': 'remontvision-proxy-check/1.0' },
+        })
+      : await directFetch('https://openrouter.ai/api/v1/models', {
+          signal: AbortSignal.timeout(15_000),
+          headers: { 'user-agent': 'remontvision-proxy-check/1.0' },
+        });
+    result = { ok: r.ok, status: r.status, ms: Date.now() - started, at: new Date().toISOString() };
   } catch (e) {
     result = { ok: false, status: 0, ms: Date.now() - started, at: new Date().toISOString(), error: String(e.message || e).slice(0, 300) };
   }

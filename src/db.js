@@ -411,6 +411,10 @@ export const q = {
     pool.query(`SELECT * FROM procurement_runs
                 WHERE render_id = $1 AND config_hash = $2 AND status IN ('queued','processing','done')
                 ORDER BY created_at DESC LIMIT 1`, [renderId, configHash]).then(r => r.rows[0] || null),
+  latestProcurementRunForRender: (renderId, userId) =>
+    pool.query(`SELECT * FROM procurement_runs
+                WHERE render_id = $1 AND user_id = $2
+                ORDER BY created_at DESC LIMIT 1`, [renderId, userId]).then(r => r.rows[0] || null),
   latestDoneRender: () =>
     pool.query(`SELECT * FROM renders WHERE status = 'done' AND image_path IS NOT NULL ORDER BY created_at DESC LIMIT 1`).then(r => r.rows[0] || null),
   procurementRunById: id =>

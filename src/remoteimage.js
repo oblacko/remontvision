@@ -2,6 +2,7 @@
 // Блокируем localhost/private IP, не image content-type, большие файлы и длинные редиректы.
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import { directFetch } from './proxy.js';
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
@@ -39,7 +40,7 @@ export async function assertPublicUrl(raw) {
 export async function fetchRemoteImage(raw) {
   let url = await assertPublicUrl(raw);
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
-    const r = await fetch(url, {
+    const r = await directFetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { 'user-agent': 'remontvision/1.0 (+https://www.remontvision.ru)' },

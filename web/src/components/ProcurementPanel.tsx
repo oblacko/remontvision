@@ -72,14 +72,33 @@ export function ProcurementPanel({
 }) {
   const [run, setRun] = useState<ProcurementRun | null>(null)
   const [starting, setStarting] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const [error, setError] = useState('')
 
+  // При смене дизайна показываем именно его подбор.
   useEffect(() => {
-    if (!open) {
-      setRun(null)
-      setError('')
-      setStarting(false)
-    }
+    setRun(null)
+    setError('')
+  }, [renderId])
+
+  // Открытие панели: подхватываем последний сохранённый run, а не начинаем с нуля.
+  useEffect(() => {
+    if (!open || !renderId) return
+    let cancelled = false
+    setRestoring(true)
+    fetch(`/api/renders/${encodeURIComponent(renderId)}/procurement`)
+      .then(async r => {
+        if (cancelled) return
+        if (r.ok) {
+          const data = await r.json().catch(() => null)
+          if (data) setRun(data)
+        } else if (r.status === 404) {
+          setRun(null)
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setRestoring(false) })
+    return () => { cancelled = true }
   }, [open, renderId])
 
   useEffect(() => {
@@ -125,21 +144,27 @@ export function ProcurementPanel({
 
   const busy = run && ['queued', 'processing'].includes(run.status)
   const done = run?.status === 'done'
+  const foundCount = run ? run.items.reduce((count, item) => count + item.candidates.length, 0) : 0
   const progress = !run ? 0 : done ? 100 : run.status === 'error' ? 100 : Math.min(92, 12 + run.items.filter(item => item.status !== 'pending' && item.status !== 'searching').length * 6)
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-foreground/55 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Подбор товаров" onClick={event => { if (event.target === event.currentTarget) onClose() }}>
-      <div className="mx-auto w-full max-w-5xl bg-background p-5 shadow-xl sm:p-8">
+    <div className="fixed inset-0 z-[60] bg-foreground/55" role="dialog" aria-modal="true" aria-label="Подбор товаров" onClick={event => { if (event.target === event.currentTarget) onClose() }}>
+      <div className="absolute inset-y-0 right-0 flex w-full max-w-2xl flex-col overflow-y-auto bg-background p-5 shadow-xl sm:p-8">
         <div className="flex items-start justify-between gap-4 border-b pb-5">
           <div>
             <p className="eyebrow">Подбор товаров</p>
-            <h2 className="display-title mt-2 text-3xl sm:text-4xl">Что купить по этому дизайну</h2>
+            <h2 className="display-title mt-2 text-3xl">Что купить по этому дизайну</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Ищем реальные карточки в магазинах, проверяем цену и ссылку. Без сметы и количества — только список товаров.</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">Панель можно закрыть — результат сохранится и откроется снова.</p>
           </div>
           <button type="button" onClick={onClose} className="flex size-11 shrink-0 items-center justify-center border hover:bg-muted" aria-label="Закрыть"><X className="size-5" /></button>
         </div>
 
-        {!run && (
+        {restoring && !run && (
+          <div className="mt-6 flex items-center gap-3 border p-5 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Загружаем сохранённый подбор…</div>
+        )}
+
+        {!run && !restoring && (
           <div className="mt-6 border p-5 sm:p-6">
             <div className="flex items-start gap-3"><Search className="mt-0.5 size-5 shrink-0 text-primary-text" /><div><p className="font-medium">Подберём товары по выбранному дизайну</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Разберём 5–8 ключевых предметов и отделку, найдём похожие товары в магазинах. Это стоит 1 кредит. Повторное открытие результата — бесплатно.</p></div></div>
             <div className="mt-5 flex flex-wrap gap-3">
@@ -155,8 +180,8 @@ export function ProcurementPanel({
           <>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
               <div>
-                <p className="text-sm font-medium">{run.status === 'done' ? 'Подбор готов' : run.status === 'error' ? 'Не удалось подобрать товары' : 'Идёт поиск товаров…'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{run.stage ? String(run.stage).slice(0, 120) : 'Проверяем карточки и ссылки'}</p>
+                <p className="text-sm font-medium">{run.status === 'done' ? 'Подбор готов' : run.status === 'error' ? (foundCount > 0 ? 'Подбор частично готов' : 'Не удалось подобрать товары') : 'Идёт поиск товаров…'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{run.stage ? String(run.stage).slice(0, 120) : 'Проверяем карточки и ссылки'}{foundCount > 0 ? ` · найдено товаров: ${foundCount}` : ''}</p>
               </div>
               {run.credit_refunded && <span className="border border-primary/40 bg-primary/5 px-3 py-2 text-xs">Кредит возвращён</span>}
               {run.status === 'error' && <button type="button" onClick={start} className="action-primary min-h-11 px-4">Попробовать снова · 1 кредит</button>}
@@ -187,7 +212,7 @@ export function ProcurementPanel({
                       </div>
                       {item.note && <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.note}</p>}
                       {item.candidates.length > 0 && (
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
                           {item.candidates.map(candidate => (
                             <a key={candidate.id} href={candidate.url} target="_blank" rel="noopener nofollow" className="group flex min-w-0 flex-col border transition-colors hover:border-foreground">
                               <div className="aspect-[4/3] overflow-hidden bg-muted">{candidate.image_url ? <img src={candidate.image_url} alt={candidate.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет фото</div>}</div>

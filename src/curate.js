@@ -10,6 +10,7 @@ import { detectImageExt } from './imagesize.js';
 import { getBuffer } from './storage.js';
 import { roomTypeByName } from './roomtypes.js';
 import { PRICE_TIERS, tierDistance } from './pricing.js';
+import { directFetch } from './proxy.js';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const REFCACHE = path.join(DATA_DIR, 'refcache');
@@ -127,7 +128,7 @@ export async function referenceImagesDetailed(products, limit = MAX_REFERENCES) 
         if (fs.existsSync(cache)) {
           buf = fs.readFileSync(cache);
         } else {
-          const r = await fetch(p.image_url, { signal: AbortSignal.timeout(10_000) });
+          const r = await directFetch(p.image_url, { signal: AbortSignal.timeout(10_000) });
           if (!r.ok) throw new Error(`http ${r.status}`);
           buf = Buffer.from(await r.arrayBuffer());
           fs.writeFileSync(cache, buf);

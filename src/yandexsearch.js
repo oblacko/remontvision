@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import { directFetch } from './proxy.js';
 
 const ENDPOINT = 'https://searchapi.api.cloud.yandex.net/v2/web/search';
 const IMAGE_SEARCH_ENDPOINT = 'https://searchapi.api.cloud.yandex.net/v2/image/search';
@@ -263,7 +264,7 @@ export async function searchWeb({
   const body = buildSearchWebBody({ query, region, limit, folderId, ...opts });
 
   const started = Date.now();
-  const response = await fetch(ENDPOINT, {
+  const response = await directFetch(ENDPOINT, {
     method: 'POST',
     headers: {
       Authorization: `Api-Key ${apiKey}`,
@@ -322,7 +323,7 @@ export async function searchImagesByText({
   };
 
   const started = Date.now();
-  const response = await fetch(IMAGE_SEARCH_ENDPOINT, {
+  const response = await directFetch(IMAGE_SEARCH_ENDPOINT, {
     method: 'POST',
     headers: {
       Authorization: `Api-Key ${apiKey}`,
@@ -358,7 +359,7 @@ export async function searchImagesByImage({
   const body = buildSearchByImageBody({ imageB64, url, site, page, familyMode, folderId });
 
   const started = Date.now();
-  const response = await fetch(IMAGE_SEARCH_BY_IMAGE_ENDPOINT, {
+  const response = await directFetch(IMAGE_SEARCH_BY_IMAGE_ENDPOINT, {
     method: 'POST',
     headers: {
       Authorization: `Api-Key ${apiKey}`,

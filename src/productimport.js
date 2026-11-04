@@ -2,6 +2,7 @@
 // Никакого автоматического попадания в каталог: только черновик + quality checks.
 import crypto from 'node:crypto';
 import { assertPublicUrl, fetchRemoteImage } from './remoteimage.js';
+import { directFetch } from './proxy.js';
 import { sanitizeImage } from './media.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { putBuffer } from './storage.js';
@@ -319,7 +320,7 @@ function similarity(a, b) {
 async function fetchPage(rawUrl, timeoutMs = 25_000) {
   let url = await assertPublicUrl(rawUrl);
   for (let i = 0; i <= 3; i++) {
-    const r = await fetch(url, {
+    const r = await directFetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(timeoutMs),
       headers: {

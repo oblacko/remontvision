@@ -1,6 +1,6 @@
 // Клиент OpenRouter: рендер через Image API, разбор рендера через chat/completions (vision).
 // Документация: https://openrouter.ai/docs/guides/overview/multimodal/image-generation
-// Если задан HTTPS_PROXY/S3-прокси — гоним через него (нативный fetch env-прокси не читает).
+// Если задан прокси — гоним через него только запросы OpenRouter (см. src/proxy.js).
 
 import { roomTypeByName } from './roomtypes.js';
 import { getModelConfig } from './modelconfig.js';
@@ -8,16 +8,9 @@ import { supportsAdvancedOptions, modelFamily, supportsResolution } from './mode
 import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 import { getPromptConfig } from './promptconfig.js';
 import { buildScalePlan } from './scaleplan.js';
+import { proxyFetch } from './proxy.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
-
-const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
-// SOCKS5 env-прокси применяет src/proxy.js через node-fetch; undici ProxyAgent его не умеет.
-if (proxyUrl && !/^socks5h?:/i.test(proxyUrl)) {
-  const { setGlobalDispatcher, ProxyAgent } = await import('undici');
-  setGlobalDispatcher(new ProxyAgent(proxyUrl));
-  console.log(`[openrouter] используется прокси: ${proxyUrl.replace(/\/\/.*@/, '//***@')}`);
-}
 
 export const MOCK_MODE = !process.env.OPENROUTER_API_KEY;
 
@@ -64,7 +57,7 @@ async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = TIME
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const r = await fetch(url, { ...options, signal: ctrl.signal });
+      const r = await proxyFetch(url, { ...options, signal: ctrl.signal });
       if (r.ok) return r;
       const body = (await r.text()).slice(0, 300);
       lastErr = new Error(`${url}: ${r.status} ${body}`);
@@ -90,7 +83,7 @@ export const supportsInputRefs = () => INPUT_REFS_OK;
 
 export async function listImageModels() {
   if (MOCK_MODE) return { mock: true, models: [] };
-  const r = await fetch(`${BASE}/images/models`, { headers: headers() });
+  const r = await proxyFetch(`${BASE}/images/models`, { headers: headers() });
   if (!r.ok) throw new Error(`models: ${r.status} ${await r.text()}`);
   const data = await r.json();
   const models = (data.data || data.models || []).map(m => ({
@@ -544,7 +537,7 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
     try {
       let r;
       for (let tryNo = 0; tryNo < 4; tryNo++) {
-        const doFetch = () => fetch(endpoint, {
+        const doFetch = () => proxyFetch(endpoint, {
           method: 'POST',
           headers: headers(),
           body: JSON.stringify(payload),
@@ -621,7 +614,7 @@ export async function generateFromText({ prompt, aspectRatio = '3:2' }) {
   }]);
   for (const [attempt, [endpoint, payload]] of attempts.entries()) {
     try {
-      const r = await fetch(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(150_000) });
+      const r = await proxyFetch(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(150_000) });
       const data = await r.json().catch(() => ({}));
       const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
       spent += cost;
@@ -646,7 +639,7 @@ export async function generateTextImage({ prompt, aspectRatio = '21:9', model, r
     aspect_ratio: aspectRatio,
     ...(resolution ? { resolution } : {}),
   };
-  const r = await withImageSlot(() => fetch(`${BASE}/images`, {
+  const r = await withImageSlot(() => proxyFetch(`${BASE}/images`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),

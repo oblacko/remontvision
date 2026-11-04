@@ -1437,6 +1437,15 @@ app.post('/api/renders/:id/procurement', h(async (req, res) => {
   res.status(started.existing ? 200 : 201).json(dto);
 }));
 
+// Последний подбор по рендеру — чтобы результат не терялся при закрытии панели.
+app.get('/api/renders/:id/procurement', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const run = await q.latestProcurementRunForRender(req.params.id, req.user.id);
+  if (!run) return res.status(404).json({ error: 'Подбор ещё не запускался' });
+  const dto = await procurementDto(run.id, req.user.id);
+  res.json(dto);
+}));
+
 app.get('/api/procurement/:id', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const dto = await procurementDto(req.params.id, req.user.id);

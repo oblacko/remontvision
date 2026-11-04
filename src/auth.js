@@ -7,6 +7,7 @@ import nodemailer from 'nodemailer';
 import { q } from './db.js';
 import { log } from './openrouter.js';
 import { grantCredits } from './payments.js';
+import { directFetch } from './proxy.js';
 
 const OTP_TTL_MIN = Number(process.env.OTP_TTL_MIN || 10);
 const SESSION_DAYS = Number(process.env.SESSION_DAYS || 30);
@@ -76,7 +77,7 @@ async function sendCodeEmail(email, code) {
           html: `<p>Ваш код входа: <b style="font-size:22px;letter-spacing:2px">${code}</b></p>
                  <p>Действует ${OTP_TTL_MIN} минут. Если вы не запрашивали код — просто игнорируйте письмо.</p>`,
         };
-    const r = await fetch('https://api.resend.com/emails', {
+    const r = await directFetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`,

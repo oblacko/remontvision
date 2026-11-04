@@ -560,8 +560,9 @@ export async function processProcurementRun(runId) {
 
     const candidates = await q.procurementCandidatesForRun(run.id);
     if (candidates.length === 0) {
+      const failedItems = items.filter(item => item.status === 'error').length;
       await failRun(run, 'Не удалось найти проверенные товары', cost);
-      log({ event: 'procurement_error', run_id: run.id, reason: 'no_candidates', cost_usd: cost });
+      log({ event: 'procurement_error', run_id: run.id, reason: 'no_candidates', items: items.length, failed_items: failedItems, cost_usd: cost });
       return;
     }
     await q.finishProcurementRun(run.id, { costUsd: cost });
