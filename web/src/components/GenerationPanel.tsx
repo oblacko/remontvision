@@ -363,8 +363,8 @@ export function GenerationPanel({
     setEstimateNote(''); setEstimateError(''); setBrief(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
     setKeepFurniture(true); setUseCatalog(false)
-    // Агентский шаг: сразу читаем комнату по фото — тип, размеры и стиль.
-    void estimateBrief(nextFile, { auto: true })
+    // Автобриф намеренно не запускаем: тип и размеры задаются вручную,
+    // при необходимости — кнопкой «Определить по фото».
   }
 
   const cleanupRoom = async () => {
