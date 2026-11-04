@@ -1480,7 +1480,13 @@ app.post('/api/renders/:id/final-review', h(async (req, res) => {
   const analysis = {
     ...(render.analysis || {}),
     architect: review.architect,
-    final: review.architect.summary || null,
+    final: review.architect.summary || {
+      concept: [room.style, room.room_type].filter(Boolean).join(' · '),
+      palette: (review.architect.palette || []).map(color => `${color.name} ${color.hex}`).join(', '),
+      materials: (review.architect.surfaces || []).map(surface => [surface.material, surface.color].filter(Boolean).join(' ')).filter(Boolean).join(', '),
+      electrical: (review.architect.electrical || []).map(item => `${item.title}: ${item.text}`).join(' '),
+      next_steps: (review.architect.hints || []).map(hint => hint.action),
+    },
     products,
   };
   await q.setRenderAnalysis(render.id, analysis);
