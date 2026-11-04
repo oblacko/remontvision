@@ -74,6 +74,8 @@ type ArtDirection = {
   lighting?: string
   mood?: string
 }
+type DimensionsEstimate = { width: number; length: number; height: number; confidence?: 'low' | 'medium' | 'high' }
+type LensInfo = { focal_length_mm?: number | null; type?: 'wide' | 'normal' | 'tele' | null; distortion?: 'strong' | 'mild' | 'none' | null; correction?: string; confidence?: 'low' | 'medium' | 'high' }
 type RoomBrief = {
   roomType?: string
   width?: number | null
@@ -104,15 +106,16 @@ type RoomResult = {
   id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
   room_width_m?: number | null; room_length_m?: number | null; room_height_m?: number | null; bed_length_m?: number | null;
   dimension_orientation?: string | null;
-  keep_furniture?: boolean; use_catalog?: boolean;
-  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null } | null;
+  keep_furniture?: boolean; use_catalog?: boolean; products_enabled?: boolean;
+  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
 type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
   budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
-  keepFurniture?: boolean; useCatalog?: boolean; artDirection?: ArtDirection | null;
+  keepFurniture?: boolean; useCatalog?: boolean; productsEnabled?: boolean; artDirection?: ArtDirection | null;
+  dimensionsEstimate?: DimensionsEstimate | null; lens?: LensInfo | null;
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
@@ -216,7 +219,7 @@ export function GenerationPanel({
   const [style, setStyle] = useState<string | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
   const [keepFurniture, setKeepFurniture] = useState(true)
-  const [useCatalog, setUseCatalog] = useState(true)
+  const [useCatalog] = useState(true)
   const [customOpen, setCustomOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [refPhoto, setRefPhoto] = useState<string | null>(null)
@@ -335,7 +338,6 @@ export function GenerationPanel({
         setDimensionOrientation(d.dimension_orientation || '')
         setPriceTier(d.price_tier || 'comfort')
         setKeepFurniture(d.keep_furniture !== false)
-        setUseCatalog(d.use_catalog !== false)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
         setPhotoError(''); setGenError(d.notice || '')
@@ -366,6 +368,8 @@ export function GenerationPanel({
             pricesAsOf: d.prices_as_of,
             analysis: render.analysis || null,
             artDirection: render.art_direction || null,
+            dimensionsEstimate: render.dimensions_estimate || null,
+            lens: render.lens || null,
           }
           setIterations([next])
           setCurrentId(next.id)
@@ -410,7 +414,7 @@ export function GenerationPanel({
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
     setEstimateNote(''); setEstimateError(''); setBrief(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
-    setKeepFurniture(true); setUseCatalog(true)
+    setKeepFurniture(true)
     // Автобриф намеренно не запускаем: тип и размеры задаются вручную,
     // при необходимости — кнопкой «Определить по фото».
   }
@@ -716,11 +720,14 @@ export function GenerationPanel({
         priceTier: room.price_tier || priceTier,
         keepFurniture: room.keep_furniture !== false,
         useCatalog: room.use_catalog !== false,
+        productsEnabled: room.products_enabled !== false,
         roomId: id,
         ratio: photoRatio,
         pricesAsOf: room.prices_as_of,
         analysis: render.analysis || null,
         artDirection: render.art_direction || null,
+        dimensionsEstimate: render.dimensions_estimate || null,
+        lens: render.lens || null,
       }
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
@@ -759,7 +766,7 @@ export function GenerationPanel({
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
     setEstimateNote(''); setEstimateError(''); setEstimateBusy(false); setBrief(null)
-    setStyle(null); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(true)
+    setStyle(null); setPriceTier('comfort'); setKeepFurniture(true)
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setCustomOpen(false); setAdvancedOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
@@ -977,19 +984,9 @@ export function GenerationPanel({
               )}
             </div>
 
-            <div className="mt-6 border p-4">
-              <button type="button" aria-pressed={useCatalog} onClick={() => setUseCatalog(v => !v)} className="flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${useCatalog ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{useCatalog ? <Check className="size-3.5" /> : null}</span>
-                <span>
-                  <span className="block text-sm font-medium">Подобрать реальные товары</span>
-                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">{useCatalog ? 'После генерации покажем товары Hoff со ссылками и ценами. На картинку не влияет, выбор запоминается.' : 'Интерьер без подбора товаров. Включите, если нужны ссылки и цены.'}</span>
-                </span>
-              </button>
-            </div>
-
             <div className="mt-8 border">
               <button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(v => !v)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}{useCatalog ? ' · товары' : ''}</span>
+                <span className="flex items-center gap-3"><SlidersHorizontal className="size-4 text-primary-text" />Дополнительно{keepFurniture ? '' : ' · мебель меняем'}</span>
                 <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`} />
               </button>
               {advancedOpen && (
@@ -1107,16 +1104,24 @@ export function GenerationPanel({
                   <span className="text-muted-foreground">
                     {realOfferCount > 0
                       ? `Класс «${tierName(current.priceTier)}» · товары: ${realOfferCount} ${realOfferCount === 1 ? 'предложение' : 'предложений'}`
-                      : current.useCatalog === false
-                        ? 'Товары отключены · подборка не формируется'
+                      : current.productsEnabled === false
+                        ? 'Подбор товаров выключен'
                         : `Класс «${tierName(current.priceTier)}» · подборка ${rub(current.total)}`}
                   </span>
-                  <span className="text-muted-foreground">{realOfferCount > 0 ? 'Реальные товары Hoff' : current.useCatalog === false ? 'Свободный дизайн' : 'Итог ориентировочный'}</span>
+                  <span className="text-muted-foreground">{realOfferCount > 0 ? 'Реальные товары Hoff' : current.productsEnabled === false ? 'Без товаров' : 'Итог ориентировочный'}</span>
                 </div>
                 {current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
                   <section className="mt-6 border p-4" aria-labelledby="art-direction">
                     <p id="art-direction" className="eyebrow">Авторский бриф</p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Направление, которое арт-директор написал по вашему фото и стилю.</p>
+                    {(current.dimensionsEstimate || current.lens) ? (
+                      <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                        {current.dimensionsEstimate ? `Оценка архитектора: ${current.dimensionsEstimate.width} × ${current.dimensionsEstimate.length} × ${current.dimensionsEstimate.height} м` : ''}
+                        {current.dimensionsEstimate?.confidence ? ` · уверенность ${current.dimensionsEstimate.confidence === 'high' ? 'высокая' : current.dimensionsEstimate.confidence === 'medium' ? 'средняя' : 'низкая'}` : ''}
+                        {current.lens?.type ? ` · объектив: ${current.lens.type === 'wide' ? 'широкий угол' : current.lens.type === 'tele' ? 'теле' : 'нормальный'}` : ''}
+                        {current.lens?.distortion && current.lens.distortion !== 'none' ? ` · ${current.lens.distortion === 'strong' ? 'сильное' : 'умеренное'} искажение` : ''}
+                      </p>
+                    ) : null}
                     {current.artDirection.palette?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {current.artDirection.palette.map((color, index) => (
@@ -1384,7 +1389,7 @@ export function GenerationPanel({
                 <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
                 {(realOfferCount > 0 || current.items.length > 0) ? (
                   <button type="button" onClick={() => setStep('estimates')} className="action-secondary min-h-14 px-6 text-base">Товары и смета</button>
-                ) : (
+                ) : current.productsEnabled === false ? null : (
                   <button type="button" onClick={openProcurement} className="action-secondary min-h-14 px-6 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
                 )}
                 <button type="button" onClick={runFinalReview} disabled={finalBusy} className="action-primary min-h-14 px-8 text-base">{finalBusy ? <><LoaderCircle className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <Check className="size-5" /></>}</button>
@@ -1469,7 +1474,7 @@ export function GenerationPanel({
                               {item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}
                             </span>
                           </div>
-                        )) : <p className="py-4 text-sm text-muted-foreground">{current.useCatalog === false ? 'Товары отключены для этой генерации.' : 'Товары не собраны — попробуйте сгенерировать ещё раз.'}</p>}
+                        )) : <p className="py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Товары не собраны — попробуйте сгенерировать ещё раз.'}</p>}
                       </div>
                       {current.items.length > 0 && (
                         <>

@@ -177,6 +177,7 @@ const SYSTEM = `Ты — архитектор интерьера и товаро
   "summary": {"concept":"...","palette":"...","materials":"...","electrical":"...","next_steps":["..."]}
 }
 Правила:
+- Все тексты для пользователя — строго на русском: strengths, issues, hints.action, hints.why, electrical.title, electrical.text и summary. Никаких английских формулировок в этих полях.
 - bbox нормирован 0..1: [x, y, ширина, высота].
 - category — только из списка: ${ARCHITECT_CATEGORIES.join(', ')}.
 - Если предмета нет в кадре — не выдумывай его.

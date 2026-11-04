@@ -5,6 +5,8 @@ export const RENDER_CONFIG_KEY = 'render.product_refs.v1';
 export const DEFAULT_RENDER_CONFIG = {
   product_refs_enabled: false,
   max_products: 3,
+  // Подбор реальных товаров после генерации. Не влияет на базовый кадр.
+  product_matching_enabled: true,
 };
 
 let cache = { ...DEFAULT_RENDER_CONFIG };
@@ -18,6 +20,7 @@ const clampInt = (value, min, max, fallback) => {
 const validate = (input = {}) => {
   const out = {};
   if ('product_refs_enabled' in input) out.product_refs_enabled = Boolean(input.product_refs_enabled);
+  if ('product_matching_enabled' in input) out.product_matching_enabled = Boolean(input.product_matching_enabled);
   if ('max_products' in input) out.max_products = clampInt(input.max_products, 2, 4, DEFAULT_RENDER_CONFIG.max_products);
   return out;
 };

@@ -71,11 +71,50 @@ function normalizePalette(value) {
   }).filter(item => item.name || item.hex).slice(0, 6);
 }
 
+function normalizeConfidence(value) {
+  const raw = String(value || '').toLowerCase();
+  return ['low', 'medium', 'high'].includes(raw) ? raw : 'low';
+}
+
+// Архитектор сам оценивает габариты по фото. Размеры нужны промту для масштаба,
+// но пользователь их не вводит: иначе перспектива и обрезка дают неверные метры.
+export function normalizeRoomDimensions(value) {
+  if (!value || typeof value !== 'object') return null;
+  const round = v => Math.round(Number(v) * 10) / 10;
+  const width = Number(value.width_m ?? value.width);
+  const length = Number(value.length_m ?? value.length);
+  const height = Number(value.height_m ?? value.height);
+  if (![width, length, height].every(Number.isFinite) || width < 1 || width > 30 || length < 1 || length > 30 || height < 2 || height > 10) return null;
+  return {
+    width: round(width),
+    length: round(length),
+    height: round(height),
+    confidence: normalizeConfidence(value.confidence),
+  };
+}
+
+// Объектив влияет на восприятие масштаба: широкий угол растягивает ближний план.
+export function normalizeLens(value) {
+  if (!value || typeof value !== 'object') return null;
+  const focal = Number(value.focal_length_mm ?? value.focal_mm);
+  const type = String(value.type || '').toLowerCase();
+  const distortion = String(value.distortion || '').toLowerCase();
+  return {
+    focal_length_mm: Number.isFinite(focal) && focal > 0 ? Math.round(focal) : null,
+    type: ['wide', 'normal', 'tele'].includes(type) ? type : null,
+    distortion: ['strong', 'mild', 'none'].includes(distortion) ? distortion : null,
+    correction: clampText(value.correction, 240),
+    confidence: normalizeConfidence(value.confidence),
+  };
+}
+
 const DIRECTIVE_SYSTEM = `Ты ведущий арт-директор интерьерного бюро, эксперт по эргономике и композиции. На входе — фотография реальной комнаты, её тип, размеры и выбранный стиль.
 Твоя задача — придумать авторское арт-направление именно для ЭТОЙ комнаты, а не взять шаблон стиля. Смотри на реальный свет, пропорции, архитектуру, материалы и ракурс на фото.
 Верни строго JSON без текста вокруг:
 {
   "palette": [{"hex":"#RRGGBB","name":"кратко"}],
+  "room_dimensions": {"width_m": 0.0, "length_m": 0.0, "height_m": 0.0, "confidence": "low|medium|high"},
+  "lens": {"focal_length_mm": 0, "type": "wide|normal|tele", "distortion": "strong|mild|none", "correction": "как искажение повлияло на оценку размеров", "confidence": "low|medium|high"},
   "focal_point": "главный акцент композиции",
   "feature_wall": "акцентная стена/плоскость и её обработка",
   "materials": "ключевые материалы и фактуры",
@@ -92,6 +131,10 @@ const DIRECTIVE_SYSTEM = `Ты ведущий арт-директор интер
 }
 Правила:
 - Палитра 4-6 гармоничных цветов под стиль и естественный свет на фото, с hex.
+- Определи реальные габариты комнаты по фото: ширина, длина, высота в метрах. Опирайся на типовые якоря — дверь 2.0–2.1 м, длина кровати 2.0 м, глубина кухонных шкафов 0.6 м, высота стула 0.45 м, плитка и панели.
+- Обязательно оцени объектив. Широкий угол (примерно 14–24 мм) растягивает ближний план и углы, из-за чего комната кажется длиннее; нормальный (35–50 мм) ближе к реальности; теле (70+ мм) сжимает пространство. Смотри на искривление вертикалей, сход диагоналей, соотношение размеров ближних и дальних предметов.
+- Не принимай растянутый широким углом ближний план за реальную длину. Скорректируй width_m/length_m/height_m с учётом дисторсии и укажи это в lens.correction.
+- Если размеры уже переданы пользователем — используй их как опорные, но проверь объектив и отметь в lens.correction, если перспектива им противоречит.
 - Опирайся на архитектуру на фото: сохраняй существующие стены, окна, двери, потолок и объёмы.
 - Создавай авторскую, но реалистичную композицию; не копируй мебель с референсов.
 - Если размеры переданы — держи масштаб мебели и проходы в этих рамках.
@@ -116,8 +159,8 @@ export async function buildArtDirection({
     && Number(dimensions.length) > 0
     && Number(dimensions.height) > 0;
   const dims = hasDimensions
-    ? `Реальные размеры комнаты: ширина ${dimensions.width} м, длина ${dimensions.length} м, высота ${dimensions.height} м. Держи масштаб мебели, проходы и пропорции в этих рамках.`
-    : 'Размеры не заданы: оцени масштаб по фотографии.';
+    ? `Реальные размеры комнаты переданы как опорные: ширина ${dimensions.width} м, длина ${dimensions.length} м, высота ${dimensions.height} м. Проверь их по перспективе и объективу.`
+    : 'Размеры не заданы: определи ширину, длину и высоту по фотографии с учётом объектива и перспективы.';
   const user = [
     `Тип комнаты: ${roomName}.`,
     `Выбранный стиль: ${style || 'подбери сам под комнату и свет'}.`,
@@ -130,6 +173,8 @@ export async function buildArtDirection({
   ].filter(Boolean).join('\n');
   const buildFields = source => ({
     palette: normalizePalette(source.palette),
+    roomDimensions: normalizeRoomDimensions(source.room_dimensions),
+    lens: normalizeLens(source.lens),
     focalPoint: clampText(source.focal_point, 240),
     featureWall: clampText(source.feature_wall, 240),
     materials: clampText(source.materials, 320),

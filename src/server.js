@@ -783,7 +783,7 @@ app.put('/api/admin/settings/render', h(async (req, res) => {
   try {
     const cfg = req.body?.config || req.body || {};
     const config = await saveRenderConfig(cfg);
-    log({ event: 'render_config_saved', product_refs_enabled: config.product_refs_enabled, max_products: config.max_products });
+    log({ event: 'render_config_saved', product_refs_enabled: config.product_refs_enabled, product_matching_enabled: config.product_matching_enabled, max_products: config.max_products });
     res.json({ config, defaults: getRenderDefaults() });
   } catch (e) {
     res.status(400).json({ error: String(e.message || e).slice(0, 300) });
@@ -1328,6 +1328,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     price_tier: room.price_tier || 'comfort',
     keep_furniture: room.keep_furniture !== false,
     use_catalog: room.use_catalog !== false,
+    products_enabled: getRenderConfig().product_matching_enabled,
     status: room.status,
     error: room.error,
     notice: room.notice || null,
@@ -1355,6 +1356,8 @@ app.get('/api/rooms/:id', h(async (req, res) => {
         accepted: render.meta.product_qa.accepted,
         issues: render.meta.product_qa.issues || [],
       } : null,
+      dimensions_estimate: render.meta?.room_dimensions_estimate || null,
+      lens: render.meta?.lens || null,
     } : null,
     items: items.map(p => ({
       id: p.id,
@@ -1470,7 +1473,7 @@ app.post('/api/renders/:id/final-review', h(async (req, res) => {
   });
   if (!review) return res.status(502).json({ error: 'Не удалось собрать итог по дизайну' });
   let products = Array.isArray(render.analysis?.products) ? render.analysis.products : [];
-  if (room.use_catalog !== false && review.architect.items.length) {
+  if (getRenderConfig().product_matching_enabled && review.architect.items.length) {
     try {
       products = await matchDesignOffers({ items: review.architect.items, roomType: room.room_type || 'Другое', topK: 3 });
     } catch (e) {

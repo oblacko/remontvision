@@ -85,6 +85,7 @@ async function processRender(renderId) {
   const room = await q.getRoom(render.room_id);
   const iteration = Boolean(render.request_text);
   const roomType = room.room_type || 'Другое';
+  const isBedRoom = /спальн|детск/i.test(roomType);
   const priceTier = normalizeTier(room.price_tier || 'comfort');
   const keepFurniture = room.keep_furniture !== false;
   const useCatalog = room.use_catalog !== false;
@@ -242,6 +243,7 @@ async function processRender(renderId) {
       // Без него дизайн скатывается к шаблонному «стиль + нейтральная комната».
       let artDirection = '';
       let artDirectionPlan = [];
+      let estimatedDimensions = roomDimensions;
       if (!MOCK_MODE) {
         try {
           const adStart = Date.now();
@@ -251,9 +253,18 @@ async function processRender(renderId) {
             roomType,
             style: room.style,
             styleDescription: styleInfo?.prompt_description || '',
-            dimensions: null,
+            dimensions: roomDimensions,
             keepFurniture,
           });
+          if (ad?.roomDimensions) {
+            estimatedDimensions = {
+              ...ad.roomDimensions,
+              bedLength: roomDimensions?.bedLength ?? (isBedRoom ? 2 : null),
+              orientation: roomDimensions?.orientation || '',
+            };
+            meta.room_dimensions_estimate = ad.roomDimensions;
+            meta.lens = ad.lens || null;
+          }
           if (ad?.text) {
             artDirection = ad.text;
             artDirectionPlan = Array.isArray(ad.productPlan) ? ad.productPlan : [];
@@ -310,9 +321,11 @@ async function processRender(renderId) {
         styleDescription: styleInfo?.prompt_description || '',
         roomType,
         keepFurniture,
-        useCatalog,
+        // В базовом кадре товаров нет: каталог подключается после генерации.
+        // Это сохраняет поведение A/B (products: [], useCatalog: false).
+        useCatalog: false,
         imageMap,
-        dimensions: null,
+        dimensions: estimatedDimensions,
         artDirection,
         productRefs: productRefsDetailed.length > 0,
       });
@@ -497,7 +510,7 @@ async function processRender(renderId) {
       }
     }
 
-    if (useCatalog && architectReview?.items?.length) {
+    if (getRenderConfig().product_matching_enabled && architectReview?.items?.length) {
       try {
         productMatches = await matchDesignOffers({ items: architectReview.items, roomType, topK: 3 });
         const offers = productMatches.reduce((sum, match) => sum + match.offers.length, 0);

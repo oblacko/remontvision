@@ -250,7 +250,7 @@ export default function Admin() {
   const [cleanupConfig, setCleanupConfig] = useState<CleanupConfig | null>(null)
   const [cleanupBusy, setCleanupBusy] = useState(false)
   const [cleanupNotice, setCleanupNotice] = useState('')
-  const [renderConfig, setRenderConfig] = useState<{ product_refs_enabled: boolean; max_products: number } | null>(null)
+  const [renderConfig, setRenderConfig] = useState<{ product_refs_enabled: boolean; max_products: number; product_matching_enabled: boolean } | null>(null)
   const [renderBusy, setRenderBusy] = useState(false)
   const [renderNotice, setRenderNotice] = useState('')
   const [articles, setArticles] = useState<Array<{ id: number; slug: string; title: string; style?: string | null; room_type?: string | null; status: string; created_at: string }>>([])
@@ -1360,19 +1360,29 @@ export default function Admin() {
           )}
 
           {tab === 'render' && (
-            <div className="mt-8 max-w-4xl">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><p className="eyebrow">Товары в рендере</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Арт-директор подбирает реальные товары Hoff по красоте и размерам и добавляет их как референсы в базовый кадр (shoppable-рендер). Выключено — чистый design-first. Референсы у FLUX 3 Image не тарифицируются.</p></div>
-                <div className="flex gap-2"><button type="button" disabled={renderBusy} onClick={() => void resetRender()} className="action-secondary">Сбросить</button><button type="button" disabled={renderBusy} onClick={() => void saveRender()} className="action-primary">{renderBusy ? 'Сохраняем…' : 'Сохранить'}</button></div>
-              </div>
-              {renderNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{renderNotice}</p>}
-              {renderConfig ? (
-                <div className="mt-6 space-y-5">
-                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={renderConfig.product_refs_enabled} onChange={e => setRenderConfig({ ...renderConfig, product_refs_enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Товары в рендере включены</span><span className="mt-1 block text-xs text-muted-foreground">Если выключено — базовый кадр без товарных референсов (текущее design-first поведение).</span></span></label>
-                  <div><label className="eyebrow mb-2 block">Сколько товаров в кадре</label><input type="number" min={2} max={4} value={renderConfig.max_products} onChange={e => setRenderConfig({ ...renderConfig, max_products: Math.max(2, Math.min(4, Number(e.target.value) || 3)) })} className="h-11 w-40 border bg-background px-3 text-sm outline-none focus:border-primary" /><span className="ml-3 text-xs text-muted-foreground">2–4 hero-товара</span></div>
-                  <p className="text-xs text-muted-foreground">Источник — catalog-service (Hoff). Включать только после A/B-проверки, что качество не проседает.</p>
+            <div className="mt-8 max-w-4xl space-y-8">
+              <div>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div><p className="eyebrow">Подбор товаров после генерации</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Архитектор разбирает готовый кадр и ищет реальные товары Hoff в catalog-service. На базовую картинку не влияет. Если выключено — блок товаров и кнопка сметы не показываются.</p></div>
                 </div>
-              ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
+                {renderConfig ? (
+                  <label className="mt-4 flex items-start gap-3 border p-3 text-sm"><input type="checkbox" checked={renderConfig.product_matching_enabled} onChange={e => setRenderConfig({ ...renderConfig, product_matching_enabled: e.target.checked })} className="mt-1 size-4 accent-primary" /><span><span className="font-medium">Подбирать реальные товары после генерации</span><span className="mt-1 block text-xs text-muted-foreground">Базовый кадр остаётся design-first: товары появляются только в разборе и смете.</span></span></label>
+                ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем настройки…</p>}
+              </div>
+              <div>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div><p className="eyebrow">Товары в рендере</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Арт-директор подбирает реальные товары Hoff по красоте и размерам и добавляет их как референсы в базовый кадр (shoppable-рендер). Выключено — чистый design-first. Референсы у FLUX 3 Image не тарифицируются.</p></div>
+                  <div className="flex gap-2"><button type="button" disabled={renderBusy} onClick={() => void resetRender()} className="action-secondary">Сбросить</button><button type="button" disabled={renderBusy} onClick={() => void saveRender()} className="action-primary">{renderBusy ? 'Сохраняем…' : 'Сохранить'}</button></div>
+                </div>
+                {renderNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{renderNotice}</p>}
+                {renderConfig ? (
+                  <div className="mt-6 space-y-5">
+                    <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={renderConfig.product_refs_enabled} onChange={e => setRenderConfig({ ...renderConfig, product_refs_enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Товары в рендере включены</span><span className="mt-1 block text-xs text-muted-foreground">Если выключено — базовый кадр без товарных референсов (текущее design-first поведение).</span></span></label>
+                    <div><label className="eyebrow mb-2 block">Сколько товаров в кадре</label><input type="number" min={2} max={4} value={renderConfig.max_products} onChange={e => setRenderConfig({ ...renderConfig, max_products: Math.max(2, Math.min(4, Number(e.target.value) || 3)) })} className="h-11 w-40 border bg-background px-3 text-sm outline-none focus:border-primary" /><span className="ml-3 text-xs text-muted-foreground">2–4 hero-товара</span></div>
+                    <p className="text-xs text-muted-foreground">Источник — catalog-service (Hoff). Включать только после A/B-проверки, что качество не проседает.</p>
+                  </div>
+                ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
+              </div>
             </div>
           )}
 

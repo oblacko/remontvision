@@ -197,9 +197,9 @@ git commit -m "feat: show architect review and real products in result"
 
 ## Phase 2 (next plan): Setup UX and session
 
-- Remove room dimensions from the generation prompt; keep them optional for final estimate only.
+- Архитектор сам оценивает габариты и объектив по фото; пользователь размеры не вводит.
 - Cleanup as a checkbox, default off, with explicit states (`off/running/done/failed_fallback_original`).
-- Products toggle persisted on the room/session and used later for search.
+- Products controlled in admin: `product_refs_enabled` (base frame, off) and `product_matching_enabled` (after generation, on).
 - One screen: canvas + «Архитектор» panel; stages `queued → briefing → rendering → reviewing → products → done`.
 - Data events per step (see `docs/DESIGN-SESSION.md`).
 
