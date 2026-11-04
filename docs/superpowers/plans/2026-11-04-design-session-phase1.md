@@ -1,5 +1,7 @@
 # Design Session Pipeline — Phase 1: Architect Review + Real Catalog Products
 
+**Status:** implemented in `853bdd7`, `13d4301`, `6765a5d`; not deployed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** После генерации один vision-проход архитектора разбирает готовый рендер и возвращает подсказки, палитру, электрику и список предметов; предметы матчатся в реальные офферы catalog-service (Hoff) и показываются в результате вместо демо-сметы.
