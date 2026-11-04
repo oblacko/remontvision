@@ -172,13 +172,26 @@ test('base prompt locks architecture and avoids structural additions', () => {
     imageMap: [{ role: 'source room' }, { role: 'art reference' }],
   });
   assert.match(prompt, /ARCHITECTURE LOCK/);
-  assert.match(prompt, /LOCKED INVARIANTS/);
+  assert.match(prompt, /PRESERVE EXACTLY/);
   assert.match(prompt, /Built-ins are architecture, not furniture/);
-  assert.match(prompt, /Do not add a second window/);
+  assert.match(prompt, /the same count, size, shape, position, sill, reveal, frame/);
   assert.match(prompt, /Ignore all architecture in the reference/);
   assert.match(prompt, /cosmetic renovation/);
   assert.doesNotMatch(prompt, /deep renovation/);
   assert.doesNotMatch(prompt, /warm cove or wall wash|headboard ledge|hide the cornice/);
+});
+
+test('V1 architecture lock remains available behind the flag', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    keepFurniture: false,
+    useCatalog: false,
+    archLockV2: false,
+    imageMap: [{ role: 'source room' }],
+  });
+  assert.match(prompt, /LOCKED INVARIANTS/);
+  assert.match(prompt, /Do not add a second window/);
 });
 
 test('edit prompt preserves built-ins and room geometry', () => {

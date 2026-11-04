@@ -11,6 +11,8 @@ import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { curateProducts, referenceImagesDetailed } from './curate.js';
 import { designProducts } from './productpipeline.js';
+import { getRenderConfig } from './renderconfig.js';
+import { pickHoffProducts, loadProductImages } from './productpicker.js';
 import { roomTypeByName } from './roomtypes.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
@@ -259,6 +261,7 @@ async function processRender(renderId) {
       // Арт-директор читает реальное фото и пишет bespoke-направление под стиль.
       // Без него дизайн скатывается к шаблонному «стиль + нейтральная комната».
       let artDirection = '';
+      let artDirectionPlan = [];
       if (!MOCK_MODE) {
         try {
           const adStart = Date.now();
@@ -273,6 +276,7 @@ async function processRender(renderId) {
           });
           if (ad?.text) {
             artDirection = ad.text;
+            artDirectionPlan = Array.isArray(ad.productPlan) ? ad.productPlan : [];
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
@@ -280,6 +284,35 @@ async function processRender(renderId) {
           }
         } catch (e) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+
+      // «Товары в рендере»: арт-директор даёт план, catalog-service ищет реальные
+      // товары Hoff, второй LLM-проход отбирает «красиво по размерам».
+      const renderCfg = getRenderConfig();
+      let productRefsDetailed = [];
+      if (renderCfg.product_refs_enabled && artDirectionPlan.length) {
+        try {
+          const picked = await pickHoffProducts({
+            plan: artDirectionPlan,
+            roomType,
+            style: room.style,
+            maxProducts: renderCfg.max_products,
+          });
+          productRefsDetailed = await loadProductImages(picked);
+          for (const ref of productRefsDetailed) {
+            imageMap.push({
+              role: `product reference — ${ref.category}: keep its exact shape, colour, material and proportions; light it with the room's own light and add a soft contact shadow`,
+              label: ref.name || '',
+            });
+          }
+          meta.product_refs = productRefsDetailed.map(ref => ({
+            offer_id: ref.offer_id, name: ref.name, category: ref.category,
+            price: ref.price, why: ref.why, picked_by: ref.picked_by,
+          }));
+          log({ event: 'product_refs_selected', room_id: room.id, render_id: renderId, count: productRefsDetailed.length, offers: productRefsDetailed.map(r => r.offer_id) });
+        } catch (e) {
+          log({ event: 'product_refs_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
       }
 
@@ -299,9 +332,10 @@ async function processRender(renderId) {
         imageMap,
         dimensions: roomDimensions,
         artDirection,
+        productRefs: productRefsDetailed.length > 0,
       });
 
-      referenceImagesB64 = styleRefUrls;
+      referenceImagesB64 = [...styleRefUrls, ...productRefsDetailed.map(r => r.b64)];
       meta.product_ids = curated.map(p => Number(p.id));
       meta.style_id = styleInfo?.id || null;
       meta.style_reference_mode = styleMode;

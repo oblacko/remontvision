@@ -4,7 +4,7 @@ import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } fr
 import { SearchLab } from '@/components/SearchLab'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'rooms' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'procurement' | 'search' | 'proxy' | 'catalog'
+type Tab = 'users' | 'packs' | 'rooms' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'render' | 'procurement' | 'search' | 'proxy' | 'catalog'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -250,6 +250,9 @@ export default function Admin() {
   const [cleanupConfig, setCleanupConfig] = useState<CleanupConfig | null>(null)
   const [cleanupBusy, setCleanupBusy] = useState(false)
   const [cleanupNotice, setCleanupNotice] = useState('')
+  const [renderConfig, setRenderConfig] = useState<{ product_refs_enabled: boolean; max_products: number } | null>(null)
+  const [renderBusy, setRenderBusy] = useState(false)
+  const [renderNotice, setRenderNotice] = useState('')
   const [procurementConfig, setProcurementConfig] = useState<ProcurementConfig | null>(null)
   const [procurementBusy, setProcurementBusy] = useState(false)
   const [procurementNotice, setProcurementNotice] = useState('')
@@ -513,6 +516,31 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
     finally { setCleanupBusy(false) }
   }
+  const loadRender = async () => {
+    try {
+      const d = await readJson(await api('/api/admin/settings/render'))
+      setRenderConfig(d.config || null); setRenderNotice('')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const saveRender = async () => {
+    if (!renderConfig) return
+    setRenderBusy(true); setRenderNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/render', { method: 'PUT', body: JSON.stringify({ config: renderConfig }) }))
+      setRenderConfig(d.config || null)
+      setRenderNotice('Настройки генерации сохранены')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setRenderBusy(false) }
+  }
+  const resetRender = async () => {
+    setRenderBusy(true); setRenderNotice(''); setAdminError('')
+    try {
+      const d = await readJson(await api('/api/admin/settings/render/reset', { method: 'POST' }))
+      setRenderConfig(d.config || null)
+      setRenderNotice('Возвращены заводские настройки генерации')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    finally { setRenderBusy(false) }
+  }
   const loadProcurement = async () => {
     try {
       const d = await readJson(await api('/api/admin/settings/procurement'))
@@ -651,7 +679,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'procurement') loadProcurement() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'render') loadRender(); if (tab === 'procurement') loadProcurement() }, [authed, tab])
   useEffect(() => { if (authed) void loadRoomTypes() }, [authed])
   useEffect(() => {
     if (!authed) return
@@ -841,7 +869,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['rooms', 'Комнаты'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['procurement', 'Поиск'], ['search', 'Поиск (лаб)'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['rooms', 'Комнаты'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['render', 'Генерация'], ['procurement', 'Поиск'], ['search', 'Поиск (лаб)'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -1298,6 +1326,23 @@ export default function Admin() {
                   </div>
                   <label className="block"><span className="eyebrow mb-2 block">Промт очистки</span><textarea value={cleanupConfig.prompt} onChange={e => setCleanupConfig({ ...cleanupConfig, prompt: e.target.value })} rows={8} maxLength={8000} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /><span className="mt-2 block text-xs text-muted-foreground">Плейсхолдеры: <code>{'{room}'}</code> — тип комнаты, <code>{'{keep}'}</code> — что сохранить, <code>{'{remove}'}</code> — что удалить. Для кухни/санузла сохраняются встроенные элементы и технические точки.</span></label>
                   <p className="text-xs text-muted-foreground">Рекомендуем FLUX 3 Image Klein, 1K, auto. Очистка добавляет второй вызов модели и увеличивает время генерации.</p>
+                </div>
+              ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
+            </div>
+          )}
+
+          {tab === 'render' && (
+            <div className="mt-8 max-w-4xl">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div><p className="eyebrow">Товары в рендере</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Арт-директор подбирает реальные товары Hoff по красоте и размерам и добавляет их как референсы в базовый кадр (shoppable-рендер). Выключено — чистый design-first. Референсы у FLUX 3 Image не тарифицируются.</p></div>
+                <div className="flex gap-2"><button type="button" disabled={renderBusy} onClick={() => void resetRender()} className="action-secondary">Сбросить</button><button type="button" disabled={renderBusy} onClick={() => void saveRender()} className="action-primary">{renderBusy ? 'Сохраняем…' : 'Сохранить'}</button></div>
+              </div>
+              {renderNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{renderNotice}</p>}
+              {renderConfig ? (
+                <div className="mt-6 space-y-5">
+                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={renderConfig.product_refs_enabled} onChange={e => setRenderConfig({ ...renderConfig, product_refs_enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Товары в рендере включены</span><span className="mt-1 block text-xs text-muted-foreground">Если выключено — базовый кадр без товарных референсов (текущее design-first поведение).</span></span></label>
+                  <div><label className="eyebrow mb-2 block">Сколько товаров в кадре</label><input type="number" min={2} max={4} value={renderConfig.max_products} onChange={e => setRenderConfig({ ...renderConfig, max_products: Math.max(2, Math.min(4, Number(e.target.value) || 3)) })} className="h-11 w-40 border bg-background px-3 text-sm outline-none focus:border-primary" /><span className="ml-3 text-xs text-muted-foreground">2–4 hero-товара</span></div>
+                  <p className="text-xs text-muted-foreground">Источник — catalog-service (Hoff). Включать только после A/B-проверки, что качество не проседает.</p>
                 </div>
               ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
             </div>

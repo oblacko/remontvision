@@ -22,11 +22,12 @@ const API = 'https://api.yookassa.ru/v3';
 const DIRECT = new Agent({ connect: { timeout: 15_000 } });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// пакеты кредитов (от 99 ₽)
+// Пакеты кредитов. Источник истины — таблица credit_packs (миграция 036);
+// константа оставлена как фолбэк и должна совпадать с ней.
 export const PACKS = [
-  { id: 'pack2',  credits: 2,  price_kopecks: 9900,  title: '2 кредита — попробовать' },
-  { id: 'pack5',  credits: 5,  price_kopecks: 22900, title: '5 кредитов' },
-  { id: 'pack15', credits: 15, price_kopecks: 59900, title: '15 кредитов — выгодно' },
+  { id: 'room',  credits: 8,  price_kopecks: 39900,  title: 'Одна комната' },
+  { id: 'flat',  credits: 15, price_kopecks: 59900,  title: 'Вся квартира' },
+  { id: 'house', credits: 50, price_kopecks: 149900, title: 'Весь дом' },
 ];
 export const packById = id => PACKS.find(p => p.id === id);
 

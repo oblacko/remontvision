@@ -220,7 +220,37 @@ function fillTemplate(text, vars = {}) {
   return String(text || '').replace(/\{(\w+)\}/g, (_, key) => vars[key] == null ? '' : String(vars[key]));
 }
 
+// ARCH_LOCK_V1 — текущая версия (много запретов «do not…»).
+const ARCH_LOCK_V1 = `ARCHITECTURE LOCK — HIGHEST PRIORITY
+This is the SAME physical room, not a new room. This is a cosmetic renovation only. The source image is a photograph of the actual room; do not redesign its architecture.
+LOCKED INVARIANTS — do not violate any of these:
+- Camera: same position, eye height, focal length, perspective, horizon, framing, crop and aspect ratio. Same left/right and top/bottom composition. No zoom, pan, tilt, room widening or narrowing.
+- Room volume: same width, depth, ceiling height, wall planes, floor plane, soffits, beams, columns, niches and arches. Do not add, remove, move, resize, open or close any wall, window, door, niche, beam, column, arch, cove, ceiling recess, skylight or room volume.
+- Windows: same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Do not add a second window. Do not widen, raise, lower or move the window.
+- Doors: same count, size, position, frame, handle and swing. Do not add a doorway, hallway or second room.
+- Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobe, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Preserve their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves, add niches, change the ceiling line, add beams or columns.
+- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights may use only existing points; do not add new recessed, cove, track or wall lights.
+- Mirrors and reflections are reflections, not openings: do not turn a mirrored wardrobe or mirror reflection into a window, door or new room.
+- If a design idea conflicts with any locked invariant, keep the architecture and change the finish or decor instead.`;
+
+// ARCH_LOCK_V2 — позитивная формулировка для FLUX 3 Image (у модели нет negative prompt).
+const ARCH_LOCK_V2 = `ARCHITECTURE LOCK — HIGHEST PRIORITY
+This is the SAME physical room from the source photograph, captured by the same camera. Recreate that exact room with new finishes.
+PRESERVE EXACTLY:
+- Camera: the same position, eye height, focal length, perspective, horizon, framing, crop and aspect ratio. The left/right and top/bottom composition stays identical.
+- Room volume: the same width, depth, ceiling height, wall planes, floor plane, soffits, beams, columns, niches and arches.
+- Windows: the same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche.
+- Doors: the same count, size, position, frame, handle and swing.
+- Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobes, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Keep their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers.
+- Electrical: the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights use only the existing points.
+- Floor: keep the existing plank or tile direction, pattern, seams and board width; change only the surface colour and finish.
+- Mirrors and reflections stay reflections; the only room they reflect is the existing room.
+- If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.`;
+
+const ARCH_LOCK_V2_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.ARCH_LOCK_V2 ?? 'true'));
+
 export function buildPrompt({
+  archLockV2 = null,
   style,
   priceTier = 'comfort',
   budget,
@@ -238,6 +268,7 @@ export function buildPrompt({
   imageMap = [],
   dimensions = null,
   artDirection = '',
+  productRefs = false,
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -285,17 +316,8 @@ export function buildPrompt({
     : '';
   const radiatorsText = fillTemplate(rules.radiators, { room: roomName });
   const scaleText = [dimensionsText, scalePlanText, bedText, radiatorsText].filter(Boolean).join('\n\n');
-  const architectureLock = `ARCHITECTURE LOCK — HIGHEST PRIORITY
-This is the SAME physical room, not a new room. This is a cosmetic renovation only. The source image is a photograph of the actual room; do not redesign its architecture.
-LOCKED INVARIANTS — do not violate any of these:
-- Camera: same position, eye height, focal length, perspective, horizon, framing, crop and aspect ratio. Same left/right and top/bottom composition. No zoom, pan, tilt, room widening or narrowing.
-- Room volume: same width, depth, ceiling height, wall planes, floor plane, soffits, beams, columns, niches and arches. Do not add, remove, move, resize, open or close any wall, window, door, niche, beam, column, arch, cove, ceiling recess, skylight or room volume.
-- Windows: same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Do not add a second window. Do not widen, raise, lower or move the window.
-- Doors: same count, size, position, frame, handle and swing. Do not add a doorway, hallway or second room.
-- Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobe, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Preserve their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves, add niches, change the ceiling line, add beams or columns.
-- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights may use only existing points; do not add new recessed, cove, track or wall lights.
-- Mirrors and reflections are reflections, not openings: do not turn a mirrored wardrobe or mirror reflection into a window, door or new room.
-- If a design idea conflicts with any locked invariant, keep the architecture and change the finish or decor instead.`;
+  const useLockV2 = archLockV2 === null ? ARCH_LOCK_V2_ENABLED : Boolean(archLockV2);
+  const architectureLock = useLockV2 ? ARCH_LOCK_V2 : ARCH_LOCK_V1;
 
   if (iteration) {
     return `${roles}
@@ -323,7 +345,7 @@ TASK
 Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a cosmetic renovation in the selected style.
 This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.
 The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
-This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.
+${productRefs ? 'This render includes specific hero products shown in the reference images. Place each one naturally in the room, keep its exact shape, colour, material and proportions, light it with the room\'s own light and add a soft contact shadow.' : 'This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.'}
 
 ${architectureLock}
 ${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
@@ -1033,8 +1055,9 @@ Image 1 — исходное фото. Image 2 — сгенерированны�
         ] },
       ],
       response_format: { type: 'json_object' },
+      temperature: 0,
     }),
-  }, { retries: 4, timeoutMs: 30_000 });
+  });
   const data = await r.json();
   const txt = data.choices?.[0]?.message?.content || '{}';
   let parsed = {};

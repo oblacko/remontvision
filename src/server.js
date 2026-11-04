@@ -26,6 +26,7 @@ import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.j
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
 import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
+import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
 import { startProcurementWorker } from './procurementjobs.js';
@@ -763,6 +764,34 @@ app.post('/api/admin/settings/cleanup/reset', h(async (req, res) => {
     const config = await resetCleanupConfig();
     log({ event: 'cleanup_config_reset' });
     res.json({ config, defaults: getCleanupDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.get('/api/admin/settings/render', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ config: getRenderConfig(), defaults: getRenderDefaults() });
+}));
+
+app.put('/api/admin/settings/render', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const cfg = req.body?.config || req.body || {};
+    const config = await saveRenderConfig(cfg);
+    log({ event: 'render_config_saved', product_refs_enabled: config.product_refs_enabled, max_products: config.max_products });
+    res.json({ config, defaults: getRenderDefaults() });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/settings/render/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const config = await resetRenderConfig();
+    log({ event: 'render_config_reset' });
+    res.json({ config, defaults: getRenderDefaults() });
   } catch (e) {
     res.status(400).json({ error: String(e.message || e).slice(0, 300) });
   }
@@ -1598,6 +1627,7 @@ async function main() {
   await loadProxyConfig();  // прокси из app_settings / env
   await loadPromptConfig(); // редактируемые правила промта из app_settings
   await loadCleanupConfig(); // очистка комнаты: модель/промт из app_settings
+  await loadRenderConfig();  // «товары в рендере»: референсы hero-товаров
   await loadProcurementConfig(); // подбор товаров: слои, лимиты, домены
   await loadSearchConfig();      // поиск: модели, домены, лимиты из app_settings
   await seedSearchPrompts();     // версии промтов vision/grid/cell

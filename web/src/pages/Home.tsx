@@ -13,15 +13,15 @@ const navItems = [['До / после', '#examples', 'examples'], ['Что вы 
 type Me = { email: string; balance: number }
 type PublicPack = { id: string; title: string; credits: number; price_kopecks: number }
 const defaultPacks: PublicPack[] = [
-  { id: 'pack2', title: 'Попробовать ещё', credits: 2, price_kopecks: 9900 },
-  { id: 'pack5', title: 'Обдумать варианты', credits: 5, price_kopecks: 22900 },
-  { id: 'pack15', title: 'Для нескольких комнат', credits: 15, price_kopecks: 59900 },
+  { id: 'room', title: 'Одна комната', credits: 8, price_kopecks: 39900 },
+  { id: 'flat', title: 'Вся квартира', credits: 15, price_kopecks: 59900 },
+  { id: 'house', title: 'Весь дом', credits: 50, price_kopecks: 149900 },
 ]
 type Consents = { offer: boolean; personal: boolean; transfer: boolean }
 const consentsOf = (c: Consents) => ({ offer: c.offer, privacy: c.personal, cross_border: c.transfer })
 
 const faq = [
-  { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатные генерации. Дальше: 2 кредита за 99 ₽, 5 за 229 ₽ или 15 за 599 ₽. Один кредит — одна генерация или правка. Подписка не нужна.' },
+  { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатные генерации. Дальше: 8 генераций за 399 ₽, 15 за 599 ₽ или 50 за 1 499 ₽. Один кредит — одна генерация или правка. Подписка не нужна.' },
   { q: 'Какое фото подойдёт?', a: 'Чёткое фото комнаты при дневном свете: JPG, PNG или WebP до 15 МБ. Подойдут портретные, квадратные и альбомные кадры. Чем лучше видно стены, пол и мебель, тем полезнее результат.' },
   { q: 'Что я получу, кроме картинки?', a: 'Подбор материалов и товаров с ценами и ссылками на магазины, палитру в RAL и рекомендации по розеткам и выключателям — всё для выбранного интерьера.' },
   { q: 'Можно изменить готовый дизайн?', a: 'Да, результат можно уточнять текстовыми запросами: например, изменить цвет пола, заменить текстиль или сделать интерьер светлее. Каждая версия сохраняется в истории правок.' },
@@ -415,7 +415,8 @@ export default function Home() {
               {packs.map((pack, index) => {
                 const unit = pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'
                 const price = new Intl.NumberFormat('ru-RU').format(pack.price_kopecks / 100) + ' ₽'
-                return <div key={pack.id} className="border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0"><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{pack.title}</p>{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 генерации бесплатно</p>}</div>
+                const isTarget = pack.id === 'flat'
+                return <div key={pack.id} className={`border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0${isTarget ? ' bg-secondary' : ''}`}><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{pack.title}</p>{isTarget && <p className="mt-2 inline-block border border-primary-text px-2 py-0.5 text-xs text-primary-text">Выгодно</p>}{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 генерации бесплатно</p>}</div>
               })}
             </div>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

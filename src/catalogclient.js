@@ -33,15 +33,27 @@ async function request(path, { method = 'GET', body = null, deps = {} } = {}) {
   return response.json();
 }
 
-export async function searchCatalog({ image = null, text = null, filters = null, topK = null, minScore = null } = {}, deps = {}) {
+export async function searchCatalog({ image = null, text = null, filters = null, product = null, topK = null, minScore = null } = {}, deps = {}) {
   const body = {};
   if (image) body.image_b64 = Buffer.from(image).toString('base64');
   if (text) body.text = String(text);
   if (filters) body.filters = filters;
+  if (product) body.product = product;
   if (topK != null) body.top_k = Number(topK);
   if (minScore != null) body.min_score = Number(minScore);
   if (!body.image_b64 && !body.text) throw new Error('Нужно изображение или текст для поиска');
   const data = await request('/search', { method: 'POST', body, deps });
+  return { results: Array.isArray(data?.results) ? data.results : [] };
+}
+
+// Поиск по ключевым словам/атрибутам без вектора (работает для всех офферов,
+// когда эмбеддер image-only и text→image недоступен).
+export async function searchCatalogText({ query = '', filters = null, product = null, topK = null } = {}, deps = {}) {
+  const body = { query: String(query || '') };
+  if (filters) body.filters = filters;
+  if (product) body.product = product;
+  if (topK != null) body.top_k = Number(topK);
+  const data = await request('/search-text', { method: 'POST', body, deps });
   return { results: Array.isArray(data?.results) ? data.results : [] };
 }
 
