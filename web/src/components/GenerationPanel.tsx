@@ -34,7 +34,7 @@ type Surface = {
 }
 type ElectricalItem = { title: string; text: string }
 type Suggestion = { target: string; label: string; product_id: number; image_url?: string | null }
-type Analysis = { surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[] }
+type Analysis = { surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[]; visible?: Array<{ label?: string; bbox?: number[]; area?: number } | string> }
 type ArtDirection = {
   palette?: { hex?: string | null; name?: string }[]
   focalPoint?: string
@@ -217,6 +217,9 @@ export function GenerationPanel({
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
+  const visibleHints = (current?.analysis?.visible || [])
+    .map(v => (typeof v === 'string' ? v : v?.label || ''))
+    .filter(Boolean)
 
   const rememberUrl = (url: string) => { urls.current.push(url) }
   const releaseUrl = (url: string | null) => {
@@ -1041,6 +1044,20 @@ export function GenerationPanel({
                       {current.artDirection.lighting ? <div><dt className="eyebrow">Свет</dt><dd className="mt-1">{current.artDirection.lighting}</dd></div> : null}
                       {current.artDirection.mood ? <div><dt className="eyebrow">Настроение</dt><dd className="mt-1">{current.artDirection.mood}</dd></div> : null}
                     </dl>
+                  </section>
+                ) : null}
+                {visibleHints.length ? (
+                  <section className="mt-6 border p-4" aria-labelledby="visible-hints">
+                    <p id="visible-hints" className="eyebrow">Что видно на фото</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">От крупного к мелкому.</p>
+                    <ol className="mt-3 grid gap-1 text-sm sm:grid-cols-2">
+                      {visibleHints.map((label, index) => (
+                        <li key={`${label}-${index}`} className="flex items-baseline gap-2">
+                          <span className="font-mono text-[10px] text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+                          <span>{label}</span>
+                        </li>
+                      ))}
+                    </ol>
                   </section>
                 ) : null}
                 {heroItems.length ? (

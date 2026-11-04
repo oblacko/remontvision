@@ -128,35 +128,49 @@ export async function buildArtDirection({
       : 'Существующую мебель можно заменить; архитектуру, окна, двери и потолок сохранить.',
     'Напиши авторское арт-направление для этой конкретной комнаты.',
   ].filter(Boolean).join('\n');
-  const { parsed, cost } = await visionJson({ system: DIRECTIVE_SYSTEM, user, images: [imageDataUrl], model: ART_DIRECTOR_MODEL });
-  const fields = {
-    palette: normalizePalette(parsed.palette),
-    focalPoint: clampText(parsed.focal_point, 240),
-    featureWall: clampText(parsed.feature_wall, 240),
-    materials: clampText(parsed.materials, 320),
-    materialContrasts: clampText(parsed.material_contrasts, 320),
-    lighting: lightingText(parsed.lighting),
-    ergonomics: clampText(parsed.ergonomics, 320),
-    designRecipe: clampText(parsed.design_recipe, 320),
-    textiles: clampText(parsed.textiles, 240),
-    decor: clampText(parsed.decor, 240),
-    mood: clampText(parsed.mood, 200),
-    avoid: clampText(parsed.avoid, 240),
-    productPlan: normalizeProductPlan(parsed.product_plan),
+  const buildFields = source => ({
+    palette: normalizePalette(source.palette),
+    focalPoint: clampText(source.focal_point, 240),
+    featureWall: clampText(source.feature_wall, 240),
+    materials: clampText(source.materials, 320),
+    materialContrasts: clampText(source.material_contrasts, 320),
+    lighting: lightingText(source.lighting),
+    ergonomics: clampText(source.ergonomics, 320),
+    designRecipe: clampText(source.design_recipe, 320),
+    textiles: clampText(source.textiles, 240),
+    decor: clampText(source.decor, 240),
+    mood: clampText(source.mood, 200),
+    avoid: clampText(source.avoid, 240),
+    productPlan: normalizeProductPlan(source.product_plan),
+  });
+  const buildText = (source, fields) => {
+    let text = clampText(source.prompt, 1800);
+    if (!text) {
+      text = [
+        fields.mood,
+        fields.designRecipe ? `Design recipe: ${fields.designRecipe}.` : '',
+        fields.materialContrasts ? `Material contrasts: ${fields.materialContrasts}.` : '',
+        fields.featureWall ? `Feature wall: ${fields.featureWall}.` : '',
+        fields.materials ? `Materials: ${fields.materials}.` : '',
+        fields.lighting ? `Lighting: ${fields.lighting}.` : '',
+        fields.ergonomics ? `Ergonomics: ${fields.ergonomics}.` : '',
+        fields.textiles ? `Textiles: ${fields.textiles}.` : '',
+        fields.decor ? `Decor: ${fields.decor}.` : '',
+      ].filter(Boolean).join(' ');
+    }
+    return text;
   };
-  let text = clampText(parsed.prompt, 1800);
-  if (!text) {
-    text = [
-      fields.mood,
-      fields.designRecipe ? `Design recipe: ${fields.designRecipe}.` : '',
-      fields.materialContrasts ? `Material contrasts: ${fields.materialContrasts}.` : '',
-      fields.featureWall ? `Feature wall: ${fields.featureWall}.` : '',
-      fields.materials ? `Materials: ${fields.materials}.` : '',
-      fields.lighting ? `Lighting: ${fields.lighting}.` : '',
-      fields.ergonomics ? `Ergonomics: ${fields.ergonomics}.` : '',
-      fields.textiles ? `Textiles: ${fields.textiles}.` : '',
-      fields.decor ? `Decor: ${fields.decor}.` : '',
-    ].filter(Boolean).join(' ');
+
+  let { parsed, cost } = await visionJson({ system: DIRECTIVE_SYSTEM, user, images: [imageDataUrl], model: ART_DIRECTOR_MODEL });
+  let fields = buildFields(parsed);
+  let text = buildText(parsed, fields);
+  // Страховка: если выбранная модель вернула пусто, пробуем основную vision-модель.
+  if (!text && ART_DIRECTOR_MODEL) {
+    const retry = await visionJson({ system: DIRECTIVE_SYSTEM, user, images: [imageDataUrl], model: null });
+    parsed = retry.parsed;
+    cost = (cost || 0) + (retry.cost || 0);
+    fields = buildFields(parsed);
+    text = buildText(parsed, fields);
   }
   if (!text) return null;
   return { ...fields, text, cost: cost ?? null };

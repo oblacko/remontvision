@@ -6,6 +6,7 @@
 
 ## 2026-11-04 — пакеты с приманкой, усиленный арт-директор и позитивный ARCHITECTURE LOCK
 
+- **Пост-аудит правки**: `/prices` актуализирована (Комната/Квартира/Дом + Robokassa); брендированные 404 для SPA и статей (API — JSON); `immutable`-кэш `/web-assets` (1 год), картинки 7 дней, шрифты 30 дней; лог `art_direction_empty`, когда арт-директор вернул пусто; «Что видно на фото» — vision отдаёт `bbox`, сортировка по площади (крупное→мелкое), блок в результате; тест `test/analysis.test.js`.
 - **Модели по слоям**: арт-директор/бриф — `ART_DIRECTOR_MODEL` (пусто → `VISION_MODEL`, сейчас gemini); отбор товаров Hoff — `PRODUCT_PICK_MODEL` (DeepSeek V4.1 Flash). Оба параметра задокументированы в `.env.example`.
 - **Пакеты кредитов (миграция `036_packs_decoy.sql`)**: `Комната` 8/399 ₽ (приманка), `Квартира` 15/599 ₽ (цель), `Дом` 50/1 499 ₽ (якорь). Старые `pack2/pack5/pack15` деактивируются. Обновлены `Home.tsx` (`defaultPacks`, FAQ, бейдж «Выгодно» на «Квартире») и `Cabinet.tsx`.
 - **Арт-директор** (`src/artdirector.js`): в JSON добавлены `material_contrasts`, структурный `lighting` (ambient/task/accent/temperature/direction), `ergonomics`, `design_recipe`; поле `prompt` обязано быть **позитивным** (без «no/without/avoid/do not»). Добавлен `lightingText()` для совместимости со строкой и объектом.

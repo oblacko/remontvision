@@ -76,9 +76,10 @@ app.use(sessionUser);
 
 // Новый лендинг (React/Vite) и старый полнофункциональный кабинет.
 const WEB_DIST = path.join(process.cwd(), 'web', 'dist');
-app.use('/images', express.static(path.join(WEB_DIST, 'images')));
-app.use('/fonts', express.static(path.join(WEB_DIST, 'fonts')));
-app.use('/web-assets', express.static(path.join(WEB_DIST, 'web-assets')));
+app.use('/images', express.static(path.join(WEB_DIST, 'images'), { maxAge: '7d' }));
+app.use('/fonts', express.static(path.join(WEB_DIST, 'fonts'), { maxAge: '30d' }));
+// Хешированные имена → можно кэшировать навсегда.
+app.use('/web-assets', express.static(path.join(WEB_DIST, 'web-assets'), { maxAge: '1y', immutable: true }));
 app.get(['/app', '/app/'], (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'app.html')));
 const webIndexPath = path.join(WEB_DIST, 'index.html');
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
@@ -1395,9 +1396,13 @@ app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products
 app.get('/procurement/:file', h(async (req, res) => serveStored(req, res, 'procurement', req.params.file)));
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
 app.get('/covers/:file', h(async (req, res) => serveStored(req, res, 'covers', req.params.file)));
+function notFoundPage(title, text) {
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} — ремонтвижн</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>body{margin:0;background:#f5f2ec;color:#1e1c19;font-family:Georgia,'Times New Roman',serif;display:flex;min-height:100vh;align-items:center;justify-content:center}.box{max-width:520px;padding:40px 24px;text-align:center}.logo{font-family:system-ui,sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px;color:#1e1c19;text-decoration:none}h1{font-size:clamp(32px,6vw,56px);line-height:1.05;margin:24px 0 12px}p{color:#6b645c;line-height:1.6}a.btn{display:inline-block;margin-top:24px;padding:14px 22px;background:#1e1c19;color:#f5f2ec;text-decoration:none;font-family:system-ui,sans-serif;font-size:14px}</style></head><body><div class="box"><a class="logo" href="/">ремонтвижн</a><h1>${title}</h1><p>${text}</p><a class="btn" href="/">На главную</a></div></body></html>`;
+}
+
 app.get('/articles/:slug', h(async (req, res) => {
   const article = await q.articleBySlug(String(req.params.slug || ''));
-  if (!article) return res.status(404).send('Статья не найдена');
+  if (!article) return res.status(404).type('html').send(notFoundPage('Статья не найдена', 'Такой статьи нет или она снята с публикации.'));
   res.type('html').send(articlePage(article));
 }));
 app.get('/search-lab/:file', h(async (req, res) => {
@@ -1688,6 +1693,11 @@ async function main() {
     log({ event: 'config_warning', error: String(e.message || e).slice(0, 300) });
   }
   if (!ADMIN_KEY) console.log('[warn] ADMIN_KEY не задан — админка каталога открыта не будет');
+  // Единая брендированная 404 для неизвестных маршрутов (API — JSON).
+  app.use((req, res) => {
+    if (String(req.path || '').startsWith('/api/')) return res.status(404).json({ error: 'Не найдено' });
+    res.status(404).type('html').send(notFoundPage('Страница не найдена', 'Такой страницы нет. Проверьте ссылку или вернитесь на главную.'));
+  });
   app.listen(PORT, () => {
     log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
     startWorker();

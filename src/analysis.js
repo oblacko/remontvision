@@ -196,6 +196,24 @@ export function buildSuggestions({ roomType, products, currentProducts = [], pri
   return out.slice(0, 4);
 }
 
+// «Что видно на фото»: нормализуем и сортируем от крупного к мелкому по площади bbox.
+function normalizeVisible(value) {
+  if (!Array.isArray(value)) return [];
+  const clamp01 = n => { const v = Number(n); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0; };
+  return value
+    .map(v => {
+      if (typeof v === 'string') return { label: v.trim(), bbox: null, area: 0 };
+      if (!v || typeof v !== 'object') return null;
+      const label = String(v.label || v.name || '').trim();
+      if (!label) return null;
+      const bbox = Array.isArray(v.bbox) && v.bbox.length === 4 ? v.bbox.map(clamp01) : null;
+      return { label, bbox, area: bbox ? bbox[2] * bbox[3] : 0 };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.area - a.area)
+    .slice(0, 20);
+}
+
 export function buildAnalysis({ roomType, parsed = {}, products = [], currentProducts = [], priceTier = 'comfort', style = '' }) {
   const surfaces = normalizeSurfaces(parsed.surfaces);
   const electrical = normalizeElectrical(roomType, parsed.electrical);
@@ -204,7 +222,7 @@ export function buildAnalysis({ roomType, parsed = {}, products = [], currentPro
     surfaces,
     electrical,
     suggestions,
-    visible: Array.isArray(parsed.visible) ? parsed.visible.slice(0, 20) : [],
+    visible: normalizeVisible(parsed.visible),
     price_tier: priceTier,
     tier_name: PRICE_TIER_META[priceTier]?.name || PRICE_TIER_META.comfort.name,
   };

@@ -807,13 +807,13 @@ export async function parseRender(renderB64, mime = 'image/png') {
 {
   "items": [{"category": "bed|wardrobe|sofa|armchair|coffee_table|dining_table|dining_chair|sideboard|desk|office_chair|storage|bench|rug|floor|paint|wallpaper|tile|skirting|countertop|cabinet|faucet|sink|toilet|shower|bathtub|light|outlets|appliance|textile", "description": "кратко по-русски", "keywords": ["3-5 ключевых слов"]}],
   "surfaces": [{"surface": "walls|floor|ceiling|cabinets|countertop|backsplash|textile|trim", "description": "кратко по-русски", "hex": "#RRGGBB"}],
-  "visible": ["bed","sofa","pendant light","floor","walls","kitchen cabinets","toilet","shower","..."],
+  "visible": [{"label":"bed","bbox":[0.1,0.3,0.5,0.4]}],
   "electrical": [{"title": "кратко по-русски", "text": "рекомендация по розеткам/свету для этой комнаты"}]
 }
 Правила:
 - items — только реальные отделочные материалы, сантехника, свет, электрика и текстиль. Без декора и растений.
 - surfaces — 3-6 главных поверхностей; hex — приблизительный цвет на картинке, без RAL-кодов.
-- visible — крупные объекты, которые реально видно.
+- visible — крупные объекты, которые реально видно. bbox — нормализованные [x,y,w,h] 0..1 относительно кадра; отсортируй массив по убыванию площади bbox (самый крупный объект первым).
 - electrical — 3-5 практичных рекомендаций с учётом планировки на картинке.
 Только JSON.`;
   const r = await fetchWithRetry(`${BASE}/chat/completions`, {
@@ -840,10 +840,23 @@ export async function parseRender(renderB64, mime = 'image/png') {
     parsed = {};
   }
   const items = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.items) ? parsed.items : []);
+  const clamp01 = n => { const v = Number(n); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0; };
+  const visible = (Array.isArray(parsed.visible) ? parsed.visible : [])
+    .map(v => {
+      if (typeof v === 'string') return { label: v.trim(), bbox: null, area: 0 };
+      if (!v || typeof v !== 'object') return null;
+      const label = String(v.label || v.name || '').trim();
+      if (!label) return null;
+      const bbox = Array.isArray(v.bbox) && v.bbox.length === 4 ? v.bbox.map(clamp01) : null;
+      return { label, bbox, area: bbox ? bbox[2] * bbox[3] : 0 };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.area - a.area)
+    .slice(0, 20);
   return {
     items,
     surfaces: Array.isArray(parsed.surfaces) ? parsed.surfaces : [],
-    visible: Array.isArray(parsed.visible) ? parsed.visible : [],
+    visible,
     electrical: Array.isArray(parsed.electrical) ? parsed.electrical : [],
     cost: data.usage?.cost ?? null,
   };
