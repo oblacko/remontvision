@@ -1471,9 +1471,13 @@ export function GenerationPanel({
                           </div>
                         )) : <p className="py-4 text-sm text-muted-foreground">{current.useCatalog === false ? 'Товары отключены для этой генерации.' : 'Товары не собраны — попробуйте сгенерировать ещё раз.'}</p>}
                       </div>
-                      <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка · класс «{tierName(current.priceTier)}»</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
-                      <p className="mt-1 text-right text-xs text-muted-foreground">{demoEstimate ? 'Демо-оценка, не оферта' : 'Смета ориентировочная'}</p>
-                      {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
+                      {current.items.length > 0 && (
+                        <>
+                          <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка · класс «{tierName(current.priceTier)}»</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
+                          <p className="mt-1 text-right text-xs text-muted-foreground">{demoEstimate ? 'Демо-оценка, не оферта' : 'Смета ориентировочная'}</p>
+                          {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
+                        </>
+                      )}
                     </>
                   )}
                 </section>
