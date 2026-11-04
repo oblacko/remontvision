@@ -11,7 +11,9 @@ import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
 import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
-import { putBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
+import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
+import { reviewDesign } from './architect.js';
+import { matchDesignOffers } from './designoffers.js';
 import { sanitizeImage, fitAspect } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES, activeRoomTypeNames, roomTypeByName, isRoomTypeActive, getRoomTypeConfig, getRoomTypeDefaults, saveRoomTypes, resetRoomTypes, loadRoomTypes } from './roomtypes.js';
@@ -1444,6 +1446,51 @@ app.get('/api/renders/:id/procurement', h(async (req, res) => {
   if (!run) return res.status(404).json({ error: 'Подбор ещё не запускался' });
   const dto = await procurementDto(run.id, req.user.id);
   res.json(dto);
+}));
+
+// «Готово»: архитектор смотрит финальный рендер и собирает итог + реальные товары.
+app.post('/api/renders/:id/final-review', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.status !== 'done' || !render.image_path) return res.status(409).json({ error: 'Дизайн ещё не готов' });
+  if (render.analysis?.final) return res.json({ analysis: render.analysis, cost_usd: 0, cached: true });
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  const buffer = await getBuffer(render.image_path);
+  const ext = path.extname(render.image_path).slice(1).toLowerCase();
+  const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+  const imageDataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+  const review = await reviewDesign({
+    imageDataUrl,
+    roomType: room.room_type || 'Другое',
+    style: room.style,
+    priceTier: room.price_tier || 'comfort',
+    mode: 'final',
+  });
+  if (!review) return res.status(502).json({ error: 'Не удалось собрать итог по дизайну' });
+  let products = Array.isArray(render.analysis?.products) ? render.analysis.products : [];
+  if (room.use_catalog !== false && review.architect.items.length) {
+    try {
+      products = await matchDesignOffers({ items: review.architect.items, roomType: room.room_type || 'Другое', topK: 3 });
+    } catch (e) {
+      log({ event: 'final_review_offers_error', render_id: render.id, error: String(e.message || e).slice(0, 300) });
+    }
+  }
+  const analysis = {
+    ...(render.analysis || {}),
+    architect: review.architect,
+    final: review.architect.summary || null,
+    products,
+  };
+  await q.setRenderAnalysis(render.id, analysis);
+  const meta = {
+    ...(render.meta || {}),
+    final_review: { cost_usd: review.cost ?? null, at: new Date().toISOString() },
+  };
+  await q.setRenderMeta(render.id, meta);
+  log({ event: 'final_review_done', render_id: render.id, user_id: req.user.id, items: review.architect.items.length, products: products.reduce((sum, match) => sum + match.offers.length, 0), cost_usd: review.cost ?? null });
+  res.json({ analysis, cost_usd: review.cost ?? null });
 }));
 
 app.get('/api/procurement/:id', h(async (req, res) => {

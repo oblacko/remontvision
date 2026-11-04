@@ -65,6 +65,7 @@ type Analysis = {
   visible?: Array<{ label?: string; bbox?: number[]; area?: number } | string>
   architect?: Architect | null
   products?: ProductMatch[]
+  final?: { concept?: string; palette?: string; materials?: string; electrical?: string; next_steps?: string[] } | null
 }
 type ArtDirection = {
   palette?: { hex?: string | null; name?: string }[]
@@ -240,6 +241,8 @@ export function GenerationPanel({
   const [creditOpen, setCreditOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [procurementOpen, setProcurementOpen] = useState(() => new URLSearchParams(window.location.search).has('products'))
+  const [finalBusy, setFinalBusy] = useState(false)
+  const [finalError, setFinalError] = useState('')
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const refInput = useRef<HTMLInputElement>(null)
@@ -729,6 +732,23 @@ export function GenerationPanel({
       setGenError(e instanceof Error ? e.message : 'Не удалось выполнить генерацию')
       setStep(iterations.length ? 'result' : 'style')
     } finally { setBusy(false); setProductBinding(false) }
+  }
+
+  const runFinalReview = async () => {
+    if (!current || finalBusy) return
+    setFinalBusy(true); setFinalError('')
+    try {
+      const r = await fetch(`/api/renders/${encodeURIComponent(current.id)}/final-review`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { onRequireLogin(); return }
+      if (!r.ok) throw new Error(d.error || 'Не удалось собрать итог')
+      setIterations(prev => prev.map(item => item.id === current.id ? { ...item, analysis: d.analysis || item.analysis } : item))
+      setStep('estimates')
+    } catch (e) {
+      setFinalError(e instanceof Error ? e.message : 'Не удалось собрать итог')
+    } finally {
+      setFinalBusy(false)
+    }
   }
 
   const resetAll = () => {
@@ -1357,12 +1377,14 @@ export function GenerationPanel({
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
                 <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
                 {(realOfferCount > 0 || current.items.length > 0) ? (
-                  <button type="button" onClick={() => setStep('estimates')} className="action-primary min-h-14 px-8 text-base">Смета и товары <ArrowRight className="size-5" /></button>
+                  <button type="button" onClick={() => setStep('estimates')} className="action-secondary min-h-14 px-6 text-base">Товары и смета</button>
                 ) : (
-                  <button type="button" onClick={openProcurement} className="action-primary min-h-14 px-8 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
+                  <button type="button" onClick={openProcurement} className="action-secondary min-h-14 px-6 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
                 )}
+                <button type="button" onClick={runFinalReview} disabled={finalBusy} className="action-primary min-h-14 px-8 text-base">{finalBusy ? <><LoaderCircle className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <Check className="size-5" /></>}</button>
               </div>
             </div>
+            {finalError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{finalError}</p>}
           </div>
         )}
 
@@ -1381,6 +1403,18 @@ export function GenerationPanel({
               </div>
 
               <div className="space-y-8">
+                {current.analysis?.final ? (
+                  <section aria-labelledby="gen-final">
+                    <h4 id="gen-final" className="eyebrow mb-4">Итог по дизайну</h4>
+                    <dl className="grid gap-3 border-y py-4 text-sm leading-6">
+                      {current.analysis.final.concept ? <div><dt className="eyebrow">Концепция</dt><dd className="mt-1">{current.analysis.final.concept}</dd></div> : null}
+                      {current.analysis.final.palette ? <div><dt className="eyebrow">Палитра</dt><dd className="mt-1">{current.analysis.final.palette}</dd></div> : null}
+                      {current.analysis.final.materials ? <div><dt className="eyebrow">Материалы</dt><dd className="mt-1">{current.analysis.final.materials}</dd></div> : null}
+                      {current.analysis.final.electrical ? <div><dt className="eyebrow">Свет и розетки</dt><dd className="mt-1">{current.analysis.final.electrical}</dd></div> : null}
+                      {current.analysis.final.next_steps?.length ? <div><dt className="eyebrow">Что дальше</dt><dd className="mt-1"><ul className="list-disc space-y-1 pl-5">{current.analysis.final.next_steps.map((step, index) => <li key={`final-step-${index}`}>{step}</li>)}</ul></dd></div> : null}
+                    </dl>
+                  </section>
+                ) : null}
                 <section aria-labelledby="gen-products">
                   <h4 id="gen-products" className="eyebrow mb-4">Товары по дизайну</h4>
                   {productMatches.length ? (
