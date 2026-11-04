@@ -208,7 +208,7 @@ export function GenerationPanel({
   const [photoRatio, setPhotoRatio] = useState(4 / 3)
   const [photoError, setPhotoError] = useState('')
   const [cleaned, setCleaned] = useState<{ file: File; url: string; model?: string } | null>(null)
-  const [useCleaned, setUseCleaned] = useState(true)
+  const [cleanupRequested, setCleanupRequested] = useState(false)
   const [cleanupBusy, setCleanupBusy] = useState(false)
   const [cleanupError, setCleanupError] = useState('')
   const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
@@ -402,18 +402,18 @@ export function GenerationPanel({
     setPhotoRatio(4 / 3)
     setPhotoName(nextFile.name)
     setPhotoError(''); setGenError('')
-    setCleaned(null); setUseCleaned(true); setCleanupError('')
+    setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setRoomType(null)
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
     setEstimateNote(''); setEstimateError(''); setBrief(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
-    setKeepFurniture(true); setUseCatalog(false)
+    setKeepFurniture(true); setUseCatalog(true)
     // Автобриф намеренно не запускаем: тип и размеры задаются вручную,
     // при необходимости — кнопкой «Определить по фото».
   }
 
-  const cleanupRoom = async () => {
-    if (!file || cleanupBusy) return
+  const cleanupRoom = async (): Promise<File | null> => {
+    if (!file || cleanupBusy) return null
     setCleanupBusy(true); setCleanupError('')
     try {
       const fd = new FormData()
@@ -421,14 +421,16 @@ export function GenerationPanel({
       fd.append('room_type', roomType || 'Другое')
       const r = await fetch('/api/cleanup', { method: 'POST', body: fd })
       const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { onRequireLogin(); return }
+      if (r.status === 401) { onRequireLogin(); return null }
       if (!r.ok || !d.image) throw new Error(d.error || 'Не удалось очистить комнату')
       const blob = await (await fetch(d.image)).blob()
       const shellFile = new File([blob], 'cleaned-room.jpg', { type: blob.type || 'image/jpeg' })
       setCleaned({ file: shellFile, url: d.image, model: d.model })
-      setUseCleaned(true)
+      setCleanupRequested(true)
+      return shellFile
     } catch (e) {
       setCleanupError(e instanceof Error ? e.message : 'Не удалось очистить комнату')
+      return null
     } finally {
       setCleanupBusy(false)
     }
@@ -640,17 +642,21 @@ export function GenerationPanel({
       let id = roomId
       if (isBase) {
         if (!file) throw new Error('Для новой генерации нужно фото комнаты')
+        let cleanupFile = cleaned?.file || null
+        if (cleanupRequested && !cleanupFile) cleanupFile = await cleanupRoom()
+        const usingCleaned = Boolean(cleanupFile)
         const fd = new FormData()
         fd.append('photo', file)
         fd.append('style', styleName)
         fd.append('room_type', roomType)
+        if (cleanupFile) fd.append('cleanup_photo', cleanupFile)
         if (roomWidthM.trim()) fd.append('room_width_m', roomWidthM.replace(',', '.'))
         if (roomLengthM.trim()) fd.append('room_length_m', roomLengthM.replace(',', '.'))
         if (roomHeightM.trim()) fd.append('room_height_m', roomHeightM.replace(',', '.'))
         if (isBedRoom) fd.append('bed_length_m', (bedLengthM.trim() || '2').replace(',', '.'))
         if (dimensionOrientation.trim()) fd.append('dimension_orientation', dimensionOrientation.trim())
         fd.append('price_tier', priceTier)
-        fd.append('keep_furniture', cleaned && useCleaned ? '0' : (keepFurniture ? '1' : '0'))
+        fd.append('keep_furniture', usingCleaned ? '0' : (keepFurniture ? '1' : '0'))
         fd.append('use_catalog', useCatalog ? '1' : '0')
         if (refFile) fd.append('style_ref', refFile)
         if (!refFile && refUrl) fd.append('style_ref_url', refUrl)
@@ -732,7 +738,8 @@ export function GenerationPanel({
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setRoomWidthM(''); setRoomLengthM(''); setRoomHeightM(''); setBedLengthM(''); setDimensionOrientation('')
     setEstimateNote(''); setEstimateError(''); setEstimateBusy(false); setBrief(null)
-    setStyle(null); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(false)
+    setStyle(null); setPriceTier('comfort'); setKeepFurniture(true); setUseCatalog(true)
+    setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setCustomOpen(false); setAdvancedOpen(false)
     setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
     loadedRoomRef.current = ''
@@ -785,10 +792,10 @@ export function GenerationPanel({
               <input ref={photoInput} id="gen-photo" type="file" accept="image/jpeg,image/png,image/webp" className="peer sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptPhoto(event.target.files?.[0])} />
               {photo ? (
                 <div className="gen-photo-preview relative mx-auto border border-foreground bg-foreground" style={{ '--photo-ratio': photoRatio } as PanelStyle}>
-                  <img src={cleaned && useCleaned ? cleaned.url : photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
+                  <img src={cleaned && cleanupRequested ? cleaned.url : photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
                     <span className="truncate text-xs">{photoName}</span>
-                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setCleaned(null); setUseCleaned(true); setCleanupError(''); if (photoInput.current) photoInput.current.value = '' }} className="flex size-11 shrink-0 items-center justify-center hover:bg-background/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Удалить фото"><X className="size-4" /></button>
+                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setCleaned(null); setCleanupRequested(false); setCleanupError(''); if (photoInput.current) photoInput.current.value = '' }} className="flex size-11 shrink-0 items-center justify-center hover:bg-background/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Удалить фото"><X className="size-4" /></button>
                   </div>
                 </div>
               ) : (
@@ -800,18 +807,22 @@ export function GenerationPanel({
               )}
               {photo && (
                 <div className="mt-5 border p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div><p className="eyebrow">Очистка комнаты</p><p className="mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Уберём мебель, технику, декор и свет. Оставим стены, окна, двери и пропорции помещения.</p></div>
-                    <button type="button" disabled={cleanupBusy} onClick={() => void cleanupRoom()} className="action-secondary min-h-11 px-4">{cleanupBusy ? 'Очищаем…' : cleaned ? 'Очистить заново' : 'Очистить комнату'}</button>
+                  <button type="button" aria-pressed={cleanupRequested} onClick={() => setCleanupRequested(value => !value)} className={`flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cleanupRequested ? '' : 'opacity-90'}`}>
+                    <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${cleanupRequested ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{cleanupRequested ? <Check className="size-3.5" /> : null}</span>
+                    <span>
+                      <span className="block text-sm font-medium">Очистить комнату перед генерацией</span>
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{cleanupRequested ? 'Уберём мебель, технику, декор и свет. Оставим стены, окна, двери и пропорции.' : 'По умолчанию выключено: сохраняем вашу мебель и планировку.'}</span>
+                    </span>
+                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                    {cleanupBusy && <span>Очищаем комнату…</span>}
+                    {!cleanupBusy && cleaned && cleanupRequested && <span className="text-primary-text">Очищено · можно перегенерировать</span>}
+                    {!cleanupBusy && cleaned && !cleanupRequested && <span>Очищенная версия сохранена, но не выбрана</span>}
+                    {!cleanupBusy && cleanupError && <span className="text-destructive" role="alert">{cleanupError}</span>}
                   </div>
-                  {cleaned && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button type="button" onClick={() => setUseCleaned(false)} className={`min-h-9 border px-3 text-xs ${!useCleaned ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted'}`}>Оригинал</button>
-                      <button type="button" onClick={() => setUseCleaned(true)} className={`min-h-9 border px-3 text-xs ${useCleaned ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted'}`}>Очищенная</button>
-                      <span className="text-[11px] text-muted-foreground">Готово · можно перегенерировать дизайн по очищенной</span>
-                    </div>
+                  {cleanupRequested && !cleaned && !cleanupBusy && (
+                    <button type="button" onClick={() => void cleanupRoom()} className="action-secondary mt-3 min-h-9 px-3 text-xs">Подготовить очищенную комнату</button>
                   )}
-                  {cleanupError && <p className="mt-3 text-sm text-destructive" role="alert">{cleanupError}</p>}
                 </div>
               )}
               {photo && (
@@ -819,7 +830,7 @@ export function GenerationPanel({
                   <p className="eyebrow">Тип комнаты</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">Чтобы в дизайне не появились предметы из другого помещения.</p>
                   <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setBedLengthM(type === 'Спальня' || type === 'Детская' ? '2' : ''); setCleaned(null); setUseCleaned(true); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
+                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setBedLengthM(type === 'Спальня' || type === 'Детская' ? '2' : ''); setCleaned(null); setCleanupRequested(false); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
                   </div>
                 </div>
               )}
