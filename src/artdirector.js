@@ -147,6 +147,10 @@ export function normalizeRepairScope(value) {
 
 const REPAIR_MODEL = process.env.ARCHITECT_MODEL || process.env.ART_DIRECTOR_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
 
+const REPAIR_SCOPE_SCHEMA = `Обязательный контракт repair_scope (не удалять при редактировании промта):
+{"floor":{"action":"replace|level|refinish|keep","material":"...","why":"..."},"ceiling":{"action":"level|paint|keep","why":"..."},"walls":{"action":"paint|wallpaper|plaster|keep","why":"..."},"doors":{"action":"replace|paint|keep","style":"...","why":"..."},"windows":{"action":"paint|fill|keep","why":"..."},"storage":["..."],"style_dir":"..."}
+null — не видно/данных нет; keep — сохранить. Только JSON.`;
+
 export async function buildRepairScope({
   originalImageDataUrl,
   cleanedImageDataUrl = null,
@@ -157,7 +161,7 @@ export async function buildRepairScope({
   if (!originalImageDataUrl) return null;
   const builder = getArchitectPrompt('builder');
   const criteria = getArchitectPrompt('criteria');
-  const system = `${builder.system}\n\n${criteria ? `КРИТЕРИЙ ПРИЁМКИ:\n${criteria.system}` : ''}`;
+  const system = `${builder.system}\n\n${REPAIR_SCOPE_SCHEMA}\n\n${criteria ? `КРИТЕРИЙ ПРИЁМКИ:\n${criteria.system}` : ''}`;
   const user = [
     `Тип комнаты: ${roomType || 'определи сам'}.`,
     `Стиль: ${style || 'определи сам'}.`,

@@ -223,12 +223,17 @@ const ANALYSIS_SCHEMA = `Дополнительно к changes верни ана
 - Никаких цен и ссылок: товары подберёт каталог.
 - Верни ОДИН JSON: поля changes из основного промта плюс поля этого анализа.`;
 
+const CHANGES_SCHEMA = `Обязательный контракт changes (не удалять при редактировании промта):
+{"changes":[{"layer":"floor|walls|ceiling|doors|windows|light|furniture|storage|textile","label":"...","current":"...","change":"...","impact":0.0,"effort":"low|medium|high","target":"..."}]}
+Только крупные значимые замены. Декор, арт, ковры и микроперестановки запрещены. Максимум 6 пунктов.`;
+
 function buildSystem(mode) {
   const reviewer = getArchitectPrompt('reviewer');
   const criteria = getArchitectPrompt('criteria');
   return [
     reviewer.system,
     criteria ? `КРИТЕРИЙ ПРИЁМКИ:\n${criteria.system}` : '',
+    CHANGES_SCHEMA,
     ANALYSIS_SCHEMA,
     mode === 'final' ? 'Это финальный результат: обязательно заполни summary.' : 'Это промежуточный результат: summary = null.',
   ].filter(Boolean).join('\n\n');
