@@ -349,7 +349,7 @@ async function processRender(renderId) {
         palette: room.palette || 'none',
         accent: room.accent || 'none',
         hasStyleRef: styleRefUrls.length > 0,
-        userStyleRef,
+        userStyleRef: styleUserRef,
         styleDescription: styleInfo?.prompt_description || '',
         roomType,
         keepFurniture,
