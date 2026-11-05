@@ -88,6 +88,7 @@ services:
       # AI-сетка (как в приложении): vision + FLUX через OpenRouter.
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_BASE: ${OPENROUTER_BASE:-https://openrouter.ai/api/v1}
+      AGENT_MODEL: ${AGENT_MODEL:-deepseek/deepseek-v4.1-flash-1017}
       SEARCH_VISION_MODEL: ${SEARCH_VISION_MODEL:-google/gemini-3.1-pro-preview}
       SEARCH_GRID_MODEL: ${SEARCH_GRID_MODEL:-black-forest-labs/flux-3-image-klein}
       SEARCH_GRID_ASPECT: ${SEARCH_GRID_ASPECT:-21:9}

@@ -11,7 +11,6 @@ import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
 import { reviewDesign } from './architect.js';
-import { matchDesignOffers } from './designoffers.js';
 import { getRenderConfig } from './renderconfig.js';
 import { pickHoffProducts, loadProductImages } from './productpicker.js';
 import { buildAnalysis } from './analysis.js';
@@ -476,7 +475,6 @@ async function processRender(renderId) {
     await q.setRoomStatus('matching', room.id);
     let parsed = { items: [], surfaces: [], visible: [], electrical: [] };
     let architectReview = null;
-    let productMatches = [];
     let visionCost = null;
     if (!MOCK_MODE) {
       const imageDataUrl = `data:${MIME_BY_EXT[ext] || 'image/jpeg'};base64,${bytes.toString('base64')}`;
@@ -510,16 +508,6 @@ async function processRender(renderId) {
       }
     }
 
-    if (getRenderConfig().product_matching_enabled && architectReview?.items?.length) {
-      try {
-        productMatches = await matchDesignOffers({ items: architectReview.items, roomType, topK: 3 });
-        const offers = productMatches.reduce((sum, match) => sum + match.offers.length, 0);
-        log({ event: 'design_offers_matched', room_id: room.id, render_id: renderId, items: productMatches.length, offers });
-      } catch (e) {
-        log({ event: 'design_offers_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-      }
-    }
-
     await q.clearItems(render.id);
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
@@ -545,9 +533,8 @@ async function processRender(renderId) {
       style: room.style,
     });
     if (architectReview) analysis.architect = architectReview;
-    if (productMatches.length) analysis.products = productMatches;
     await q.setRenderAnalysis(renderId, analysis);
-    log({ event: 'render_analyzed', room_id: room.id, render_id: renderId, items: parsed.items.length, architect_hints: architectReview?.hints?.length || 0, product_items: productMatches.length, suggestions: analysis.suggestions.length });
+    log({ event: 'render_analyzed', room_id: room.id, render_id: renderId, items: parsed.items.length, architect_hints: architectReview?.hints?.length || 0, suggestions: analysis.suggestions.length });
 
     const totalCost = sumCostBreakdown();
     await q.setRenderMeta(renderId, {

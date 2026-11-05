@@ -13,14 +13,13 @@ import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, y
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { reviewDesign } from './architect.js';
-import { matchDesignOffers } from './designoffers.js';
+import { runVisionAgent, getCatalogOffer } from './catalogclient.js';
 import { sanitizeImage, fitAspect } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES, activeRoomTypeNames, roomTypeByName, isRoomTypeActive, getRoomTypeConfig, getRoomTypeDefaults, saveRoomTypes, resetRoomTypes, loadRoomTypes } from './roomtypes.js';
 import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
 import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
-import { seedCatalog } from './catalogseed.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
 import { validateModelOptions, modelCaps } from './modelcaps.js';
@@ -1472,14 +1471,7 @@ app.post('/api/renders/:id/final-review', h(async (req, res) => {
     mode: 'final',
   });
   if (!review) return res.status(502).json({ error: 'Не удалось собрать итог по дизайну' });
-  let products = Array.isArray(render.analysis?.products) ? render.analysis.products : [];
-  if (getRenderConfig().product_matching_enabled && review.architect.items.length) {
-    try {
-      products = await matchDesignOffers({ items: review.architect.items, roomType: room.room_type || 'Другое', topK: 3 });
-    } catch (e) {
-      log({ event: 'final_review_offers_error', render_id: render.id, error: String(e.message || e).slice(0, 300) });
-    }
-  }
+  const products = Array.isArray(render.analysis?.products) ? render.analysis.products : [];
   const analysis = {
     ...(render.analysis || {}),
     architect: review.architect,
@@ -1500,6 +1492,74 @@ app.post('/api/renders/:id/final-review', h(async (req, res) => {
   await q.setRenderMeta(render.id, meta);
   log({ event: 'final_review_done', render_id: render.id, user_id: req.user.id, items: review.architect.items.length, products: products.reduce((sum, match) => sum + match.offers.length, 0), cost_usd: review.cost ?? null });
   res.json({ analysis, cost_usd: review.cost ?? null });
+}));
+
+// Поиск товаров по кнопке: агент смотрит на рендер и вызывает MCP-инструменты каталога.
+app.post('/api/renders/:id/product-search', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.status !== 'done' || !render.image_path) return res.status(409).json({ error: 'Дизайн ещё не готов' });
+  if (!getRenderConfig().product_matching_enabled) return res.status(503).json({ error: 'Подбор товаров выключен в админке' });
+  if (render.analysis?.mcp_products && !req.body?.refresh) {
+    return res.json({ analysis: render.analysis, cached: true });
+  }
+  const room = await q.getRoom(render.room_id);
+  const buffer = await getBuffer(render.image_path);
+  const ext = path.extname(render.image_path).slice(1).toLowerCase();
+  const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+  const started = Date.now();
+  try {
+    const agent = await runVisionAgent({
+      image: buffer,
+      mime,
+      roomType: room?.room_type || 'Другое',
+      style: room?.style || '',
+      topK: 4,
+      maxSteps: 10,
+    });
+    const ids = [...new Set((agent.items || []).flatMap(item => item.offer_ids || []).map(String))].slice(0, 40);
+    const offers = new Map();
+    await Promise.all(ids.map(async id => {
+      try {
+        const offer = await getCatalogOffer(id);
+        if (!offer) return;
+        offers.set(String(id), {
+          id: String(offer.id),
+          name: String(offer.name || ''),
+          price: offer.price == null ? null : Number(offer.price),
+          currency: offer.currency || 'RUB',
+          merchant: offer.merchant || null,
+          url: offer.affiliate_url || offer.canonical_url || null,
+          image_url: offer.picture_url || null,
+          erid: offer.erid || null,
+          score: null,
+        });
+      } catch (e) {
+        log({ event: 'product_search_offer_error', render_id: render.id, offer_id: id, error: String(e.message || e).slice(0, 200) });
+      }
+    }));
+    const products = (agent.items || []).map(item => {
+      const itemOffers = (item.offer_ids || []).map(id => offers.get(String(id))).filter(Boolean).slice(0, 4);
+      return {
+        item: { key: item.category || item.label, label: item.label || item.category || 'Товар', category: item.category || '' },
+        offers: itemOffers,
+        ...(itemOffers.length ? {} : { note: 'В каталоге не нашлось подходящего товара' }),
+      };
+    });
+    const analysis = {
+      ...(render.analysis || {}),
+      products,
+      mcp_products: products,
+      mcp_room: agent.room || null,
+    };
+    await q.setRenderAnalysis(render.id, analysis);
+    log({ event: 'product_search_done', render_id: render.id, user_id: req.user.id, items: products.length, offers: [...offers.values()].length, ms: Date.now() - started });
+    res.json({ analysis, cached: false });
+  } catch (e) {
+    log({ event: 'product_search_error', render_id: render.id, user_id: req.user.id, error: String(e.message || e).slice(0, 300), ms: Date.now() - started });
+    res.status(502).json({ error: 'Не удалось подобрать товары. Попробуйте ещё раз.' });
+  }
 }));
 
 app.get('/api/procurement/:id', h(async (req, res) => {
@@ -1735,7 +1795,6 @@ app.use((err, req, res, _next) => {
 // ---------- старт ----------
 async function main() {
   await migrate();          // накат миграций Postgres
-  await seedCatalog();      // идемпотентный сид каталога (catalog/seed.json)
   await seedStyleReferences(); // сгенерированные референсы стилей (style-refs/seed.json)
   await loadModelConfig();  // модели из app_settings / env
   await loadProxyConfig();  // прокси из app_settings / env

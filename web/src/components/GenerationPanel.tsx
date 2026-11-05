@@ -19,7 +19,6 @@ import {
   Zap,
 } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
-import { ProcurementPanel } from '@/components/ProcurementPanel'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -131,13 +130,6 @@ const defaultStylePresets: StylePreset[] = [
   { key: 'mediterranean', name: 'Средиземноморский модерн', accent: 'terra', image_url: '/images/style-deco.webp' },
 ] as const
 
-const refinePresets = [
-  'Изменить цвет пола на тёмный дуб',
-  'Сделать интерьер светлее',
-  'Заменить текстиль на лён',
-  'Добавить больше растений',
-] as const
-
 const priceTiers = [
   { key: 'start', name: 'Старт', short: 'Практично и аккуратно', description: 'Ламинат, керамика, painted MDF и базовые fixtures. Чисто и надёжно.' },
   { key: 'comfort', name: 'Комфорт', short: 'Лучший баланс', description: 'Инженерная доска, кварц, качественные фасады, латунь/сталь и layered lighting.' },
@@ -205,18 +197,13 @@ export function GenerationPanel({
   const [priceTier, setPriceTier] = useState('comfort')
   const [keepFurniture, setKeepFurniture] = useState(true)
   const [useCatalog] = useState(true)
-  const [customOpen, setCustomOpen] = useState(false)
-  const [refPhoto, setRefPhoto] = useState<string | null>(null)
-  const [refFile, setRefFile] = useState<File | null>(null)
-  const [refName, setRefName] = useState('')
-  const [refUrl, setRefUrl] = useState('')
-  const [refUrlDraft, setRefUrlDraft] = useState('')
-  const [usedRef, setUsedRef] = useState<File | null>(null)
   const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
   const [refineText, setRefineText] = useState('')
+  const [showAllHints, setShowAllHints] = useState(false)
+  const [editFormOpen, setEditFormOpen] = useState(false)
   const [genStage, setGenStage] = useState('queued')
   const [genMode, setGenMode] = useState<'base' | 'edit'>('base')
   const [elapsed, setElapsed] = useState(0)
@@ -227,32 +214,17 @@ export function GenerationPanel({
   const [productBinding, setProductBinding] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const [procurementOpen, setProcurementOpen] = useState(() => new URLSearchParams(window.location.search).has('products'))
   const [finalBusy, setFinalBusy] = useState(false)
   const [finalError, setFinalError] = useState('')
+  const [productSearchBusy, setProductSearchBusy] = useState(false)
+  const [productSearchError, setProductSearchError] = useState('')
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
-  const refInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
   const loadedRoomRef = useRef('')
 
-  // Панель подбора отражается в URL: перезагрузка и «назад» не теряют результат.
-  const setProductsInUrl = (on: boolean) => {
-    const url = new URL(window.location.href)
-    if (on) url.searchParams.set('products', '1')
-    else url.searchParams.delete('products')
-    window.history.replaceState(window.history.state, '', url)
-  }
-  const openProcurement = () => { setProcurementOpen(true); setProductsInUrl(true) }
-  const closeProcurement = () => { setProcurementOpen(false); setProductsInUrl(false) }
-
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
-  const visibleHints = (current?.analysis?.visible || [])
-    .map(v => (typeof v === 'string' ? v : v?.label || ''))
-    .filter(Boolean)
-  const architect = current?.analysis?.architect || null
-  const architectLayers = architect?.layers || []
   const productMatches = current?.analysis?.products || []
   const realOfferCount = productMatches.reduce((sum, match) => sum + match.offers.length, 0)
   const demoEstimate = (current?.items.length ?? 0) > 0 && current!.items.every(item => !item.direct_url)
@@ -390,7 +362,7 @@ export function GenerationPanel({
     setPhotoError(''); setGenError('')
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setRoomType(null)
-    setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); setUsedRef(null)
+    setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null)
     setKeepFurniture(true)
     // Габариты и объектив оценивает архитектор по фото — пользователь их не вводит.
   }
@@ -417,39 +389,6 @@ export function GenerationPanel({
     } finally {
       setCleanupBusy(false)
     }
-  }
-
-  const acceptRef = (nextFile?: File) => {
-    if (!nextFile || !nextFile.type.startsWith('image/')) return
-    releaseUrl(refPhoto)
-    const url = URL.createObjectURL(nextFile)
-    rememberUrl(url)
-    setRefPhoto(url)
-    setRefFile(nextFile)
-    setRefName(nextFile.name)
-    setRefUrl(''); setRefUrlDraft('')
-    setStyle(null)
-    setUsedRef(null)
-  }
-
-  const acceptRefUrl = (url: string) => {
-    const clean = url.trim()
-    if (!/^https?:\/\//i.test(clean)) return
-    releaseUrl(refPhoto)
-    setRefPhoto(null)
-    setRefFile(null)
-    setRefUrl(clean)
-    setRefUrlDraft('')
-    setRefName('Референс по ссылке')
-    setStyle(null)
-    setUsedRef(null)
-    if (refInput.current) refInput.current.value = ''
-  }
-
-  const clearRef = () => {
-    releaseUrl(refPhoto)
-    setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
-    if (refInput.current) refInput.current.value = ''
   }
 
   const clearEditRefs = () => {
@@ -565,9 +504,10 @@ export function GenerationPanel({
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
     setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setRefineText('')
+    setEditFormOpen(false); setShowAllHints(false)
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
     try {
-      const isBase = !roomId || Boolean(refFile && refFile !== usedRef)
+      const isBase = !roomId
       let id = roomId
       if (isBase) {
         if (!file) throw new Error('Для новой генерации нужно фото комнаты')
@@ -584,8 +524,6 @@ export function GenerationPanel({
         fd.append('price_tier', priceTier)
         fd.append('keep_furniture', usingCleaned ? '0' : (keepFurniture ? '1' : '0'))
         fd.append('use_catalog', useCatalog ? '1' : '0')
-        if (refFile) fd.append('style_ref', refFile)
-        if (!refFile && refUrl) fd.append('style_ref_url', refUrl)
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { onRequireLogin(); return }
@@ -593,7 +531,6 @@ export function GenerationPanel({
         if (!r.ok) throw new Error(d.error || String(r.status))
         id = d.id
         setRoomId(id)
-        setUsedRef(refFile)
       } else {
         const fd = new FormData()
         fd.append('text', request)
@@ -677,21 +614,38 @@ export function GenerationPanel({
     }
   }
 
+  const runProductSearch = async () => {
+    if (!current || productSearchBusy) return
+    setProductSearchBusy(true); setProductSearchError('')
+    try {
+      const r = await fetch(`/api/renders/${encodeURIComponent(current.id)}/product-search`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { onRequireLogin(); return }
+      if (!r.ok) throw new Error(d.error || 'Не удалось подобрать товары')
+      setIterations(prev => prev.map(item => item.id === current.id ? { ...item, analysis: d.analysis || item.analysis } : item))
+      setStep('estimates')
+    } catch (e) {
+      setProductSearchError(e instanceof Error ? e.message : 'Не удалось подобрать товары')
+    } finally {
+      setProductSearchBusy(false)
+    }
+  }
+
   const resetAll = () => {
     releaseUrl(photo)
-    releaseUrl(refPhoto)
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setStyle(null); setPriceTier('comfort'); setKeepFurniture(true)
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
-    setCustomOpen(false)
-    setRefPhoto(null); setRefFile(null); setRefName(''); setRefUrl(''); setRefUrlDraft(''); setUsedRef(null)
     loadedRoomRef.current = ''
     clearEditRefs()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
     setRefineText(''); setGenError(''); setGenStage('queued'); setElapsed(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     if (photoInput.current) photoInput.current.value = ''
-    if (refInput.current) refInput.current.value = ''
   }
 
   const activeStep = stepIndex(step)
@@ -804,7 +758,7 @@ export function GenerationPanel({
           <div>
             <p className="eyebrow">Шаг 02 / Стиль</p>
             <h3 className="display-title mt-6 text-4xl">Выберите направление</h3>
-            {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Можно не выбирать стиль — тогда загрузите свой референс ниже.</p>}
+            {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите одно направление — оно задаст палитру, материалы и свет.</p>}
             <div className="mt-8 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3 lg:grid-cols-5">
               {stylePresets.map((item) => (
                 <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => setStyle(item.name)} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
@@ -823,54 +777,13 @@ export function GenerationPanel({
               ))}
             </div>
 
-            <div className="mt-8 border">
-              <button type="button" aria-expanded={customOpen} onClick={() => setCustomOpen((value) => !value)} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                <span className="flex items-center gap-3"><Upload className="size-4 text-primary-text" />Загрузить свой стиль{refPhoto ? <span className="text-xs text-muted-foreground">· {refName}</span> : null}</span>
-                <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${customOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {customOpen && (
-                <div className="border-t border-foreground/25 p-4" onPaste={(event) => {
-                  if ((event.target as HTMLElement).tagName === 'INPUT') return
-                  const pastedFile = event.clipboardData.files?.[0]
-                  if (pastedFile) { event.preventDefault(); acceptRef(pastedFile); return }
-                  const pastedText = event.clipboardData.getData('text')
-                  if (pastedText && /^https?:\/\//i.test(pastedText.trim())) { event.preventDefault(); acceptRefUrl(pastedText) }
-                }}>
-                  <input ref={refInput} id="gen-ref" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptRef(event.target.files?.[0])} />
-                  {refPhoto ? (
-                    <div className="flex items-center justify-between gap-4 border bg-muted px-4 py-3">
-                      <span className="truncate text-sm">{refName}</span>
-                      <button type="button" onClick={clearRef} className="flex size-11 items-center justify-center hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить референс"><X className="size-4" /></button>
-                    </div>
-                  ) : refUrl ? (
-                    <div className="flex items-center justify-between gap-4 border bg-muted px-4 py-3">
-                      <a href={refUrl} target="_blank" rel="noopener noreferrer" className="truncate text-sm underline underline-offset-2">{refUrl}</a>
-                      <button type="button" onClick={clearRef} className="flex size-11 items-center justify-center hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить референс"><X className="size-4" /></button>
-                    </div>
-                  ) : (
-                    <>
-                      <label htmlFor="gen-ref" className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-foreground/40 px-4 text-center text-sm transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
-                        <Upload className="size-5 text-primary-text" />
-                        <span>Загрузить фото или вставить из буфера</span>
-                        <span className="text-xs text-muted-foreground">JPG, PNG, WebP — нейросеть перенесёт настроение референса</span>
-                      </label>
-                      <div className="mt-3 flex gap-2">
-                        <input value={refUrlDraft} onChange={(event) => setRefUrlDraft(event.target.value)} onBlur={() => { if (refUrlDraft) acceptRefUrl(refUrlDraft) }} onKeyDown={(event) => { if (event.key === 'Enter' && refUrlDraft) { event.preventDefault(); acceptRefUrl(refUrlDraft) } }} placeholder="или вставьте ссылку на референс" className="h-11 min-w-0 flex-1 border bg-background px-3 text-sm outline-none focus:border-primary" />
-                        <button type="button" disabled={!refUrlDraft.trim()} onClick={() => acceptRefUrl(refUrlDraft)} className="min-h-11 border border-foreground px-3 text-xs hover:bg-foreground hover:text-background disabled:opacity-40">Добавить</button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => setStep('photo')} className="action-secondary"><ArrowLeft className="size-4" />Назад</button>
               <button
                 type="button"
-                disabled={busy || (!style && !refFile && !refUrl)}
+                disabled={busy || !style}
                 onClick={() => {
                   const request = style ? `Стиль: ${style}` : 'Стиль по референсу'
                   void startGeneration(request, style ?? 'Референс пользователя')
@@ -989,103 +902,6 @@ export function GenerationPanel({
                     </dl>
                   </section>
                 ) : null}
-                {architect && (architect.layers?.length || architect.hints?.length || architect.strengths?.length || architect.palette?.length) ? (
-                  <section className="mt-6 border p-4" aria-labelledby="architect-review">
-                    <p id="architect-review" className="eyebrow">Разбор архитектора</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">По готовому изображению: что получилось, что улучшить, свет и розетки.</p>
-                    {architect.palette?.length ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {architect.palette.map((color, index) => (
-                          <span key={`${color.hex}-${index}`} className="inline-flex items-center gap-2 border bg-background px-2 py-1 text-[11px]">
-                            <span className="size-4 shrink-0 border" style={{ background: color.hex }} aria-hidden="true" />
-                            {color.name}{color.where ? ` · ${color.where}` : ''}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                    {architect.strengths?.length ? (
-                      <ul className="mt-4 grid gap-1 text-sm">
-                        {architect.strengths.map((item, index) => (
-                          <li key={`strength-${index}`} className="flex items-baseline gap-2">
-                            <Check className="mt-0.5 size-3.5 shrink-0 text-primary-text" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {architectLayers.length ? (
-                      <div className="mt-4">
-                        <p className="eyebrow">Что влияет на интерьер</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Сначала то, что даст больше эффекта. Нажмите действие — оно уйдёт в точечную правку.</p>
-                        <div className="mt-3 grid gap-3">
-                          {architectLayers.map((layer, index) => (
-                            <div key={`layer-${layer.key}-${index}`} className="border border-foreground/20 p-3">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-sm font-medium">{index + 1}. {layer.label}</p>
-                                <span className={`border px-2 py-0.5 text-[10px] uppercase tracking-wide ${layer.impact >= 0.7 ? 'border-primary/40 bg-primary/5 text-primary-text' : 'border-foreground/20 text-muted-foreground'}`}>
-                                  {layer.impact >= 0.7 ? 'сильное влияние' : layer.impact >= 0.4 ? 'среднее влияние' : 'точечно'}
-                                </span>
-                              </div>
-                              {layer.current ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{layer.current}</p> : null}
-                              <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground">
-                                <span>эффект {Math.round((layer.impact || 0) * 100)}%</span>
-                                <span>усилие: {layer.effort === 'low' ? 'низкое' : layer.effort === 'high' ? 'высокое' : 'среднее'}</span>
-                                <span>риск: {layer.risk === 'low' ? 'низкий' : layer.risk === 'high' ? 'высокий' : 'средний'}</span>
-                              </div>
-                              {layer.preserve ? <p className="mt-1 text-[11px] leading-5 text-muted-foreground">Не трогать: {layer.preserve}</p> : null}
-                              {layer.actions?.length ? (
-                                <div className="mt-2 grid gap-2">
-                                  {layer.actions.map((action, actionIndex) => (
-                                    <button
-                                      key={`layer-action-${layer.key}-${actionIndex}`}
-                                      type="button"
-                                      onClick={() => startGeneration(action.action, current.styleName, { target: action.target || layer.key, parentId: current.id })}
-                                      className="flex flex-col items-start gap-1 border border-foreground/20 px-3 py-2 text-left text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    >
-                                      <span className="font-medium">{action.action}</span>
-                                      {action.why ? <span className="text-muted-foreground">{action.why}</span> : null}
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : architect.hints?.length ? (
-                      <div className="mt-4">
-                        <p className="eyebrow">Что улучшить</p>
-                        <div className="mt-2 grid gap-2">
-                          {architect.hints.map((hint, index) => (
-                            <button
-                              key={`hint-${index}`}
-                              type="button"
-                              onClick={() => startGeneration(hint.action, current.styleName, { target: hint.target || undefined, parentId: current.id })}
-                              className="flex flex-col items-start gap-1 border border-foreground/20 px-3 py-2 text-left text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              <span className="font-medium">{hint.action}</span>
-                              {hint.why ? <span className="text-muted-foreground">{hint.why}</span> : null}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </section>
-                ) : null}
-                {visibleHints.length ? (
-                  <section className="mt-6 border p-4" aria-labelledby="visible-hints">
-                    <p id="visible-hints" className="eyebrow">Что видно на фото</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">От крупного к мелкому.</p>
-                    <ol className="mt-3 grid gap-1 text-sm sm:grid-cols-2">
-                      {visibleHints.map((label, index) => (
-                        <li key={`${label}-${index}`} className="flex items-baseline gap-2">
-                          <span className="font-mono text-[10px] text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
-                          <span>{label}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
-                ) : null}
                 {heroItems.length ? (
                   <section className="mt-6 border p-4" aria-labelledby="hero-products">
                     <p id="hero-products" className="eyebrow">Привязать товар к этому кадру</p>
@@ -1106,20 +922,6 @@ export function GenerationPanel({
                     </div>
                   </section>
                 ) : null}
-                {current.analysis?.suggestions?.length ? (
-                  <div className="mt-6 border p-4">
-                    <p className="eyebrow">Что улучшить</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Кнопки прикрепляют референс товара и меняют только выбранный объект.</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {current.analysis.suggestions.map(s => (
-                        <button key={`${s.target}-${s.product_id}`} type="button" onClick={() => startGeneration(s.label, current.styleName, { target: s.target, productId: s.product_id, parentId: current.id })} className="inline-flex min-h-10 items-center gap-2 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          {s.image_url ? <img src={s.image_url} alt="" className="size-7 border object-cover" /> : null}
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
               <aside className="border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
@@ -1127,9 +929,19 @@ export function GenerationPanel({
                 <div className="mt-4 space-y-2">
                   {iterations.map((item, index) => {
                     const expanded = openHistory === item.id
+                    const quickEdits = (item.analysis?.architect?.layers || [])
+                      .flatMap(layer => (layer.actions || []).map(action => ({
+                        target: action.target || layer.key,
+                        action: action.action,
+                        why: action.why,
+                        impact: layer.impact || 0,
+                        layerLabel: layer.label,
+                      })))
+                      .sort((a, b) => b.impact - a.impact)
+                    const visibleEdits = showAllHints ? quickEdits : quickEdits.slice(0, 3)
                     return (
                       <div key={item.id} className="border border-foreground/25">
-                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) setRefineText(''); setOpenHistory(expanded ? null : item.id); setCurrentId(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setRefineText(''); setShowAllHints(false); setEditFormOpen(false) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                           <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span><span className="truncate">{item.request}</span></span>
                           <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
                         </button>
@@ -1140,14 +952,37 @@ export function GenerationPanel({
                               <p className="text-xs leading-5 text-muted-foreground">Эта версия показана на экране. Запустите правку от неё — новая версия добавится в историю.</p>
                             </div>
                             <p className="eyebrow mt-5">Быстрые правки</p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {refinePresets.map((preset) => (
-                                <button key={preset} type="button" onClick={() => startGeneration(preset, item.styleName, { parentId: item.id })} className="min-h-10 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                  {preset}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="mt-3 flex flex-col gap-2">
+                            {quickEdits.length ? (
+                              <div className="mt-3">
+                                <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+                                  {visibleEdits.map((edit, editIndex) => (
+                                    <button
+                                      key={`${edit.layerLabel}-${editIndex}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setRefineText(edit.action)
+                                        setEditFormOpen(true)
+                                        requestAnimationFrame(() => document.getElementById('edit-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+                                      }}
+                                      className="flex min-h-12 shrink-0 flex-col items-start gap-0.5 border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-40"
+                                    >
+                                      <span className="text-xs font-medium leading-4">{edit.action}</span>
+                                      <span className="text-[10px] text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
+                                    </button>
+                                  ))}
+                                </div>
+                                {quickEdits.length > 3 && (
+                                  <button type="button" onClick={() => setShowAllHints(value => !value)} className="mt-2 text-xs underline decoration-border underline-offset-4 hover:decoration-foreground">
+                                    {showAllHints ? 'Свернуть' : `Ещё ${quickEdits.length - 3}`}
+                                  </button>
+                                )}
+                              </div>
+                            ) : <p className="mt-2 text-xs leading-5 text-muted-foreground">Архитектор не оставил подсказок — опишите правку ниже.</p>}
+                            <button type="button" onClick={() => { setEditFormOpen(value => !value); requestAnimationFrame(() => document.getElementById('edit-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} className="mt-3 inline-flex min-h-10 items-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                              Своя правка
+                            </button>
+                            {editFormOpen && (
+                            <div id="edit-form" className="mt-3 flex flex-col gap-2">
                               <input value={refineText} onChange={(event) => setRefineText(event.target.value)} onPaste={(event) => {
                                 const file = event.clipboardData.files?.[0]
                                 if (file) { event.preventDefault(); addEditRefFromFile(file); return }
@@ -1258,6 +1093,7 @@ export function GenerationPanel({
                                 Перегенерировать <RotateCcw className="size-4" />
                               </button>
                             </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1278,12 +1114,13 @@ export function GenerationPanel({
                 {(realOfferCount > 0 || current.items.length > 0) ? (
                   <button type="button" onClick={() => setStep('estimates')} className="action-secondary min-h-14 px-6 text-base">Товары и смета</button>
                 ) : current.productsEnabled === false ? null : (
-                  <button type="button" onClick={openProcurement} className="action-secondary min-h-14 px-6 text-base">Найти товары · 1 кредит <Search className="size-5" /></button>
+                  <button type="button" onClick={runProductSearch} disabled={productSearchBusy} className="action-secondary min-h-14 px-6 text-base">{productSearchBusy ? <><LoaderCircle className="size-4 animate-spin" /> Ищем товары…</> : <>Найти товары <Search className="size-5" /></>}</button>
                 )}
                 <button type="button" onClick={runFinalReview} disabled={finalBusy} className="action-primary min-h-14 px-8 text-base">{finalBusy ? <><LoaderCircle className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <Check className="size-5" /></>}</button>
               </div>
             </div>
             {finalError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{finalError}</p>}
+            {productSearchError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{productSearchError}</p>}
           </div>
         )}
 
@@ -1430,7 +1267,6 @@ export function GenerationPanel({
       )}
 
       <ShareDialog renderId={current?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
-      <ProcurementPanel renderId={current?.id || ''} open={procurementOpen} onClose={closeProcurement} onCreditsChanged={onRefreshUser} />
       {creditOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/80 p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
           <div className="w-full max-w-md border border-foreground bg-background p-6 shadow-[8px_8px_0_oklch(var(--foreground))]">

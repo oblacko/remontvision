@@ -855,54 +855,6 @@ export async function parseRender(renderB64, mime = 'image/png') {
   };
 }
 
-// Простой матчинг: ключевые слова + штраф за несовпадение цвета. v2 — эмбеддинги.
-const COLOR_HINTS = {
-  'белый': ['бел', 'светл'],
-  'бежевый': ['беж', 'светл'],
-  'серый': ['сер', 'камен'],
-  'грейдж': ['грейдж', 'сер', 'камен'],
-  'графит': ['графит', 'темн', 'черн'],
-  'черный': ['черн', 'темн'],
-  'тёмный': ['темн', 'графит', 'черн'],
-  'темный': ['темн', 'графит', 'черн'],
-  'светлый': ['светл', 'бел', 'беж'],
-  'антрацит': ['антрацит', 'темн', 'черн'],
-  'латунь': ['латун', 'золот', 'brass'],
-  'золотой': ['золот', 'латун'],
-  'хром': ['хром', 'серебр'],
-  'сталь': ['стал', 'серебр'],
-  'дерево': ['дерев', 'древес'],
-  'коричневый': ['корич', 'дерев', 'орех'],
-  'орех': ['орех', 'корич', 'дерев'],
-  'оливковый': ['олив', 'зелен', 'шалфей'],
-  'терракота': ['террак', 'оранж', 'красн'],
-  'меловой': ['мелов', 'бел', 'светл'],
-  'песочный': ['песоч', 'беж', 'светл'],
-};
-
-export function matchCatalog(items, products) {
-  const norm = s => (s || '').toLowerCase().replace(/ё/g, 'е');
-  const results = [];
-  for (const it of items.slice(0, 12)) {
-    const words = [...(it.keywords || []), it.description || '', it.category || ''].map(norm);
-    const text = words.join(' ');
-    let best = null, bestScore = 0;
-    for (const p of products) {
-      if (p.category !== it.category) continue;
-      const pwords = norm(p.keywords).split(',').map(w => w.trim());
-      let score = pwords.filter(w => w && words.some(x => x.includes(w) || w.includes(x))).length / Math.max(pwords.length, 1);
-      const color = norm((p.attrs || {})['цвет'] || '').split(/[ ,/]+/)[0];
-      const hints = COLOR_HINTS[color] || (color ? [color] : []);
-      if (hints.length && !hints.some(h => text.includes(h))) score *= 0.5;
-      if (score > bestScore) { bestScore = score; best = p; }
-    }
-    if (best && bestScore >= 0.34) results.push({ product: best, score: bestScore });
-  }
-  const seen = new Map();
-  for (const r of results) if (!seen.has(r.product.id) || seen.get(r.product.id).score < r.score) seen.set(r.product.id, r);
-  return [...seen.values()];
-}
-
 // Vision для «Найти товары»: подробная карточка видимых предметов и поверхностей.
 export async function parseProcurementImage(renderB64, mime = 'image/png', { roomType = '' } = {}) {
   const sys = `Ты — аналитик интерьерного рендера для подбора товаров. Верни строго JSON без текста вокруг:
