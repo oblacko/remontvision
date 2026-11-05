@@ -217,3 +217,24 @@ test('no art direction block when the art director did not run', () => {
   const prompt = buildPrompt({ style: 'Джапанди', roomType: 'Спальня' });
   assert.doesNotMatch(prompt, /ART DIRECTION/);
 });
+
+test('repair scope turns the prompt into a full renovation and removes the preserve-floor rule', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    repairScope: {
+      floor: { action: 'replace', material: 'светлый дуб' },
+      ceiling: { action: 'level' },
+      walls: { action: 'paint', material: 'тёплый белый' },
+      doors: { action: 'replace', style: 'белые' },
+      windows: { action: 'fill' },
+      storage: ['шкаф в нише'],
+      style_dir: 'тёплый минимализм',
+    },
+  });
+  assert.match(prompt, /REPAIR SCOPE/);
+  assert.match(prompt, /floor: action=replace/);
+  assert.match(prompt, /after a full renovation/);
+  assert.doesNotMatch(prompt, /preserve the existing floor/i);
+  assert.match(prompt, /action=keep: preserve/);
+});
