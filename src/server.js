@@ -13,7 +13,8 @@ import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, y
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { reviewDesign } from './architect.js';
-import { runVisionAgent, getCatalogOffer } from './catalogclient.js';
+import { getCatalogOffer } from './catalogclient.js';
+import { runVisionAgent } from './visionagent.js';
 import { sanitizeImage, fitAspect } from './media.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES, activeRoomTypeNames, roomTypeByName, isRoomTypeActive, getRoomTypeConfig, getRoomTypeDefaults, saveRoomTypes, resetRoomTypes, loadRoomTypes } from './roomtypes.js';

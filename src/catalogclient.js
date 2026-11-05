@@ -78,6 +78,11 @@ export async function getCatalogOffer(offerId, deps = {}) {
   return request(`/offers/${encodeURIComponent(offerId)}`, { deps });
 }
 
+export async function listCatalogCategories(deps = {}) {
+  const data = await request('/categories', { deps });
+  return Array.isArray(data) ? data : [];
+}
+
 export async function runVisionAgent({ image, roomType = '', style = '', topK = 5, maxSteps = 10, mime = 'image/jpeg' } = {}, deps = {}) {
   if (!image) throw new Error('Нужна картинка рендера');
   const data = await request('/vision-agent', {
