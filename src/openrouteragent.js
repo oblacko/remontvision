@@ -12,11 +12,18 @@ let client = null;
 async function fetcher(input, init) {
   if (typeof Request !== 'undefined' && input instanceof Request) {
     const body = ['GET', 'HEAD'].includes(input.method) ? undefined : await input.text();
-    return proxyFetch(input.url, {
+    const res = await proxyFetch(input.url, {
       method: input.method,
       headers: Object.fromEntries(input.headers.entries()),
       body,
       signal: input.signal,
+    });
+    // node-fetch (SOCKS) отдаёт Node-стрим, а SDK ждёт web Response.
+    const bytes = await res.arrayBuffer();
+    return new Response(bytes, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: Object.fromEntries(res.headers.entries()),
     });
   }
   return proxyFetch(input, init);
