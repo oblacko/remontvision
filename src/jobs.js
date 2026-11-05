@@ -11,8 +11,7 @@ import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
 import { reviewDesign } from './architect.js';
-import { getRenderConfig } from './renderconfig.js';
-import { pickHoffProducts, loadProductImages } from './productpicker.js';
+import { buildDesignDirection, DESIGN_DIRECTION_ENABLED } from './designeragent.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
@@ -262,10 +261,10 @@ async function processRender(renderId) {
       }
       meta.art_direction_input = precleanedShell ? 'cleaned_shell' : 'original';
 
-      // Арт-директор читает реальное фото и пишет bespoke-направление под стиль.
-      // Без него дизайн скатывается к шаблонному «стиль + нейтральная комната».
+      // Фото-проход: оцениваем размеры и объектив как раньше. Для новой пары
+      // style×concept текст направления берём у direction-агента; свободный
+      // арт-директор остаётся fallback-ом для старых комнат (откат).
       let artDirection = '';
-      let artDirectionPlan = [];
       let estimatedDimensions = roomDimensions;
       if (!MOCK_MODE) {
         try {
@@ -288,9 +287,48 @@ async function processRender(renderId) {
             meta.room_dimensions_estimate = ad.roomDimensions;
             meta.lens = ad.lens || null;
           }
-          if (ad?.text) {
+          let direction = null;
+          if (DESIGN_DIRECTION_ENABLED && room.concept_key && styleInfo?.key) {
+            try {
+              const usedDirections = room.user_id
+                ? (await q.designRegistryForUser(room.user_id))
+                    .map(row => ({ main_move: row.main_move, focal_zone: row.focal_zone }))
+                    .filter(item => item.main_move || item.focal_zone)
+                : [];
+              direction = await buildDesignDirection({
+                styleId: styleInfo.key,
+                conceptId: room.concept_key,
+                roomType,
+                dimensions: estimatedDimensions,
+                usedDirections,
+              });
+            } catch (e) {
+              log({ event: 'design_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+            }
+          }
+          if (direction?.text) {
+            artDirection = direction.text;
+            artDirectionCost = (ad.cost || 0) + (direction.cost || 0);
+            addCost('art_direction', ad.cost);
+            addCost('art_direction', direction.cost);
+            meta.design_direction = { ...direction, ms: Date.now() - adStart };
+            meta.concept_key = room.concept_key;
+            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: room.style, concept: room.concept_key, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart });
+            if (room.user_id) {
+              await q.recordDesignDirection({
+                userId: room.user_id,
+                roomId: room.id,
+                roomType,
+                styleKey: styleInfo.key,
+                conceptKey: room.concept_key,
+                focalZone: direction.focalZone,
+                mainMove: direction.mainMove?.action || direction.mainMove?.target || '',
+                accepted: true,
+              });
+            }
+            try { await q.setRoomDesign(room.id, room.concept_key, direction); } catch { /* метаданные не критичны */ }
+          } else if (ad?.text) {
             artDirection = ad.text;
-            artDirectionPlan = Array.isArray(ad.productPlan) ? ad.productPlan : [];
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
@@ -303,36 +341,6 @@ async function processRender(renderId) {
         }
       }
 
-      // «Товары в рендере»: арт-директор даёт план, catalog-service ищет реальные
-      // товары Hoff, второй LLM-проход отбирает «красиво по размерам».
-      const renderCfg = getRenderConfig();
-      let productRefsDetailed = [];
-      if (renderCfg.product_refs_enabled && artDirectionPlan.length) {
-        await q.setRoomStatus('product_refs', room.id);
-        try {
-          const picked = await pickHoffProducts({
-            plan: artDirectionPlan,
-            roomType,
-            style: room.style,
-            maxProducts: renderCfg.max_products,
-          });
-          productRefsDetailed = await loadProductImages(picked);
-          for (const ref of productRefsDetailed) {
-            imageMap.push({
-              role: `product reference — ${ref.category}: keep its exact shape, colour, material and proportions; light it with the room's own light and add a soft contact shadow`,
-              label: ref.name || '',
-            });
-          }
-          meta.product_refs = productRefsDetailed.map(ref => ({
-            offer_id: ref.offer_id, name: ref.name, category: ref.category,
-            price: ref.price, why: ref.why, picked_by: ref.picked_by,
-          }));
-          log({ event: 'product_refs_selected', room_id: room.id, render_id: renderId, count: productRefsDetailed.length, offers: productRefsDetailed.map(r => r.offer_id) });
-        } catch (e) {
-          log({ event: 'product_refs_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-        }
-      }
-
       prompt = buildPrompt({
         style: room.style,
         priceTier,
@@ -341,7 +349,7 @@ async function processRender(renderId) {
         palette: room.palette || 'none',
         accent: room.accent || 'none',
         hasStyleRef: styleRefUrls.length > 0,
-        userStyleRef: styleUserRef,
+        userStyleRef,
         styleDescription: styleInfo?.prompt_description || '',
         roomType,
         keepFurniture,
@@ -352,10 +360,10 @@ async function processRender(renderId) {
         dimensions: estimatedDimensions,
         artDirection,
         repairScope,
-        productRefs: productRefsDetailed.length > 0,
+        productRefs: false,
       });
 
-      referenceImagesB64 = [...styleRefUrls, ...productRefsDetailed.map(r => r.b64)];
+      referenceImagesB64 = [...styleRefUrls];
       meta.style_id = styleInfo?.id || null;
       meta.style_reference_mode = styleMode;
       meta.user_style_ref_ignored = Boolean(room.style_ref_path && styleMode !== 'reference');

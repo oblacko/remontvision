@@ -87,6 +87,42 @@ export function validateChanges(value) {
     .slice(0, 6);
 }
 
+const HexField = z.string().regex(/^#[0-9a-f]{6}$/i).optional().catch(undefined);
+
+const MoveSchema = z.object({
+  target: z.string().optional().default(''),
+  action: z.string().optional().default(''),
+  effect: z.string().optional().default(''),
+});
+
+export const DesignDirectionSchema = z.object({
+  style_id: z.string().optional().default(''),
+  concept_id: z.string().optional().default(''),
+  compatibility: z.enum(['ok', 'weaken']).optional().catch('ok').default('ok'),
+  concept: z.string().optional().default(''),
+  main_move: MoveSchema.optional().default({ target: '', action: '', effect: '' }),
+  supporting_moves: z.array(MoveSchema).max(4).catch([]).default([]),
+  palette_hex: z.object({
+    base: HexField,
+    support: HexField,
+    dark: HexField,
+    accent: HexField,
+  }).catch({}).default({}),
+  focal_point: z.string().optional().default(''),
+  focal_zone: z.enum(['window', 'wall', 'center', 'ceiling', 'floor', 'perimeter']).optional().catch('center').default('center'),
+  quiet_areas: z.array(z.string()).max(6).catch([]).default([]),
+  materials_story: z.array(z.string()).max(8).catch([]).default([]),
+  prompt_en: z.string().optional().default(''),
+  novelty_class: z.enum(['novel', 'balance', 'safe']).optional().catch('balance').default('balance'),
+  avoid: z.array(z.string()).max(6).catch([]).default([]),
+});
+
+export function validateDesignDirection(value) {
+  if (!value || typeof value !== 'object') return null;
+  const parsed = DesignDirectionSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 export function validateSearchResult(value) {
   if (!value || typeof value !== 'object') return null;
   const items = Array.isArray(value.items)

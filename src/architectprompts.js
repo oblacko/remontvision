@@ -1,8 +1,9 @@
 // Версионируемые промты архитектурного контура: дизайнер, строитель, рецензент, критерий приёмки.
 // Редактируются в админке, активные версии держим в памяти.
 import { DEFAULT_DESIGNER_PROMPT } from './designerprompt.js';
+import { DEFAULT_DIRECTION_PROMPT } from './directionprompt.js';
 
-export const ARCHITECT_PROMPT_KINDS = ['designer', 'builder', 'reviewer', 'criteria'];
+export const ARCHITECT_PROMPT_KINDS = ['designer', 'builder', 'reviewer', 'criteria', 'direction'];
 
 export const DEFAULT_BUILDER_PROMPT = `Ты — архитектор-строитель и дизайнер интерьера. Смотришь на фото реальной квартиры до ремонта.
 Это ПОЛНЫЙ ремонт, а не косметика. Определи, что нужно чинить и менять.
@@ -73,6 +74,7 @@ export const DEFAULT_ARCHITECT_PROMPTS = {
   builder: DEFAULT_BUILDER_PROMPT,
   reviewer: DEFAULT_REVIEWER_PROMPT,
   criteria: DEFAULT_CRITERIA_PROMPT,
+  direction: DEFAULT_DIRECTION_PROMPT,
 };
 
 let cache = {};

@@ -62,10 +62,10 @@ export async function migrate() {
 // ---------- запросы ----------
 export const q = {
   // rooms
-  createRoom: (id, style, budget, photoPath, userId, roomType = null, palette = null, accent = null, styleRefPath = null, priceTier = 'comfort', keepFurniture = true, useCatalog = true, precleanedShellPath = null, roomWidthM = null, roomLengthM = null, roomHeightM = null, bedLengthM = null, dimensionOrientation = null) =>
-    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, room_type, palette, accent, style_ref_path, price_tier, keep_furniture, use_catalog, precleaned_shell_path, room_width_m, room_length_m, room_height_m, bed_length_m, dimension_orientation)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-      [id, style, budget, photoPath, userId, roomType, palette, accent, styleRefPath, priceTier, keepFurniture, useCatalog, precleanedShellPath, roomWidthM, roomLengthM, roomHeightM, bedLengthM, dimensionOrientation]),
+  createRoom: (id, style, budget, photoPath, userId, roomType = null, palette = null, accent = null, styleRefPath = null, priceTier = 'comfort', keepFurniture = true, useCatalog = true, precleanedShellPath = null, roomWidthM = null, roomLengthM = null, roomHeightM = null, bedLengthM = null, dimensionOrientation = null, conceptKey = null) =>
+    pool.query(`INSERT INTO rooms (id, style, budget, photo_path, user_id, room_type, palette, accent, style_ref_path, price_tier, keep_furniture, use_catalog, precleaned_shell_path, room_width_m, room_length_m, room_height_m, bed_length_m, dimension_orientation, concept_key)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+      [id, style, budget, photoPath, userId, roomType, palette, accent, styleRefPath, priceTier, keepFurniture, useCatalog, precleanedShellPath, roomWidthM, roomLengthM, roomHeightM, bedLengthM, dimensionOrientation, conceptKey]),
   getRoom: id => pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   roomByPhotoKey: key =>
     pool.query(`SELECT user_id FROM rooms WHERE photo_path = $1 OR photo_path LIKE '%/' || $1 LIMIT 1`, [key])
@@ -83,6 +83,9 @@ export const q = {
     pool.query(`UPDATE rooms SET status = 'error', error = $1, notice = NULL, updated_at = now() WHERE id = $2`, [error, id]),
   setRoomNotice: (notice, id) =>
     pool.query(`UPDATE rooms SET status = 'done', error = NULL, notice = $1, updated_at = now() WHERE id = $2`, [notice, id]),
+  setRoomDesign: (id, conceptKey, designDirection) =>
+    pool.query(`UPDATE rooms SET concept_key = $2, design_direction = $3, updated_at = now() WHERE id = $1`,
+      [id, conceptKey || null, designDirection ? JSON.stringify(designDirection) : null]),
   deleteRoom: id => withTransaction(async client => {
     await client.query(`DELETE FROM render_items WHERE render_id IN (SELECT id FROM renders WHERE room_id = $1)`, [id]);
     await client.query(`DELETE FROM renders WHERE room_id = $1`, [id]);
@@ -541,6 +544,20 @@ export const q = {
       [id, ...keys.map(k => fields[k])]).then(r => r.rows[0] || null);
   },
   deleteStyle: id => pool.query(`DELETE FROM styles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
+  // концепции и реестр направлений
+  concepts: activeOnly =>
+    pool.query(`SELECT * FROM concepts ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)
+      .then(r => r.rows),
+  conceptByKey: key =>
+    pool.query(`SELECT * FROM concepts WHERE key = $1`, [key]).then(r => r.rows[0] || null),
+  recordDesignDirection: ({ userId, roomId, roomType, styleKey, conceptKey, focalZone, mainMove, accepted = true }) =>
+    pool.query(`INSERT INTO design_registry (user_id, room_id, room_type, style_key, concept_key, focal_zone, main_move, user_accepted)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [userId || null, roomId || null, roomType || null, styleKey, conceptKey, focalZone || null, mainMove || null, accepted !== false]),
+  designRegistryForUser: userId =>
+    pool.query(`SELECT style_key, concept_key, focal_zone, main_move, room_type, created_at
+                FROM design_registry WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
+      .then(r => r.rows),
   styleReferences: (styleId, roomType = null) =>
     pool.query(`SELECT * FROM style_references WHERE style_id = $1 AND approved IS NOT FALSE
                 ${roomType ? 'AND (room_type IS NULL OR room_type = $2)' : ''}

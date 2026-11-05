@@ -82,7 +82,6 @@ type ProductMatch = {
   offers: ProductOffer[]
   note?: string
 }
-type ProductRef = { offer_id?: string; name: string; category?: string; price?: number | null; why?: string }
 type Analysis = {
   surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[]
   visible?: Array<{ label?: string; bbox?: number[]; area?: number } | string>
@@ -130,18 +129,25 @@ type RoomResult = {
   id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
   room_width_m?: number | null; room_length_m?: number | null; room_height_m?: number | null; bed_length_m?: number | null;
   dimension_orientation?: string | null;
-  keep_furniture?: boolean; use_catalog?: boolean; products_enabled?: boolean; product_refs_enabled?: boolean;
-  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null; repair_scope?: RepairScope | null; product_refs?: ProductRef[] } | null;
+  keep_furniture?: boolean; use_catalog?: boolean; products_enabled?: boolean; concept_key?: string | null;
+  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null; repair_scope?: RepairScope | null; design_direction?: DesignDirection | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
 type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
   budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
-  keepFurniture?: boolean; useCatalog?: boolean; productsEnabled?: boolean; productRefsEnabled?: boolean; artDirection?: ArtDirection | null;
+  keepFurniture?: boolean; useCatalog?: boolean; productsEnabled?: boolean; artDirection?: ArtDirection | null;
   dimensionsEstimate?: DimensionsEstimate | null; lens?: LensInfo | null; repairScope?: RepairScope | null;
-  productRefs?: ProductRef[];
+  designDirection?: DesignDirection | null;
 }
+type DesignDirection = {
+  conceptId?: string | null; concept?: string; mainMove?: { target?: string; action?: string; effect?: string } | null;
+  focalPoint?: string; focalZone?: string | null; quietAreas?: string[]; materialsStory?: string[];
+  palette?: { hex: string; name?: string }[]; compatibility?: 'ok' | 'weaken';
+}
+type DesignConcept = { id: string; name: string; main_move: string; quiet_areas: string; description: string }
+type DesignCompatibility = Record<string, Record<string, 'ok' | 'weaken' | 'conflict'>>
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
@@ -149,15 +155,17 @@ const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(
 
 type StylePreset = { key: string; name: string; accent: string; image_url?: string }
 const defaultStylePresets: StylePreset[] = [
-  { key: 'scandi', name: 'Скандинавский', accent: 'dust', image_url: '/images/style-scandi.webp' },
+  { key: 'minimalism', name: 'Современный минимализм', accent: 'sand', image_url: '/images/style-minimal.webp' },
+  { key: 'scandinavian', name: 'Скандинавский', accent: 'dust', image_url: '/images/style-scandi.webp' },
   { key: 'japandi', name: 'Джапанди', accent: 'forest', image_url: '/images/style-japandi.webp' },
-  { key: 'wabi-sabi', name: 'Ваби-саби', accent: 'sand', image_url: '/images/style-japandi.webp' },
-  { key: 'organic', name: 'Органик модерн', accent: 'sand', image_url: '/images/style-minimal.webp' },
-  { key: 'warm-minimal', name: 'Тёплый минимализм', accent: 'dust', image_url: '/images/style-scandi.webp' },
-  { key: 'biophilic', name: 'Биофильный', accent: 'forest', image_url: '/images/style-country.webp' },
-  { key: 'heritage', name: 'Современная классика', accent: 'terra', image_url: '/images/style-neo.webp' },
-  { key: 'mediterranean', name: 'Средиземноморский модерн', accent: 'terra', image_url: '/images/style-deco.webp' },
-] as const
+  { key: 'loft', name: 'Лофт', accent: 'graphite', image_url: '/images/style-loft.webp' },
+  { key: 'neoclassic', name: 'Неоклассика', accent: 'sand', image_url: '/images/style-neo.webp' },
+  { key: 'eco', name: 'Эко / органический модерн', accent: 'forest', image_url: '/images/style-country.webp' },
+  { key: 'dark_contemporary', name: 'Тёмный контемпорари', accent: 'graphite', image_url: '/images/style-dark.webp' },
+  { key: 'art_deco', name: 'Ар-деко', accent: 'terra', image_url: '/images/style-deco.webp' },
+  { key: 'mediterranean', name: 'Средиземноморский', accent: 'terra', image_url: '/images/style-boho.webp' },
+  { key: 'memphis_accent', name: 'Мемфис-акцент', accent: 'terra', image_url: '/images/style-modern.webp' },
+]
 
 const presentationLabel = (status?: GenItem['presentation_status']) => status === 'verified'
   ? 'Проверен на рендере'
@@ -226,7 +234,10 @@ export function GenerationPanel({
   const [style, setStyle] = useState<string | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
   const [useCatalog] = useState(true)
-  const [productRefsEnabled, setProductRefsEnabled] = useState(false)
+  const [concepts, setConcepts] = useState<DesignConcept[]>([])
+  const [compatibility, setCompatibility] = useState<DesignCompatibility>({})
+  const [conceptKey, setConceptKey] = useState<string | null>(null)
+  const [aiPickBusy, setAiPickBusy] = useState(false)
   const [selectedOffers, setSelectedOffers] = useState<Record<string, ProductOffer>>({})
   const [openSummaryTab, setOpenSummaryTab] = useState<string | null>(null)
   const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
@@ -287,6 +298,16 @@ export function GenerationPanel({
   }, [])
 
   useEffect(() => {
+    fetch('/api/design')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (Array.isArray(d?.concepts) && d.concepts.length) setConcepts(d.concepts)
+        if (d?.compatibility && typeof d.compatibility === 'object') setCompatibility(d.compatibility)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     fetch('/api/room-types')
       .then(r => r.ok ? r.json() : null)
       .then(list => {
@@ -326,7 +347,7 @@ export function GenerationPanel({
         setRoomType(d.room_type || null)
         if (d.room_type) setRoomTypes(prev => prev.includes(d.room_type) ? prev : [...prev, d.room_type])
         setPriceTier(d.price_tier || 'comfort')
-        setProductRefsEnabled(d.product_refs_enabled === true)
+        setConceptKey(d.concept_key || null)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
         setPhotoError(''); setGenError(d.notice || '')
@@ -559,6 +580,7 @@ export function GenerationPanel({
         const fd = new FormData()
         fd.append('photo', file)
         fd.append('style', styleName)
+        fd.append('concept', conceptKey || '')
         fd.append('room_type', roomType)
         if (cleanupFile) fd.append('cleanup_photo', cleanupFile)
         if (isBedRoom) fd.append('bed_length_m', '2')
@@ -572,7 +594,7 @@ export function GenerationPanel({
         if (!r.ok) throw new Error(d.error || String(r.status))
         id = d.id
         setRoomId(id)
-        setProductRefsEnabled(d.product_refs_enabled === true)
+        if (d.concept_key) setConceptKey(d.concept_key)
       } else {
         const fd = new FormData()
         fd.append('text', request)
@@ -626,8 +648,7 @@ export function GenerationPanel({
         dimensionsEstimate: render.dimensions_estimate || null,
         lens: render.lens || null,
         repairScope: render.repair_scope || null,
-        productRefs: render.product_refs || [],
-        productRefsEnabled: room.product_refs_enabled === true,
+        designDirection: render.design_direction || null,
       }
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
@@ -697,12 +718,26 @@ export function GenerationPanel({
     if (photoInput.current) photoInput.current.value = ''
   }
 
+  const pickRandomDesign = async () => {
+    if (aiPickBusy) return
+    setAiPickBusy(true)
+    try {
+      const r = await fetch('/api/design/random', { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok || !d.style_id || !d.concept_id) return
+      const preset = stylePresets.find(item => item.key === d.style_id)
+      if (preset) setStyle(preset.name)
+      setConceptKey(d.concept_id)
+    } catch { /* тихо: пользователь выберет вручную */ } finally {
+      setAiPickBusy(false)
+    }
+  }
+
   const activeStep = stepIndex(step)
   const genStages = genMode === 'edit' ? EDIT_GEN_STAGES : [
     ...BASE_GEN_STAGES.slice(0, 1),
     ...(cleanupRequested ? [{ key: 'cleanup', label: 'Очистка', hint: 'Убираем мебель и готовим пустую комнату' }] : []),
     ...BASE_GEN_STAGES.slice(1, 3),
-    ...(productRefsEnabled ? [{ key: 'product_refs', label: 'Товары в кадре', hint: 'Подбираем референсы товаров Hoff' }] : []),
     ...BASE_GEN_STAGES.slice(3),
   ]
   const genStageIndex = Math.max(0, genStages.findIndex(item => item.key === genStage))
@@ -802,7 +837,7 @@ export function GenerationPanel({
             {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите одно направление — оно задаст палитру, материалы и свет.</p>}
             <div className="mt-8 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3 lg:grid-cols-5">
               {stylePresets.map((item) => (
-                <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => setStyle(item.name)} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { setStyle(item.name); setConceptKey(null) }} className={`group relative bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
                   <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
                     <img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
                     {style === item.name && (
@@ -818,15 +853,46 @@ export function GenerationPanel({
               ))}
             </div>
 
+            <div className="mt-10 border-t pt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="eyebrow">Шаг 03 / Концепция</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{style ? 'Выберите главный ход будущего интерьера.' : 'Сначала выберите стиль — покажем совместимые концепции.'}</p>
+                </div>
+                <button type="button" onClick={() => void pickRandomDesign()} disabled={aiPickBusy} className="action-secondary min-h-10 px-3 text-xs">
+                  {aiPickBusy ? <><LoaderCircle className="size-3.5 animate-spin" /> Подбираем…</> : 'На усмотрение ИИ'}
+                </button>
+              </div>
+              <div className="mt-4 grid gap-px border bg-border sm:grid-cols-2 lg:grid-cols-3">
+                {concepts.map((concept) => {
+                  const selectedKey = stylePresets.find(item => item.name === style)?.key || null
+                  const level = selectedKey ? (compatibility[concept.id]?.[selectedKey] || 'ok') : 'ok'
+                  const disabled = !style || level === 'conflict'
+                  const selected = conceptKey === concept.id
+                  return (
+                    <button key={concept.id} type="button" disabled={disabled} aria-pressed={selected} onClick={() => setConceptKey(concept.id)} className={`bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                      <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                        {concept.name}
+                        {selected ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{concept.main_move}</span>
+                      <span className="mt-1 block text-[10px] uppercase tracking-wide text-muted-foreground">{level === 'weaken' ? 'ослабленная форма' : level === 'conflict' ? 'несовместимо со стилем' : 'совместимо'}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => setStep('photo')} className="action-secondary"><ArrowLeft className="size-4" />Назад</button>
               <button
                 type="button"
-                disabled={busy || !style}
+                disabled={busy || !style || (concepts.length > 0 && !conceptKey)}
                 onClick={() => {
-                  const request = style ? `Стиль: ${style}` : 'Стиль по референсу'
+                  const conceptName = concepts.find(item => item.id === conceptKey)?.name
+                  const request = style ? `Стиль: ${style}${conceptName ? ` · концепция: ${conceptName}` : ''}` : 'Стиль по референсу'
                   void startGeneration(request, style ?? 'Референс пользователя')
                 }}
                 className="action-primary min-h-14 px-8 text-base disabled:opacity-40"
@@ -933,19 +999,30 @@ export function GenerationPanel({
                     </dl>
                   </section>
                 ) : null}
-                {current.productRefs?.length ? (
-                  <section className="mt-6 border p-4" aria-labelledby="included-products">
-                    <p id="included-products" className="eyebrow">Что вошло в дизайн</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Эти товары Hoff были добавлены референсами в базовый кадр.</p>
-                    <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
-                      {current.productRefs.map((ref, index) => (
-                        <div key={`${ref.offer_id || ref.name}-${index}`} className="w-40 shrink-0 border p-2">
-                          <p className="line-clamp-2 text-xs font-medium leading-4">{ref.name}</p>
-                          <p className="mt-1 text-[11px] text-muted-foreground">{ref.category || 'товар'}{ref.price ? ` · ${rub(Number(ref.price))}` : ''}</p>
-                          {ref.why ? <p className="mt-1 line-clamp-3 text-[10px] leading-4 text-muted-foreground">{ref.why}</p> : null}
-                        </div>
-                      ))}
-                    </div>
+                {current.designDirection ? (
+                  <section className="mt-6 border p-4" aria-labelledby="design-direction">
+                    <p id="design-direction" className="eyebrow">Направление дизайна</p>
+                    {current.designDirection.concept ? <p className="mt-2 text-sm font-medium">{current.designDirection.concept}</p> : null}
+                    {current.designDirection.mainMove?.action ? (
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {current.designDirection.mainMove.target ? `${current.designDirection.mainMove.target}: ` : ''}
+                        {current.designDirection.mainMove.action}
+                        {current.designDirection.mainMove.effect ? ` — ${current.designDirection.mainMove.effect}` : ''}
+                      </p>
+                    ) : null}
+                    {current.designDirection.palette?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {current.designDirection.palette.map((color) => (
+                          <span key={`${color.hex}-${color.name || ''}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <span className="size-4 border border-foreground/20" style={{ background: color.hex }} />
+                            {color.name || color.hex}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {current.designDirection.materialsStory?.length ? <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Материалы: {current.designDirection.materialsStory.join(', ')}</p> : null}
+                    {current.designDirection.focalPoint ? <p className="mt-1 text-[11px] leading-5 text-muted-foreground">Фокус: {current.designDirection.focalPoint}</p> : null}
+                    {current.designDirection.compatibility === 'weaken' ? <p className="mt-1 text-[11px] text-muted-foreground">Ослабленная форма пары</p> : null}
                   </section>
                 ) : null}
                 {heroItems.length ? (

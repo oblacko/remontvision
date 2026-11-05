@@ -4,6 +4,16 @@
 
 Дата обновления: 2026-11-05. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-05 — стиль × концепт, новый агент-дизайнер, отказ от товаров в кадре
+
+- **Новые 10 стилей.** Каталог из `designer-agent-instruction-v1`: `minimalism, scandinavian, japandi, loft, neoclassic, eco, dark_contemporary, art_deco, mediterranean, memphis_accent` с палитрой base/support/dark/accent и материалами. Миграция `040_design_styles_concepts.sql` канонизирует ключи, вставляет 10 стилей и скрывает старые (`active=false`); старые комнаты и рендеры не ломаются.
+- **10 концепций.** Таблица `concepts` — текстовые карточки (главный ход + спокойные зоны): `accent_block, monochrome_depth, heavy_light, light_sculpture, nature_focus, graphic_rhythm, asymmetric_balance, tactile_base, one_exception, horizontal_division`. Матрица совместимости: 83 ok / 10 weaken / 7 conflict (`src/designdata.js`).
+- **Выбор пользователя.** Фото → стиль → концепция (✗ пары disabled, «~» помечены «ослабленная форма»). Кнопка «На усмотрение ИИ» — случайная ok-пара без повторов; реестр `design_registry` помнит пары по пользователю.
+- **Новый агент-дизайнер.** `src/designeragent.js` + версионируемый кинд `direction` в админке. После выбора style×concept собирает `DesignDirection` без фото: main_move, palette_hex, focal_point/zone, quiet_areas, materials_story, prompt_en. Старый свободный арт-директор остаётся fallback-ом за `DESIGN_DIRECTION_ENABLED`; размеры и объектив по-прежнему оценивает фото-проход.
+- **Товары в кадре убраны.** `product_refs`/`product_plan` и шаг «Товары в кадре» удалены из генерации, DTO и UI («Что вошло в дизайн»). Подбор товаров по рендеру для сметы сохранён.
+- **UI результата.** Блок «Направление дизайна» показывает концепцию, главный ход, палитру, материалы и фокус.
+- Тесты: `npm test` 159/159; build OK; миграция проверена на копии схемы (10 активных стилей, 10 концепций, `design_registry`).
+
 ## 2026-11-05 — строитель и рецензент, промты в админке, удаление style reference
 
 - **Проход A — строитель.** `buildArtDirection`/`buildRepairScope` получает original_photo и cleaned_shell (если очистка включена), возвращает `repair_scope`: пол, потолок, стены, двери, окна, хранение, направление. Арт-директор при очистке читает пустую комнату, а не оригинал.

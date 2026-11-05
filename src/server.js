@@ -39,6 +39,7 @@ import { getSearchConfig, saveSearchConfig, resetSearchConfig, loadSearchConfig 
 import { listSearchPrompts, createPromptVersion, activatePromptVersion, loadSearchPrompts, seedSearchPrompts, DEFAULT_SEARCH_PROMPTS, PROMPT_KINDS } from './searchprompts.js';
 import { listArchitectPrompts, createArchitectPromptVersion, activateArchitectPromptVersion, loadArchitectPrompts, seedArchitectPrompts, DEFAULT_ARCHITECT_PROMPTS, ARCHITECT_PROMPT_KINDS, getArchitectPrompt } from './architectprompts.js';
 import { getStyleConfig, getStyleDefaults, saveStyleConfig, resetStyleConfig, loadStyleConfig } from './styleconfig.js';
+import { DESIGN_STYLES, DESIGN_CONCEPTS, pickRandomCompatiblePair, compatibilityOf } from './designdata.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 
 const PORT = Number(process.env.PORT || 3000);
@@ -261,6 +262,26 @@ app.get('/api/styles', h(async (_req, res) => {
   res.json((await q.styles(true)).map(styleDto));
 }));
 app.get('/api/room-types', (_req, res) => res.json(activeRoomTypeNames()));
+
+app.get('/api/design', (_req, res) => {
+  res.json({
+    styles: DESIGN_STYLES.map(({ id, name, palette, materials }) => ({ id, name, palette, materials })),
+    concepts: DESIGN_CONCEPTS.map(({ id, name, main_move, quiet_areas, description }) => ({
+      id, name, main_move, quiet_areas, description,
+    })),
+    compatibility: Object.fromEntries(DESIGN_CONCEPTS.map(concept => [
+      concept.id,
+      Object.fromEntries(DESIGN_STYLES.map(style => [style.id, compatibilityOf(style.id, concept.id)])),
+    ])),
+  });
+});
+
+// «На усмотрение ИИ»: случайная совместимая пара без повторов у пользователя.
+app.post('/api/design/random', rateLimit, h(async (req, res) => {
+  const rows = req.user ? await q.designRegistryForUser(req.user.id) : [];
+  const usedPairs = rows.map(row => `${row.style_key}:${row.concept_key}`);
+  res.json(pickRandomCompatiblePair({ usedPairs }));
+}));
 
 // ---------- авторизация (e-mail код; заделка под OAuth yandex/vk/mailru) ----------
 app.post('/api/auth/request-code', rateLimit, h(async (req, res) => {
@@ -1265,11 +1286,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
     }
   }
   const id = crypto.randomUUID();
-  const allowedStyles = [
-    'Современный', 'Светлый', 'Тёмный', 'Классика',
-    'Скандинавский', 'Лофт', 'Джапанди', 'Неоклассика', 'Минимализм',
-    'Тёмный модерн', 'Бохо', 'Ар-деко', 'Кантри',
-  ];
+  const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
   const requestedStyle = String(req.body?.style || '').trim();
   const requestedRoomType = String(req.body?.room_type || '').trim();
   if (!requestedStyle) {
@@ -1278,8 +1295,10 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const roomType = ROOM_TYPE_NAMES.includes(requestedRoomType) && isRoomTypeActive(requestedRoomType) ? requestedRoomType : 'Другое';
   const dbStyle = requestedStyle ? await q.styleByName(requestedStyle) : null;
   const style = requestedStyle
-    ? (dbStyle && dbStyle.active ? dbStyle.name : (allowedStyles.includes(requestedStyle) ? requestedStyle : 'Современный'))
-    : 'Современный';
+    ? (dbStyle && dbStyle.active ? dbStyle.name : (canonicalStyleNames.has(requestedStyle) ? requestedStyle : 'Современный минимализм'))
+    : 'Современный минимализм';
+  const requestedConcept = String(req.body?.concept || '').trim();
+  const conceptKey = DESIGN_CONCEPTS.some(item => item.id === requestedConcept) ? requestedConcept : null;
   const allowedPalettes = new Set(['none', 'mono', 'analogous', 'complementary', 'split']);
   const allowedAccents = new Set(['none', 'forest', 'sand', 'terra', 'dust', 'graphite']);
   const palette = allowedPalettes.has(req.body.palette) ? req.body.palette : 'none';
@@ -1315,7 +1334,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const dimensionOrientation = String(req.body.dimension_orientation || '').trim().slice(0, 200) || null;
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, conceptKey);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
@@ -1327,7 +1346,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
     }
     throw e;
   }
-  res.status(201).json({ id, status: 'queued', product_refs_enabled: getRenderConfig().product_refs_enabled });
+  res.status(201).json({ id, status: 'queued', concept_key: conceptKey });
 }));
 
 app.get('/api/rooms/:id', h(async (req, res) => {
@@ -1357,7 +1376,8 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     keep_furniture: room.keep_furniture !== false,
     use_catalog: room.use_catalog !== false,
     products_enabled: getRenderConfig().product_matching_enabled,
-    product_refs_enabled: getRenderConfig().product_refs_enabled,
+    concept_key: room.concept_key || null,
+    design_direction: room.design_direction || null,
     status: room.status,
     error: room.error,
     notice: room.notice || null,
@@ -1388,7 +1408,17 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       dimensions_estimate: render.meta?.room_dimensions_estimate || null,
       lens: render.meta?.lens || null,
       repair_scope: render.meta?.repair_scope || null,
-      product_refs: Array.isArray(render.meta?.product_refs) ? render.meta.product_refs : [],
+      design_direction: render.meta?.design_direction ? {
+        conceptId: render.meta.design_direction.conceptId || null,
+        concept: render.meta.design_direction.concept || '',
+        mainMove: render.meta.design_direction.mainMove || null,
+        focalPoint: render.meta.design_direction.focalPoint || '',
+        focalZone: render.meta.design_direction.focalZone || null,
+        quietAreas: render.meta.design_direction.quietAreas || [],
+        materialsStory: render.meta.design_direction.materialsStory || [],
+        palette: render.meta.design_direction.palette || [],
+        compatibility: render.meta.design_direction.compatibility || 'ok',
+      } : null,
     } : null,
     items: items.map(p => ({
       id: p.id,

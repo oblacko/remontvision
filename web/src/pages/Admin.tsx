@@ -268,7 +268,7 @@ export default function Admin() {
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [architectPrompts, setArchitectPrompts] = useState<ArchitectPromptsState | null>(null)
-  const [architectKind, setArchitectKind] = useState<'designer' | 'builder' | 'reviewer' | 'criteria'>('builder')
+  const [architectKind, setArchitectKind] = useState<'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction'>('builder')
   const [architectDraft, setArchitectDraft] = useState('')
   const [architectBusy, setArchitectBusy] = useState(false)
   const [architectNotice, setArchitectNotice] = useState('')
@@ -700,7 +700,7 @@ export default function Admin() {
     try { setPromptRows(await readJson(await api('/api/admin/renders?limit=150'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
-  const loadArchitectPrompts = async (kind: 'designer' | 'builder' | 'reviewer' | 'criteria' = architectKind) => {
+  const loadArchitectPrompts = async (kind: 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' = architectKind) => {
     try {
       const d = await readJson(await api('/api/admin/architect-prompts')) as ArchitectPromptsState
       setArchitectPrompts(d)
@@ -708,7 +708,7 @@ export default function Admin() {
       setArchitectNotice('')
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
-  const selectArchitectKind = (kind: 'designer' | 'builder' | 'reviewer' | 'criteria') => {
+  const selectArchitectKind = (kind: 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction') => {
     setArchitectKind(kind)
     setArchitectDraft(architectPrompts?.[kind]?.active?.system || '')
     setArchitectNotice('')
@@ -1238,7 +1238,7 @@ export default function Admin() {
               </div>
               {architectNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{architectNotice}</p>}
               <div className="mt-5 flex flex-wrap gap-2">
-                {([['designer', 'Дизайнер'], ['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки']] as const).map(([kind, label]) => (
+                {([['designer', 'Дизайнер'], ['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки'], ['direction', 'Агент направлений']] as const).map(([kind, label]) => (
                   <button key={kind} type="button" onClick={() => selectArchitectKind(kind)} className={`min-h-10 border px-3 text-sm ${architectKind === kind ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
                 ))}
               </div>
@@ -1476,7 +1476,7 @@ export default function Admin() {
                 {renderNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{renderNotice}</p>}
                 {renderConfig ? (
                   <div className="mt-6 space-y-5">
-                    <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={renderConfig.product_refs_enabled} onChange={e => setRenderConfig({ ...renderConfig, product_refs_enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Товары в рендере включены</span><span className="mt-1 block text-xs text-muted-foreground">Если выключено — базовый кадр без товарных референсов (текущее design-first поведение).</span></span></label>
+                    <label className="flex items-center gap-3 border p-3 text-sm opacity-60"><input type="checkbox" checked={false} disabled className="size-4 accent-primary" /><span><span className="font-medium">Товары в рендере отключены</span><span className="mt-1 block text-xs text-muted-foreground">Функция убрана: базовый кадр больше не добавляет товарные референсы.</span></span></label>
                     <div><label className="eyebrow mb-2 block">Сколько товаров в кадре</label><input type="number" min={2} max={4} value={renderConfig.max_products} onChange={e => setRenderConfig({ ...renderConfig, max_products: Math.max(2, Math.min(4, Number(e.target.value) || 3)) })} className="h-11 w-40 border bg-background px-3 text-sm outline-none focus:border-primary" /><span className="ml-3 text-xs text-muted-foreground">2–4 hero-товара</span></div>
                     <p className="text-xs text-muted-foreground">Источник — catalog-service (Hoff). Включать только после A/B-проверки, что качество не проседает.</p>
                   </div>
