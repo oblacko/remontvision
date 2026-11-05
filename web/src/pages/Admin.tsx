@@ -4,7 +4,7 @@ import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } fr
 import { SearchLab } from '@/components/SearchLab'
 import '../App.css'
 
-type Tab = 'users' | 'packs' | 'rooms' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'render' | 'articles' | 'procurement' | 'search' | 'proxy' | 'catalog'
+type Tab = 'users' | 'packs' | 'rooms' | 'styles' | 'rules' | 'prompts' | 'models' | 'cleanup' | 'render' | 'articles' | 'procurement' | 'search' | 'proxy' | 'catalog' | 'architect'
 type AdminUser = {
   id: number; email: string; balance: number; rooms_count: number; renders_count: number;
   created_at: string; last_generation_at: string | null;
@@ -26,6 +26,8 @@ type PromptRow = {
   meta?: { mode?: string; target?: string | null; refs?: Array<{ index: number; role: string; label?: string }>; cleanup?: { model?: string; resolution?: string; cost_usd?: number | null; shell_path?: string; error?: string } | null } | null;
 }
 type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
+type ArchitectPromptRow = { id: number; kind: string; version: number; system: string; active: boolean }
+type ArchitectPromptsState = Record<string, { rows: ArchitectPromptRow[]; active: { id: number | null; version: number; system: string } }>
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
 type Style = {
   id: number; key: string; name: string; accent: string; description: string;
@@ -265,6 +267,11 @@ export default function Admin() {
   const [styleReferenceNotice, setStyleReferenceNotice] = useState('')
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
+  const [architectPrompts, setArchitectPrompts] = useState<ArchitectPromptsState | null>(null)
+  const [architectKind, setArchitectKind] = useState<'builder' | 'reviewer' | 'criteria'>('builder')
+  const [architectDraft, setArchitectDraft] = useState('')
+  const [architectBusy, setArchitectBusy] = useState(false)
+  const [architectNotice, setArchitectNotice] = useState('')
   const [styles, setStyles] = useState<Style[]>([])
   const [selectedStyleId, setSelectedStyleId] = useState<number | null>(null)
   const [styleDetail, setStyleDetail] = useState<StyleDetail | null>(null)
@@ -693,6 +700,53 @@ export default function Admin() {
     try { setPromptRows(await readJson(await api('/api/admin/renders?limit=150'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
+  const loadArchitectPrompts = async (kind: 'builder' | 'reviewer' | 'criteria' = architectKind) => {
+    try {
+      const d = await readJson(await api('/api/admin/architect-prompts')) as ArchitectPromptsState
+      setArchitectPrompts(d)
+      setArchitectDraft(d[kind]?.active?.system || '')
+      setArchitectNotice('')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const selectArchitectKind = (kind: 'builder' | 'reviewer' | 'criteria') => {
+    setArchitectKind(kind)
+    setArchitectDraft(architectPrompts?.[kind]?.active?.system || '')
+    setArchitectNotice('')
+  }
+  const saveArchitectPrompt = async () => {
+    setArchitectBusy(true); setArchitectNotice(''); setAdminError('')
+    try {
+      const created = await readJson(await api('/api/admin/architect-prompts', {
+        method: 'POST', body: JSON.stringify({ kind: architectKind, system: architectDraft }),
+      }))
+      await api(`/api/admin/architect-prompts/${created.id}/activate`, {
+        method: 'POST', body: JSON.stringify({ kind: architectKind }),
+      })
+      await loadArchitectPrompts(architectKind)
+      setArchitectNotice('Новая версия создана и активирована')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сохранить промт') }
+    finally { setArchitectBusy(false) }
+  }
+  const activateArchitectPrompt = async (id: number) => {
+    setArchitectBusy(true); setArchitectNotice(''); setAdminError('')
+    try {
+      await api(`/api/admin/architect-prompts/${id}/activate`, {
+        method: 'POST', body: JSON.stringify({ kind: architectKind }),
+      })
+      await loadArchitectPrompts(architectKind)
+      setArchitectNotice('Версия активирована')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось активировать версию') }
+    finally { setArchitectBusy(false) }
+  }
+  const resetArchitectPrompts = async () => {
+    setArchitectBusy(true); setArchitectNotice(''); setAdminError('')
+    try {
+      await api('/api/admin/architect-prompts/reset', { method: 'POST' })
+      await loadArchitectPrompts(architectKind)
+      setArchitectNotice('Возвращены заводские промты')
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Не удалось сбросить промты') }
+    finally { setArchitectBusy(false) }
+  }
   const loadStyle = async (id: number) => {
     setSelectedStyleId(id); setKit(null); setKitNotice('')
     try {
@@ -707,7 +761,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'render') loadRender(); if (tab === 'articles') { loadArticles(); if (!styles.length) loadStyles() } if (tab === 'procurement') loadProcurement() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'architect') loadArchitectPrompts(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'render') loadRender(); if (tab === 'articles') { loadArticles(); if (!styles.length) loadStyles() } if (tab === 'procurement') loadProcurement() }, [authed, tab])
   useEffect(() => { if (authed) void loadRoomTypes() }, [authed])
   useEffect(() => {
     if (!authed) return
@@ -897,7 +951,7 @@ export default function Admin() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="eyebrow">Управление</p><h1 className="display-title mt-2 text-4xl">Админка</h1></div>
             <nav className="flex border-b" aria-label="Разделы админки">
-              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['rooms', 'Комнаты'], ['styles', 'Стили'], ['rules', 'Промт'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['render', 'Генерация'], ['articles', 'Статьи'], ['procurement', 'Поиск'], ['search', 'Поиск (лаб)'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
+              {([['users', 'Пользователи'], ['packs', 'Пакеты кредитов'], ['rooms', 'Комнаты'], ['styles', 'Стили'], ['rules', 'Промт'], ['architect', 'Архитектор'], ['prompts', 'Логи'], ['models', 'Модели'], ['cleanup', 'Очистка'], ['render', 'Генерация'], ['articles', 'Статьи'], ['procurement', 'Поиск'], ['search', 'Поиск (лаб)'], ['proxy', 'Прокси'], ['catalog', 'Каталог']] as const).map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTab(id)} className={`min-h-12 border-b-2 px-4 text-sm transition-colors ${tab === id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -1167,6 +1221,51 @@ export default function Admin() {
                   <p className="text-xs text-muted-foreground">После сохранения новые генерации используют эти правила. Уже готовые рендеры не меняются.</p>
                 </div>
               ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем правила…</p>}
+            </div>
+          )}
+
+          {tab === 'architect' && (
+            <div className="mt-8 max-w-5xl">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="eyebrow">Промты архитектора</p>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Строитель анализирует исходное состояние и формирует repair_scope. Рецензент смотрит готовый рендер и формирует changes. JSON-контракт фиксирован в коде; здесь редактируются только инструкции.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={architectBusy} onClick={() => void resetArchitectPrompts()} className="action-secondary">Сбросить всё</button>
+                  <button type="button" disabled={architectBusy || !architectDraft.trim()} onClick={() => void saveArchitectPrompt()} className="action-primary">{architectBusy ? 'Сохраняем…' : 'Сохранить как новую версию'}</button>
+                </div>
+              </div>
+              {architectNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{architectNotice}</p>}
+              <div className="mt-5 flex flex-wrap gap-2">
+                {([['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки']] as const).map(([kind, label]) => (
+                  <button key={kind} type="button" onClick={() => selectArchitectKind(kind)} className={`min-h-10 border px-3 text-sm ${architectKind === kind ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
+                ))}
+              </div>
+              {architectPrompts ? (
+                <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_20rem]">
+                  <label className="block">
+                    <span className="eyebrow">System-промт</span>
+                    <textarea value={architectDraft} onChange={e => setArchitectDraft(e.target.value)} rows={22} maxLength={12000} className="mt-2 w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" />
+                    <span className="mt-2 block text-xs text-muted-foreground">Активная версия: v{architectPrompts[architectKind]?.active?.version || 0}. Плейсхолдеры контракта не удаляйте: ответ валидируется на сервере.</span>
+                  </label>
+                  <div>
+                    <p className="eyebrow">Версии · {architectKind}</p>
+                    <div className="mt-3 space-y-2">
+                      {(architectPrompts[architectKind]?.rows || []).map(row => (
+                        <div key={row.id} className={`border p-3 text-xs ${row.active ? 'border-primary bg-primary/5' : 'border-foreground/20'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">v{row.version} {row.active ? '· активна' : ''}</span>
+                            {!row.active && <button type="button" disabled={architectBusy} onClick={() => void activateArchitectPrompt(row.id)} className="underline underline-offset-2">Активировать</button>}
+                          </div>
+                          <p className="mt-1 line-clamp-3 text-muted-foreground">{row.system}</p>
+                        </div>
+                      ))}
+                      {!(architectPrompts[architectKind]?.rows || []).length && <p className="border border-dashed p-4 text-xs text-muted-foreground">Версий пока нет.</p>}
+                    </div>
+                  </div>
+                </div>
+              ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем промты…</p>}
             </div>
           )}
 

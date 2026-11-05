@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { normalizeRoomDimensions, normalizeLens } = await import('../src/artdirector.js');
+const { normalizeRoomDimensions, normalizeLens, normalizeRepairScope } = await import('../src/artdirector.js');
 
 test('normalizeRoomDimensions validates and rounds architect estimates', () => {
   assert.deepEqual(normalizeRoomDimensions({ width_m: 2.84, length_m: 4.16, height_m: 2.61, confidence: 'high' }), {
@@ -31,4 +31,23 @@ test('normalizeLens keeps focal length, type, distortion and correction', () => 
   });
   assert.equal(normalizeLens({ type: 'fisheye', distortion: 'huge' }).type, null);
   assert.equal(normalizeLens(null), null);
+});
+
+test('normalizeRepairScope keeps null, keep and valid actions, drops unknown', () => {
+  const out = normalizeRepairScope({
+    floor: { action: 'replace', material: 'светлый дуб', why: 'старый ламинат' },
+    ceiling: { action: 'keep', why: 'ровный' },
+    walls: { action: 'tile', why: 'недопустимо' },
+    doors: null,
+    windows: { action: 'fill', why: 'откосы' },
+    storage: ['шкаф в нише', 42, ''],
+    style_dir: 'тёплый минимализм',
+  });
+  assert.equal(out.floor.action, 'replace');
+  assert.equal(out.ceiling.action, 'keep');
+  assert.equal(out.walls, null);
+  assert.equal(out.doors, null);
+  assert.equal(out.windows.action, 'fill');
+  assert.deepEqual(out.storage, ['шкаф в нише', '42']);
+  assert.equal(out.style_dir, 'тёплый минимализм');
 });

@@ -20,7 +20,7 @@ import { modelCaps } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
-import { buildArtDirection } from './artdirector.js';
+import { buildArtDirection, buildRepairScope } from './artdirector.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -105,6 +105,7 @@ async function processRender(renderId) {
   // Себестоимость полной генерации: каждый внешний запрос пишется отдельно.
   const costBreakdown = {
     art_direction: null,
+    repair_scope: null,
     cleanup: null,
     design: null,
     design_retry: null,
@@ -238,6 +239,34 @@ async function processRender(renderId) {
         }
       }
 
+      // Проход A: строитель определяет объём ремонта по исходному фото и cleaned shell.
+      let repairScope = null;
+      if (!MOCK_MODE) {
+        try {
+          const originalBuf = await getBuffer(room.photo_path || sourceStored);
+          const cleanedBuf = precleanedShell ? await getBuffer(precleanedShell) : null;
+          const repair = await buildRepairScope({
+            originalImageDataUrl: await bufferToDataUrl(originalBuf),
+            cleanedImageDataUrl: cleanedBuf ? await bufferToDataUrl(cleanedBuf) : null,
+            roomType,
+            style: room.style,
+            styleDescription: styleInfo?.prompt_description || '',
+          });
+          if (repair?.repairScope) {
+            repairScope = repair.repairScope;
+            meta.repair_scope = repair.repairScope;
+            meta.repair_prompt_version = repair.promptVersion ?? null;
+            addCost('repair_scope', repair.cost);
+            log({ event: 'repair_scope_ok', room_id: room.id, render_id: renderId, input: precleanedShell ? 'cleaned_shell' : 'original', floor: repair.repairScope.floor?.action || null, ceiling: repair.repairScope.ceiling?.action || null, doors: repair.repairScope.doors?.action || null, cost_usd: repair.cost ?? null });
+          } else {
+            log({ event: 'repair_scope_empty', room_id: room.id, render_id: renderId });
+          }
+        } catch (e) {
+          log({ event: 'repair_scope_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+      meta.art_direction_input = precleanedShell ? 'cleaned_shell' : 'original';
+
       // Арт-директор читает реальное фото и пишет bespoke-направление под стиль.
       // Без него дизайн скатывается к шаблонному «стиль + нейтральная комната».
       let artDirection = '';
@@ -246,7 +275,7 @@ async function processRender(renderId) {
       if (!MOCK_MODE) {
         try {
           const adStart = Date.now();
-          const adBuf = await getBuffer(room.photo_path || sourceStored);
+          const adBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
           const ad = await buildArtDirection({
             imageDataUrl: await bufferToDataUrl(adBuf),
             roomType,
@@ -326,6 +355,7 @@ async function processRender(renderId) {
         imageMap,
         dimensions: estimatedDimensions,
         artDirection,
+        repairScope,
         productRefs: productRefsDetailed.length > 0,
       });
 

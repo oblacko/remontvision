@@ -38,6 +38,10 @@ type ArchitectLayer = {
   effort?: 'low' | 'medium' | 'high'; risk?: 'low' | 'medium' | 'high'
   preserve?: string; actions?: { target?: string; action: string; why?: string }[]
 }
+type ArchitectChange = {
+  layer: string; label: string; current: string; change: string
+  impact: number; effort?: 'low' | 'medium' | 'high'; target?: string
+}
 type Architect = {
   room?: {
     type?: string; style?: string; lighting?: string
@@ -51,6 +55,7 @@ type Architect = {
   issues?: string[]
   hints?: ArchitectHint[]
   layers?: ArchitectLayer[]
+  changes?: ArchitectChange[]
   electrical?: ElectricalItem[]
   summary?: { concept?: string; palette?: string; materials?: string; electrical?: string; next_steps?: string[] } | null
 }
@@ -929,15 +934,13 @@ export function GenerationPanel({
                 <div className="mt-4 space-y-2">
                   {iterations.map((item, index) => {
                     const expanded = openHistory === item.id
-                    const quickEdits = (item.analysis?.architect?.layers || [])
-                      .flatMap(layer => (layer.actions || []).map(action => ({
-                        target: action.target || layer.key,
-                        action: action.action,
-                        why: action.why,
-                        impact: layer.impact || 0,
-                        layerLabel: layer.label,
-                      })))
-                      .sort((a, b) => b.impact - a.impact)
+                    const quickEdits = (item.analysis?.architect?.changes || []).map(change => ({
+                      target: change.target || change.layer,
+                      action: change.change,
+                      why: change.current,
+                      impact: change.impact || 0,
+                      layerLabel: change.label || change.layer,
+                    })).sort((a, b) => b.impact - a.impact)
                     const visibleEdits = showAllHints ? quickEdits : quickEdits.slice(0, 3)
                     return (
                       <div key={item.id} className="border border-foreground/25">
@@ -1139,6 +1142,22 @@ export function GenerationPanel({
               </div>
 
               <div className="space-y-8">
+                {current.analysis?.architect?.changes?.length ? (
+                  <section aria-labelledby="gen-changes">
+                    <h4 id="gen-changes" className="eyebrow mb-4">Что можно изменить</h4>
+                    <ol className="divide-y border-y">
+                      {current.analysis.architect.changes.map((change, index) => (
+                        <li key={`${change.layer}-${index}`} className="flex gap-3 py-3 text-sm">
+                          <span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+                          <div>
+                            <p className="font-medium">{change.change}</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{change.label} · сейчас: {change.current}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                ) : null}
                 {current.analysis?.final ? (
                   <section aria-labelledby="gen-final">
                     <h4 id="gen-final" className="eyebrow mb-4">Итог по дизайну</h4>

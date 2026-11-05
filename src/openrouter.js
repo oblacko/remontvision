@@ -261,6 +261,7 @@ export function buildPrompt({
   imageMap = [],
   dimensions = null,
   artDirection = '',
+  repairScope = null,
   productRefs = false,
 }) {
   const tierKey = normalizeTier(priceTier);
@@ -332,15 +333,42 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
     ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
   ].filter(Boolean).join(' ');
 
+  const repairLines = repairScope
+    ? Object.entries({
+        floor: repairScope.floor,
+        ceiling: repairScope.ceiling,
+        walls: repairScope.walls,
+        doors: repairScope.doors,
+        windows: repairScope.windows,
+      }).map(([key, item]) => item
+        ? `${key}: action=${item.action}${item.material ? `; material=${item.material}` : ''}${item.style ? `; style=${item.style}` : ''}${item.why ? `; why=${item.why}` : ''}`
+        : `${key}: null`)
+      : [];
+  const repairScopeText = repairScope
+    ? `\nREPAIR SCOPE — EXPLICIT PERMISSIONS
+${repairLines.join('\n')}
+${repairScope.storage?.length ? `storage: ${repairScope.storage.join('; ')}` : 'storage: no specific requirements'}
+${repairScope.style_dir ? `direction: ${repairScope.style_dir}` : ''}
+Rules:
+- action=keep: preserve the element.
+- action is not keep: perform the change; do not preserve the old finish just to match the source photo.
+- null: no justified work; do not invent construction.
+- Always preserve room geometry, wall positions, window and door openings.
+`
+    : '';
+
   return `${roles}
 
 TASK
-Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} after a cosmetic renovation in the selected style.
-This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.
+Create a photorealistic, aspirational editorial photograph of the SAME ${roomName} ${repairScope ? 'after a full renovation in the selected style' : 'after a cosmetic renovation in the selected style'}.
+${repairScope
+  ? 'This is a renovation, not a styling pass. The room volume, window and door openings and camera must remain identical, but finishes, floor, ceiling, doors, windows, furniture, lighting and textiles may change exactly as REPAIR SCOPE allows.'
+  : 'This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.'}
 The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
 ${productRefs ? 'This render includes specific hero products shown in the reference images. Place each one naturally in the room, keep its exact shape, colour, material and proportions, light it with the room\'s own light and add a soft contact shadow.' : 'This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.'}
 
 ${architectureLock}
+${repairScopeText}
 ${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY
@@ -355,7 +383,9 @@ Keep the existing functional zones and furniture positions. The bed stays agains
 
 CHANGE / DEEP TRANSFORMATION
 ${change}.
-If a floor product is listed below, change only its surface finish; do not change the floor plane or geometry. If no floor product is listed, preserve the existing floor. Style words such as "light oak" refer to furniture and joinery only, not to replacing the floor unless a floor product is explicitly listed. The same applies to walls: change only the surface finish when a wall finish is listed.
+${repairScope
+  ? 'Follow REPAIR SCOPE for floor, walls, ceiling, doors and windows. Do not fall back to preserving the old finish when the scope says change.'
+  : 'If a floor product is listed below, change only its surface finish; do not change the floor plane or geometry. If no floor product is listed, preserve the existing floor. Style words such as "light oak" refer to furniture and joinery only, not to replacing the floor unless a floor product is explicitly listed. The same applies to walls: change only the surface finish when a wall finish is listed.'}
 Keep the result functional, keep realistic dimensions, and do not block doors or windows.
 
 COMPOSITION

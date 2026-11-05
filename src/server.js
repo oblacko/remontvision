@@ -38,6 +38,7 @@ import { createSearchJob, processVisionStep, processGridStep, processCropsStep, 
 import { startSearchWorker } from './searchjobs.js';
 import { getSearchConfig, saveSearchConfig, resetSearchConfig, loadSearchConfig } from './searchconfig.js';
 import { listSearchPrompts, createPromptVersion, activatePromptVersion, loadSearchPrompts, seedSearchPrompts, DEFAULT_SEARCH_PROMPTS, PROMPT_KINDS } from './searchprompts.js';
+import { listArchitectPrompts, createArchitectPromptVersion, activateArchitectPromptVersion, loadArchitectPrompts, seedArchitectPrompts, DEFAULT_ARCHITECT_PROMPTS, ARCHITECT_PROMPT_KINDS, getArchitectPrompt } from './architectprompts.js';
 import { getStyleConfig, getStyleDefaults, saveStyleConfig, resetStyleConfig, loadStyleConfig } from './styleconfig.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 
@@ -961,6 +962,52 @@ app.post('/api/admin/search/prompts/reset', h(async (req, res) => {
   res.json(prompts);
 }));
 
+app.get('/api/admin/architect-prompts', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const data = {};
+  for (const kind of ARCHITECT_PROMPT_KINDS) {
+    data[kind] = {
+      rows: await listArchitectPrompts(kind),
+      active: getArchitectPrompt(kind),
+    };
+  }
+  res.json(data);
+}));
+
+app.post('/api/admin/architect-prompts', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const kind = String(req.body?.kind || '');
+  const system = String(req.body?.system || '');
+  try {
+    const created = await createArchitectPromptVersion(kind, system);
+    return res.status(201).json(created);
+  } catch (e) {
+    return res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/architect-prompts/:id/activate', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const kind = String(req.body?.kind || '');
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Некорректный id промта' });
+  try {
+    return res.json(await activateArchitectPromptVersion(kind, id));
+  } catch (e) {
+    return res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
+app.post('/api/admin/architect-prompts/reset', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const prompts = {};
+  for (const kind of ARCHITECT_PROMPT_KINDS) {
+    const created = await createArchitectPromptVersion(kind, DEFAULT_ARCHITECT_PROMPTS[kind]);
+    prompts[kind] = await activateArchitectPromptVersion(kind, created.id);
+  }
+  res.json(prompts);
+}));
+
 async function runSearchStep(req, res, stage, processFn) {
   if (!requireAdmin(req, res)) return;
   const job = await q.getSearchJob(req.params.id);
@@ -1206,14 +1253,11 @@ app.post('/api/estimate-room', rateLimit, upload.single('photo'), h(async (req, 
 
 app.post('/api/rooms', rateLimit, upload.fields([
   { name: 'photo', maxCount: 1 },
-  { name: 'style_ref', maxCount: 1 },
   { name: 'cleanup_photo', maxCount: 1 },
 ]), h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const photo = req.files?.photo?.[0];
-  const styleRef = req.files?.style_ref?.[0];
   const cleanupPhoto = req.files?.cleanup_photo?.[0];
-  const styleRefUrl = String(req.body?.style_ref_url || '').trim();
   if (!photo) return res.status(400).json({ error: 'Нет фото' });
   if (!MOCK_MODE) {
     const bal = await q.creditBalance(req.user.id);
@@ -1225,21 +1269,18 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const allowedStyles = [
     'Современный', 'Светлый', 'Тёмный', 'Классика',
     'Скандинавский', 'Лофт', 'Джапанди', 'Неоклассика', 'Минимализм',
-    'Тёмный модерн', 'Бохо', 'Ар-деко', 'Кантри', 'Референс пользователя',
+    'Тёмный модерн', 'Бохо', 'Ар-деко', 'Кантри',
   ];
   const requestedStyle = String(req.body?.style || '').trim();
   const requestedRoomType = String(req.body?.room_type || '').trim();
-  if (!requestedStyle && !styleRef && !styleRefUrl) {
-    return res.status(400).json({ error: 'Выберите стиль или загрузите референс' });
-  }
-  if (requestedStyle === 'Референс пользователя' && !styleRef && !styleRefUrl) {
-    return res.status(400).json({ error: 'Для стиля по референсу загрузите изображение или ссылку' });
+  if (!requestedStyle) {
+    return res.status(400).json({ error: 'Выберите стиль' });
   }
   const roomType = ROOM_TYPE_NAMES.includes(requestedRoomType) && isRoomTypeActive(requestedRoomType) ? requestedRoomType : 'Другое';
   const dbStyle = requestedStyle ? await q.styleByName(requestedStyle) : null;
   const style = requestedStyle
     ? (dbStyle && dbStyle.active ? dbStyle.name : (allowedStyles.includes(requestedStyle) ? requestedStyle : 'Современный'))
-    : 'Референс пользователя';
+    : 'Современный';
   const allowedPalettes = new Set(['none', 'mono', 'analogous', 'complementary', 'split']);
   const allowedAccents = new Set(['none', 'forest', 'sand', 'terra', 'dust', 'graphite']);
   const palette = allowedPalettes.has(req.body.palette) ? req.body.palette : 'none';
@@ -1275,18 +1316,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const dimensionOrientation = String(req.body.dimension_orientation || '').trim().slice(0, 200) || null;
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
-  let styleRefKey = styleRef ? await saveUpload(styleRef, 'uploads') : null;
-  if (!styleRefKey && styleRefUrl) {
-    try {
-      const img = await fetchRemoteImage(styleRefUrl);
-      styleRefKey = await saveUpload({ buffer: img.buffer, mimetype: img.mime }, 'uploads');
-    } catch (e) {
-      await remove(photoKey);
-      if (cleanupKey) await remove(cleanupKey);
-      return res.status(400).json({ error: `Не удалось загрузить референс по ссылке: ${e.message}` });
-    }
-  }
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, styleRefKey, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation);
+  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation);
   try {
     await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
   } catch (e) {
@@ -1294,7 +1324,6 @@ app.post('/api/rooms', rateLimit, upload.fields([
       await q.deleteRoom(id);
       await remove(photoKey);
       if (cleanupKey) await remove(cleanupKey);
-      if (styleRefKey) await remove(styleRefKey);
       return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: await q.creditBalance(req.user.id) });
     }
     throw e;
@@ -1821,6 +1850,8 @@ async function main() {
   await loadSearchConfig();      // поиск: модели, домены, лимиты из app_settings
   await seedSearchPrompts();     // версии промтов vision/grid/cell
   await loadSearchPrompts();     // активные версии в память
+  await seedArchitectPrompts();  // промты строителя/рецензента/критерия
+  await loadArchitectPrompts();  // активные версии архитектора
   await loadStyleConfig(); // источник стиля: текст/свотчи
   await loadRoomTypes();   // типы комнат: справочник и промты из app_settings
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {

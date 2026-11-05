@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { normalizeArchitect, reviewDesign, ARCHITECT_CATEGORIES } = await import('../src/architect.js');
+const { normalizeArchitect, normalizeChanges, reviewDesign, ARCHITECT_CATEGORIES } = await import('../src/architect.js');
 
 test('normalizeArchitect keeps valid items and drops unknown categories', () => {
   const out = normalizeArchitect({
@@ -32,19 +32,19 @@ test('normalizeArchitect validates palette, hints and limits their count', () =>
   assert.equal(out.hints[0].priority, 'high');
 });
 
-test('normalizeArchitect sorts editable layers by impact and keeps only valid keys', () => {
-  const out = normalizeArchitect({
-    layers: [
-      { key: 'textile', label: 'Текстиль', impact: 0.3, actions: [{ action: 'Заменить шторы' }] },
-      { key: 'walls', label: 'Стены', impact: 0.9, actions: [{ target: 'walls', action: 'Покрасить в тёплый белый', why: 'Больше света' }] },
-      { key: 'ufo', label: 'НЛО', impact: 1 },
+test('normalizeChanges sorts by impact and filters micro/decor actions', () => {
+  const out = normalizeChanges({
+    changes: [
+      { layer: 'light', label: 'Свет', current: 'старая люстра', change: 'Подвинуть торшер на 5 см', impact: 0.9 },
+      { layer: 'walls', label: 'Стены', current: 'тёмные обои', change: 'Покрасить стены в тёплый белый', impact: 0.8 },
+      { layer: 'textile', label: 'Текстиль', current: 'старый ковёр', change: 'Заменить ковёр', impact: 0.7 },
+      { layer: 'floor', label: 'Пол', current: 'старый ламинат', change: 'Заменить напольное покрытие на светлый дуб', impact: 0.6 },
+      { layer: 'decor', label: 'Декор', current: 'вазы', change: 'Убрать вазы', impact: 0.5 },
     ],
   });
-  assert.equal(out.layers.length, 2);
-  assert.equal(out.layers[0].key, 'walls');
-  assert.equal(out.layers[0].impact, 0.9);
-  assert.equal(out.layers[0].actions[0].action, 'Покрасить в тёплый белый');
-  assert.equal(out.layers[1].key, 'textile');
+  assert.deepEqual(out.map(item => item.layer), ['walls', 'floor']);
+  assert.equal(out[0].change, 'Покрасить стены в тёплый белый');
+  assert.equal(out[0].target, 'walls');
 });
 
 test('reviewDesign returns parsed-compatible data sorted by visible area', async () => {

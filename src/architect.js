@@ -4,6 +4,8 @@ const ARCHITECT_MODEL = process.env.ARCHITECT_MODEL
   || process.env.SEARCH_VISION_MODEL
   || 'deepseek/deepseek-v4.1-flash-1017';
 
+import { getArchitectPrompt } from './architectprompts.js';
+
 // Категории совпадают с catalog-service, чтобы найденные предметы сразу искались в Hoff.
 export const ARCHITECT_CATEGORIES = [
   'bed', 'mattress', 'sofa', 'armchair', 'office_chair', 'dining_chair', 'bench',
@@ -17,9 +19,12 @@ export const ARCHITECT_CATEGORIES = [
 const CATEGORY_SET = new Set(ARCHITECT_CATEGORIES);
 const VISIBILITY = new Set(['seen', 'hidden', 'not_seen']);
 const PRIORITY = new Set(['high', 'medium', 'low']);
-export const LAYER_KEYS = ['walls', 'floor', 'furniture', 'light', 'ceiling', 'textile', 'decor', 'storage', 'appliances', 'art'];
-const LAYER_SET = new Set(LAYER_KEYS);
-const LAYER_EFFORT = new Set(['low', 'medium', 'high']);
+export const CHANGE_LAYERS = ['floor', 'walls', 'ceiling', 'doors', 'windows', 'light', 'furniture', 'storage', 'textile'];
+const CHANGE_LAYER_SET = new Set(CHANGE_LAYERS);
+const CHANGE_EFFORT = new Set(['low', 'medium', 'high']);
+const MICRO_CHANGE = /(подвинуть|сдвинуть|переставить|поправить|повернуть|поднять|опустить|сдвиг|микро)/i;
+const DECOR_WORD = /(ваз|подушк|постер|картин|растен|свеч|статуэтк|декор|книг)/i;
+const RUG_WORD = /(ковер|ковёр|палас)/i;
 
 const clampText = (value, max = 300) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const asArray = value => (Array.isArray(value) ? value : []);
@@ -126,33 +131,34 @@ function normalizeTextList(value, limit = 6) {
   return asArray(value).map(item => clampText(item, 240)).filter(Boolean).slice(0, limit);
 }
 
-function normalizeLayers(parsed) {
-  return asArray(parsed.layers).map(item => {
+export function normalizeChanges(parsed) {
+  const seen = new Set();
+  return asArray(parsed.changes).map(item => {
     if (!item || typeof item !== 'object') return null;
-    const key = clampText(item.key, 40).toLowerCase();
-    if (!LAYER_SET.has(key)) return null;
-    const actions = asArray(item.actions).map(action => {
-      if (!action || typeof action !== 'object') return null;
-      const text = clampText(action.action, 200);
-      if (!text) return null;
-      return {
-        target: clampText(action.target, 60) || key,
-        action: text,
-        why: clampText(action.why, 240),
-      };
-    }).filter(Boolean).slice(0, 4);
+    const layer = clampText(item.layer, 40).toLowerCase();
+    if (!CHANGE_LAYER_SET.has(layer)) return null;
+    const current = clampText(item.current, 240);
+    const change = clampText(item.change, 240);
+    if (!current || !change) return null;
     const impact = Number(item.impact);
+    if (!Number.isFinite(impact)) return null;
+    // Микропозиции и декор не показываем даже в разрешённом слое.
+    if (MICRO_CHANGE.test(change)) return null;
+    if (DECOR_WORD.test(change)) return null;
+    if (layer === 'textile' && RUG_WORD.test(change)) return null;
+    const key = `${layer}|${change}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
     return {
-      key,
-      label: clampText(item.label, 60) || key,
-      current: clampText(item.current, 240),
-      impact: Number.isFinite(impact) ? Math.max(0, Math.min(1, impact)) : 0,
-      effort: LAYER_EFFORT.has(item.effort) ? item.effort : 'medium',
-      risk: LAYER_EFFORT.has(item.risk) ? item.risk : 'medium',
-      preserve: clampText(item.preserve, 200),
-      actions,
+      layer,
+      label: clampText(item.label, 60) || layer,
+      current,
+      change,
+      impact: Math.max(0, Math.min(1, impact)),
+      effort: CHANGE_EFFORT.has(item.effort) ? item.effort : 'medium',
+      target: clampText(item.target, 60) || layer,
     };
-  }).filter(Boolean).sort((a, b) => b.impact - a.impact).slice(0, 8);
+  }).filter(Boolean).sort((a, b) => b.impact - a.impact).slice(0, 6);
 }
 
 export function normalizeArchitect(parsed = {}) {
@@ -171,7 +177,7 @@ export function normalizeArchitect(parsed = {}) {
     strengths: normalizeTextList(source.strengths),
     issues: normalizeTextList(source.issues),
     hints: normalizeHints(source),
-    layers: normalizeLayers(source),
+    changes: normalizeChanges(source),
     electrical: normalizeElectrical(source),
     summary: source.summary && typeof source.summary === 'object' ? {
       concept: clampText(source.summary.concept, 400),
@@ -183,8 +189,7 @@ export function normalizeArchitect(parsed = {}) {
   };
 }
 
-const SYSTEM = `Ты — архитектор интерьера и товаровед. Смотришь на готовую визуализацию комнаты и разбираешь её для пользователя.
-Верни строго JSON без текста вокруг:
+const ANALYSIS_SCHEMA = `Дополнительно к changes верни анализ готового кадра в том же JSON:
 {
   "room": {"type":"...","style":"...","lighting":"...","walls":{"color":"...","material":"..."},"floor":{"color":"...","material":"..."},"ceiling":{"color":"...","material":"..."}},
   "palette": [{"name":"...","hex":"#RRGGBB","where":"стены/пол/мебель"}],
@@ -205,30 +210,29 @@ const SYSTEM = `Ты — архитектор интерьера и товаро
   }],
   "strengths": ["что получилось хорошо"],
   "issues": ["что объективно не так"],
-  "hints": [{"target":"sofa|walls|light|...","action":"что сделать","why":"зачем","priority":"high|medium|low"}],
-  "layers": [{
-    "key":"walls|floor|furniture|light|ceiling|textile|decor|storage|appliances|art",
-    "label":"Стены",
-    "current":"что сейчас: цвет, материал, состояние",
-    "impact":0.0,
-    "effort":"low|medium|high",
-    "risk":"low|medium|high",
-    "preserve":"что нельзя трогать",
-    "actions":[{"target":"walls","action":"конкретная правка","why":"что это даст дизайну"}]
-  }],
   "electrical": [{"title":"Розетки у кровати","text":"где и на какой высоте"}],
   "summary": {"concept":"...","palette":"...","materials":"...","electrical":"...","next_steps":["..."]}
 }
-Правила:
-- Все тексты для пользователя — строго на русском: strengths, issues, hints.action, hints.why, layers.label, layers.current, layers.preserve, layers.actions.action, layers.actions.why, electrical.title, electrical.text и summary. Никаких английских формулировок в этих полях.
+Правила анализа:
+- Все тексты для пользователя — строго на русском.
 - bbox нормирован 0..1: [x, y, ширина, высота].
 - category — только из списка: ${ARCHITECT_CATEGORIES.join(', ')}.
 - Если предмета нет в кадре — не выдумывай его.
-- hints — максимум 6, каждая привязана к конкретному объекту или поверхности.
-- layers — карта того, что влияет на интерьер. Сначала стены, пол, крупная мебель, свет, потолок, текстиль и декор, но порядок определяется реальным влиянием: impact 0..1, сортировка по убыванию. Для каждого слоя — что сейчас, что можно изменить, усилие, риск и что нельзя трогать. actions — максимум 4 конкретные точечные правки.
-- electrical — практичные рекомендации по розеткам, выключателям и свету, без проекта электроснабжения.
+- electrical — практичные рекомендации по розеткам и свету, без проекта электроснабжения.
 - summary заполняй только для финального разбора; для промежуточного оставь null.
-- Никаких цен и ссылок: товары подберёт каталог.`;
+- Никаких цен и ссылок: товары подберёт каталог.
+- Верни ОДИН JSON: поля changes из основного промта плюс поля этого анализа.`;
+
+function buildSystem(mode) {
+  const reviewer = getArchitectPrompt('reviewer');
+  const criteria = getArchitectPrompt('criteria');
+  return [
+    reviewer.system,
+    criteria ? `КРИТЕРИЙ ПРИЁМКИ:\n${criteria.system}` : '',
+    ANALYSIS_SCHEMA,
+    mode === 'final' ? 'Это финальный результат: обязательно заполни summary.' : 'Это промежуточный результат: summary = null.',
+  ].filter(Boolean).join('\n\n');
+}
 
 function buildUserPrompt({ roomType, style, priceTier, mode }) {
   return [
@@ -269,29 +273,30 @@ export async function reviewDesign({
 } = {}) {
   if (!imageDataUrl) return null;
   const callVision = vision || (await import('./openrouter.js')).visionJson;
+  const system = buildSystem(mode);
   const user = buildUserPrompt({ roomType, style, priceTier, mode });
   let parsed = {};
   let cost = null;
   try {
-    const first = await callVision({ system: SYSTEM, user, images: [imageDataUrl], model: ARCHITECT_MODEL });
+    const first = await callVision({ system, user, images: [imageDataUrl], model: ARCHITECT_MODEL });
     parsed = first?.parsed || {};
     cost = first?.cost ?? null;
   } catch {
     return null;
   }
   let architect = normalizeArchitect(parsed);
-  const empty = !architect.items.length && !architect.hints.length && !architect.surfaces.length;
+  const empty = !architect.items.length && !architect.hints.length && !architect.changes.length && !architect.surfaces.length;
   if (empty && ARCHITECT_MODEL) {
     try {
-      const retry = await callVision({ system: SYSTEM, user, images: [imageDataUrl], model: null });
+      const retry = await callVision({ system, user, images: [imageDataUrl], model: null });
       const retryArchitect = normalizeArchitect(retry?.parsed || {});
-      if (retryArchitect.items.length || retryArchitect.hints.length || retryArchitect.surfaces.length) {
+      if (retryArchitect.items.length || retryArchitect.hints.length || retryArchitect.changes.length || retryArchitect.surfaces.length) {
         architect = retryArchitect;
         parsed = retry?.parsed || {};
         cost = (cost || 0) + (retry?.cost || 0);
       }
     } catch { /* остаётся первый пустой результат */ }
   }
-  if (!architect.items.length && !architect.hints.length && !architect.surfaces.length) return null;
+  if (!architect.items.length && !architect.hints.length && !architect.changes.length && !architect.surfaces.length) return null;
   return { parsed: toParsed(architect), architect, cost: cost ?? null };
 }

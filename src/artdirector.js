@@ -3,6 +3,7 @@
 // вставляется в промт генерации отдельным блоком ART DIRECTION.
 import { visionJson } from './openrouter.js';
 import { roomTypeByName } from './roomtypes.js';
+import { getArchitectPrompt } from './architectprompts.js';
 
 // Категории, которые арт-директор может просить из каталога. Локальный список,
 // чтобы не зависеть от searchvision.js (он может отличаться в разных сборках).
@@ -106,6 +107,78 @@ export function normalizeLens(value) {
     correction: clampText(value.correction, 240),
     confidence: normalizeConfidence(value.confidence),
   };
+}
+
+const REPAIR_ACTIONS = {
+  floor: ['replace', 'level', 'refinish', 'keep'],
+  ceiling: ['level', 'paint', 'keep'],
+  walls: ['paint', 'wallpaper', 'plaster', 'keep'],
+  doors: ['replace', 'paint', 'keep'],
+  windows: ['paint', 'fill', 'keep'],
+};
+
+// null — не видно/данных нет; keep — видно и сохраняем; неизвестный action — отбрасываем.
+export function normalizeRepairScope(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const one = (key) => {
+    const item = source[key];
+    if (!item || typeof item !== 'object') return null;
+    const action = String(item.action || '').toLowerCase();
+    if (!REPAIR_ACTIONS[key].includes(action)) return null;
+    return {
+      action,
+      material: clampText(item.material, 120),
+      style: clampText(item.style, 120),
+      why: clampText(item.why, 240),
+    };
+  };
+  return {
+    floor: one('floor'),
+    ceiling: one('ceiling'),
+    walls: one('walls'),
+    doors: one('doors'),
+    windows: one('windows'),
+    storage: Array.isArray(source.storage)
+      ? source.storage.map(item => clampText(item, 120)).filter(Boolean).slice(0, 6)
+      : [],
+    style_dir: clampText(source.style_dir, 300),
+  };
+}
+
+const REPAIR_MODEL = process.env.ARCHITECT_MODEL || process.env.ART_DIRECTOR_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
+
+export async function buildRepairScope({
+  originalImageDataUrl,
+  cleanedImageDataUrl = null,
+  roomType = 'Другое',
+  style = '',
+  styleDescription = '',
+} = {}) {
+  if (!originalImageDataUrl) return null;
+  const builder = getArchitectPrompt('builder');
+  const criteria = getArchitectPrompt('criteria');
+  const system = `${builder.system}\n\n${criteria ? `КРИТЕРИЙ ПРИЁМКИ:\n${criteria.system}` : ''}`;
+  const user = [
+    `Тип комнаты: ${roomType || 'определи сам'}.`,
+    `Стиль: ${style || 'определи сам'}.`,
+    styleDescription ? `Бриф стиля: ${styleDescription}` : '',
+    cleanedImageDataUrl
+      ? 'Изображение 1 — original_photo: исходное состояние и отделка. Изображение 2 — cleaned_shell: очищенная комната, основа планировки и свободного пространства. Различия после очистки не считай выполненным ремонтом.'
+      : 'Одно изображение — original_photo: исходное состояние комнаты.',
+    'Определи полный объём ремонта и верни JSON по схеме.',
+  ].filter(Boolean).join('\n');
+  try {
+    const { parsed, cost } = await visionJson({
+      system,
+      user,
+      images: [originalImageDataUrl, cleanedImageDataUrl].filter(Boolean),
+      model: REPAIR_MODEL,
+    });
+    const repairScope = normalizeRepairScope(parsed);
+    return { repairScope, lens: normalizeLens(parsed.lens), cost: cost ?? null, promptVersion: builder.version };
+  } catch {
+    return null;
+  }
 }
 
 const DIRECTIVE_SYSTEM = `Ты ведущий арт-директор интерьерного бюро, эксперт по эргономике и композиции. На входе — фотография реальной комнаты, её тип, размеры и выбранный стиль.

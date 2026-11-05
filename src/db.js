@@ -705,4 +705,23 @@ export const q = {
         `UPDATE search_prompts SET active = true WHERE id = $2 AND kind = $1 RETURNING *`, [kind, id]);
       return rows[0] || null;
     }),
+  listArchitectPrompts: kind =>
+    pool.query(`SELECT id, kind, version, system, active FROM architect_prompts
+                WHERE kind = $1 ORDER BY version DESC`, [kind]).then(r => r.rows),
+  createArchitectPromptVersion: (kind, system) =>
+    withTransaction(async client => {
+      const { rows } = await client.query(
+        `SELECT COALESCE(MAX(version), 0) + 1 AS version FROM architect_prompts WHERE kind = $1`, [kind]);
+      const ins = await client.query(
+        `INSERT INTO architect_prompts (kind, version, system, active) VALUES ($1,$2,$3,false) RETURNING *`,
+        [kind, rows[0].version, system]);
+      return ins.rows[0];
+    }),
+  activateArchitectPromptVersion: (kind, id) =>
+    withTransaction(async client => {
+      await client.query(`UPDATE architect_prompts SET active = false WHERE kind = $1`, [kind]);
+      const { rows } = await client.query(
+        `UPDATE architect_prompts SET active = true WHERE id = $2 AND kind = $1 RETURNING *`, [kind, id]);
+      return rows[0] || null;
+    }),
 };
