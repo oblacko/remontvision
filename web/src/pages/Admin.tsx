@@ -268,7 +268,7 @@ export default function Admin() {
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [architectPrompts, setArchitectPrompts] = useState<ArchitectPromptsState | null>(null)
-  const [architectKind, setArchitectKind] = useState<'builder' | 'reviewer' | 'criteria'>('builder')
+  const [architectKind, setArchitectKind] = useState<'designer' | 'builder' | 'reviewer' | 'criteria'>('builder')
   const [architectDraft, setArchitectDraft] = useState('')
   const [architectBusy, setArchitectBusy] = useState(false)
   const [architectNotice, setArchitectNotice] = useState('')
@@ -700,7 +700,7 @@ export default function Admin() {
     try { setPromptRows(await readJson(await api('/api/admin/renders?limit=150'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
-  const loadArchitectPrompts = async (kind: 'builder' | 'reviewer' | 'criteria' = architectKind) => {
+  const loadArchitectPrompts = async (kind: 'designer' | 'builder' | 'reviewer' | 'criteria' = architectKind) => {
     try {
       const d = await readJson(await api('/api/admin/architect-prompts')) as ArchitectPromptsState
       setArchitectPrompts(d)
@@ -708,7 +708,7 @@ export default function Admin() {
       setArchitectNotice('')
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
-  const selectArchitectKind = (kind: 'builder' | 'reviewer' | 'criteria') => {
+  const selectArchitectKind = (kind: 'designer' | 'builder' | 'reviewer' | 'criteria') => {
     setArchitectKind(kind)
     setArchitectDraft(architectPrompts?.[kind]?.active?.system || '')
     setArchitectNotice('')
@@ -1238,7 +1238,7 @@ export default function Admin() {
               </div>
               {architectNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{architectNotice}</p>}
               <div className="mt-5 flex flex-wrap gap-2">
-                {([['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки']] as const).map(([kind, label]) => (
+                {([['designer', 'Дизайнер'], ['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки']] as const).map(([kind, label]) => (
                   <button key={kind} type="button" onClick={() => selectArchitectKind(kind)} className={`min-h-10 border px-3 text-sm ${architectKind === kind ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
                 ))}
               </div>

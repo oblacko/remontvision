@@ -31,8 +31,7 @@ import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupCo
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { generateArticle, articlePage } from './articles.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
-import { startProcurement, procurementDto, logProcurementClick } from './procurement.js';
-import { startProcurementWorker } from './procurementjobs.js';
+import { logProcurementClick } from './procurement.js';
 import { getProcurementConfig, getProcurementDefaults, saveProcurementConfig, resetProcurementConfig, loadProcurementConfig } from './procurementconfig.js';
 import { createSearchJob, processVisionStep, processGridStep, processCropsStep, processObjectSearch, searchJobDto, searchResultsDto } from './searchservice.js';
 import { startSearchWorker } from './searchjobs.js';
@@ -1387,6 +1386,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       } : null,
       dimensions_estimate: render.meta?.room_dimensions_estimate || null,
       lens: render.meta?.lens || null,
+      repair_scope: render.meta?.repair_scope || null,
     } : null,
     items: items.map(p => ({
       id: p.id,
@@ -1463,23 +1463,6 @@ app.get('/go/:id', h(async (req, res) => {
   return res.redirect(302, productLink(product));
 }));
 
-// «Найти товары»: 1 кредит за запуск, повторное открытие бесплатно.
-app.post('/api/renders/:id/procurement', h(async (req, res) => {
-  if (!requireAuth(req, res)) return;
-  const started = await startProcurement({ userId: req.user.id, renderId: req.params.id });
-  const dto = await procurementDto(started.run.id, req.user.id);
-  res.status(started.existing ? 200 : 201).json(dto);
-}));
-
-// Последний подбор по рендеру — чтобы результат не терялся при закрытии панели.
-app.get('/api/renders/:id/procurement', h(async (req, res) => {
-  if (!requireAuth(req, res)) return;
-  const run = await q.latestProcurementRunForRender(req.params.id, req.user.id);
-  if (!run) return res.status(404).json({ error: 'Подбор ещё не запускался' });
-  const dto = await procurementDto(run.id, req.user.id);
-  res.json(dto);
-}));
-
 // «Готово»: архитектор смотрит финальный рендер и собирает итог + реальные товары.
 app.post('/api/renders/:id/final-review', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
@@ -1504,7 +1487,7 @@ app.post('/api/renders/:id/final-review', h(async (req, res) => {
   const products = Array.isArray(render.analysis?.products) ? render.analysis.products : [];
   const analysis = {
     ...(render.analysis || {}),
-    architect: review.architect,
+    architect: { ...review.architect, status: 'ready', render_id: render.id },
     final: review.architect.summary || {
       concept: [room.style, room.room_type].filter(Boolean).join(' · '),
       palette: (review.architect.palette || []).map(color => `${color.name} ${color.hex}`).join(', '),
@@ -1605,13 +1588,6 @@ app.post('/api/renders/:id/product-search', h(async (req, res) => {
     log({ event: 'product_search_error', render_id: render.id, user_id: req.user.id, error: String(e.message || e).slice(0, 300), ms: Date.now() - started });
     res.status(502).json({ error: 'Не удалось подобрать товары. Попробуйте ещё раз.' });
   }
-}));
-
-app.get('/api/procurement/:id', h(async (req, res) => {
-  if (!requireAuth(req, res)) return;
-  const dto = await procurementDto(req.params.id, req.user.id);
-  if (!dto) return res.status(404).json({ error: 'Подбор не найден' });
-  res.json(dto);
 }));
 
 app.get('/buy/:id', h(async (req, res) => {
@@ -1872,7 +1848,6 @@ async function main() {
   app.listen(PORT, () => {
     log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
     startWorker();
-    startProcurementWorker();
     startSearchWorker();
   });
 }

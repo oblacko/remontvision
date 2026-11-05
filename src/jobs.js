@@ -61,11 +61,6 @@ async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
     if (!stored || refs.length >= 2) return;
     try { refs.push({ buf: await getBuffer(stored), kind, title }); } catch { /* пропускаем битый референс */ }
   };
-  if (room.style_ref_path) {
-    // Пользовательский референс главнее: не подмешиваем админские/обложку.
-    await add(room.style_ref_path, 'user', 'user style reference');
-    return { refs, user: true };
-  }
   for (const ref of adminStyleRefs) await add(ref.image_path, ref.kind || 'upload', ref.title || '');
   if (!refs.length && styleInfo) {
     if (styleInfo.preset_image_path) await add(styleInfo.preset_image_path, 'cover', 'style cover');
@@ -562,7 +557,11 @@ async function processRender(renderId) {
       priceTier,
       style: room.style,
     });
-    if (architectReview) analysis.architect = architectReview;
+    if (architectReview) {
+      analysis.architect = { ...architectReview, status: 'ready', render_id: renderId };
+    } else if (!MOCK_MODE) {
+      analysis.architect = { status: 'failed', render_id: renderId, changes: [], items: [], hints: [] };
+    }
     await q.setRenderAnalysis(renderId, analysis);
     log({ event: 'render_analyzed', room_id: room.id, render_id: renderId, items: parsed.items.length, architect_hints: architectReview?.hints?.length || 0, suggestions: analysis.suggestions.length });
 

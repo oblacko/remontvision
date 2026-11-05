@@ -83,22 +83,3 @@ export async function listCatalogCategories(deps = {}) {
   return Array.isArray(data) ? data : [];
 }
 
-export async function runVisionAgent({ image, roomType = '', style = '', topK = 5, maxSteps = 10, mime = 'image/jpeg' } = {}, deps = {}) {
-  if (!image) throw new Error('Нужна картинка рендера');
-  const data = await request('/vision-agent', {
-    method: 'POST',
-    body: {
-      image_b64: Buffer.from(image).toString('base64'),
-      room_type: roomType,
-      style,
-      top_k: topK,
-      max_steps: maxSteps,
-      mime,
-    },
-    deps: { ...deps, timeoutMs: Number(deps.timeoutMs) || 240_000 },
-  });
-  return {
-    room: data?.room || {},
-    items: Array.isArray(data?.items) ? data.items : [],
-  };
-}

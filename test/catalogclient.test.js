@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { searchCatalog, runVisionAgent } from '../src/catalogclient.js';
+import { searchCatalog } from '../src/catalogclient.js';
 
 test('searchCatalog posts image, filters and token', async () => {
   let captured;
@@ -71,22 +71,3 @@ test('searchCatalog sends product attributes', async () => {
   assert.deepEqual(body.product, { color: 'коричневый', label: 'Кровать' });
 });
 
-test('runVisionAgent posts the render and context', async () => {
-  let captured;
-  const fetchImpl = async (url, opts) => {
-    captured = { url, opts };
-    return { ok: true, json: async () => ({ room: { type: 'Спальня' }, items: [{ label: 'Кровать', offer_ids: ['1'] }] }) };
-  };
-  const out = await runVisionAgent(
-    { image: Buffer.from('render'), roomType: 'Спальня', style: 'Скандинавский', topK: 4, maxSteps: 8, mime: 'image/jpeg' },
-    { baseUrl: 'http://catalog:8000', token: 't', fetchImpl },
-  );
-  assert.equal(captured.url, 'http://catalog:8000/vision-agent');
-  const body = JSON.parse(captured.opts.body);
-  assert.equal(body.image_b64, Buffer.from('render').toString('base64'));
-  assert.equal(body.room_type, 'Спальня');
-  assert.equal(body.style, 'Скандинавский');
-  assert.equal(body.top_k, 4);
-  assert.equal(body.max_steps, 8);
-  assert.deepEqual(out.items[0].offer_ids, ['1']);
-});

@@ -42,6 +42,19 @@ type ArchitectChange = {
   layer: string; label: string; current: string; change: string
   impact: number; effort?: 'low' | 'medium' | 'high'; target?: string
 }
+function changesFromArchitect(architect?: Architect | null): ArchitectChange[] {
+  if (!architect) return []
+  if (architect.changes?.length) return architect.changes
+  return (architect.layers || []).flatMap(layer => (layer.actions || []).map(action => ({
+    layer: layer.key,
+    label: layer.label,
+    current: action.why || layer.current || '',
+    change: action.action,
+    impact: layer.impact || 0,
+    effort: layer.effort,
+    target: action.target || layer.key,
+  }))).sort((a, b) => b.impact - a.impact)
+}
 type Architect = {
   room?: {
     type?: string; style?: string; lighting?: string
@@ -85,6 +98,18 @@ type ArtDirection = {
 }
 type DimensionsEstimate = { width: number; length: number; height: number; confidence?: 'low' | 'medium' | 'high' }
 type LensInfo = { focal_length_mm?: number | null; type?: 'wide' | 'normal' | 'tele' | null; distortion?: 'strong' | 'mild' | 'none' | null; correction?: string; confidence?: 'low' | 'medium' | 'high' }
+type RepairAction = { action: string; material?: string; style?: string; why?: string }
+type RepairScope = {
+  floor?: RepairAction | null; ceiling?: RepairAction | null; walls?: RepairAction | null
+  doors?: RepairAction | null; windows?: RepairAction | null
+  storage?: string[]; style_dir?: string
+}
+const REPAIR_LABELS: Array<[keyof Pick<RepairScope, 'floor' | 'ceiling' | 'walls' | 'doors' | 'windows'>, string]> = [
+  ['floor', 'Пол'], ['ceiling', 'Потолок'], ['walls', 'Стены'], ['doors', 'Двери'], ['windows', 'Окна'],
+]
+const repairRows = (scope?: RepairScope | null) => REPAIR_LABELS
+  .map(([key, label]) => scope?.[key] ? { label, ...scope[key]! } : null)
+  .filter((item): item is { label: string } & RepairAction => Boolean(item))
 type EditRefDraft = {
   id: string
   file: File | null
@@ -105,7 +130,7 @@ type RoomResult = {
   room_width_m?: number | null; room_length_m?: number | null; room_height_m?: number | null; bed_length_m?: number | null;
   dimension_orientation?: string | null;
   keep_furniture?: boolean; use_catalog?: boolean; products_enabled?: boolean;
-  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null } | null;
+  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null; repair_scope?: RepairScope | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
 type Iteration = {
@@ -113,7 +138,7 @@ type Iteration = {
   items: GenItem[]; total: number; roomId: string; ratio: number;
   budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
   keepFurniture?: boolean; useCatalog?: boolean; productsEnabled?: boolean; artDirection?: ArtDirection | null;
-  dimensionsEstimate?: DimensionsEstimate | null; lens?: LensInfo | null;
+  dimensionsEstimate?: DimensionsEstimate | null; lens?: LensInfo | null; repairScope?: RepairScope | null;
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
@@ -230,6 +255,7 @@ export function GenerationPanel({
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
   const productMatches = current?.analysis?.products || []
+  const currentChanges = changesFromArchitect(current?.analysis?.architect)
   const realOfferCount = productMatches.reduce((sum, match) => sum + match.offers.length, 0)
   const demoEstimate = (current?.items.length ?? 0) > 0 && current!.items.every(item => !item.direct_url)
 
@@ -324,6 +350,7 @@ export function GenerationPanel({
             artDirection: render.art_direction || null,
             dimensionsEstimate: render.dimensions_estimate || null,
             lens: render.lens || null,
+            repairScope: render.repair_scope || null,
           }
           setIterations([next])
           setCurrentId(next.id)
@@ -585,6 +612,7 @@ export function GenerationPanel({
         artDirection: render.art_direction || null,
         dimensionsEstimate: render.dimensions_estimate || null,
         lens: render.lens || null,
+        repairScope: render.repair_scope || null,
       }
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
@@ -920,7 +948,7 @@ export function GenerationPanel({
                 <div className="mt-4 space-y-2">
                   {iterations.map((item, index) => {
                     const expanded = openHistory === item.id
-                    const quickEdits = (item.analysis?.architect?.changes || []).map(change => ({
+                    const quickEdits = changesFromArchitect(item.analysis?.architect).map(change => ({
                       target: change.target || change.layer,
                       action: change.change,
                       why: change.current,
@@ -1128,11 +1156,30 @@ export function GenerationPanel({
               </div>
 
               <div className="space-y-8">
-                {current.analysis?.architect?.changes?.length ? (
+                {(repairRows(current.repairScope).length || current.repairScope?.storage?.length) ? (
+                  <section aria-labelledby="gen-repair">
+                    <h4 id="gen-repair" className="eyebrow mb-4">План ремонта</h4>
+                    <dl className="grid gap-2 border-y py-4 text-sm">
+                      {repairRows(current.repairScope).map(row => (
+                        <div key={row.label} className="grid gap-1 sm:grid-cols-[7rem_1fr]">
+                          <dt className="text-muted-foreground">{row.label}</dt>
+                          <dd><span className="font-medium">{row.action}</span>{row.material ? ` · ${row.material}` : ''}{row.why ? <span className="block text-xs text-muted-foreground">{row.why}</span> : null}</dd>
+                        </div>
+                      ))}
+                      {current.repairScope?.storage?.length ? (
+                        <div className="grid gap-1 sm:grid-cols-[7rem_1fr]">
+                          <dt className="text-muted-foreground">Хранение</dt>
+                          <dd><ul className="list-disc space-y-1 pl-4">{current.repairScope.storage.map((item, index) => <li key={`storage-${index}`}>{item}</li>)}</ul></dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  </section>
+                ) : null}
+                {currentChanges.length ? (
                   <section aria-labelledby="gen-changes">
                     <h4 id="gen-changes" className="eyebrow mb-4">Что можно изменить</h4>
                     <ol className="divide-y border-y">
-                      {current.analysis.architect.changes.map((change, index) => (
+                      {currentChanges.map((change, index) => (
                         <li key={`${change.layer}-${index}`} className="flex gap-3 py-3 text-sm">
                           <span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
                           <div>

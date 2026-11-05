@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpRight, Download, Expand, LoaderCircle, LogOut, Search, Share2, Trash2, X } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
-import { ProcurementPanel } from '@/components/ProcurementPanel'
 import '../App.css'
 
 type Me = { email: string; balance: number }
@@ -72,7 +71,6 @@ export default function Cabinet() {
   const [notice, setNotice] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
-  const [procurementRenderId, setProcurementRenderId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [buyConsent, setBuyConsent] = useState(false)
   const [buying, setBuying] = useState('')
@@ -406,7 +404,7 @@ export default function Cabinet() {
                   {roomData.render?.image && <button type="button" onClick={() => setFullscreen(true)} className="action-secondary"><Expand className="size-4" />На весь экран</button>}
                   {roomData.render?.image && <a href={roomData.render.image} download="remontvision-design.jpg" className="action-secondary"><Download className="size-4" />Скачать</a>}
                   {roomData.render?.image && <button type="button" onClick={() => setShareOpen(true)} className="action-secondary"><Share2 className="size-4" />Поделиться</button>}
-                  {roomData.render?.id && <button type="button" onClick={() => setProcurementRenderId(roomData.render?.id || null)} className="action-primary"><Search className="size-4" />Найти товары · 1 кредит</button>}
+                  {roomData.render?.id && <a href={`/?room=${encodeURIComponent(roomData.id)}&products=1`} className="action-primary"><ArrowUpRight className="size-4" />Товары в генераторе</a>}
                   <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
                 </div>
@@ -446,7 +444,6 @@ export default function Cabinet() {
         </div>
       )}
       <ShareDialog renderId={roomData?.render?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
-      <ProcurementPanel renderId={procurementRenderId || ''} open={Boolean(procurementRenderId)} onClose={() => setProcurementRenderId(null)} onCreditsChanged={async () => { await loadMe(); await loadData() }} />
     </div>
   )
 }

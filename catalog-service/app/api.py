@@ -100,15 +100,6 @@ class VisionSearchIn(BaseModel):
     top_k: int = 5
 
 
-class VisionAgentIn(BaseModel):
-    image_b64: str
-    room_type: str = ""
-    style: str = ""
-    top_k: int = 5
-    max_steps: int = 10
-    mime: str = "image/jpeg"
-
-
 class SegmentHeadIn(BaseModel):
     image_b64: str
     max_items: int = 15
@@ -464,25 +455,6 @@ def create_app(
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=503, detail=f"Vision-поиск недоступен: {exc}"
-            )
-
-    @app.post("/vision-agent", dependencies=[Depends(verify_token)])
-    def vision_agent_endpoint(body: VisionAgentIn):
-        image_bytes = _decode_image(body.image_b64)
-        from . import vision_agent
-
-        try:
-            return vision_agent.run_image(
-                image_bytes,
-                mime=body.mime or "image/jpeg",
-                room_type=body.room_type,
-                style=body.style,
-                top_k=max(1, min(20, body.top_k)),
-                max_steps=max(1, min(14, body.max_steps)),
-            )
-        except Exception as exc:  # noqa: BLE001
-            raise HTTPException(
-                status_code=503, detail=f"Vision-агент недоступен: {exc}"
             )
 
     @app.post("/segment-head", dependencies=[Depends(verify_token)])
