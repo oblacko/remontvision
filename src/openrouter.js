@@ -354,6 +354,7 @@ Rules:
 - action=keep: preserve the element.
 - action is not keep: perform the change; do not preserve the old finish just to match the source photo.
 - null: no justified work; do not invent construction.
+- REPAIR SCOPE only applies to elements clearly visible in the source photo. Never add a door, window, wall or opening that is not visible; ignore scope actions for non-visible elements.
 - Always preserve room geometry, wall positions, window and door openings.
 `
     : '';

@@ -33,6 +33,15 @@ test('normalizeLens keeps focal length, type, distortion and correction', () => 
   assert.equal(normalizeLens(null), null);
 });
 
+test('normalizeRepairScope rejects a door inferred from a wall fragment', () => {
+  const out = normalizeRepairScope({
+    doors: { action: 'replace', why: 'В кадре виден только фрагмент старого полотна, окрашенного в зелёный, у левой стены' },
+    windows: { action: 'paint', why: 'Деревянные рамы с двумя створками и подоконники выглядят целыми' },
+  });
+  assert.equal(out.doors, null);
+  assert.equal(out.windows.action, 'paint');
+});
+
 test('normalizeRepairScope keeps null, keep and valid actions, drops unknown', () => {
   const out = normalizeRepairScope({
     floor: { action: 'replace', material: 'светлый дуб', why: 'старый ламинат' },

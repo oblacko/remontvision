@@ -117,6 +117,11 @@ const REPAIR_ACTIONS = {
   windows: ['paint', 'fill', 'keep'],
 };
 
+// Дверь/окно нельзя выдумывать по цветной полосе, краю стены или проёму без полотна.
+const UNCERTAIN_EVIDENCE = /(фрагмент|похоже|возможно|вероятно|не видно|частично|предполож|обрез|край стены|цветн.*полос|тень)/i;
+const CLEAR_DOOR = /(дверь|дверн|полотно|наличник|ручк|петл|створк)/i;
+const CLEAR_WINDOW = /(окно|оконн|рама|створк|подоконник|откос|стеклопакет)/i;
+
 // null — не видно/данных нет; keep — видно и сохраняем; неизвестный action — отбрасываем.
 export function normalizeRepairScope(value) {
   const source = value && typeof value === 'object' ? value : {};
@@ -125,11 +130,14 @@ export function normalizeRepairScope(value) {
     if (!item || typeof item !== 'object') return null;
     const action = String(item.action || '').toLowerCase();
     if (!REPAIR_ACTIONS[key].includes(action)) return null;
+    const why = clampText(item.why, 240);
+    if (key === 'doors' && (!CLEAR_DOOR.test(why) || UNCERTAIN_EVIDENCE.test(why))) return null;
+    if (key === 'windows' && (!CLEAR_WINDOW.test(why) || UNCERTAIN_EVIDENCE.test(why))) return null;
     return {
       action,
       material: clampText(item.material, 120),
       style: clampText(item.style, 120),
-      why: clampText(item.why, 240),
+      why,
     };
   };
   return {
@@ -149,7 +157,7 @@ const REPAIR_MODEL = process.env.ARCHITECT_MODEL || process.env.ART_DIRECTOR_MOD
 
 const REPAIR_SCOPE_SCHEMA = `Обязательный контракт repair_scope (не удалять при редактировании промта):
 {"floor":{"action":"replace|level|refinish|keep","material":"...","why":"..."},"ceiling":{"action":"level|paint|keep","why":"..."},"walls":{"action":"paint|wallpaper|plaster|keep","why":"..."},"doors":{"action":"replace|paint|keep","style":"...","why":"..."},"windows":{"action":"paint|fill|keep","why":"..."},"storage":["..."],"style_dir":"..."}
-null — не видно/данных нет; keep — сохранить. Только JSON.`;
+null — не видно/данных нет; keep — сохранить. Дверь/окно — только если явно видны (полотно, рама, створка, ручка, наличник); цветная полоса или проём без полотна — null. Только JSON.`;
 
 export async function buildRepairScope({
   originalImageDataUrl,
