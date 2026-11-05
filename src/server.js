@@ -1546,7 +1546,17 @@ app.post('/api/renders/:id/product-search', h(async (req, res) => {
     });
     await Promise.all(workers);
     const products = (agent.items || []).map(item => {
-      const itemOffers = (item.offer_ids || []).map(id => offers.get(String(id))).filter(Boolean).slice(0, 4);
+      const seen = new Set();
+      const itemOffers = (item.offer_ids || [])
+        .map(id => offers.get(String(id)))
+        .filter(Boolean)
+        .filter(offer => {
+          const key = offer.url || offer.id;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 4);
       return {
         item: { key: item.category || item.label, label: item.label || item.category || 'Товар', category: item.category || '' },
         offers: itemOffers,
