@@ -5,6 +5,8 @@ const ARCHITECT_MODEL = process.env.ARCHITECT_MODEL
   || 'deepseek/deepseek-v4.1-flash-1017';
 
 import { getArchitectPrompt } from './architectprompts.js';
+import { callAgentJson } from './openrouteragent.js';
+import { validateChanges } from './agentcontracts.js';
 
 // Категории совпадают с catalog-service, чтобы найденные предметы сразу искались в Hoff.
 export const ARCHITECT_CATEGORIES = [
@@ -283,12 +285,36 @@ export async function reviewDesign({
   let parsed = {};
   let cost = null;
   try {
-    const first = await callVision({ system, user, images: [imageDataUrl], model: ARCHITECT_MODEL });
-    parsed = first?.parsed || {};
-    cost = first?.cost ?? null;
+    if (vision) {
+      const first = await callVision({ system, user, images: [imageDataUrl], model: ARCHITECT_MODEL });
+      parsed = first?.parsed || {};
+      cost = first?.cost ?? null;
+    } else {
+      try {
+        const agent = await callAgentJson({
+          instructions: system,
+          inputText: user,
+          images: [imageDataUrl],
+          model: ARCHITECT_MODEL,
+          maxCostUsd: Number(process.env.ARCHITECT_MAX_COST_USD || 0.02),
+          maxSteps: 2,
+        });
+        if (agent.parsed) {
+          parsed = agent.parsed;
+          cost = agent.cost ?? null;
+        }
+      } catch { /* fallback на visionJson ниже */ }
+      if (!parsed || !Object.keys(parsed).length) {
+        const legacy = await callVision({ system, user, images: [imageDataUrl], model: ARCHITECT_MODEL });
+        parsed = legacy?.parsed || {};
+        cost = legacy?.cost ?? null;
+      }
+    }
   } catch {
     return null;
   }
+  const validatedChanges = validateChanges(parsed);
+  if (validatedChanges) parsed = { ...parsed, changes: validatedChanges };
   let architect = normalizeArchitect(parsed);
   const empty = !architect.items.length && !architect.hints.length && !architect.changes.length && !architect.surfaces.length;
   if (empty && ARCHITECT_MODEL) {

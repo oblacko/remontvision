@@ -4,6 +4,8 @@
 import { visionJson } from './openrouter.js';
 import { roomTypeByName } from './roomtypes.js';
 import { getArchitectPrompt } from './architectprompts.js';
+import { callAgentJson } from './openrouteragent.js';
+import { validateRepairScope } from './agentcontracts.js';
 
 // Категории, которые арт-директор может просить из каталога. Локальный список,
 // чтобы не зависеть от searchvision.js (он может отличаться в разных сборках).
@@ -180,14 +182,34 @@ export async function buildRepairScope({
     'Определи полный объём ремонта и верни JSON по схеме.',
   ].filter(Boolean).join('\n');
   try {
-    const { parsed, cost } = await visionJson({
-      system,
-      user,
-      images: [originalImageDataUrl, cleanedImageDataUrl].filter(Boolean),
-      model: REPAIR_MODEL,
-    });
-    let repairScope = normalizeRepairScope(parsed);
-    let totalCost = cost ?? null;
+    let parsed = null;
+    let totalCost = null;
+    try {
+      const agent = await callAgentJson({
+        instructions: system,
+        inputText: user,
+        images: [originalImageDataUrl, cleanedImageDataUrl].filter(Boolean),
+        model: REPAIR_MODEL,
+        maxCostUsd: Number(process.env.REPAIR_SCOPE_MAX_COST_USD || 0.02),
+        maxSteps: 2,
+      });
+      if (agent.parsed) {
+        parsed = agent.parsed;
+        totalCost = agent.cost ?? null;
+      }
+    } catch { /* fallback на visionJson ниже */ }
+    if (!parsed) {
+      const legacy = await visionJson({
+        system,
+        user,
+        images: [originalImageDataUrl, cleanedImageDataUrl].filter(Boolean),
+        model: REPAIR_MODEL,
+      });
+      parsed = legacy.parsed;
+      totalCost = legacy.cost ?? null;
+    }
+    const validated = validateRepairScope(parsed);
+    let repairScope = normalizeRepairScope(validated || parsed);
     const isEmpty = !repairScope.floor && !repairScope.ceiling && !repairScope.walls
       && !repairScope.doors && !repairScope.windows && !repairScope.storage.length && !repairScope.style_dir;
     if (isEmpty && REPAIR_MODEL) {
@@ -198,7 +220,8 @@ export async function buildRepairScope({
           images: [originalImageDataUrl, cleanedImageDataUrl].filter(Boolean),
           model: null,
         });
-        const retryScope = normalizeRepairScope(retry.parsed || {});
+        const retryValidated = validateRepairScope(retry.parsed || {});
+        const retryScope = normalizeRepairScope(retryValidated || retry.parsed || {});
         const retryEmpty = !retryScope.floor && !retryScope.ceiling && !retryScope.walls
           && !retryScope.doors && !retryScope.windows && !retryScope.storage.length && !retryScope.style_dir;
         if (!retryEmpty) {
