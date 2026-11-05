@@ -1327,7 +1327,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
     }
     throw e;
   }
-  res.status(201).json({ id, status: 'queued' });
+  res.status(201).json({ id, status: 'queued', product_refs_enabled: getRenderConfig().product_refs_enabled });
 }));
 
 app.get('/api/rooms/:id', h(async (req, res) => {
@@ -1357,6 +1357,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     keep_furniture: room.keep_furniture !== false,
     use_catalog: room.use_catalog !== false,
     products_enabled: getRenderConfig().product_matching_enabled,
+    product_refs_enabled: getRenderConfig().product_refs_enabled,
     status: room.status,
     error: room.error,
     notice: room.notice || null,
@@ -1387,6 +1388,7 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       dimensions_estimate: render.meta?.room_dimensions_estimate || null,
       lens: render.meta?.lens || null,
       repair_scope: render.meta?.repair_scope || null,
+      product_refs: Array.isArray(render.meta?.product_refs) ? render.meta.product_refs : [],
     } : null,
     items: items.map(p => ({
       id: p.id,

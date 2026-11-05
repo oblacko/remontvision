@@ -308,6 +308,7 @@ async function processRender(renderId) {
       const renderCfg = getRenderConfig();
       let productRefsDetailed = [];
       if (renderCfg.product_refs_enabled && artDirectionPlan.length) {
+        await q.setRoomStatus('product_refs', room.id);
         try {
           const picked = await pickHoffProducts({
             plan: artDirectionPlan,

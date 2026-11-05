@@ -82,6 +82,7 @@ type ProductMatch = {
   offers: ProductOffer[]
   note?: string
 }
+type ProductRef = { offer_id?: string; name: string; category?: string; price?: number | null; why?: string }
 type Analysis = {
   surfaces?: Surface[]; electrical?: ElectricalItem[]; suggestions?: Suggestion[]
   visible?: Array<{ label?: string; bbox?: number[]; area?: number } | string>
@@ -129,24 +130,22 @@ type RoomResult = {
   id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
   room_width_m?: number | null; room_length_m?: number | null; room_height_m?: number | null; bed_length_m?: number | null;
   dimension_orientation?: string | null;
-  keep_furniture?: boolean; use_catalog?: boolean; products_enabled?: boolean;
-  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null; repair_scope?: RepairScope | null } | null;
+  keep_furniture?: boolean; use_catalog?: boolean; products_enabled?: boolean; product_refs_enabled?: boolean;
+  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null; repair_scope?: RepairScope | null; product_refs?: ProductRef[] } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
 type Iteration = {
   id: string; request: string; image: string; styleName: string;
   items: GenItem[]; total: number; roomId: string; ratio: number;
   budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
-  keepFurniture?: boolean; useCatalog?: boolean; productsEnabled?: boolean; artDirection?: ArtDirection | null;
+  keepFurniture?: boolean; useCatalog?: boolean; productsEnabled?: boolean; productRefsEnabled?: boolean; artDirection?: ArtDirection | null;
   dimensionsEstimate?: DimensionsEstimate | null; lens?: LensInfo | null; repairScope?: RepairScope | null;
+  productRefs?: ProductRef[];
 }
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
-const fmtDateTime = (iso?: string | null) => iso
-  ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  : null
 
 type StylePreset = { key: string; name: string; accent: string; image_url?: string }
 const defaultStylePresets: StylePreset[] = [
@@ -160,13 +159,6 @@ const defaultStylePresets: StylePreset[] = [
   { key: 'mediterranean', name: 'Средиземноморский модерн', accent: 'terra', image_url: '/images/style-deco.webp' },
 ] as const
 
-const priceTiers = [
-  { key: 'start', name: 'Старт', short: 'Практично и аккуратно', description: 'Ламинат, керамика, painted MDF и базовые fixtures. Чисто и надёжно.' },
-  { key: 'comfort', name: 'Комфорт', short: 'Лучший баланс', description: 'Инженерная доска, кварц, качественные фасады, латунь/сталь и layered lighting.' },
-  { key: 'premium', name: 'Премиум', short: 'Статусные материалы', description: 'Натуральный камень, массив, дизайнерский свет и брендовая сантехника.' },
-  { key: 'atelier', name: 'Ателье', short: 'Дизайнерские решения', description: 'Редкие фактуры, кастомные решения и коллекционные предметы.' },
-] as const
-const tierName = (key?: string | null) => priceTiers.find(item => item.key === key)?.name || 'Комфорт'
 const presentationLabel = (status?: GenItem['presentation_status']) => status === 'verified'
   ? 'Проверен на рендере'
   : status === 'matched' ? 'Похожий по рендеру' : 'Подобран к дизайну'
@@ -188,6 +180,14 @@ const EDIT_GEN_STAGES = [
   { key: 'done', label: 'Готово', hint: 'Открываем новую версию' },
 ] as const
 const defaultRoomTypes = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое']
+const SUMMARY_TABS = [
+  ['repair', 'Ремонт'],
+  ['changes', 'Что изменить'],
+  ['products', 'Товары'],
+  ['ral', 'Палитра'],
+  ['electrical', 'Розетки'],
+  ['final', 'Итог'],
+] as const
 
 function stepIndex(step: Step): number {
   if (step === 'photo') return 0
@@ -226,6 +226,9 @@ export function GenerationPanel({
   const [style, setStyle] = useState<string | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
   const [useCatalog] = useState(true)
+  const [productRefsEnabled, setProductRefsEnabled] = useState(false)
+  const [selectedOffers, setSelectedOffers] = useState<Record<string, ProductOffer>>({})
+  const [openSummaryTab, setOpenSummaryTab] = useState<string | null>(null)
   const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
@@ -256,8 +259,13 @@ export function GenerationPanel({
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
   const productMatches = current?.analysis?.products || []
   const currentChanges = changesFromArchitect(current?.analysis?.architect)
-  const realOfferCount = productMatches.reduce((sum, match) => sum + match.offers.length, 0)
-  const demoEstimate = (current?.items.length ?? 0) > 0 && current!.items.every(item => !item.direct_url)
+  const selectedOffersList = Object.values(selectedOffers)
+  const toggleOffer = (offer: ProductOffer) => setSelectedOffers(prev => {
+    const next = { ...prev }
+    if (next[offer.id]) delete next[offer.id]
+    else next[offer.id] = offer
+    return next
+  })
 
   const rememberUrl = (url: string) => { urls.current.push(url) }
   const releaseUrl = (url: string | null) => {
@@ -318,6 +326,7 @@ export function GenerationPanel({
         setRoomType(d.room_type || null)
         if (d.room_type) setRoomTypes(prev => prev.includes(d.room_type) ? prev : [...prev, d.room_type])
         setPriceTier(d.price_tier || 'comfort')
+        setProductRefsEnabled(d.product_refs_enabled === true)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
         setPhotoError(''); setGenError(d.notice || '')
@@ -541,7 +550,10 @@ export function GenerationPanel({
       if (isBase) {
         if (!file) throw new Error('Для новой генерации нужно фото комнаты')
         let cleanupFile = cleaned?.file || null
-        if (cleanupRequested && !cleanupFile) cleanupFile = await cleanupRoom()
+        if (cleanupRequested && !cleanupFile) {
+          setGenStage('cleanup')
+          cleanupFile = await cleanupRoom()
+        }
         if (cleanupRequested && !cleanupFile) setGenError('Очистка не удалась — генерируем по оригиналу. Можно выключить очистку и попробовать снова.')
         const usingCleaned = Boolean(cleanupFile)
         const fd = new FormData()
@@ -560,6 +572,7 @@ export function GenerationPanel({
         if (!r.ok) throw new Error(d.error || String(r.status))
         id = d.id
         setRoomId(id)
+        setProductRefsEnabled(d.product_refs_enabled === true)
       } else {
         const fd = new FormData()
         fd.append('text', request)
@@ -613,6 +626,8 @@ export function GenerationPanel({
         dimensionsEstimate: render.dimensions_estimate || null,
         lens: render.lens || null,
         repairScope: render.repair_scope || null,
+        productRefs: render.product_refs || [],
+        productRefsEnabled: room.product_refs_enabled === true,
       }
       setIterations(prev => [...prev, next])
       setCurrentId(next.id)
@@ -636,6 +651,8 @@ export function GenerationPanel({
       if (r.status === 401) { onRequireLogin(); return }
       if (!r.ok) throw new Error(d.error || 'Не удалось собрать итог')
       setIterations(prev => prev.map(item => item.id === current.id ? { ...item, analysis: d.analysis || item.analysis } : item))
+      setOpenSummaryTab(null)
+      setSelectedOffers({})
       setStep('estimates')
     } catch (e) {
       setFinalError(e instanceof Error ? e.message : 'Не удалось собрать итог')
@@ -657,6 +674,8 @@ export function GenerationPanel({
       if (r.status === 401) { onRequireLogin(); return }
       if (!r.ok) throw new Error(d.error || 'Не удалось подобрать товары')
       setIterations(prev => prev.map(item => item.id === current.id ? { ...item, analysis: d.analysis || item.analysis } : item))
+      setOpenSummaryTab('products')
+      setSelectedOffers({})
       setStep('estimates')
     } catch (e) {
       setProductSearchError(e instanceof Error ? e.message : 'Не удалось подобрать товары')
@@ -679,7 +698,13 @@ export function GenerationPanel({
   }
 
   const activeStep = stepIndex(step)
-  const genStages = genMode === 'edit' ? EDIT_GEN_STAGES : BASE_GEN_STAGES
+  const genStages = genMode === 'edit' ? EDIT_GEN_STAGES : [
+    ...BASE_GEN_STAGES.slice(0, 1),
+    ...(cleanupRequested ? [{ key: 'cleanup', label: 'Очистка', hint: 'Убираем мебель и готовим пустую комнату' }] : []),
+    ...BASE_GEN_STAGES.slice(1, 3),
+    ...(productRefsEnabled ? [{ key: 'product_refs', label: 'Товары в кадре', hint: 'Подбираем референсы товаров Hoff' }] : []),
+    ...BASE_GEN_STAGES.slice(3),
+  ]
   const genStageIndex = Math.max(0, genStages.findIndex(item => item.key === genStage))
   const genStageInfo = genStages[genStageIndex]
   const genPercent = Math.round(((genStageIndex + 1) / genStages.length) * 100)
@@ -748,9 +773,6 @@ export function GenerationPanel({
                     {!cleanupBusy && cleaned && !cleanupRequested && <span>Очищенная версия сохранена, но не выбрана</span>}
                     {!cleanupBusy && cleanupError && <span className="text-destructive" role="alert">{cleanupError}</span>}
                   </div>
-                  {cleanupRequested && !cleaned && !cleanupBusy && (
-                    <button type="button" onClick={() => void cleanupRoom()} className="action-secondary mt-3 min-h-9 px-3 text-xs">Подготовить очищенную комнату</button>
-                  )}
                 </div>
               )}
               {photo && (
@@ -881,16 +903,6 @@ export function GenerationPanel({
                     </button>
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm">
-                  <span className="text-muted-foreground">
-                    {realOfferCount > 0
-                      ? `Класс «${tierName(current.priceTier)}» · товары: ${realOfferCount} ${realOfferCount === 1 ? 'предложение' : 'предложений'}`
-                      : current.productsEnabled === false
-                        ? 'Подбор товаров выключен'
-                        : `Класс «${tierName(current.priceTier)}» · подборка ${rub(current.total)}`}
-                  </span>
-                  <span className="text-muted-foreground">{realOfferCount > 0 ? 'Реальные товары Hoff' : current.productsEnabled === false ? 'Без товаров' : 'Итог ориентировочный'}</span>
-                </div>
                 {current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
                   <section className="mt-6 border p-4" aria-labelledby="art-direction">
                     <p id="art-direction" className="eyebrow">Авторский бриф</p>
@@ -919,6 +931,21 @@ export function GenerationPanel({
                       {current.artDirection.lighting ? <div><dt className="eyebrow">Свет</dt><dd className="mt-1">{current.artDirection.lighting}</dd></div> : null}
                       {current.artDirection.mood ? <div><dt className="eyebrow">Настроение</dt><dd className="mt-1">{current.artDirection.mood}</dd></div> : null}
                     </dl>
+                  </section>
+                ) : null}
+                {current.productRefs?.length ? (
+                  <section className="mt-6 border p-4" aria-labelledby="included-products">
+                    <p id="included-products" className="eyebrow">Что вошло в дизайн</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">Эти товары Hoff были добавлены референсами в базовый кадр.</p>
+                    <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+                      {current.productRefs.map((ref, index) => (
+                        <div key={`${ref.offer_id || ref.name}-${index}`} className="w-40 shrink-0 border p-2">
+                          <p className="line-clamp-2 text-xs font-medium leading-4">{ref.name}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{ref.category || 'товар'}{ref.price ? ` · ${rub(Number(ref.price))}` : ''}</p>
+                          {ref.why ? <p className="mt-1 line-clamp-3 text-[10px] leading-4 text-muted-foreground">{ref.why}</p> : null}
+                        </div>
+                      ))}
+                    </div>
                   </section>
                 ) : null}
                 {heroItems.length ? (
@@ -981,10 +1008,10 @@ export function GenerationPanel({
                                         setEditFormOpen(true)
                                         requestAnimationFrame(() => document.getElementById('edit-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
                                       }}
-                                      className="flex min-h-12 shrink-0 flex-col items-start gap-0.5 border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-40"
+                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 flex-col items-start gap-0.5 overflow-hidden border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
-                                      <span className="text-xs font-medium leading-4">{edit.action}</span>
-                                      <span className="text-[10px] text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
+                                      <span className="line-clamp-2 w-full break-words text-xs font-medium leading-4" title={edit.action}>{edit.action}</span>
+                                      <span className="w-full truncate text-[10px] text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
                                     </button>
                                   ))}
                                 </div>
@@ -1127,12 +1154,6 @@ export function GenerationPanel({
               <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="action-secondary"><ArrowLeft className="size-4" />Изменить стиль</button>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
-                <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
-                {(realOfferCount > 0 || current.items.length > 0) ? (
-                  <button type="button" onClick={() => setStep('estimates')} className="action-secondary min-h-14 px-6 text-base">Товары и смета</button>
-                ) : current.productsEnabled === false ? null : (
-                  <button type="button" onClick={runProductSearch} disabled={productSearchBusy} className="action-secondary min-h-14 px-6 text-base">{productSearchBusy ? <><LoaderCircle className="size-4 animate-spin" /> Ищем товары…</> : <>Найти товары <Search className="size-5" /></>}</button>
-                )}
                 <button type="button" onClick={runFinalReview} disabled={finalBusy} className="action-primary min-h-14 px-8 text-base">{finalBusy ? <><LoaderCircle className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <Check className="size-5" /></>}</button>
               </div>
             </div>
@@ -1155,9 +1176,15 @@ export function GenerationPanel({
                 </div>
               </div>
 
-              <div className="space-y-8">
-                {(repairRows(current.repairScope).length || current.repairScope?.storage?.length) ? (
-                  <section aria-labelledby="gen-repair">
+              <div>
+                <div className="flex gap-2 overflow-x-auto border-b pb-2">
+                  {SUMMARY_TABS.map(([id, label]) => (
+                    <button key={id} type="button" onClick={() => setOpenSummaryTab(openSummaryTab === id ? null : id)} className={`min-h-10 shrink-0 border px-3 text-xs transition-colors ${openSummaryTab === id ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
+                  ))}
+                </div>
+
+                {openSummaryTab === 'repair' && ((repairRows(current.repairScope).length || current.repairScope?.storage?.length) ? (
+                  <section className="mt-5" aria-labelledby="gen-repair">
                     <h4 id="gen-repair" className="eyebrow mb-4">План ремонта</h4>
                     <dl className="grid gap-2 border-y py-4 text-sm">
                       {repairRows(current.repairScope).map(row => (
@@ -1174,133 +1201,126 @@ export function GenerationPanel({
                       ) : null}
                     </dl>
                   </section>
-                ) : null}
-                {currentChanges.length ? (
-                  <section aria-labelledby="gen-changes">
+                ) : <p className="mt-5 border-y py-4 text-sm text-muted-foreground">План ремонта пока не собран.</p>)}
+
+                {openSummaryTab === 'changes' && (
+                  <section className="mt-5" aria-labelledby="gen-changes">
                     <h4 id="gen-changes" className="eyebrow mb-4">Что можно изменить</h4>
-                    <ol className="divide-y border-y">
-                      {currentChanges.map((change, index) => (
-                        <li key={`${change.layer}-${index}`} className="flex gap-3 py-3 text-sm">
-                          <span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
-                          <div>
-                            <p className="font-medium">{change.change}</p>
-                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{change.label} · сейчас: {change.current}</p>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
+                    {currentChanges.length ? (
+                      <ol className="divide-y border-y">
+                        {currentChanges.map((change, index) => (
+                          <li key={`${change.layer}-${index}`} className="flex gap-3 py-3 text-sm">
+                            <span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+                            <div><p className="font-medium">{change.change}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{change.label} · сейчас: {change.current}</p></div>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : <p className="border-y py-4 text-sm text-muted-foreground">Архитектор не оставил значимых изменений.</p>}
                   </section>
-                ) : null}
-                {current.analysis?.final ? (
-                  <section aria-labelledby="gen-final">
-                    <h4 id="gen-final" className="eyebrow mb-4">Итог по дизайну</h4>
-                    <dl className="grid gap-3 border-y py-4 text-sm leading-6">
-                      {current.analysis.final.concept ? <div><dt className="eyebrow">Концепция</dt><dd className="mt-1">{current.analysis.final.concept}</dd></div> : null}
-                      {current.analysis.final.palette ? <div><dt className="eyebrow">Палитра</dt><dd className="mt-1">{current.analysis.final.palette}</dd></div> : null}
-                      {current.analysis.final.materials ? <div><dt className="eyebrow">Материалы</dt><dd className="mt-1">{current.analysis.final.materials}</dd></div> : null}
-                      {current.analysis.final.electrical ? <div><dt className="eyebrow">Свет и розетки</dt><dd className="mt-1">{current.analysis.final.electrical}</dd></div> : null}
-                      {current.analysis.final.next_steps?.length ? <div><dt className="eyebrow">Что дальше</dt><dd className="mt-1"><ul className="list-disc space-y-1 pl-5">{current.analysis.final.next_steps.map((step, index) => <li key={`final-step-${index}`}>{step}</li>)}</ul></dd></div> : null}
-                    </dl>
-                  </section>
-                ) : null}
-                <section aria-labelledby="gen-products">
-                  <h4 id="gen-products" className="eyebrow mb-4">Товары по дизайну</h4>
-                  {productMatches.length ? (
-                    <div className="space-y-6">
-                      {productMatches.map((match, index) => (
-                        <div key={`${match.item.category}-${index}`}>
-                          <div className="flex items-baseline justify-between gap-3 border-b pb-2">
-                            <p className="text-sm font-medium">{match.item.label}</p>
-                            <span className="text-xs text-muted-foreground">{match.offers.length ? `${match.offers.length} в каталоге` : 'нет в каталоге'}</span>
-                          </div>
-                          {match.offers.length ? (
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                              {match.offers.map(offer => (
-                                <a key={offer.id} href={offer.url || '#'} target="_blank" rel={offer.url ? 'noopener nofollow sponsored' : 'noopener nofollow'} className="group flex min-w-0 flex-col border transition-colors hover:border-foreground">
-                                  <div className="aspect-[4/3] overflow-hidden bg-muted">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет фото</div>}</div>
-                                  <div className="flex flex-1 flex-col p-3">
-                                    <p className="line-clamp-2 text-xs font-medium leading-5">{offer.name}</p>
-                                    <div className="mt-2 flex items-center justify-between gap-2"><span className="text-sm font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</span><span className="truncate text-[11px] text-muted-foreground">{offer.merchant}</span></div>
-                                    {offer.erid ? <p className="mt-1 text-[10px] text-muted-foreground">реклама · erid {offer.erid}</p> : null}
-                                  </div>
-                                </a>
-                              ))}
-                            </div>
-                          ) : <p className="mt-2 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}
-                        </div>
-                      ))}
-                      <p className="text-xs leading-5 text-muted-foreground">Цены и наличие — на момент подбора. Перед покупкой сверьте размеры, цвет и условия магазина.</p>
+                )}
+
+                {openSummaryTab === 'products' && (
+                  <section className="mt-5" aria-labelledby="gen-products">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h4 id="gen-products" className="eyebrow">Товары</h4>
+                      <button type="button" onClick={runProductSearch} disabled={productSearchBusy || current.productsEnabled === false} className="action-secondary min-h-10 px-3 text-xs">{productSearchBusy ? <><LoaderCircle className="size-3.5 animate-spin" /> Ищем…</> : 'Поиск товаров'}</button>
                     </div>
-                  ) : (
-                    <>
-                      {demoEstimate && (
-                        <p className="mb-4 border border-foreground/20 bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
-                          Демо-подборка: это пример состава и цен, а не товары конкретного магазина. Ссылки ведут на похожие позиции.
-                        </p>
-                      )}
-                      <div className="divide-y border-y">
-                        {current.items.length ? current.items.map((item, index) => (
-                          <div key={`${item.name}-${index}`} className="estimate-row grid gap-x-4 gap-y-1 py-3.5 text-sm">
-                            <span>{item.name}</span>
-                            <span className="row-span-2 self-center font-medium">{rub(item.price * item.qty)}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {rub(item.price)} × {item.qty} {item.unit}
-                              {` · ${presentationLabel(item.presentation_status)}`}
-                              {item.source ? ` · ${item.source}` : ''}
-                              {item.price_tier ? ` · ${tierName(item.price_tier)}` : ''}
-                              {item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}
-                            </span>
+                    {productSearchError && <p className="mt-3 text-xs text-destructive" role="alert">{productSearchError}</p>}
+                    {productMatches.length ? (
+                      <div className="mt-4 space-y-4">
+                        {productMatches.map((match, index) => (
+                          <div key={`${match.item.category}-${index}`}>
+                            <p className="text-xs font-medium">{match.item.label}</p>
+                            {match.offers.length ? (
+                              <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                                {match.offers.map(offer => {
+                                  const active = Boolean(selectedOffers[offer.id])
+                                  return (
+                                    <div key={offer.id} className={`w-40 shrink-0 border transition-colors ${active ? 'border-primary' : 'border-foreground/20'}`}>
+                                      <button type="button" onClick={() => toggleOffer(offer)} className="block w-full text-left">
+                                        <div className="h-24 w-full overflow-hidden bg-muted">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">Нет фото</div>}</div>
+                                        <div className="p-2">
+                                          <p className="line-clamp-2 text-[11px] font-medium leading-4">{offer.name}</p>
+                                          <p className="mt-1 text-xs font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</p>
+                                        </div>
+                                      </button>
+                                      {offer.url ? <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" className="block border-t px-2 py-1 text-[10px] underline underline-offset-2">{offer.merchant || 'в магазин'}</a> : null}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            ) : <p className="mt-1 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}
                           </div>
-                        )) : <p className="py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Товары не собраны — попробуйте сгенерировать ещё раз.'}</p>}
+                        ))}
                       </div>
-                      {current.items.length > 0 && (
-                        <>
-                          <p className="mt-3 flex items-center justify-between text-sm"><span className="text-muted-foreground">Итого, оценка · класс «{tierName(current.priceTier)}»</span><strong className="text-xl font-light text-primary-text">{rub(current.total)}</strong></p>
-                          <p className="mt-1 text-right text-xs text-muted-foreground">{demoEstimate ? 'Демо-оценка, не оферта' : 'Смета ориентировочная'}</p>
-                          {fmtDateTime(current.pricesAsOf) && <p className="mt-1 text-right text-[11px] text-muted-foreground">Цены актуальны на {fmtDateTime(current.pricesAsOf)}</p>}
-                        </>
-                      )}
-                    </>
-                  )}
-                </section>
+                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Товары ещё не собраны. Нажмите «Поиск товаров».'}</p>}
+                    {selectedOffersList.length ? (
+                      <div className="mt-5 border-t pt-3">
+                        <p className="eyebrow">Выбрано</p>
+                        <ul className="mt-2 divide-y border-y text-sm">
+                          {selectedOffersList.map(offer => (
+                            <li key={offer.id} className="flex items-start justify-between gap-3 py-2"><span className="min-w-0">{offer.name}</span><span className="shrink-0 font-medium">{offer.price === null ? '—' : rub(offer.price)}</span></li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </section>
+                )}
 
-                <section aria-labelledby="gen-ral">
-                  <h4 id="gen-ral" className="eyebrow mb-4">Палитра по рендеру · RAL ориентировочно</h4>
-                  {current.analysis?.surfaces?.length ? (
-                    <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                      {current.analysis.surfaces.map((surface, index) => (
-                        <div key={`${surface.surface}-${index}`} className="bg-background p-3">
-                          <span className="block h-10 w-full border border-foreground/20" style={{ background: surface.hex }} />
-                          <p className="mt-2 text-xs font-medium">{surface.label || surface.surface}</p>
-                          <p className="font-mono text-[11px] text-muted-foreground">{surface.ral?.code || surface.hex}</p>
-                          {surface.ral ? <p className="text-[11px] text-muted-foreground">{surface.ral.name}</p> : null}
-                          {surface.description ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{surface.description}</p> : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="border-y py-4 text-sm text-muted-foreground">Палитра появится после анализа рендера — сейчас vision не вернул поверхности.</p>}
-                  <p className="mt-2 text-[11px] leading-4 text-muted-foreground">RAL подобран по оттенкам на картинке, точный код сверяйте по вееру.</p>
-                </section>
+                {openSummaryTab === 'ral' && (
+                  <section className="mt-5" aria-labelledby="gen-ral">
+                    <h4 id="gen-ral" className="eyebrow mb-4">Палитра по рендеру · RAL ориентировочно</h4>
+                    {current.analysis?.surfaces?.length ? (
+                      <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
+                        {current.analysis.surfaces.map((surface, index) => (
+                          <div key={`${surface.surface}-${index}`} className="bg-background p-3">
+                            <span className="block h-10 w-full border border-foreground/20" style={{ background: surface.hex }} />
+                            <p className="mt-2 text-xs font-medium">{surface.label || surface.surface}</p>
+                            <p className="font-mono text-[11px] text-muted-foreground">{surface.ral?.code || surface.hex}</p>
+                            {surface.ral ? <p className="text-[11px] text-muted-foreground">{surface.ral.name}</p> : null}
+                            {surface.description ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{surface.description}</p> : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="border-y py-4 text-sm text-muted-foreground">Палитра появится после анализа рендера.</p>}
+                    <p className="mt-2 text-[11px] leading-4 text-muted-foreground">RAL подобран по оттенкам на картинке, точный код сверяйте по вееру.</p>
+                  </section>
+                )}
 
-                <section aria-labelledby="gen-electrical">
-                  <h4 id="gen-electrical" className="eyebrow mb-4">Розетки и выключатели · рекомендация</h4>
-                  {current.analysis?.electrical?.length ? (
-                    <ul className="divide-y border-y">
-                      {current.analysis.electrical.map((item, index) => (
-                        <li key={`${item.title}-${index}`} className="flex gap-3 py-3 text-sm"><Zap className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div></li>
-                      ))}
-                    </ul>
-                  ) : <p className="border-y py-4 text-sm text-muted-foreground">Рекомендации по электрике появятся после анализа рендера.</p>}
-                </section>
+                {openSummaryTab === 'electrical' && (
+                  <section className="mt-5" aria-labelledby="gen-electrical">
+                    <h4 id="gen-electrical" className="eyebrow mb-4">Розетки и выключатели · рекомендация</h4>
+                    {current.analysis?.electrical?.length ? (
+                      <ul className="divide-y border-y">
+                        {current.analysis.electrical.map((item, index) => (
+                          <li key={`${item.title}-${index}`} className="flex gap-3 py-3 text-sm"><Zap className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div></li>
+                        ))}
+                      </ul>
+                    ) : <p className="border-y py-4 text-sm text-muted-foreground">Рекомендации по электрике появятся после анализа рендера.</p>}
+                  </section>
+                )}
+
+                {openSummaryTab === 'final' && (
+                  <section className="mt-5" aria-labelledby="gen-final">
+                    <h4 id="gen-final" className="eyebrow mb-4">Итог по дизайну</h4>
+                    {current.analysis?.final ? (
+                      <dl className="grid gap-3 border-y py-4 text-sm leading-6">
+                        {current.analysis.final.concept ? <div><dt className="eyebrow">Концепция</dt><dd className="mt-1">{current.analysis.final.concept}</dd></div> : null}
+                        {current.analysis.final.palette ? <div><dt className="eyebrow">Палитра</dt><dd className="mt-1">{current.analysis.final.palette}</dd></div> : null}
+                        {current.analysis.final.materials ? <div><dt className="eyebrow">Материалы</dt><dd className="mt-1">{current.analysis.final.materials}</dd></div> : null}
+                        {current.analysis.final.electrical ? <div><dt className="eyebrow">Свет и розетки</dt><dd className="mt-1">{current.analysis.final.electrical}</dd></div> : null}
+                        {current.analysis.final.next_steps?.length ? <div><dt className="eyebrow">Что дальше</dt><dd className="mt-1"><ul className="list-disc space-y-1 pl-5">{current.analysis.final.next_steps.map((step, index) => <li key={`final-step-${index}`}>{step}</li>)}</ul></dd></div> : null}
+                      </dl>
+                    ) : <p className="border-y py-4 text-sm text-muted-foreground">Итог ещё не собран. Нажмите «Готово · итог».</p>}
+                  </section>
+                )}
               </div>
             </div>
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => setStep('result')} className="action-secondary"><ArrowLeft className="size-4" />Вернуться к результату</button>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <a href={`/cabinet?room=${encodeURIComponent(current.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Открыть в кабинете</a>
                 <button type="button" onClick={resetAll} className="action-secondary"><RotateCcw className="size-4" />Новая комната</button>
-                <button type="button" onClick={onClose} className="action-primary min-h-14 px-8 text-base">Завершить <Check className="size-5" /></button>
               </div>
             </div>
           </div>

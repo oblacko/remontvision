@@ -404,7 +404,6 @@ export default function Cabinet() {
                   {roomData.render?.image && <button type="button" onClick={() => setFullscreen(true)} className="action-secondary"><Expand className="size-4" />На весь экран</button>}
                   {roomData.render?.image && <a href={roomData.render.image} download="remontvision-design.jpg" className="action-secondary"><Download className="size-4" />Скачать</a>}
                   {roomData.render?.image && <button type="button" onClick={() => setShareOpen(true)} className="action-secondary"><Share2 className="size-4" />Поделиться</button>}
-                  {roomData.render?.id && <a href={`/?room=${encodeURIComponent(roomData.id)}&products=1`} className="action-primary"><ArrowUpRight className="size-4" />Товары в генераторе</a>}
                   <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
                 </div>
