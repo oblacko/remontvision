@@ -1520,25 +1520,30 @@ app.post('/api/renders/:id/product-search', h(async (req, res) => {
     });
     const ids = [...new Set((agent.items || []).flatMap(item => item.offer_ids || []).map(String))].slice(0, 40);
     const offers = new Map();
-    await Promise.all(ids.map(async id => {
-      try {
-        const offer = await getCatalogOffer(id);
-        if (!offer) return;
-        offers.set(String(id), {
-          id: String(offer.id),
-          name: String(offer.name || ''),
-          price: offer.price == null ? null : Number(offer.price),
-          currency: offer.currency || 'RUB',
-          merchant: offer.merchant || null,
-          url: offer.affiliate_url || offer.canonical_url || null,
-          image_url: offer.picture_url || null,
-          erid: offer.erid || null,
-          score: null,
-        });
-      } catch (e) {
-        log({ event: 'product_search_offer_error', render_id: render.id, offer_id: id, error: String(e.message || e).slice(0, 200) });
+    const queue = [...ids];
+    const workers = Array.from({ length: Math.min(6, queue.length) }, async () => {
+      while (queue.length) {
+        const id = queue.shift();
+        try {
+          const offer = await getCatalogOffer(id);
+          if (!offer) continue;
+          offers.set(String(id), {
+            id: String(offer.id),
+            name: String(offer.name || ''),
+            price: offer.price == null ? null : Number(offer.price),
+            currency: offer.currency || 'RUB',
+            merchant: offer.merchant || null,
+            url: offer.affiliate_url || offer.canonical_url || null,
+            image_url: offer.picture_url || null,
+            erid: offer.erid || null,
+            score: null,
+          });
+        } catch (e) {
+          log({ event: 'product_search_offer_error', render_id: render.id, offer_id: id, error: String(e.message || e).slice(0, 200) });
+        }
       }
-    }));
+    });
+    await Promise.all(workers);
     const products = (agent.items || []).map(item => {
       const itemOffers = (item.offer_ids || []).map(id => offers.get(String(id))).filter(Boolean).slice(0, 4);
       return {
