@@ -16,6 +16,7 @@ export const MOCK_MODE = !process.env.OPENROUTER_API_KEY;
 
 const HTTP_REFERER = process.env.APP_URL || 'http://localhost:3000';
 const TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 120_000);
+const IMAGE_TIMEOUT_MS = Number(process.env.OPENROUTER_IMAGE_TIMEOUT_MS || 300_000);
 export const MAX_REFERENCES = 4; // сколько референсов уходит в генерацию (проверяй supported_parameters модели)
 
 // --- логирование: json-строки для юнит-экономики и отладки ---
@@ -571,9 +572,17 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
           method: 'POST',
           headers: headers(),
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(150_000),
+          signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
         });
-        r = endpoint.endsWith('/images') ? await withImageSlot(doFetch) : await doFetch();
+        try {
+          r = endpoint.endsWith('/images') ? await withImageSlot(doFetch) : await doFetch();
+        } catch (e) {
+          if ((e.name === 'AbortError' || /aborted|timeout/i.test(String(e.message || ''))) && tryNo < 1) {
+            log({ event: 'render_timeout_retry', model, endpoint, attempt: tryNo + 1, timeout_ms: IMAGE_TIMEOUT_MS });
+            continue;
+          }
+          throw e;
+        }
         if (r.status === 429 && tryNo < 3) {
           const retryAfter = Number(r.headers.get('retry-after') || 0);
           const wait = Math.max(10, Math.min(60, retryAfter || (10 * 2 ** tryNo)));
@@ -644,7 +653,7 @@ export async function generateFromText({ prompt, aspectRatio = '3:2' }) {
   }]);
   for (const [attempt, [endpoint, payload]] of attempts.entries()) {
     try {
-      const r = await proxyFetch(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(150_000) });
+      const r = await proxyFetch(endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(payload), signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
       const data = await r.json().catch(() => ({}));
       const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
       spent += cost;
@@ -673,7 +682,7 @@ export async function generateTextImage({ prompt, aspectRatio = '21:9', model, r
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(150_000),
+    signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
   }));
   const data = await r.json().catch(() => ({}));
   const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
