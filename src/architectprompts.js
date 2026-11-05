@@ -2,8 +2,9 @@
 // Редактируются в админке, активные версии держим в памяти.
 import { DEFAULT_DESIGNER_PROMPT } from './designerprompt.js';
 import { DEFAULT_DIRECTION_PROMPT } from './directionprompt.js';
+import { DEFAULT_LAYOUT_PROMPT } from './layoutprompt.js';
 
-export const ARCHITECT_PROMPT_KINDS = ['designer', 'builder', 'reviewer', 'criteria', 'direction'];
+export const ARCHITECT_PROMPT_KINDS = ['designer', 'builder', 'reviewer', 'criteria', 'direction', 'layout'];
 
 export const DEFAULT_BUILDER_PROMPT = `Ты — архитектор-строитель и дизайнер интерьера. Смотришь на фото реальной квартиры до ремонта.
 Это ПОЛНЫЙ ремонт, а не косметика. Определи, что нужно чинить и менять.
@@ -75,6 +76,7 @@ export const DEFAULT_ARCHITECT_PROMPTS = {
   reviewer: DEFAULT_REVIEWER_PROMPT,
   criteria: DEFAULT_CRITERIA_PROMPT,
   direction: DEFAULT_DIRECTION_PROMPT,
+  layout: DEFAULT_LAYOUT_PROMPT,
 };
 
 let cache = {};

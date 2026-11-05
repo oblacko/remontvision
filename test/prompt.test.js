@@ -82,7 +82,7 @@ test('prompt modes can drop furniture and catalog', () => {
     imageMap: [{ role: 'style reference' }],
   });
   assert.match(prompt, /FURNITURE MODE/);
-  assert.match(prompt, /Replace and restyle existing loose furniture/);
+  assert.match(prompt, /The room is empty/);
   assert.match(prompt, /CATALOG DISABLED/);
   assert.doesNotMatch(prompt, /Инженерная доска/);
 });
@@ -237,4 +237,54 @@ test('repair scope turns the prompt into a full renovation and removes the prese
   assert.match(prompt, /after a full renovation/);
   assert.doesNotMatch(prompt, /preserve the existing floor/i);
   assert.match(prompt, /action=keep: preserve/);
+});
+
+test('empty room follows the architect layout plan instead of freezing the old layout', () => {
+  const prompt = buildPrompt({
+    style: 'Неоклассика',
+    priceTier: 'comfort',
+    products: [],
+    roomType: 'Кабинет',
+    keepFurniture: false,
+    useCatalog: false,
+    dimensions: { width: 3, length: 4, height: 2.7 },
+    layoutPlan: {
+      strategy: 'Рабочая зона у окна + lounge у стеллажа',
+      zones: [{ name: 'Работа', purpose: 'стол у окна', position: 'у окна' }],
+      items: [{ type: 'desk', label: 'Стол 140 см', position: 'перпендикулярно окну', size_cm: '140x70' }],
+      circulation: 'проход 90 см от двери',
+      focal_point: 'стеллаж-перегородка',
+      avoid: ['стол в центре комнаты'],
+    },
+  });
+  assert.match(prompt, /LAYOUT PLAN/);
+  assert.match(prompt, /Рабочая зона у окна/);
+  assert.match(prompt, /Стол 140 см/);
+  assert.match(prompt, /The room is empty/i);
+  assert.doesNotMatch(prompt, /Keep the existing functional zones and furniture positions/);
+  assert.doesNotMatch(prompt, /do not change the room layout or architecture/);
+});
+
+test('kept-furniture room still locks the existing layout', () => {
+  const prompt = buildPrompt({
+    style: 'Неоклассика',
+    roomType: 'Кабинет',
+    keepFurniture: true,
+    useCatalog: false,
+  });
+  assert.match(prompt, /Keep the existing functional zones and furniture positions/);
+  assert.match(prompt, /Preserve existing large furniture/);
+});
+
+test('empty room without a layout plan still designs from scratch and does not reference a missing plan', () => {
+  const prompt = buildPrompt({
+    style: 'Неоклассика',
+    roomType: 'Кабинет',
+    keepFurniture: false,
+    useCatalog: false,
+  });
+  assert.match(prompt, /The room is empty/);
+  assert.match(prompt, /from scratch/);
+  assert.doesNotMatch(prompt, /LAYOUT PLAN/);
+  assert.doesNotMatch(prompt, /Keep the existing functional zones and furniture positions/);
 });

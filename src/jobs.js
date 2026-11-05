@@ -12,6 +12,7 @@ import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
 import { reviewDesign } from './architect.js';
 import { buildDesignDirection, DESIGN_DIRECTION_ENABLED } from './designeragent.js';
+import { buildLayoutPlan } from './layoutagent.js';
 import { buildAnalysis } from './analysis.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
@@ -99,6 +100,7 @@ async function processRender(renderId) {
   // Себестоимость полной генерации: каждый внешний запрос пишется отдельно.
   const costBreakdown = {
     art_direction: null,
+    layout: null,
     repair_scope: null,
     cleanup: null,
     design: null,
@@ -341,6 +343,32 @@ async function processRender(renderId) {
         }
       }
 
+      // Планировщик нужен только для пустой комнаты: он предлагает расстановку,
+      // чтобы модель не сводила кабинет к «стол + стул + шкаф».
+      let layoutPlan = null;
+      if (!MOCK_MODE && !keepFurniture) {
+        try {
+          const layoutStart = Date.now();
+          const layoutBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
+          layoutPlan = await buildLayoutPlan({
+            imageDataUrl: await bufferToDataUrl(layoutBuf),
+            roomType,
+            dimensions: estimatedDimensions,
+            style: styleInfo?.key || room.style,
+            concept: room.concept_key || '',
+          });
+          if (layoutPlan) {
+            addCost('layout', layoutPlan.cost);
+            meta.layout_plan = layoutPlan;
+            log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, cost_usd: layoutPlan.cost ?? null, ms: Date.now() - layoutStart });
+          } else {
+            log({ event: 'layout_plan_empty', room_id: room.id, render_id: renderId });
+          }
+        } catch (e) {
+          log({ event: 'layout_plan_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
+
       prompt = buildPrompt({
         style: room.style,
         priceTier,
@@ -361,6 +389,7 @@ async function processRender(renderId) {
         artDirection,
         repairScope,
         productRefs: false,
+        layoutPlan,
       });
 
       referenceImagesB64 = [...styleRefUrls];

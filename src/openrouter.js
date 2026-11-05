@@ -8,6 +8,7 @@ import { supportsAdvancedOptions, modelFamily, supportsResolution } from './mode
 import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 import { getPromptConfig } from './promptconfig.js';
 import { buildScalePlan } from './scaleplan.js';
+import { layoutPlanToText } from './layoutagent.js';
 import { proxyFetch } from './proxy.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
@@ -264,6 +265,7 @@ export function buildPrompt({
   artDirection = '',
   repairScope = null,
   productRefs = false,
+  layoutPlan = null,
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -277,11 +279,28 @@ export function buildPrompt({
   const change = fullChange
     .split(/(?<=[.!?])\s+/)
     .filter(sentence => !(keepFurniture ? /\b(replace|restyle|rearrange|reposition|move)\b/i : /\b(rearrange|reposition|move)\b/i).test(sentence))
-    .join(' ') || 'Update surface finishes, textiles, lighting and decor without changing the room layout.';
+    .join(' ')
+    .replace(/\.+$/, '') || 'Update surface finishes, textiles, lighting and decor without changing the room layout';
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
-  const styling = 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use only existing shelves, ledges and niches; never add a new built-in, ledge, cove or wall panel.';
+  const styling = keepFurniture
+    ? 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use only existing shelves, ledges and niches; never add a new built-in, ledge, cove or wall panel.'
+    : 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use existing or freestanding shelves, consoles and ledges; never add a new built-in, niche, cove or wall panel.';
   const rules = getPromptConfig();
-  const furnitureRule = keepFurniture ? rules.furnitureOn : rules.furnitureOff;
+  const furnitureRule = keepFurniture
+    ? rules.furnitureOn
+    : layoutPlan
+      ? 'The room is empty. Furnish it from scratch according to the LAYOUT PLAN. Keep all architecture, openings, plumbing and electrical points. Do not reproduce old furniture positions and do not leave the room half-finished.'
+      : 'The room is empty. Furnish it from scratch: create 2–3 functional zones and a complete, lived-in composition. Keep all architecture, openings, plumbing and electrical points. Do not reproduce old furniture positions and do not leave the room half-finished.';
+  const placementRule = keepFurniture
+    ? 'Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation; do not center it under the window if it was not there. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.'
+    : layoutPlan
+      ? 'Place furniture exactly as the LAYOUT PLAN describes: zones, items and circulation. Keep 60–90 cm walkways and do not block windows, doors or radiators. Do not invent old furniture positions.'
+      : 'Design a believable furniture layout from scratch: 2–3 zones, 60–90 cm walkways, nothing blocking windows, doors or radiators. Do not reduce the room to a single desk+chair+shelf set.';
+  const compositionRule = keepFurniture
+    ? 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved only when furniture replacement is allowed; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.'
+    : layoutPlan
+      ? 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be placed anywhere the LAYOUT PLAN allows; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.'
+      : 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be placed freely to support the designed zones; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.';
   const catalogText = useCatalog
     ? productsText(products)
     : 'No catalog products are used for this render. Choose materials, lighting and furniture that best fit the style and the room. Do not add a product list or estimate.';
@@ -372,6 +391,7 @@ ${productRefs ? 'This render includes specific hero products shown in the refere
 ${architectureLock}
 ${repairScopeText}
 ${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
+${layoutPlan ? `\nLAYOUT PLAN — DESIGNED BY THE ARCHITECT\n${layoutPlanToText(layoutPlan)}\nFollow this plan as the primary layout: place each item in the described zone, keep the circulation, and do not collapse the room into a minimal desk+chair+shelf set. Exact centimetres may be adjusted to the photo, but keep the composition and the item list.\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY
 ${keep}.
@@ -381,7 +401,7 @@ FURNITURE MODE
 ${furnitureRule}
 
 FURNITURE PLACEMENT
-Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation; do not center it under the window if it was not there. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.
+${placementRule}
 
 CHANGE / DEEP TRANSFORMATION
 ${change}.
@@ -391,7 +411,7 @@ ${repairScope
 Keep the result functional, keep realistic dimensions, and do not block doors or windows.
 
 COMPOSITION
-Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved only when furniture replacement is allowed; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.
+${compositionRule}
 
 LIGHTING DESIGN — THE MAIN WOW TOOL
 ${rules.lighting}

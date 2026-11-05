@@ -123,6 +123,44 @@ export function validateDesignDirection(value) {
   return parsed.success ? parsed.data : null;
 }
 
+const layoutText = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+export function normalizeLayoutPlan(value) {
+  if (!value || typeof value !== 'object') return null;
+  const items = (Array.isArray(value.items) ? value.items : [])
+    .map(item => {
+      const type = layoutText(item?.type, 40).toLowerCase();
+      if (!type) return null;
+      return {
+        type,
+        label: layoutText(item?.label, 120),
+        position: layoutText(item?.position, 160),
+        size_cm: layoutText(item?.size_cm, 40),
+        priority: Number.isFinite(Number(item?.priority)) ? Number(item.priority) : 0,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+  if (!items.length) return null;
+  const zones = (Array.isArray(value.zones) ? value.zones : [])
+    .map(zone => {
+      const name = layoutText(zone?.name, 60);
+      if (!name) return null;
+      return { name, purpose: layoutText(zone?.purpose, 160), position: layoutText(zone?.position, 120) };
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+  return {
+    strategy: layoutText(value.strategy, 240),
+    zones,
+    items,
+    circulation: layoutText(value.circulation, 240),
+    focal_point: layoutText(value.focal_point, 160),
+    avoid: (Array.isArray(value.avoid) ? value.avoid : [])
+      .map(item => layoutText(item, 120)).filter(Boolean).slice(0, 6),
+  };
+}
+
 export function validateSearchResult(value) {
   if (!value || typeof value !== 'object') return null;
   const items = Array.isArray(value.items)
