@@ -200,7 +200,6 @@ export function GenerationPanel({
   const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
   const [style, setStyle] = useState<string | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
-  const [keepFurniture, setKeepFurniture] = useState(true)
   const [useCatalog] = useState(true)
   const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
   const [iterations, setIterations] = useState<Iteration[]>([])
@@ -293,7 +292,6 @@ export function GenerationPanel({
         setRoomType(d.room_type || null)
         if (d.room_type) setRoomTypes(prev => prev.includes(d.room_type) ? prev : [...prev, d.room_type])
         setPriceTier(d.price_tier || 'comfort')
-        setKeepFurniture(d.keep_furniture !== false)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
         setPhotoError(''); setGenError(d.notice || '')
@@ -368,7 +366,6 @@ export function GenerationPanel({
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setRoomType(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null)
-    setKeepFurniture(true)
     // Габариты и объектив оценивает архитектор по фото — пользователь их не вводит.
   }
 
@@ -527,7 +524,7 @@ export function GenerationPanel({
         if (cleanupFile) fd.append('cleanup_photo', cleanupFile)
         if (isBedRoom) fd.append('bed_length_m', '2')
         fd.append('price_tier', priceTier)
-        fd.append('keep_furniture', usingCleaned ? '0' : (keepFurniture ? '1' : '0'))
+        fd.append('keep_furniture', usingCleaned ? '0' : '1')
         fd.append('use_catalog', useCatalog ? '1' : '0')
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
@@ -644,7 +641,7 @@ export function GenerationPanel({
     releaseUrl(photo)
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
-    setStyle(null); setPriceTier('comfort'); setKeepFurniture(true)
+    setStyle(null); setPriceTier('comfort')
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     loadedRoomRef.current = ''
     clearEditRefs()
@@ -726,17 +723,6 @@ export function GenerationPanel({
                   {cleanupRequested && !cleaned && !cleanupBusy && (
                     <button type="button" onClick={() => void cleanupRoom()} className="action-secondary mt-3 min-h-9 px-3 text-xs">Подготовить очищенную комнату</button>
                   )}
-                </div>
-              )}
-              {photo && (
-                <div className="mt-3 border p-4">
-                  <button type="button" aria-pressed={keepFurniture} onClick={() => setKeepFurniture(value => !value)} className="flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${keepFurniture ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{keepFurniture ? <Check className="size-3.5" /> : null}</span>
-                    <span>
-                      <span className="block text-sm font-medium">Оставить мебель</span>
-                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{keepFurniture ? 'Сохраняем существующую мебель и планировку, обновляем отделку.' : 'Меняем мебель и отделку, сохраняя архитектуру, окна и двери.'}</span>
-                    </span>
-                  </button>
                 </div>
               )}
               {photo && (
