@@ -91,9 +91,7 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
   const [commentDraft, setCommentDraft] = useState('')
   const [addFor, setAddFor] = useState<string | null>(null)
   const [addText, setAddText] = useState('')
-  const [onlyNeeded, setOnlyNeeded] = useState(false)
   const groups = useMemo(() => groupRoadmap(items), [items])
-  const hasNeeded = groups.some(group => group.items.some(item => item.active && !item.done))
 
   if (!hasPurchased) return <Skeleton />
   if (!items.length) return <EmptyRoadmap busy={busy} error={error} onGenerate={actions.onGenerate} />
@@ -131,33 +129,13 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {[{ value: false, label: 'Все' }, { value: true, label: 'Только нужное' }].map(option => (
-          <button
-            key={option.label}
-            type="button"
-            aria-pressed={onlyNeeded === option.value}
-            onClick={() => setOnlyNeeded(option.value)}
-            className={`min-h-9 border px-3 text-xs transition-colors ${onlyNeeded === option.value ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-
       <Progress items={items} />
       {error && <p className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{error}</p>}
-
-      {onlyNeeded && !hasNeeded && (
-        <p className="border border-foreground/25 p-4 text-sm text-muted-foreground">Всё куплено — в списке не осталось нужных позиций.</p>
-      )}
 
       <div className="space-y-3">
         {groups.map(group => {
           const active = group.items.filter(item => item.active)
           const done = active.filter(item => item.done).length
-          const visible = onlyNeeded ? group.items.filter(item => item.active && !item.done) : group.items
-          if (onlyNeeded && !visible.length) return null
           return (
             <details key={group.key} className="group border border-foreground/25">
               <summary className="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
@@ -168,7 +146,7 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
               </summary>
               <div className="border-t border-foreground/25">
                 <ul>
-                  {visible.map(item => (
+                  {group.items.map(item => (
                     <li key={item.id} className={cn('border-t border-foreground/10 first:border-t-0', !item.active && 'opacity-50')}>
                       <div className="flex items-start gap-3 px-3 py-3">
                         <button
