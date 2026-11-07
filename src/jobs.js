@@ -378,7 +378,7 @@ async function processRender(renderId) {
             keepFurniture: effectiveKeepFurniture,
             sessionId: meta.render_session,
           });
-          if (layoutPlan) {
+          if (layoutPlan?.status === 'proposed' && layoutPlan.items?.length) {
             addCost('layout', layoutPlan.cost);
             const fitted = fitLayoutPlan({ plan: layoutPlan, dimensions: estimatedDimensions, roomType, artDirection });
             layoutPlan = fitted.plan;
@@ -386,9 +386,16 @@ async function processRender(renderId) {
             meta.layout_fit = fitted.fit;
             if (fitted.dropped.length) log({ event: 'layout_fit_dropped', room_id: room.id, render_id: renderId, dropped: fitted.fit?.dropped, needed_cm: fitted.fit?.neededCm, width_m: fitted.fit?.widthM });
             meta.layout_plan = layoutPlan;
-            log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, cost_usd: layoutPlan.cost ?? null, ms: Date.now() - layoutStart });
+            meta.layout_validation = layoutPlan.validation || null;
+            meta.layout_assumptions = layoutPlan.assumptions || [];
+            log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, validation: layoutPlan.validation?.result || null, cost_usd: layoutPlan.cost ?? null, ms: Date.now() - layoutStart });
           } else {
-            log({ event: 'layout_plan_empty', room_id: room.id, render_id: renderId });
+            if (layoutPlan) {
+              addCost('layout', layoutPlan.cost);
+              meta.layout_plan_skipped = { status: layoutPlan.status, strategy: layoutPlan.strategy, questions: layoutPlan.questions || [], missing_inputs: layoutPlan.missing_inputs || [] };
+            }
+            layoutPlan = null;
+            log({ event: 'layout_plan_empty', room_id: room.id, render_id: renderId, status: meta.layout_plan_skipped?.status || null });
           }
         } catch (e) {
           log({ event: 'layout_plan_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
