@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { ExamplesCarousel } from '@/components/ExamplesCarousel'
 import { GenerationPanel } from '@/components/GenerationPanel'
+import { useTasks } from '@/components/TaskDock'
 
 const site = 'https://www.remontvision.ru'
 const navItems = [['До / после', '#examples', 'examples'], ['Что вы получите', '#result', 'result'], ['Как работает', '#how', 'how'], ['Цены', '#prices', 'prices']] as const
@@ -59,6 +60,12 @@ export default function Home() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelRoomId, setPanelRoomId] = useState('')
   const [packs, setPacks] = useState<PublicPack[]>(defaultPacks)
+  const { refresh: refreshTasks, setPanelOpen: setTasksPanelOpen } = useTasks()
+
+  useEffect(() => {
+    setTasksPanelOpen(panelOpen)
+  }, [panelOpen, setTasksPanelOpen])
+  useEffect(() => () => setTasksPanelOpen(false), [setTasksPanelOpen])
 
   async function loadMe() {
     try {
@@ -148,6 +155,7 @@ export default function Home() {
       if (!r.ok) throw new Error(d.error || String(r.status))
       localStorage.setItem('rv_last_email', loginEmail)
       await loadMe()
+      void refreshTasks()
       setPendingPanel(false)
       setLoginOpen(false)
       if (openAfter) setPanelOpen(true)

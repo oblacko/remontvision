@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
+import { useTasks } from '@/components/TaskDock'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -219,6 +220,7 @@ export function GenerationPanel({
   onRefreshUser: () => void | Promise<void>
   isAuthed?: boolean
 }) {
+  const { refresh: refreshTasks } = useTasks()
   const [step, setStep] = useState<Step>('photo')
   const [roomType, setRoomType] = useState<string | null>(null)
   const [roomTypes, setRoomTypes] = useState<string[]>(defaultRoomTypes)
@@ -602,6 +604,7 @@ export function GenerationPanel({
         if (!r.ok) throw new Error(d.error || String(r.status))
         id = d.id
         setRoomId(id)
+        void refreshTasks()
         if (d.concept_key) setConceptKey(d.concept_key)
       } else {
         const fd = new FormData()
@@ -664,10 +667,12 @@ export function GenerationPanel({
       setGenStage('done')
       setStep('result')
       clearEditRefs()
+      void refreshTasks()
       await onRefreshUser()
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось выполнить генерацию')
       setStep(iterations.length ? 'result' : 'style')
+      void refreshTasks()
     } finally { setBusy(false); setProductBinding(false) }
   }
 

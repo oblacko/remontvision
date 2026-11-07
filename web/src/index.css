@@ -126,3 +126,14 @@
   .action-final:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 oklch(var(--background)); }
   .action-final:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 oklch(var(--background)); }
 }
+
+@keyframes rv-progress-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(300%); }
+}
+.rv-progress {
+  animation: rv-progress-slide 1.3s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rv-progress { animation: none; transform: none; width: 100%; }
+}
