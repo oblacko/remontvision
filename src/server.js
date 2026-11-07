@@ -13,6 +13,7 @@ import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, y
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { reviewDesign } from './architect.js';
+import { breakdownInterior } from './breakdown.js';
 import { getCatalogOffer } from './catalogclient.js';
 import { runVisionAgent } from './visionagent.js';
 import { sanitizeImage, fitAspect } from './media.js';
@@ -1586,6 +1587,48 @@ app.post('/api/renders/:id/final-review', h(async (req, res) => {
   await q.setRenderMeta(render.id, meta);
   log({ event: 'final_review_done', render_id: render.id, user_id: req.user.id, items: review.architect.items.length, products: products.reduce((sum, match) => sum + match.offers.length, 0), cost_usd: review.cost ?? null });
   res.json({ analysis, cost_usd: review.cost ?? null });
+}));
+
+// «Разбор интерьера» по кнопке: практичный гайд с постепенным раскрытием.
+app.post('/api/renders/:id/breakdown', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.status !== 'done' || !render.image_path) return res.status(409).json({ error: 'Дизайн ещё не готов' });
+  if (render.analysis?.breakdown) {
+    return res.json({ analysis: render.analysis, breakdown: render.analysis.breakdown, cached: true });
+  }
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  const buffer = await getBuffer(render.image_path);
+  const ext = path.extname(render.image_path).slice(1).toLowerCase();
+  const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+  const imageDataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+  const result = await breakdownInterior({
+    imageDataUrl,
+    roomType: room.room_type || 'Другое',
+    style: room.style,
+    priceTier: room.price_tier || 'comfort',
+    budget: room.budget,
+    dimensions: render.meta?.room_dimensions_estimate || null,
+  });
+  if (!result) return res.status(502).json({ error: 'Не удалось собрать разбор интерьера' });
+  const analysis = { ...(render.analysis || {}), breakdown: result.breakdown };
+  await q.setRenderAnalysis(render.id, analysis);
+  const meta = {
+    ...(render.meta || {}),
+    breakdown: { cost_usd: result.cost ?? null, at: new Date().toISOString() },
+  };
+  await q.setRenderMeta(render.id, meta);
+  log({
+    event: 'breakdown_done',
+    render_id: render.id,
+    user_id: req.user.id,
+    top_cards: result.breakdown.top_cards.length,
+    sections: result.breakdown.sections.length,
+    cost_usd: result.cost ?? null,
+  });
+  res.json({ analysis, breakdown: result.breakdown, cost_usd: result.cost ?? null });
 }));
 
 // Поиск товаров по кнопке: агент смотрит на рендер и вызывает MCP-инструменты каталога.

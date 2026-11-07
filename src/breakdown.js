@@ -1,0 +1,58 @@
+// Разбор интерьера по кнопке: один vision-вызов, результат — маршрут для UI.
+import { callAgentJson } from './openrouteragent.js';
+import { buildBreakdownSystem, buildBreakdownUser, normalizeBreakdown } from './breakdowndata.js';
+
+const BREAKDOWN_MODEL = process.env.BREAKDOWN_MODEL
+  || process.env.ARCHITECT_MODEL
+  || 'deepseek/deepseek-v4.1-flash-1017';
+
+export async function breakdownInterior({
+  imageDataUrl,
+  roomType = '',
+  style = '',
+  priceTier = 'comfort',
+  budget = null,
+  dimensions = null,
+  vision = null,
+} = {}) {
+  if (!imageDataUrl) return null;
+  const system = buildBreakdownSystem();
+  const user = buildBreakdownUser({ roomType, style, priceTier, budget, dimensions });
+  let parsed = {};
+  let cost = null;
+
+  try {
+    if (vision) {
+      const first = await vision({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL });
+      parsed = first?.parsed || {};
+      cost = first?.cost ?? null;
+    } else {
+      try {
+        const agent = await callAgentJson({
+          instructions: system,
+          inputText: user,
+          images: [imageDataUrl],
+          model: BREAKDOWN_MODEL,
+          maxCostUsd: Number(process.env.BREAKDOWN_MAX_COST_USD || 0.08),
+          maxSteps: 2,
+        });
+        if (agent.parsed) {
+          parsed = agent.parsed;
+          cost = agent.cost ?? null;
+        }
+      } catch { /* fallback на visionJson ниже */ }
+      if (!parsed || !Object.keys(parsed).length) {
+        const { visionJson } = await import('./openrouter.js');
+        const legacy = await visionJson({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL });
+        parsed = legacy?.parsed || {};
+        cost = legacy?.cost ?? null;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  const breakdown = normalizeBreakdown(parsed);
+  if (!breakdown) return null;
+  return { breakdown, cost: cost ?? null, parsed };
+}

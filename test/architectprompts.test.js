@@ -11,10 +11,10 @@ const {
 } = await import('../src/architectprompts.js');
 
 test('architect prompt kinds have non-empty defaults', () => {
-  assert.deepEqual(ARCHITECT_PROMPT_KINDS, ['designer', 'builder', 'reviewer', 'criteria', 'direction', 'layout']);
+  assert.deepEqual(ARCHITECT_PROMPT_KINDS, ['designer', 'builder', 'reviewer', 'criteria', 'direction', 'layout', 'breakdown']);
   for (const kind of ARCHITECT_PROMPT_KINDS) {
     assert.ok(DEFAULT_ARCHITECT_PROMPTS[kind].length > 100);
-    assert.match(DEFAULT_ARCHITECT_PROMPTS[kind], /JSON|Критерий/i);
+    assert.match(DEFAULT_ARCHITECT_PROMPTS[kind], /JSON|Критерий|интерьер/i);
   }
 });
 

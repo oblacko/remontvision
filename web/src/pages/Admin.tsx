@@ -28,6 +28,7 @@ type PromptRow = {
 type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
 type ArchitectPromptRow = { id: number; kind: string; version: number; system: string; active: boolean }
 type ArchitectPromptsState = Record<string, { rows: ArchitectPromptRow[]; active: { id: number | null; version: number; system: string } }>
+type ArchitectKind = 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout' | 'breakdown'
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
 type Style = {
   id: number; key: string; name: string; accent: string; description: string;
@@ -268,7 +269,7 @@ export default function Admin() {
   const [promptRows, setPromptRows] = useState<PromptRow[]>([])
   const [promptQuery, setPromptQuery] = useState('')
   const [architectPrompts, setArchitectPrompts] = useState<ArchitectPromptsState | null>(null)
-  const [architectKind, setArchitectKind] = useState<'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout'>('builder')
+  const [architectKind, setArchitectKind] = useState<ArchitectKind>('builder')
   const [architectDraft, setArchitectDraft] = useState('')
   const [architectBusy, setArchitectBusy] = useState(false)
   const [architectNotice, setArchitectNotice] = useState('')
@@ -700,7 +701,7 @@ export default function Admin() {
     try { setPromptRows(await readJson(await api('/api/admin/renders?limit=150'))); }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
-  const loadArchitectPrompts = async (kind: 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout' = architectKind) => {
+  const loadArchitectPrompts = async (kind: ArchitectKind = architectKind) => {
     try {
       const d = await readJson(await api('/api/admin/architect-prompts')) as ArchitectPromptsState
       setArchitectPrompts(d)
@@ -708,7 +709,7 @@ export default function Admin() {
       setArchitectNotice('')
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
-  const selectArchitectKind = (kind: 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout') => {
+  const selectArchitectKind = (kind: ArchitectKind) => {
     setArchitectKind(kind)
     setArchitectDraft(architectPrompts?.[kind]?.active?.system || '')
     setArchitectNotice('')
@@ -1238,7 +1239,7 @@ export default function Admin() {
               </div>
               {architectNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{architectNotice}</p>}
               <div className="mt-5 flex flex-wrap gap-2">
-                {([['designer', 'Дизайнер'], ['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки'], ['direction', 'Агент направлений'], ['layout', 'Планировщик']] as const).map(([kind, label]) => (
+                {([['designer', 'Дизайнер'], ['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки'], ['direction', 'Агент направлений'], ['layout', 'Планировщик'], ['breakdown', 'Разбор интерьера']] as const).map(([kind, label]) => (
                   <button key={kind} type="button" onClick={() => selectArchitectKind(kind)} className={`min-h-10 border px-3 text-sm ${architectKind === kind ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
                 ))}
               </div>

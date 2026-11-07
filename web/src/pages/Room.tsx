@@ -1,43 +1,34 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Download, Expand, LoaderCircle, Share2, X, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Download, Expand, LoaderCircle, Share2, X, Zap } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import '../App.css'
 
-type Move = { target?: string; action?: string; effect?: string }
-type DesignDirection = {
-  concept?: string
-  mainMove?: Move | null
-  supportingMoves?: Move[]
-  focalPoint?: string
-  focalZone?: string | null
-  quietAreas?: string[]
-  materialsStory?: string[]
-  materials?: string
-  palette?: { hex?: string | null; name?: string }[]
-  compatibility?: string
-  avoid?: string[]
-}
-type LayoutPlan = {
-  strategy?: string
-  zones?: { name?: string; purpose?: string; position?: string }[]
-  items?: { type?: string; label?: string; position?: string; size_cm?: string }[]
-  circulation?: string
-  focalPoint?: string
-  avoid?: string[]
-}
-type RepairAction = { action: string; material?: string; style?: string; why?: string }
-type RepairScope = {
-  floor?: RepairAction | null; ceiling?: RepairAction | null; walls?: RepairAction | null
-  doors?: RepairAction | null; windows?: RepairAction | null
-  storage?: string[]; style_dir?: string
-}
-type Dimensions = { width: number; length: number; height: number; confidence?: string }
-type Lens = { focal_length_mm?: number | null; type?: string | null; distortion?: string | null; correction?: string; confidence?: string }
 type Surface = { surface?: string; label?: string; hex?: string; ral?: { code?: string; name?: string } | null; description?: string }
 type Electrical = { title?: string; text?: string }
-type Change = { layer: string; label: string; current: string; change: string; impact: number; effort?: string; target?: string }
+type BreakdownCard = {
+  title?: string
+  preview?: string
+  action?: string
+  body?: string
+  details?: string[]
+  name?: string
+  traits?: string
+  clarify?: string
+  custom?: string
+  effort?: string
+  edit_instruction?: string
+}
+type BreakdownSection = { key: string; title: string; preview?: string; cards: BreakdownCard[] }
+type Breakdown = {
+  title: string
+  lead?: string
+  top_cards: BreakdownCard[]
+  sections: BreakdownSection[]
+  next_action?: { label: string; kind: 'sizes' | 'materials' | 'change' | 'apply' } | null
+  questions: string[]
+}
 type Render = {
   id: string
   image: string | null
@@ -47,14 +38,8 @@ type Render = {
   analysis?: {
     surfaces?: Surface[]
     electrical?: Electrical[]
-    architect?: { changes?: Change[] } | null
-    final?: { next_steps?: string[] } | null
+    breakdown?: Breakdown | null
   } | null
-  design_direction?: DesignDirection | null
-  layout_plan?: LayoutPlan | null
-  repair_scope?: RepairScope | null
-  dimensions_estimate?: Dimensions | null
-  lens?: Lens | null
 }
 type RoomData = {
   id: string
@@ -66,16 +51,7 @@ type RoomData = {
   render?: Render | null
 }
 
-const REPAIR_LABELS: Array<[keyof Pick<RepairScope, 'floor' | 'ceiling' | 'walls' | 'doors' | 'windows'>, string]> = [
-  ['floor', 'Пол'], ['ceiling', 'Потолок'], ['walls', 'Стены'], ['doors', 'Двери'], ['windows', 'Окна'],
-]
-const repairRows = (scope?: RepairScope | null) => REPAIR_LABELS
-  .map(([key, label]) => scope?.[key] ? { label, ...scope[key]! } : null)
-  .filter((item): item is { label: string } & RepairAction => Boolean(item))
-
 const stageLabel = (status?: string) => status === 'analyzing' ? 'Анализ фото' : status === 'rendering' ? 'Генерация изображения' : status === 'matching' ? 'Разбор рендера' : status === 'queued' ? 'В очереди' : 'В процессе'
-const lensLabel = (type?: string | null) => type === 'wide' ? 'широкий угол' : type === 'tele' ? 'теле' : type === 'normal' ? 'нормальный' : ''
-const confidenceLabel = (value?: string) => value === 'high' ? 'высокая' : value === 'medium' ? 'средняя' : value === 'low' ? 'низкая' : ''
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -83,6 +59,48 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="eyebrow mb-3">{title}</h3>
       {children}
     </section>
+  )
+}
+
+function Disclosure({ title, preview, action, children }: { title?: string; preview?: string; action?: string; children: ReactNode }) {
+  if (!title) return null
+  return (
+    <details className="group border border-foreground/25">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-3 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-sm font-medium leading-5">{title}</span>
+          {preview && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{preview}</span>}
+          {action && <span className="mt-1.5 inline-block text-[11px] text-primary-text">{action} →</span>}
+        </span>
+        <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-2 border-t border-foreground/25 px-3 py-3 text-sm leading-6 text-muted-foreground">{children}</div>
+    </details>
+  )
+}
+
+function BuyCard({ card }: { card: BreakdownCard }) {
+  return (
+    <div className="border border-foreground/20 p-3">
+      <p className="text-sm font-medium">{card.name}</p>
+      {card.traits && <p className="mt-1 text-xs leading-5 text-muted-foreground">Признаки: {card.traits}</p>}
+      {card.clarify && <p className="mt-1 text-xs leading-5 text-muted-foreground">Уточнить: {card.clarify}</p>}
+      {card.custom && <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{card.custom}</p>}
+    </div>
+  )
+}
+
+function ChangeCard({ card, onAdd }: { card: BreakdownCard; onAdd: () => void }) {
+  return (
+    <div className="border border-foreground/20 p-3">
+      <p className="text-sm font-medium">{card.title}</p>
+      {card.preview && <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.preview}</p>}
+      {card.body && <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.body}</p>}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        {card.effort ? <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{card.effort}</span> : <span />}
+        <button type="button" onClick={onAdd} className="text-xs underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground">Добавить изменение</button>
+      </div>
+    </div>
   )
 }
 
@@ -95,7 +113,9 @@ export default function Room() {
   const [error, setError] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
-  const [finalBusy, setFinalBusy] = useState(false)
+  const [breakdownBusy, setBreakdownBusy] = useState(false)
+  const [breakdownError, setBreakdownError] = useState('')
+  const [pendingEdit, setPendingEdit] = useState<{ id: string; text: string } | null>(null)
 
   const loadRoom = useCallback(async (renderId?: string) => {
     try {
@@ -130,20 +150,28 @@ export default function Room() {
 
   const render = room?.render || null
   const image = render?.image || room?.photo_url || null
-  const nextSteps = render?.analysis?.final?.next_steps || []
+  const breakdown = render?.analysis?.breakdown || null
 
-  const makeFinal = async () => {
-    if (!render?.id || finalBusy) return
-    setFinalBusy(true)
+  const runBreakdown = async () => {
+    if (!render?.id || breakdownBusy) return
+    setBreakdownBusy(true)
+    setBreakdownError('')
     try {
-      const r = await fetch(`/api/renders/${render.id}/final-review`, { method: 'POST' })
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || String(r.status))
-      await loadRoom()
+      const r = await fetch(`/api/renders/${render.id}/breakdown`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      await loadRoom(render.id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось собрать итог')
+      setBreakdownError(e instanceof Error ? e.message : 'Не удалось собрать разбор')
     } finally {
-      setFinalBusy(false)
+      setBreakdownBusy(false)
     }
+  }
+
+  const addChangeToEditor = (value: string) => {
+    const text = value.trim()
+    if (text) setPendingEdit({ id: crypto.randomUUID(), text })
+    setTab('editor')
   }
 
   if (loading && !room) {
@@ -229,11 +257,23 @@ export default function Room() {
                   onRefreshUser={async () => {}}
                   onEdited={() => { void loadRoom() }}
                   onSelectVersion={(renderId) => { void loadRoom(renderId) }}
+                  pendingEdit={pendingEdit}
+                  onPendingEditHandled={() => setPendingEdit(null)}
                   isAuthed
                 />
               )}
 
-              {tab === 'design' && <DesignTab render={render} nextSteps={nextSteps} finalBusy={finalBusy} onMakeFinal={() => void makeFinal()} />}
+              {tab === 'design' && (
+                <DesignTab
+                  render={render}
+                  breakdown={breakdown}
+                  busy={breakdownBusy}
+                  error={breakdownError}
+                  onRun={() => void runBreakdown()}
+                  onAddChange={addChangeToEditor}
+                  onOpenEditor={() => setTab('editor')}
+                />
+              )}
             </div>
           </div>
         )}
@@ -251,74 +291,100 @@ export default function Room() {
   )
 }
 
-function DesignTab({ render, nextSteps, finalBusy, onMakeFinal }: {
+function DesignTab({ render, breakdown, busy, error, onRun, onAddChange, onOpenEditor }: {
   render: Render | null
-  nextSteps: string[]
-  finalBusy: boolean
-  onMakeFinal: () => void
+  breakdown: Breakdown | null
+  busy: boolean
+  error: string
+  onRun: () => void
+  onAddChange: (text: string) => void
+  onOpenEditor: () => void
 }) {
-  const dd = render?.design_direction
-  const layout = render?.layout_plan
-  const repair = render?.repair_scope
-  const dims = render?.dimensions_estimate
-  const lens = render?.lens
   const surfaces = render?.analysis?.surfaces || []
   const electrical = render?.analysis?.electrical || []
-  const changes = render?.analysis?.architect?.changes || []
-  const repairItems = repairRows(repair)
+  const changeCards = breakdown?.sections.find(section => section.key === 'change')?.cards || []
+
+  const runNextAction = () => {
+    if (breakdown?.next_action?.kind === 'change') {
+      onAddChange(changeCards[0]?.edit_instruction || changeCards[0]?.title || '')
+      return
+    }
+    onOpenEditor()
+  }
 
   return (
-    <div className="mt-6">
-      {dd && (
-        <Section title="Направление">
-          {dd.concept && <p className="text-sm font-medium">{dd.concept}</p>}
-          {dd.mainMove?.action && <p className="mt-2 text-sm leading-6 text-muted-foreground">{dd.mainMove.target ? `${dd.mainMove.target}: ` : ''}{dd.mainMove.action}{dd.mainMove.effect ? ` — ${dd.mainMove.effect}` : ''}</p>}
-          {!!dd.palette?.length && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {dd.palette.map((color, index) => (
-                <span key={`${color.hex}-${index}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="size-4 border border-foreground/20" style={{ background: color.hex || 'transparent' }} />{color.name || color.hex}</span>
+    <div className="mt-2 space-y-6">
+      {!breakdown ? (
+        <div className="border border-foreground/25 p-5 sm:p-7">
+          <p className="eyebrow">Разбор интерьера</p>
+          <h2 className="display-title mt-3 text-2xl sm:text-3xl">Ваш интерьер — в деталях</h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Что сохранить, что проверить и как воплотить. Разбор опирается на этот рендер и сохранится в комнате.</p>
+          {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
+          <button type="button" onClick={onRun} disabled={busy} className="action-primary mt-5 w-full sm:w-auto">
+            {busy ? <><LoaderCircle className="size-4 animate-spin" /> Разбираем…</> : <>Запустить разбор <ArrowRight className="size-4" /></>}
+          </button>
+        </div>
+      ) : (
+        <>
+          <header>
+            <p className="eyebrow">Разбор интерьера</p>
+            <h2 className="display-title mt-2 text-3xl sm:text-4xl">{breakdown.title}</h2>
+            {breakdown.lead && <p className="mt-2 text-sm text-muted-foreground">{breakdown.lead}</p>}
+          </header>
+
+          {!!breakdown.top_cards.length && (
+            <div className="space-y-2">
+              {breakdown.top_cards.map((card, index) => (
+                <Disclosure key={`top-${index}`} title={card.title} preview={card.preview} action={card.action}>
+                  {card.body && <p>{card.body}</p>}
+                  {!!card.details?.length && <ul className="list-disc space-y-1 pl-5">{card.details.map((detail, detailIndex) => <li key={detailIndex}>{detail}</li>)}</ul>}
+                </Disclosure>
               ))}
             </div>
           )}
-          {!!dd.materialsStory?.length && <p className="mt-3 text-xs leading-5 text-muted-foreground">Материалы: {dd.materialsStory.join(', ')}</p>}
-          {dd.focalPoint && <p className="mt-1 text-xs leading-5 text-muted-foreground">Фокус: {dd.focalPoint}</p>}
-          {!!dd.quietAreas?.length && <p className="mt-1 text-xs leading-5 text-muted-foreground">Спокойные зоны: {dd.quietAreas.join(', ')}</p>}
-          {dd.compatibility === 'weaken' && <p className="mt-1 text-[11px] text-muted-foreground">Ослабленная форма пары</p>}
-        </Section>
-      )}
 
-      {layout && (
-        <Section title="Планировка">
-          {layout.strategy && <p className="text-sm leading-6">{layout.strategy}</p>}
-          {!!layout.zones?.length && <ul className="mt-3 space-y-1 text-xs leading-5 text-muted-foreground">{layout.zones.map((zone, index) => <li key={index}>• {zone.name}{zone.position ? ` (${zone.position})` : ''}{zone.purpose ? `: ${zone.purpose}` : ''}</li>)}</ul>}
-          {!!layout.items?.length && <ol className="mt-3 space-y-1 text-xs leading-5 text-muted-foreground">{layout.items.map((item, index) => <li key={index}>{index + 1}. {item.label || item.type}{item.position ? ` — ${item.position}` : ''}{item.size_cm ? `, ${item.size_cm}` : ''}</li>)}</ol>}
-          {layout.circulation && <p className="mt-3 text-xs leading-5 text-muted-foreground">Проходы: {layout.circulation}</p>}
-        </Section>
-      )}
-
-      {repairItems.length > 0 && (
-        <Section title="План ремонта">
-          <dl className="grid gap-2 text-sm">
-            {repairItems.map(row => (
-              <div key={row.label} className="grid gap-1 sm:grid-cols-[7rem_1fr]">
-                <dt className="text-muted-foreground">{row.label}</dt>
-                <dd><span className="font-medium">{row.action}</span>{row.material ? ` · ${row.material}` : ''}{row.why ? <span className="block text-xs text-muted-foreground">{row.why}</span> : null}</dd>
-              </div>
+          <div className="space-y-3">
+            {breakdown.sections.map(section => (
+              <details key={section.key} className="group border border-foreground/25">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{section.title}</span>
+                    {section.preview && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{section.preview}</span>}
+                  </span>
+                  <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="space-y-2 border-t border-foreground/25 p-3">
+                  {section.cards.map((card, index) => {
+                    if (section.key === 'buy') return <BuyCard key={`buy-${index}`} card={card} />
+                    if (section.key === 'change') return <ChangeCard key={`change-${index}`} card={card} onAdd={() => onAddChange(card.edit_instruction || card.title || '')} />
+                    return (
+                      <Disclosure key={`${section.key}-${index}`} title={card.title} preview={card.preview} action={card.action}>
+                        {card.body && <p>{card.body}</p>}
+                        {!!card.details?.length && <ul className="list-disc space-y-1 pl-5">{card.details.map((detail, detailIndex) => <li key={detailIndex}>{detail}</li>)}</ul>}
+                      </Disclosure>
+                    )
+                  })}
+                </div>
+              </details>
             ))}
-            {!!repair?.storage?.length && <div className="grid gap-1 sm:grid-cols-[7rem_1fr]"><dt className="text-muted-foreground">Хранение</dt><dd><ul className="list-disc space-y-1 pl-4">{repair.storage.map((item, index) => <li key={index}>{item}</li>)}</ul></dd></div>}
-          </dl>
-        </Section>
-      )}
+          </div>
 
-      {(dims || lens) && (
-        <Section title="Размеры и объектив">
-          {dims && <p className="text-sm">{dims.width} × {dims.length} × {dims.height} м{dims.confidence ? ` · уверенность ${confidenceLabel(dims.confidence)}` : ''}</p>}
-          {lens && <p className="mt-1 text-xs leading-5 text-muted-foreground">{lens.focal_length_mm ? `${lens.focal_length_mm} мм` : ''}{lens.type ? ` · ${lensLabel(lens.type)}` : ''}{lens.distortion ? ` · дисторсия ${lens.distortion}` : ''}{lens.correction ? ` · ${lens.correction}` : ''}</p>}
-        </Section>
+          {breakdown.next_action && (
+            <button type="button" onClick={runNextAction} className="action-primary w-full">
+              {breakdown.next_action.label} <ArrowRight className="size-4" />
+            </button>
+          )}
+
+          {!!breakdown.questions.length && (
+            <Section title="Что уточнить">
+              <ul className="list-disc space-y-1 pl-5 text-sm leading-6">{breakdown.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
+            </Section>
+          )}
+        </>
       )}
 
       {!!surfaces.length && (
-        <Section title="Палитра RAL по рендеру">
+        <Section title="Палитра RAL">
           <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
             {surfaces.map((surface, index) => (
               <div key={`${surface.surface}-${index}`} className="bg-background p-3">
@@ -334,7 +400,7 @@ function DesignTab({ render, nextSteps, finalBusy, onMakeFinal }: {
       )}
 
       {!!electrical.length && (
-        <Section title="Розетки и выключатели · рекомендация">
+        <Section title="Розетки и свет · рекомендация">
           <ul className="divide-y border-y">
             {electrical.map((item, index) => (
               <li key={index} className="flex gap-3 py-3 text-sm"><Zap className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div></li>
@@ -342,30 +408,6 @@ function DesignTab({ render, nextSteps, finalBusy, onMakeFinal }: {
           </ul>
         </Section>
       )}
-
-      {!!changes.length && (
-        <Section title="Что можно изменить">
-          <ol className="divide-y border-y">
-            {changes.map((change, index) => (
-              <li key={`${change.layer}-${index}`} className="flex gap-3 py-3 text-sm">
-                <span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
-                <div><p className="font-medium">{change.change}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{change.label} · сейчас: {change.current}</p></div>
-              </li>
-            ))}
-          </ol>
-        </Section>
-      )}
-
-      <Section title="Что дальше">
-        {nextSteps.length ? (
-          <ul className="list-disc space-y-1 pl-5 text-sm leading-6">{nextSteps.map((step, index) => <li key={index}>{step}</li>)}</ul>
-        ) : (
-          <div>
-            <p className="text-sm text-muted-foreground">Итог по дизайну ещё не собран.</p>
-            <button type="button" onClick={onMakeFinal} disabled={finalBusy} className="action-secondary mt-3 min-h-10 px-3 text-xs">{finalBusy ? <><LoaderCircle className="size-3.5 animate-spin" /> Собираем…</> : 'Собрать итог'}</button>
-          </div>
-        )}
-      </Section>
     </div>
   )
 }
