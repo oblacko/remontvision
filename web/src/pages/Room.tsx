@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Check, Download, Expand, LoaderCircle, Share2, Trash2, X, Zap } from 'lucide-react'
+import { ArrowLeft, LoaderCircle, Share2, Trash2, Zap } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
+import { GenerationPanel } from '@/components/GenerationPanel'
 import '../App.css'
 
 type Move = { target?: string; action?: string; effect?: string }
@@ -96,11 +97,7 @@ export default function Room() {
   const [tab, setTab] = useState<'editor' | 'design'>('editor')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [editText, setEditText] = useState('')
-  const [editBusy, setEditBusy] = useState(false)
-  const [editError, setEditError] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
   const [finalBusy, setFinalBusy] = useState(false)
 
   const loadRoom = useCallback(async (renderId?: string | null) => {
@@ -149,40 +146,13 @@ export default function Room() {
 
   const render = room?.render || null
   const image = render?.image || room?.photo_url || null
-  const changes = useMemo(() => render?.analysis?.architect?.changes || [], [render])
-  const quickEdits = useMemo(() => [...changes].sort((a, b) => b.impact - a.impact).slice(0, 3), [changes])
   const nextSteps = render?.analysis?.final?.next_steps || []
 
   const selectVersion = async (renderId: string) => {
     setSelectedRenderId(renderId)
-    setFullscreen(false)
     setLoading(true)
     await loadRoom(renderId)
     setLoading(false)
-  }
-
-  const applyEdit = async () => {
-    const text = editText.trim()
-    if (!text || editBusy || busy) return
-    setEditBusy(true); setEditError('')
-    try {
-      const fd = new FormData()
-      fd.append('text', text)
-      if (selectedRenderId) fd.append('parent_id', selectedRenderId)
-      const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
-      const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { setEditError('Нужно войти'); return }
-      if (r.status === 402) { setEditError('Нужен кредит'); return }
-      if (!r.ok) throw new Error(d.error || String(r.status))
-      setEditText('')
-      setSelectedRenderId(null)
-      await loadRoom()
-      await loadVersions()
-    } catch (e) {
-      setEditError(e instanceof Error ? e.message : 'Не удалось применить правку')
-    } finally {
-      setEditBusy(false)
-    }
   }
 
   const makeFinal = async () => {
@@ -254,7 +224,7 @@ export default function Room() {
           </div>
         ) : (
           <div className="grid gap-8 xl:grid-cols-[1fr_22rem]">
-            <div>
+            <div className="min-w-0">
               <div className="flex gap-2 overflow-x-auto border-b pb-2">
                 {([['editor', 'Редактор'], ['design', 'Дизайн']] as const).map(([key, label]) => (
                   <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-10 shrink-0 border px-4 text-xs transition-colors ${tab === key ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
@@ -262,43 +232,26 @@ export default function Room() {
               </div>
 
               {tab === 'editor' && (
-                <div className="mt-6">
-                  <div className="relative bg-foreground">
-                    {image
-                      ? <img src={image} alt="Дизайн комнаты" className="max-h-[62svh] w-full object-contain" />
-                      : <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">Изображение недоступно</div>}
-                    {image && (
-                      <div className="absolute right-3 top-3 flex gap-2">
-                        <button type="button" onClick={() => setFullscreen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Во весь экран"><Expand className="size-5" /></button>
-                        <a href={image} download="remontvision-design.webp" className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Скачать"><Download className="size-5" /></a>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-6 border p-4">
-                    <p className="eyebrow">Своя правка</p>
-                    <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={3} placeholder="Что поменять: «стены светлее», «люстру проще», «пол → дерево»" className="mt-3 w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" />
-                    {quickEdits.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {quickEdits.map((change, index) => (
-                          <button key={`${change.layer}-${index}`} type="button" onClick={() => setEditText(change.change)} className="max-w-full truncate border border-foreground/30 px-3 py-2 text-left text-xs transition-colors hover:border-foreground">
-                            {change.change}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {editError && <p className="mt-3 text-xs text-destructive" role="alert">{editError}</p>}
-                    <button type="button" onClick={() => void applyEdit()} disabled={!editText.trim() || editBusy} className="action-primary mt-4 min-h-12 px-5 text-sm disabled:opacity-40">
-                      {editBusy ? <><LoaderCircle className="size-4 animate-spin" /> Применяем…</> : <>Применить · 1 кредит <Check className="size-4" /></>}
-                    </button>
-                  </div>
+                <div className="mt-6 min-w-0">
+                  <GenerationPanel
+                    key={`${id}:${selectedRenderId || 'latest'}`}
+                    open
+                    inline
+                    initialRoomId={id}
+                    initialRenderId={selectedRenderId || undefined}
+                    onClose={() => {}}
+                    onRequireLogin={() => navigate('/')}
+                    onRefreshUser={async () => {}}
+                    onEdited={() => { setSelectedRenderId(null); void loadRoom(); void loadVersions() }}
+                    isAuthed
+                  />
                 </div>
               )}
 
               {tab === 'design' && <DesignTab render={render} nextSteps={nextSteps} finalBusy={finalBusy} onMakeFinal={() => void makeFinal()} />}
             </div>
 
-            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+            <aside className="min-w-0 border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
               <div className="flex items-center justify-between gap-2">
                 <p className="eyebrow">Версии</p>
                 <span className="text-xs text-muted-foreground">{versions.length}</span>
@@ -321,13 +274,6 @@ export default function Room() {
           </div>
         )}
       </main>
-
-      {fullscreen && image && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/95 p-4" role="dialog" aria-modal="true" aria-label="Просмотр дизайна" onClick={() => setFullscreen(false)}>
-          <button type="button" onClick={() => setFullscreen(false)} className="absolute right-4 top-4 flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm hover:bg-background hover:text-foreground" aria-label="Закрыть"><X className="size-5" /></button>
-          <img src={image} alt="Дизайн комнаты" className="max-h-full max-w-full object-contain" onClick={event => event.stopPropagation()} />
-        </div>
-      )}
 
       {render?.id && <ShareDialog renderId={render.id} open={shareOpen} onClose={() => setShareOpen(false)} />}
     </div>

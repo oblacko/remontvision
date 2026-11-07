@@ -209,20 +209,26 @@ function stepIndex(step: Step): number {
 export function GenerationPanel({
   open,
   initialRoomId = '',
+  initialRenderId = '',
+  inline = false,
   onClose,
   onRequireLogin,
   onRefreshUser,
+  onEdited,
   isAuthed = false,
 }: {
   open: boolean
   initialRoomId?: string
+  initialRenderId?: string
+  inline?: boolean
   onClose: () => void
   onRequireLogin: () => void
   onRefreshUser: () => void | Promise<void>
+  onEdited?: () => void
   isAuthed?: boolean
 }) {
   const { refresh: refreshTasks } = useTasks()
-  const [step, setStep] = useState<Step>('photo')
+  const [step, setStep] = useState<Step>(initialRoomId ? 'result' : 'photo')
   const [roomType, setRoomType] = useState<string | null>(null)
   const [roomTypes, setRoomTypes] = useState<string[]>(defaultRoomTypes)
   const [stylePresets, setStylePresets] = useState<StylePreset[]>(defaultStylePresets)
@@ -331,6 +337,7 @@ export function GenerationPanel({
 
   useEffect(() => {
     if (!open) { loadedRoomRef.current = ''; setCreditOpen(false); return }
+    if (inline) return
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     window.setTimeout(() => closeRef.current?.focus(), 380)
@@ -343,12 +350,13 @@ export function GenerationPanel({
   }, [open, onClose])
 
   useEffect(() => {
-    if (!open || !initialRoomId || loadedRoomRef.current === initialRoomId) return
-    loadedRoomRef.current = initialRoomId
+    const loadKey = `${initialRoomId}:${initialRenderId}`
+    if (!open || !initialRoomId || loadedRoomRef.current === loadKey) return
+    loadedRoomRef.current = loadKey
     let cancelled = false
     ;(async () => {
       try {
-        const r = await fetch(`/api/rooms/${initialRoomId}`)
+        const r = await fetch(`/api/rooms/${initialRoomId}${initialRenderId ? `?render_id=${encodeURIComponent(initialRenderId)}` : ''}`)
         const d = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(d.error || String(r.status))
         if (cancelled) return
@@ -394,6 +402,7 @@ export function GenerationPanel({
           }
           setIterations([next])
           setCurrentId(next.id)
+          setOpenHistory(next.id)
           setStep('result')
         } else {
           setStep('photo')
@@ -403,7 +412,7 @@ export function GenerationPanel({
       }
     })()
     return () => { cancelled = true }
-  }, [open, initialRoomId])
+  }, [open, initialRoomId, initialRenderId])
 
   useEffect(() => {
     if (step !== 'generating') return
@@ -669,6 +678,7 @@ export function GenerationPanel({
       setStep('result')
       clearEditRefs()
       void refreshTasks()
+      onEdited?.()
       await onRefreshUser()
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось выполнить генерацию')
@@ -752,8 +762,8 @@ export function GenerationPanel({
   const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
 
   return (
-    <div className="gen-overlay" data-open={open} role="dialog" aria-modal="true" aria-label="Генератор дизайна интерьера">
-      <div className="flex min-h-16 items-center justify-between gap-4 border-b px-4 sm:px-6">
+    <div className={inline ? 'min-w-0' : 'gen-overlay'} data-open={open} role={inline ? undefined : 'dialog'} aria-modal={inline ? undefined : 'true'} aria-label="Генератор дизайна интерьера">
+      {!inline && <div className="flex min-h-16 items-center justify-between gap-4 border-b px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-6">
           <p className="display-title text-lg">Генератор дизайна</p>
           <ol className="hidden items-center gap-4 md:flex" aria-label="Шаги генерации">
@@ -767,9 +777,10 @@ export function GenerationPanel({
         <button ref={closeRef} type="button" onClick={onClose} className="flex size-12 items-center justify-center border border-foreground transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Закрыть генератор">
           <X className="size-5" />
         </button>
-      </div>
+      </div>}
 
-      <div className="gen-body">
+      <div className={inline ? 'min-w-0' : 'gen-body'}>
+        {inline && step === 'result' && !current && <div className="py-10 text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-primary-text" /></div>}
         {step === 'photo' && (
           <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
             <div>
@@ -942,9 +953,9 @@ export function GenerationPanel({
         )}
 
         {step === 'result' && current && (
-          <div>
-            <div className="grid gap-8 xl:grid-cols-[1fr_22rem]">
-              <div>
+          <div className="min-w-0">
+            <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_22rem]">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
                   <div>
                     <p className="eyebrow">Шаг 03 / Результат</p>
@@ -968,7 +979,7 @@ export function GenerationPanel({
                     </button>
                   </div>
                 </div>
-                {current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
+                {!inline && current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
                   <section className="mt-6 border p-4" aria-labelledby="art-direction">
                     <p id="art-direction" className="eyebrow">Авторский бриф</p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Направление, которое арт-директор написал по вашему фото и стилю.</p>
@@ -998,7 +1009,7 @@ export function GenerationPanel({
                     </dl>
                   </section>
                 ) : null}
-                {current.designDirection ? (
+                {!inline && current.designDirection ? (
                   <section className="mt-6 border p-4" aria-labelledby="design-direction">
                     <p id="design-direction" className="eyebrow">Направление дизайна</p>
                     {current.designDirection.concept ? <p className="mt-2 text-sm font-medium">{current.designDirection.concept}</p> : null}
@@ -1046,7 +1057,7 @@ export function GenerationPanel({
                 ) : null}
               </div>
 
-              <aside className="border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
+              <aside className="min-w-0 border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
                 <p className="eyebrow">История правок</p>
                 <div className="mt-4 space-y-2">
                   {iterations.map((item, index) => {
@@ -1226,14 +1237,14 @@ export function GenerationPanel({
 
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
-            <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+            {!inline && <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="action-secondary"><ArrowLeft className="size-4" />Изменить стиль</button>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
                 <Link to={`/room/${encodeURIComponent(current.roomId)}`} className="action-secondary min-h-14 px-6 text-base">Открыть комнату</Link>
                 <button type="button" onClick={runFinalReview} disabled={finalBusy} className="action-primary min-h-14 px-8 text-base">{finalBusy ? <><LoaderCircle className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <Check className="size-5" /></>}</button>
               </div>
-            </div>
+            </div>}
             {finalError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{finalError}</p>}
             {productSearchError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{productSearchError}</p>}
           </div>
