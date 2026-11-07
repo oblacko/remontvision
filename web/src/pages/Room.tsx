@@ -11,6 +11,16 @@ import '../App.css'
 
 type Surface = { surface?: string; label?: string; hex?: string; ral?: { code?: string; name?: string } | null; description?: string }
 type Electrical = { title?: string; text?: string }
+type Move = { target?: string; action?: string; effect?: string }
+type DesignDirection = {
+  concept?: string
+  mood?: string
+  mainMove?: Move | null
+  focalPoint?: string
+  materials?: string
+  materialsStory?: string[]
+  quietAreas?: string[]
+}
 type BreakdownCard = { icon?: string; name: string; traits?: string; clarify?: string; why?: string; hex?: string | null }
 type Breakdown = { version?: number; title: string; lead?: string; cards: BreakdownCard[] }
 type Render = {
@@ -34,6 +44,7 @@ type RoomData = {
   photo_url?: string | null
   has_purchased?: boolean
   roadmap_items?: RoadmapItem[]
+  design_direction?: DesignDirection | null
   render?: Render | null
 }
 
@@ -290,6 +301,7 @@ export default function Room() {
             <div className={tab === 'design' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
               <DesignTab
                 render={render}
+                direction={room.design_direction || null}
                 breakdown={breakdown}
                 busy={breakdownBusy}
                 error={breakdownError}
@@ -331,8 +343,9 @@ export default function Room() {
   )
 }
 
-function DesignTab({ render, breakdown, busy, error, onRun }: {
+function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
   render: Render | null
+  direction: DesignDirection | null
   breakdown: Breakdown | null
   busy: boolean
   error: string
@@ -340,9 +353,32 @@ function DesignTab({ render, breakdown, busy, error, onRun }: {
 }) {
   const surfaces = render?.analysis?.surfaces || []
   const electrical = render?.analysis?.electrical || []
+  const materials = direction?.materialsStory?.length ? direction.materialsStory.join(', ') : direction?.materials
+  const hasBrief = Boolean(direction && (direction.concept || direction.mood || direction.mainMove?.action || materials || direction.focalPoint))
 
   return (
     <div className="mt-2 space-y-6">
+      {hasBrief && direction && (
+        <section className="border border-foreground/25 p-4">
+          <div className="flex items-start gap-3">
+            <GuideIcon name="sparkles" className="mt-0.5" />
+            <div className="min-w-0">
+              <p className="eyebrow">Авторский бриф</p>
+              {direction.concept && <p className="mt-1.5 text-sm font-medium leading-5">{direction.concept}</p>}
+              {direction.mood && direction.mood !== direction.concept && <p className="mt-1 text-xs leading-5 text-muted-foreground">{direction.mood}</p>}
+              {direction.mainMove?.action && (
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                  Акцент: {direction.mainMove.target ? `${direction.mainMove.target} — ` : ''}{direction.mainMove.action}{direction.mainMove.effect ? ` · ${direction.mainMove.effect}` : ''}
+                </p>
+              )}
+              {materials && <p className="mt-1 text-xs leading-5 text-muted-foreground">Материалы: {materials}</p>}
+              {direction.focalPoint && <p className="mt-1 text-xs leading-5 text-muted-foreground">Фокус: {direction.focalPoint}</p>}
+              {!!direction.quietAreas?.length && <p className="mt-1 text-xs leading-5 text-muted-foreground">Спокойные зоны: {direction.quietAreas.join(', ')}</p>}
+            </div>
+          </div>
+        </section>
+      )}
+
       {!breakdown ? (
         <div className="border border-foreground/25 p-5 sm:p-7">
           <p className="eyebrow">Разбор интерьера</p>
