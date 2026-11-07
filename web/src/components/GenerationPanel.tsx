@@ -1104,7 +1104,24 @@ export function GenerationPanel({
                             <p className="eyebrow mt-5">Быстрые правки</p>
                             {quickEdits.length ? (
                               <div className="mt-3">
-                                <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+                                <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 sm:hidden">
+                                  {quickEdits.map((edit, editIndex) => (
+                                    <button
+                                      key={`${edit.layerLabel}-${editIndex}`}
+                                      type="button"
+                                      disabled={editRefs.length >= MAX_EDIT_BLOCKS}
+                                      onClick={() => {
+                                        addEditBlockWithText(edit.action)
+                                        requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+                                      }}
+                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 snap-start flex-col items-start gap-0.5 overflow-hidden border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      <span className="line-clamp-2 w-full break-words text-xs font-medium leading-4" title={edit.action}>{edit.action}</span>
+                                      <span className="w-full truncate text-[10px] text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="hidden gap-2 sm:flex sm:flex-wrap">
                                   {visibleEdits.map((edit, editIndex) => (
                                     <button
                                       key={`${edit.layerLabel}-${editIndex}`}
@@ -1122,7 +1139,7 @@ export function GenerationPanel({
                                   ))}
                                 </div>
                                 {quickEdits.length > 3 && (
-                                  <button type="button" onClick={() => setShowAllHints(value => !value)} className="mt-2 text-xs underline decoration-border underline-offset-4 hover:decoration-foreground">
+                                  <button type="button" onClick={() => setShowAllHints(value => !value)} className="mt-2 hidden text-xs underline decoration-border underline-offset-4 hover:decoration-foreground sm:inline-flex">
                                     {showAllHints ? 'Свернуть' : `Ещё ${quickEdits.length - 3}`}
                                   </button>
                                 )}
