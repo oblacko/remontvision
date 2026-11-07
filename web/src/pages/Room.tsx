@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, LoaderCircle, X, Zap } from 'lucide-react'
+import { ArrowLeft, Download, Expand, LoaderCircle, Share2, X, Zap } from 'lucide-react'
+import { ShareDialog } from '@/components/ShareDialog'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import '../App.css'
 
@@ -92,6 +93,8 @@ export default function Room() {
   const [tab, setTab] = useState<'editor' | 'design'>('editor')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
   const [finalBusy, setFinalBusy] = useState(false)
 
   const loadRoom = useCallback(async () => {
@@ -189,28 +192,44 @@ export default function Room() {
             <Link to="/cabinet" className="action-secondary mt-6 inline-flex"><ArrowLeft className="size-4" />В кабинет</Link>
           </div>
         ) : (
-          <div className="grid gap-8 xl:grid-cols-[1fr_22rem]">
-            <div className="min-w-0">
-              <nav className="flex overflow-x-auto border-b" aria-label="Разделы комнаты">
-                {([['editor', 'Редактор'], ['design', 'Дизайн']] as const).map(([key, label]) => (
-                  <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm ${tab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
-                ))}
-              </nav>
+          <div>
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
+              <div>
+                <p className="eyebrow">{room.room_type || 'Комната'}</p>
+                <h1 className="display-title mt-2 text-4xl sm:text-5xl">{room.style}</h1>
+              </div>
+            </div>
 
-              {tab === 'editor' && (
-                <div className="mt-6 min-w-0">
-                  <GenerationPanel
-                    key={id}
-                    open
-                    inline
-                    initialRoomId={id}
-                    onClose={() => {}}
-                    onRequireLogin={() => navigate('/')}
-                    onRefreshUser={async () => {}}
-                    onEdited={() => { void loadRoom() }}
-                    isAuthed
-                  />
+            {image && (
+              <div className="relative mt-6 bg-foreground">
+                <img src={image} alt="Дизайн комнаты" className="max-h-[62svh] w-full object-contain" />
+                <div className="absolute right-3 top-3 flex gap-2">
+                  <button type="button" onClick={() => setFullscreen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Во весь экран"><Expand className="size-5" /></button>
+                  <a href={image} download="remontvision-design.webp" className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Скачать"><Download className="size-5" /></a>
+                  {render?.id && <button type="button" onClick={() => setShareOpen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Поделиться"><Share2 className="size-5" /></button>}
                 </div>
+              </div>
+            )}
+
+            <nav className="mt-6 flex overflow-x-auto border-b" aria-label="Разделы комнаты">
+              {([['editor', 'Редактор'], ['design', 'Дизайн']] as const).map(([key, label]) => (
+                <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm ${tab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
+              ))}
+            </nav>
+
+            <div className="mt-6 min-w-0">
+              {tab === 'editor' && (
+                <GenerationPanel
+                  key={id}
+                  open
+                  inline
+                  initialRoomId={id}
+                  onClose={() => {}}
+                  onRequireLogin={() => navigate('/')}
+                  onRefreshUser={async () => {}}
+                  onEdited={() => { void loadRoom() }}
+                  isAuthed
+                />
               )}
 
               {tab === 'design' && <DesignTab render={render} nextSteps={nextSteps} finalBusy={finalBusy} onMakeFinal={() => void makeFinal()} />}
@@ -218,6 +237,15 @@ export default function Room() {
           </div>
         )}
       </main>
+
+      {fullscreen && image && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/95 p-4" role="dialog" aria-modal="true" aria-label="Просмотр дизайна" onClick={() => setFullscreen(false)}>
+          <button type="button" onClick={() => setFullscreen(false)} className="absolute right-4 top-4 flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Закрыть"><X className="size-5" /></button>
+          <img src={image} alt="Дизайн комнаты" className="max-h-full max-w-full object-contain" onClick={event => event.stopPropagation()} />
+        </div>
+      )}
+
+      {render?.id && <ShareDialog renderId={render.id} open={shareOpen} onClose={() => setShareOpen(false)} />}
     </div>
   )
 }

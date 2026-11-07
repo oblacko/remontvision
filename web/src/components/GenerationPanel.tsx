@@ -956,14 +956,14 @@ export function GenerationPanel({
           <div className="min-w-0">
             <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_22rem]">
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+                {!inline && <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
                   <div>
                     <p className="eyebrow">Шаг 03 / Результат</p>
                     <h3 className="mt-2 text-xl font-light uppercase">{current.styleName}</h3>
                   </div>
                   <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Версия {iterations.length}</span>
-                </div>
-                <div className="relative mt-6 bg-foreground">
+                </div>}
+                {!inline && <div className="relative mt-6 bg-foreground">
                   <div className="max-h-[62svh] overflow-hidden">
                     <img src={current.image} alt="Сгенерированный дизайн интерьера" className="h-full max-h-[62svh] w-full object-contain" />
                   </div>
@@ -978,7 +978,7 @@ export function GenerationPanel({
                       <Share2 className="size-5" />
                     </button>
                   </div>
-                </div>
+                </div>}
                 {!inline && current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
                   <section className="mt-6 border p-4" aria-labelledby="art-direction">
                     <p id="art-direction" className="eyebrow">Авторский бриф</p>
