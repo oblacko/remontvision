@@ -13,7 +13,7 @@ test('breakdownTask maps running render meta into a task', () => {
     photo_path: 'uploads/photo.jpg',
     created_at: '2026-11-07T09:00:00.000Z',
     meta: { breakdown: { status: 'running', started_at: '2026-11-07T10:00:00.000Z' } },
-  });
+  }, Date.parse('2026-11-07T10:01:00.000Z'));
 
   assert.equal(task.kind, 'breakdown');
   assert.equal(task.id, 'breakdown:render-1');
@@ -72,7 +72,7 @@ test('roadmapTask maps running and completed roadmap meta', () => {
     image_path: 'renders/r6.png',
     created_at: '2026-11-07T09:00:00.000Z',
     meta: { roadmap: { status: 'running', started_at: '2026-11-07T10:40:00.000Z' } },
-  });
+  }, Date.parse('2026-11-07T10:41:00.000Z'));
   const done = roadmapTask({
     id: 'render-7',
     room_id: 'room-7',
@@ -86,4 +86,17 @@ test('roadmapTask maps running and completed roadmap meta', () => {
   assert.equal(running.status, 'running');
   assert.equal(done.status, 'done');
   assert.equal(roadmapTask({ id: 'render-8', meta: {} }), null);
+});
+
+test('stale running tasks are hidden after ten minutes', () => {
+  const started = '2026-11-07T10:00:00.000Z';
+  const fresh = Date.parse(started) + 5 * 60 * 1000;
+  const stale = Date.parse(started) + 11 * 60 * 1000;
+  const row = { id: 'render-9', meta: { breakdown: { status: 'running', started_at: started } } };
+  const roadmapRow = { id: 'render-9', meta: { roadmap: { status: 'running', started_at: started } } };
+
+  assert.ok(breakdownTask(row, fresh));
+  assert.equal(breakdownTask(row, stale), null);
+  assert.ok(roadmapTask(roadmapRow, fresh));
+  assert.equal(roadmapTask(roadmapRow, stale), null);
 });

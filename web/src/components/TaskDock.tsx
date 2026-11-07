@@ -138,8 +138,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     const cutoff = Date.now() - 10 * 60 * 1000
     return all
       .filter(task => {
-        if (!isTerminal(task)) return true
         if (dismissed.has(task.id)) return false
+        if (!isTerminal(task)) return true
         const created = new Date(task.created_at).getTime()
         return Number.isFinite(created) && created > cutoff
       })
@@ -175,7 +175,7 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
 
   return (
     <li className="relative border-t border-foreground/15 first:border-t-0">
-      <Link to={to} className="group flex gap-3 px-3 py-3 pr-8 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+      <Link to={to} onClick={onDismiss} className="group flex gap-3 px-3 py-3 pr-8 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
         <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden border border-foreground/20 bg-muted">
           {thumb
             ? <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -196,16 +196,14 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
           {error && task.error && <span className="mt-1 block line-clamp-2 text-[11px] text-muted-foreground">{task.error}</span>}
         </span>
       </Link>
-      {!active && (
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Скрыть задачу"
-        >
-          <X className="size-3.5" />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label="Скрыть задачу"
+      >
+        <X className="size-3.5" />
+      </button>
     </li>
   )
 }
