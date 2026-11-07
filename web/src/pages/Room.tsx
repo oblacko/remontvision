@@ -1,35 +1,77 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, ArrowRight, ChevronDown, Download, Expand, LoaderCircle, Share2, X, Zap } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Armchair,
+  Bed,
+  Blinds,
+  Box,
+  Calculator,
+  ChevronDown,
+  ClipboardCheck,
+  Coins,
+  CookingPot,
+  DoorOpen,
+  Download,
+  Droplet,
+  Expand,
+  Fan,
+  Flag,
+  Hammer,
+  Lamp,
+  Layers,
+  Lightbulb,
+  LoaderCircle,
+  PaintRoller,
+  Palette,
+  Receipt,
+  Refrigerator,
+  Rocket,
+  Ruler,
+  Share2,
+  ShieldCheck,
+  ShoppingCart,
+  ShowerHead,
+  Sofa,
+  Sparkles,
+  Table,
+  Tag,
+  Utensils,
+  Wallpaper,
+  WashingMachine,
+  Wrench,
+  X,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { useTasks } from '@/components/TaskDock'
+import { cn } from '@/lib/utils'
 import '../App.css'
 
 type Surface = { surface?: string; label?: string; hex?: string; ral?: { code?: string; name?: string } | null; description?: string }
 type Electrical = { title?: string; text?: string }
-type BreakdownCard = {
-  title?: string
-  preview?: string
-  action?: string
-  body?: string
-  details?: string[]
-  name?: string
-  traits?: string
-  clarify?: string
-  custom?: string
-  effort?: string
-  edit_instruction?: string
+type Move = { target?: string; action?: string; effect?: string }
+type DesignDirection = {
+  concept?: string
+  mainMove?: Move | null
+  focalPoint?: string
+  materials?: string
+  palette?: { hex?: string | null; name?: string }[]
 }
-type BreakdownSection = { key: string; title: string; preview?: string; cards: BreakdownCard[] }
-type Breakdown = {
-  title: string
-  lead?: string
-  top_cards: BreakdownCard[]
-  sections: BreakdownSection[]
-  next_action?: { label: string; kind: 'change' | 'apply' } | null
-  questions: string[]
-}
+type BreakdownTopCard = { icon?: string; title: string; preview?: string }
+type BreakdownBuyCard = { icon?: string; name: string; traits?: string; clarify?: string }
+type BreakdownCalcCard = { icon?: string; element: string; note?: string }
+type BreakdownCheckCard = { icon?: string; what: string; when?: string; why?: string }
+type BreakdownStartCard = { icon?: string; action: string; why?: string }
+type BreakdownSection =
+  | { key: 'buy'; icon?: string; title: string; preview?: string; cards: BreakdownBuyCard[] }
+  | { key: 'calc'; icon?: string; title: string; preview?: string; cards: BreakdownCalcCard[] }
+  | { key: 'check'; icon?: string; title: string; preview?: string; cards: BreakdownCheckCard[] }
+  | { key: 'start'; icon?: string; title: string; preview?: string; cards: BreakdownStartCard[] }
+type Breakdown = { version?: number; title: string; lead?: string; top_cards: BreakdownTopCard[]; sections: BreakdownSection[] }
 type Render = {
   id: string
   image: string | null
@@ -41,6 +83,7 @@ type Render = {
     electrical?: Electrical[]
     breakdown?: Breakdown | null
   } | null
+  design_direction?: DesignDirection | null
 }
 type RoomData = {
   id: string
@@ -52,57 +95,81 @@ type RoomData = {
   render?: Render | null
 }
 
-const stageLabel = (status?: string) => status === 'analyzing' ? 'Анализ фото' : status === 'rendering' ? 'Генерация изображения' : status === 'matching' ? 'Разбор рендера' : status === 'queued' ? 'В очереди' : 'В процессе'
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="border-t py-5 first:border-t-0 first:pt-0">
-      <h3 className="eyebrow mb-3">{title}</h3>
-      {children}
-    </section>
-  )
+const BREAKDOWN_ICONS: Record<string, LucideIcon> = {
+  palette: Palette, layers: Layers, paint: PaintRoller, wallpaper: Wallpaper,
+  sofa: Sofa, armchair: Armchair, bed: Bed, table: Table, lamp: Lamp,
+  lightbulb: Lightbulb, refrigerator: Refrigerator, cooktop: CookingPot,
+  utensils: Utensils, hood: Fan, washing: WashingMachine, shower: ShowerHead,
+  water: Droplet, ruler: Ruler, zap: Zap, calculator: Calculator, coins: Coins,
+  receipt: Receipt, check: ClipboardCheck, shield: ShieldCheck, rocket: Rocket,
+  flag: Flag, arrow: ArrowRight, hammer: Hammer, wrench: Wrench, box: Box,
+  door: DoorOpen, blinds: Blinds, shopping: ShoppingCart, tag: Tag, sparkles: Sparkles,
 }
 
-function Disclosure({ title, preview, action, children }: { title?: string; preview?: string; action?: string; children: ReactNode }) {
-  if (!title) return null
+const stageLabel = (status?: string) => status === 'analyzing' ? 'Анализ фото' : status === 'rendering' ? 'Генерация изображения' : status === 'matching' ? 'Разбор рендера' : status === 'queued' ? 'В очереди' : 'В процессе'
+
+function BreakdownIcon({ name, className }: { name?: string; className?: string }) {
+  const Icon = (name && BREAKDOWN_ICONS[name]) || Sparkles
+  return <Icon className={cn('size-4 shrink-0 text-primary-text', className)} />
+}
+
+function GuideSection({ icon, title, preview, children }: { icon?: string; title: string; preview?: string; children: ReactNode }) {
   return (
     <details className="group border border-foreground/25">
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-3 [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0">
-          <span className="block text-sm font-medium leading-5">{title}</span>
+      <summary className="flex cursor-pointer list-none items-start gap-3 p-4 [&::-webkit-details-marker]:hidden">
+        <BreakdownIcon name={icon} className="mt-0.5" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">{title}</span>
           {preview && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{preview}</span>}
-          {action && <span className="mt-1.5 inline-block text-[11px] text-primary-text">{action} →</span>}
         </span>
         <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
-      <div className="space-y-2 border-t border-foreground/25 px-3 py-3 text-sm leading-6 text-muted-foreground">{children}</div>
+      <div className="space-y-2 border-t border-foreground/25 p-3">{children}</div>
     </details>
   )
 }
 
-function BuyCard({ card }: { card: BreakdownCard }) {
+function GuideItem({ icon, title, children }: { icon?: string; title: string; children?: ReactNode }) {
   return (
-    <div className="border border-foreground/20 p-3">
-      <p className="text-sm font-medium">{card.name}</p>
-      {card.traits && <p className="mt-1 text-xs leading-5 text-muted-foreground">Признаки: {card.traits}</p>}
-      {card.clarify && <p className="mt-1 text-xs leading-5 text-muted-foreground">Уточнить: {card.clarify}</p>}
-      {card.custom && <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{card.custom}</p>}
+    <div className="flex gap-3 border border-foreground/20 p-3">
+      <BreakdownIcon name={icon} className="mt-0.5" />
+      <div className="min-w-0">
+        <p className="text-sm font-medium leading-5">{title}</p>
+        {children}
+      </div>
     </div>
   )
 }
 
-function ChangeCard({ card, onAdd }: { card: BreakdownCard; onAdd: () => void }) {
-  return (
-    <div className="border border-foreground/20 p-3">
-      <p className="text-sm font-medium">{card.title}</p>
-      {card.preview && <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.preview}</p>}
-      {card.body && <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.body}</p>}
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        {card.effort ? <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{card.effort}</span> : <span />}
-        <button type="button" onClick={onAdd} className="text-xs underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground">Добавить изменение</button>
-      </div>
-    </div>
-  )
+function SectionCards({ section }: { section: BreakdownSection }) {
+  if (section.key === 'buy') {
+    return <>{section.cards.map((card, index) => (
+      <GuideItem key={index} icon={card.icon} title={card.name}>
+        {card.traits && <p className="mt-1 text-xs leading-5 text-muted-foreground">Сохранить: {card.traits}</p>}
+        {card.clarify && <p className="mt-1 text-xs leading-5 text-muted-foreground">Уточнить: {card.clarify}</p>}
+      </GuideItem>
+    ))}</>
+  }
+  if (section.key === 'calc') {
+    return <>{section.cards.map((card, index) => (
+      <GuideItem key={index} icon={card.icon} title={card.element}>
+        {card.note && <p className="mt-1 text-xs leading-5 text-muted-foreground">В расчёт: {card.note}</p>}
+      </GuideItem>
+    ))}</>
+  }
+  if (section.key === 'check') {
+    return <>{section.cards.map((card, index) => (
+      <GuideItem key={index} icon={card.icon} title={card.what}>
+        {card.when && <p className="mt-1 text-xs leading-5 text-muted-foreground">До: {card.when}</p>}
+        {card.why && <p className="mt-1 text-xs leading-5 text-muted-foreground">Зачем: {card.why}</p>}
+      </GuideItem>
+    ))}</>
+  }
+  return <>{section.cards.map((card, index) => (
+    <GuideItem key={index} icon={card.icon} title={card.action}>
+      {card.why && <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.why}</p>}
+    </GuideItem>
+  ))}</>
 }
 
 export default function Room() {
@@ -118,7 +185,6 @@ export default function Room() {
   const [fullscreen, setFullscreen] = useState(false)
   const [breakdownBusy, setBreakdownBusy] = useState(false)
   const [breakdownError, setBreakdownError] = useState('')
-  const [pendingEdit, setPendingEdit] = useState<{ id: string; text: string } | null>(null)
 
   const loadRoom = useCallback(async (renderId?: string) => {
     try {
@@ -153,7 +219,8 @@ export default function Room() {
 
   const render = room?.render || null
   const image = render?.image || room?.photo_url || null
-  const breakdown = render?.analysis?.breakdown || null
+  const storedBreakdown = render?.analysis?.breakdown || null
+  const breakdown = storedBreakdown?.version === 2 ? storedBreakdown : null
   const selectedRenderId = render?.id || ''
   const selectedRenderRef = useRef('')
 
@@ -181,12 +248,6 @@ export default function Room() {
     } finally {
       if (selectedRenderRef.current === targetId) setBreakdownBusy(false)
     }
-  }
-
-  const addChangeToEditor = (value: string) => {
-    const text = value.trim()
-    if (text) setPendingEdit({ id: crypto.randomUUID(), text })
-    setTab('editor')
   }
 
   if (loading && !room) {
@@ -271,8 +332,6 @@ export default function Room() {
                 onRefreshUser={async () => {}}
                 onEdited={() => { void loadRoom() }}
                 onSelectVersion={(renderId) => { void loadRoom(renderId) }}
-                pendingEdit={pendingEdit}
-                onPendingEditHandled={() => setPendingEdit(null)}
                 isAuthed
               />
             </div>
@@ -280,12 +339,11 @@ export default function Room() {
             <div className={tab === 'design' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
               <DesignTab
                 render={render}
+                style={room.style}
                 breakdown={breakdown}
                 busy={breakdownBusy}
                 error={breakdownError}
                 onRun={() => void runBreakdown()}
-                onAddChange={addChangeToEditor}
-                onOpenEditor={() => setTab('editor')}
               />
             </div>
           </div>
@@ -304,40 +362,27 @@ export default function Room() {
   )
 }
 
-function DesignTab({ render, breakdown, busy, error, onRun, onAddChange, onOpenEditor }: {
+function DesignTab({ render, style, breakdown, busy, error, onRun }: {
   render: Render | null
+  style: string
   breakdown: Breakdown | null
   busy: boolean
   error: string
   onRun: () => void
-  onAddChange: (text: string) => void
-  onOpenEditor: () => void
 }) {
   const surfaces = render?.analysis?.surfaces || []
   const electrical = render?.analysis?.electrical || []
-  const changeCards = breakdown?.sections.find(section => section.key === 'change')?.cards || []
-  const nextAction = breakdown?.next_action?.kind === 'change' || breakdown?.next_action?.kind === 'apply'
-    ? breakdown.next_action
-    : null
-
-  const runNextAction = () => {
-    const kind = nextAction?.kind
-    if (kind === 'change' || kind === 'apply') {
-      const instruction = changeCards.find(card => card.edit_instruction)?.edit_instruction
-        || changeCards[0]?.title
-        || ''
-      if (instruction) { onAddChange(instruction); return }
-    }
-    onOpenEditor()
-  }
+  const direction = render?.design_direction || null
+  const startCard = breakdown?.sections.find(section => section.key === 'start')?.cards[0]
+  const guideSections = breakdown?.sections.filter(section => section.key !== 'start') || []
 
   return (
-    <div className="mt-2 space-y-6">
+    <div className="mt-2 space-y-4">
       {!breakdown ? (
         <div className="border border-foreground/25 p-5 sm:p-7">
           <p className="eyebrow">Разбор интерьера</p>
-          <h2 className="display-title mt-3 text-2xl sm:text-3xl">Ваш интерьер — в деталях</h2>
-          <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Что сохранить, что проверить и как воплотить. Разбор опирается на этот рендер и сохранится в комнате.</p>
+          <h2 className="display-title mt-3 text-2xl sm:text-3xl">Как воплотить этот дизайн</h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Что повторить, что купить, что включить в расчёт и что согласовать до заказа. Разбор опирается на этот рендер и сохранится в комнате.</p>
           {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
           <button type="button" onClick={onRun} disabled={busy} className="action-primary mt-5 w-full sm:w-auto">
             {busy ? <><LoaderCircle className="size-4 animate-spin" /> Разбираем…</> : <>Запустить разбор <ArrowRight className="size-4" /></>}
@@ -345,66 +390,69 @@ function DesignTab({ render, breakdown, busy, error, onRun, onAddChange, onOpenE
         </div>
       ) : (
         <>
+          <div className="border border-foreground/25 p-4">
+            <div className="flex items-start gap-3">
+              <BreakdownIcon name="sparkles" className="mt-0.5" />
+              <div className="min-w-0">
+                <p className="eyebrow">Стиль</p>
+                <p className="mt-1 text-sm font-medium">{style}</p>
+                {direction?.concept && <p className="mt-1 text-xs leading-5 text-muted-foreground">{direction.concept}</p>}
+                {direction?.mainMove?.action && (
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Акцент: {direction.mainMove.target ? `${direction.mainMove.target} — ` : ''}{direction.mainMove.action}{direction.mainMove.effect ? ` · ${direction.mainMove.effect}` : ''}
+                  </p>
+                )}
+                {direction?.focalPoint && <p className="mt-1 text-xs leading-5 text-muted-foreground">Фокус: {direction.focalPoint}</p>}
+              </div>
+            </div>
+          </div>
+
           <header>
-            <p className="eyebrow">Разбор интерьера</p>
-            <h2 className="display-title mt-2 text-3xl sm:text-4xl">{breakdown.title}</h2>
+            <h2 className="display-title text-3xl sm:text-4xl">{breakdown.title}</h2>
             {breakdown.lead && <p className="mt-2 text-sm text-muted-foreground">{breakdown.lead}</p>}
           </header>
 
           {!!breakdown.top_cards.length && (
             <div className="space-y-2">
+              <p className="eyebrow">Главное</p>
               {breakdown.top_cards.map((card, index) => (
-                <Disclosure key={`top-${index}`} title={card.title} preview={card.preview} action={card.action}>
-                  {card.body && <p>{card.body}</p>}
-                  {!!card.details?.length && <ul className="list-disc space-y-1 pl-5">{card.details.map((detail, detailIndex) => <li key={detailIndex}>{detail}</li>)}</ul>}
-                </Disclosure>
+                <div key={index} className="flex gap-3 border border-foreground/25 p-3">
+                  <BreakdownIcon name={card.icon} className="mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-5">{card.title}</p>
+                    {card.preview && <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.preview}</p>}
+                  </div>
+                </div>
               ))}
             </div>
           )}
 
           <div className="space-y-3">
-            {breakdown.sections.map(section => (
-              <details key={section.key} className="group border border-foreground/25">
-                <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{section.title}</span>
-                    {section.preview && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{section.preview}</span>}
-                  </span>
-                  <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="space-y-2 border-t border-foreground/25 p-3">
-                  {section.cards.map((card, index) => {
-                    if (section.key === 'buy') return <BuyCard key={`buy-${index}`} card={card} />
-                    if (section.key === 'change') return <ChangeCard key={`change-${index}`} card={card} onAdd={() => onAddChange(card.edit_instruction || card.title || '')} />
-                    return (
-                      <Disclosure key={`${section.key}-${index}`} title={card.title} preview={card.preview} action={card.action}>
-                        {card.body && <p>{card.body}</p>}
-                        {!!card.details?.length && <ul className="list-disc space-y-1 pl-5">{card.details.map((detail, detailIndex) => <li key={detailIndex}>{detail}</li>)}</ul>}
-                      </Disclosure>
-                    )
-                  })}
-                </div>
-              </details>
+            {guideSections.map(section => (
+              <GuideSection key={section.key} icon={section.icon} title={section.title} preview={section.preview}>
+                <SectionCards section={section} />
+              </GuideSection>
             ))}
           </div>
 
-          {nextAction && (
-            <button type="button" onClick={runNextAction} className="action-primary w-full">
-              {nextAction.label} <ArrowRight className="size-4" />
-            </button>
-          )}
-
-          {!!breakdown.questions.length && (
-            <Section title="Что уточнить">
-              <ul className="list-disc space-y-1 pl-5 text-sm leading-6">{breakdown.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
-            </Section>
+          {startCard && (
+            <div className="border border-foreground bg-primary/5 p-4">
+              <div className="flex items-start gap-3">
+                <BreakdownIcon name={startCard.icon || 'rocket'} className="mt-0.5" />
+                <div className="min-w-0">
+                  <p className="eyebrow">С чего начать</p>
+                  <p className="mt-1 text-sm font-medium">{startCard.action}</p>
+                  {startCard.why && <p className="mt-1 text-xs leading-5 text-muted-foreground">{startCard.why}</p>}
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
 
       {!!surfaces.length && (
-        <Section title="Палитра RAL">
-          <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
+        <GuideSection icon="palette" title="Цвета (RAL)" preview="Палитра из архитекторского разбора">
+          <div className="grid grid-cols-2 gap-px border border-foreground/20 bg-border sm:grid-cols-3">
             {surfaces.map((surface, index) => (
               <div key={`${surface.surface}-${index}`} className="bg-background p-3">
                 <span className="block h-10 w-full border border-foreground/20" style={{ background: surface.hex || 'transparent' }} />
@@ -415,17 +463,20 @@ function DesignTab({ render, breakdown, busy, error, onRun, onAddChange, onOpenE
               </div>
             ))}
           </div>
-        </Section>
+        </GuideSection>
       )}
 
       {!!electrical.length && (
-        <Section title="Розетки и свет · рекомендация">
+        <GuideSection icon="zap" title="Розетки и свет" preview="Рекомендации из архитекторского разбора">
           <ul className="divide-y border-y">
             {electrical.map((item, index) => (
-              <li key={index} className="flex gap-3 py-3 text-sm"><Zap className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div></li>
+              <li key={index} className="flex gap-3 py-3 text-sm">
+                <Zap className="mt-0.5 size-4 shrink-0 text-primary-text" />
+                <div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div>
+              </li>
             ))}
           </ul>
-        </Section>
+        </GuideSection>
       )}
     </div>
   )

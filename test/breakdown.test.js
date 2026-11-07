@@ -6,81 +6,89 @@ const {
   buildBreakdownSystem,
   buildBreakdownUser,
   SECTION_TITLES,
+  BREAKDOWN_ICON_KEYS,
 } = await import('../src/breakdowndata.js');
 
-test('normalizeBreakdown keeps at most 3 top cards and clamps copy', () => {
+test('normalizeBreakdown keeps up to 3 top cards and validates icons', () => {
   const result = normalizeBreakdown({
-    title: '  Ваш интерьер — в деталях  ',
-    lead: 'Что сохранить, проверить и подобрать.',
+    title: '  Как воплотить этот дизайн  ',
+    lead: 'Что повторить и что купить.',
     top_cards: [
-      { title: 'Что создаёт образ', preview: 'Светлые фасады и дерево.', action: 'Что сохранить', body: 'Объяснение', details: ['Шаг 1', '', 'Шаг 2'] },
-      { title: 'До заказа кухни', preview: 'Проверьте открывание.', action: 'Что измерить', body: 'Объяснение' },
-      { title: 'С чего начать', preview: 'Сравните образцы.', action: 'Какие образцы' },
-      { title: 'Лишняя карточка', preview: 'Не должна попасть.' },
+      { icon: 'sofa', title: 'Что создаёт образ', preview: 'Светлые фасады и дерево.' },
+      { icon: 'unknown-icon', title: 'До заказа кухни', preview: 'Проверьте открывание.' },
+      { icon: 'ruler', title: 'Что измерить' },
+      { icon: 'tag', title: 'Лишняя карточка' },
     ],
-    sections: [],
   });
 
-  assert.equal(result.title, 'Ваш интерьер — в деталях');
+  assert.equal(result.version, 2);
+  assert.equal(result.title, 'Как воплотить этот дизайн');
   assert.equal(result.top_cards.length, 3);
-  assert.deepEqual(result.top_cards[0].details, ['Шаг 1', 'Шаг 2']);
-  assert.equal(result.top_cards[2].action, 'Какие образцы');
+  assert.equal(result.top_cards[0].icon, 'sofa');
+  assert.equal(result.top_cards[1].icon, 'sparkles');
+  assert.equal(result.top_cards[2].preview, '');
 });
 
-test('normalizeBreakdown drops empty and unknown sections', () => {
+test('normalizeBreakdown keeps only known non-empty sections with limits', () => {
   const result = normalizeBreakdown({
-    top_cards: [],
     sections: [
-      { key: 'repeat', preview: 'Повтор', cards: [{ title: 'Сохранить свет', body: 'Текст' }] },
-      { key: 'unknown', cards: [{ title: 'Мусор' }] },
-      { key: 'check', preview: 'Пусто', cards: [] },
-      { key: 'buy', cards: [{ name: 'Стол', traits: 'Дуб', clarify: '180 см', custom: 'нет' }] },
+      { key: 'buy', cards: Array.from({ length: 7 }, (_, i) => ({ name: `Позиция ${i}` })) },
+      { key: 'calc', cards: Array.from({ length: 5 }, (_, i) => ({ element: `Связка ${i}` })) },
+      { key: 'check', cards: Array.from({ length: 4 }, (_, i) => ({ what: `Проверка ${i}` })) },
+      { key: 'start', cards: [{ action: 'Снять размеры' }, { action: 'Вторая' }] },
+      { key: 'unknown', cards: [{ name: 'Мусор' }] },
+      { key: 'buy', cards: [{ name: 'Дубль' }] },
+      { key: 'save', cards: [] },
     ],
+  });
+
+  assert.deepEqual(result.sections.map(section => section.key), ['buy', 'calc', 'check', 'start']);
+  assert.equal(result.sections[0].cards.length, 5);
+  assert.equal(result.sections[1].cards.length, 3);
+  assert.equal(result.sections[2].cards.length, 3);
+  assert.equal(result.sections[3].cards.length, 1);
+  assert.equal(result.sections[3].title, SECTION_TITLES.start);
+  assert.equal(result.sections[3].icon, 'rocket');
+});
+
+test('normalizeBreakdown maps card fields and falls back to section icons', () => {
+  const result = normalizeBreakdown({
+    sections: [
+      { key: 'buy', cards: [{ name: 'Стол', traits: 'дуб', clarify: 'длина', icon: 'table' }] },
+      { key: 'calc', cards: [{ element: 'Окно', note: 'комплект и монтаж' }] },
+      { key: 'check', cards: [{ what: 'Габариты', when: 'до заказа', why: 'совместимость' }] },
+      { key: 'start', cards: [{ action: 'Измерить проход', why: 'проверить эргономику' }] },
+    ],
+  });
+
+  assert.deepEqual(result.sections[0].cards[0], { icon: 'table', name: 'Стол', traits: 'дуб', clarify: 'длина' });
+  assert.equal(result.sections[1].cards[0].icon, 'calculator');
+  assert.equal(result.sections[2].cards[0].icon, 'check');
+  assert.equal(result.sections[2].cards[0].when, 'до заказа');
+  assert.equal(result.sections[3].cards[0].icon, 'rocket');
+  assert.equal(result.sections[3].cards[0].why, 'проверить эргономику');
+});
+
+test('normalizeBreakdown accepts sections as an object and returns null when empty', () => {
+  const result = normalizeBreakdown({
+    sections: {
+      buy: { cards: [{ name: 'Стул' }] },
+      start: { cards: [{ action: 'Позвать замерщика' }] },
+    },
   });
 
   assert.equal(result.sections.length, 2);
-  assert.equal(result.sections[0].key, 'repeat');
-  assert.equal(result.sections[0].title, SECTION_TITLES.repeat);
-  assert.equal(result.sections[1].key, 'buy');
-  assert.equal(result.sections[1].cards[0].name, 'Стол');
-});
-
-test('normalizeBreakdown keeps edit instructions for change cards', () => {
-  const result = normalizeBreakdown({
-    sections: [{
-      key: 'change',
-      cards: [{ title: 'Заменить шторы', body: 'На лён.', effort: 'подбор предмета', edit_instruction: 'Заменить шторы на льняные светлые.' }],
-    }],
-  });
-
-  const card = result.sections[0].cards[0];
-  assert.equal(card.edit_instruction, 'Заменить шторы на льняные светлые.');
-  assert.equal(card.effort, 'подбор предмета');
-});
-
-test('normalizeBreakdown keeps actionable next action and drops unsupported kinds', () => {
-  const result = normalizeBreakdown({
-    sections: [{ key: 'repeat', cards: [{ title: 'Свет' }] }],
-    next_action: { label: 'Применить изменения', kind: 'apply' },
-    questions: ['Первый?', 'Второй?', 'Третий?', 'Четвёртый?'],
-  });
-
-  assert.deepEqual(result.next_action, { label: 'Применить изменения', kind: 'apply' });
-  assert.equal(result.questions.length, 3);
-  assert.equal(normalizeBreakdown({ sections: [{ key: 'repeat', cards: [{ title: 'Свет' }] }], next_action: { label: 'Добавить размеры', kind: 'sizes' } }).next_action, null);
-});
-
-test('normalizeBreakdown returns null when there is nothing useful', () => {
   assert.equal(normalizeBreakdown({ top_cards: [], sections: [] }), null);
 });
 
-test('buildBreakdownSystem merges consultant rules with progressive disclosure', () => {
+test('buildBreakdownSystem merges the consultant prompt with icons and JSON contract', () => {
   const system = buildBreakdownSystem();
-  assert.match(system, /практичный консультант по реализации интерьера/i);
-  assert.match(system, /постепенн/i);
+  assert.match(system, /Как воплотить этот дизайн/);
+  assert.match(system, /практический гайд/i);
+  assert.match(system, /ВЫБОР ИКОНКИ/);
   assert.match(system, /top_cards/);
-  assert.match(system, /edit_instruction/);
-  assert.match(system, /Только JSON/i);
+  assert.match(system, /до 350 слов/i);
+  for (const key of BREAKDOWN_ICON_KEYS) assert.ok(system.includes(key), `icon ${key} missing`);
 });
 
 test('buildBreakdownUser passes known inputs and omits unknown ones', () => {

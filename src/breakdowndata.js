@@ -1,63 +1,80 @@
-// Контракт и нормализация пошагового разбора интерьера.
+// Контракт и нормализация практического гайда «Как воплотить этот дизайн».
 // Чистые функции без БД — используются и сервером, и тестами.
 import { getArchitectPrompt } from './architectprompts.js';
 
 export const SECTION_TITLES = {
-  repeat: 'Как повторить этот интерьер',
-  check: 'Что проверить до ремонта',
-  buy: 'Что купить',
-  save: 'Где можно сэкономить',
-  change: 'Что можно изменить',
+  buy: 'Что подобрать',
+  calc: 'Что включить в расчёт',
+  check: 'До заказа и начала работ',
+  start: 'С чего начать',
 };
 
+export const SECTION_ICONS = {
+  buy: 'shopping',
+  calc: 'calculator',
+  check: 'check',
+  start: 'rocket',
+};
+
+// Закрытый набор иконок: ключи совпадают с картой в web/src/pages/Room.tsx.
+export const BREAKDOWN_ICON_KEYS = [
+  'palette', 'layers', 'paint', 'wallpaper', 'sofa', 'armchair', 'bed', 'table',
+  'lamp', 'lightbulb', 'refrigerator', 'cooktop', 'utensils', 'hood', 'washing',
+  'shower', 'water', 'ruler', 'zap', 'calculator', 'coins', 'receipt', 'check',
+  'shield', 'rocket', 'flag', 'arrow', 'hammer', 'wrench', 'box', 'door', 'blinds',
+  'shopping', 'tag', 'sparkles',
+];
+
+const ICON_SET = new Set(BREAKDOWN_ICON_KEYS);
 const SECTION_KEYS = Object.keys(SECTION_TITLES);
-const NEXT_KINDS = new Set(['change', 'apply']);
-const CARD_LIMITS = { buy: 8, change: 3, default: 5 };
+const CARD_LIMITS = { top: 3, buy: 5, calc: 3, check: 3, start: 1 };
 
 const text = (value, max = 300) => {
   if (typeof value !== 'string' && typeof value !== 'number') return '';
   return String(value).replace(/\s+/g, ' ').trim().slice(0, max);
 };
-const list = (value, max = 5) => (Array.isArray(value) ? value : [])
-  .map(item => text(item, 400))
-  .filter(Boolean)
-  .slice(0, max);
+
+const icon = (value, fallback = 'sparkles') => {
+  const key = text(value, 40).toLowerCase();
+  return ICON_SET.has(key) ? key : fallback;
+};
 
 export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без markdown-обёрток:
 {
-  "title": "Ваш интерьер — в деталях",
-  "lead": "одна строка: что сохранить, проверить и подобрать",
+  "title": "Как воплотить этот дизайн",
+  "lead": "одна строка: что повторить, что купить и что проверить",
   "top_cards": [
-    {"title":"до 6 слов","preview":"до 18 слов","action":"Что измерить / Что сохранить / Какие образцы","body":"объяснение","details":["конкретный шаг","что уточнить"]}
+    {"icon":"иконка из списка","title":"до 6 слов","preview":"до 20 слов"}
   ],
   "sections": [
-    {"key":"repeat|check|buy|save|change","title":"описательный заголовок","preview":"до 18 слов","cards":[
-      {"title":"...","preview":"...","action":"...","body":"...","details":["..."]}
+    {"key":"buy","icon":"shopping","preview":"до 18 слов","cards":[
+      {"icon":"иконка","name":"предмет или отделка","traits":"видимые признаки","clarify":"один параметр уточнить"}
+    ]},
+    {"key":"calc","icon":"calculator","preview":"до 18 слов","cards":[
+      {"icon":"иконка","element":"элемент","note":"какие позиции включить или исключить"}
+    ]},
+    {"key":"check","icon":"check","preview":"до 18 слов","cards":[
+      {"icon":"иконка","what":"что согласовать","when":"до какого действия","why":"зачем"}
+    ]},
+    {"key":"start","icon":"rocket","preview":"до 18 слов","cards":[
+      {"icon":"иконка","action":"одно действие сейчас","why":"что оно позволит проверить"}
     ]}
-  ],
-  "next_action": {"label":"Добавить изменение / Применить изменения","kind":"change|apply"},
-  "questions": ["до 3 вопросов, которые сильнее всего изменят рекомендации"]
+  ]
 }
 
 Правила контракта:
-- top_cards — 1–3 карточки. sections — только непустые, каждая key встречается один раз.
-- Для key="buy" карточка: {"name":"...","traits":"видимые признаки","clarify":"что уточнить и какие размеры","custom":"готовое изделие или на заказ"}.
-- Для key="change" карточка: {"title":"...","preview":"...","body":"...","effort":"подбор предмета | частичная переделка | требует проектирования","edit_instruction":"самодостаточная инструкция для редактирования изображения"}.
-- Для остальных разделов карточка: {"title":"...","preview":"...","action":"...","body":"...","details":["..."]}.
-- edit_instruction пиши так, чтобы правку можно было применить к изображению без дополнительных пояснений.
-- next_action — только действие редактора: «Добавить изменение» (change) или «Применить изменения» (apply). Если для вывода не хватает данных, не создавай кнопку, а задай вопрос в questions.
-- Не заполняй разделы ради объёма. Только применимые к этому помещению выводы.
+- top_cards — до 3 карточек. sections — только непустые, каждая key один раз.
+- buy — до 5 позиций, calc — до 3, check — до 3, start — ровно 1.
+- icon — только из списка: ${BREAKDOWN_ICON_KEYS.join(', ')}. Не выдумывай другие имена.
+- Весь ответ — до 350 слов. Никаких длинных абзацев.
+- Не повторяй один вывод в разных разделах.
+- Неприменимые разделы не выводи.
 - Все тексты — на русском. Только JSON.`;
-
-const PROGRESSIVE_RULES = `Формат ответа — маршрут для интерфейса, а не статья.
-Сначала 1–3 самых полезных вывода, затем до пяти раскрываемых разделов (только непустые). Заголовки описательные, без кликбейта. В карточке сначала вывод, затем одна строка «зачем открывать», внутри — объяснение и конкретный шаг.
-Не дублируй карточки первого уровня внутри разделов: связывай их с подробностью.`;
 
 export function buildBreakdownSystem() {
   const prompt = getArchitectPrompt('breakdown');
   return [
     prompt?.system || '',
-    PROGRESSIVE_RULES,
     BREAKDOWN_SCHEMA,
   ].filter(Boolean).join('\n\n');
 }
@@ -78,72 +95,89 @@ export function buildBreakdownUser({ roomType, style, priceTier, budget, dimensi
     priceTier ? `Класс материалов: ${priceTier}.` : '',
     budget != null ? `Бюджет: ${Math.round(Number(budget))} тыс. ₽.` : '',
     dims ? `Размеры (оценка по изображению): ${dims}.` : '',
-    'Не выдумывай отсутствующие данные. Если данных не хватает, выполни доступный разбор и задай до 3 вопросов в конце.',
+    'Не выдумывай отсутствующие данные. Если данных не хватает, обозначь это в разделе «С чего начать».',
   ].filter(Boolean).join('\n');
 }
 
-function normalizeGenericCard(raw) {
+function normalizeTopCard(raw) {
   const title = text(raw?.title, 120);
   if (!title) return null;
   return {
+    icon: icon(raw?.icon),
     title,
     preview: text(raw?.preview, 200),
-    action: text(raw?.action, 80),
-    body: text(raw?.body, 800),
-    details: list(raw?.details, 6),
-  };
-}
-
-function normalizeBuyCard(raw) {
-  const name = text(raw?.name, 120) || text(raw?.title, 120);
-  if (!name) return null;
-  return {
-    name,
-    traits: text(raw?.traits, 300),
-    clarify: text(raw?.clarify, 300),
-    custom: text(raw?.custom, 120),
-  };
-}
-
-function normalizeChangeCard(raw) {
-  const title = text(raw?.title, 120);
-  const editInstruction = text(raw?.edit_instruction, 400);
-  if (!title && !editInstruction) return null;
-  return {
-    title: title || editInstruction.slice(0, 80),
-    preview: text(raw?.preview, 200),
-    body: text(raw?.body, 800),
-    effort: text(raw?.effort, 80),
-    edit_instruction: editInstruction,
   };
 }
 
 function normalizeCard(key, raw) {
-  if (key === 'buy') return normalizeBuyCard(raw);
-  if (key === 'change') return normalizeChangeCard(raw);
-  return normalizeGenericCard(raw);
+  const fallbackIcon = SECTION_ICONS[key] || 'sparkles';
+  const cardIcon = icon(raw?.icon, fallbackIcon);
+  if (key === 'buy') {
+    const name = text(raw?.name, 120) || text(raw?.title, 120);
+    if (!name) return null;
+    return {
+      icon: cardIcon,
+      name,
+      traits: text(raw?.traits, 300),
+      clarify: text(raw?.clarify, 300),
+    };
+  }
+  if (key === 'calc') {
+    const element = text(raw?.element, 160) || text(raw?.title, 160) || text(raw?.name, 160);
+    if (!element) return null;
+    return {
+      icon: cardIcon,
+      element,
+      note: text(raw?.note, 400) || text(raw?.body, 400),
+    };
+  }
+  if (key === 'check') {
+    const what = text(raw?.what, 200) || text(raw?.title, 200);
+    if (!what) return null;
+    return {
+      icon: cardIcon,
+      what,
+      when: text(raw?.when, 200),
+      why: text(raw?.why, 300),
+    };
+  }
+  const action = text(raw?.action, 200) || text(raw?.title, 200) || text(raw?.body, 200);
+  if (!action) return null;
+  return {
+    icon: cardIcon,
+    action,
+    why: text(raw?.why, 300),
+  };
 }
+
+const readSections = parsed => {
+  if (Array.isArray(parsed?.sections)) return parsed.sections;
+  if (parsed?.sections && typeof parsed.sections === 'object') {
+    return Object.entries(parsed.sections).map(([key, value]) => ({ key, ...(value || {}) }));
+  }
+  return [];
+};
 
 export function normalizeBreakdown(parsed = {}) {
   if (!parsed || typeof parsed !== 'object') return null;
 
   const topCards = (Array.isArray(parsed.top_cards) ? parsed.top_cards : [])
-    .map(normalizeGenericCard)
+    .map(normalizeTopCard)
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, CARD_LIMITS.top);
 
   const sections = [];
-  for (const raw of Array.isArray(parsed.sections) ? parsed.sections : []) {
+  for (const raw of readSections(parsed)) {
     const key = text(raw?.key, 40);
     if (!SECTION_KEYS.includes(key) || sections.some(section => section.key === key)) continue;
-    const limit = CARD_LIMITS[key] || CARD_LIMITS.default;
     const cards = (Array.isArray(raw.cards) ? raw.cards : [])
       .map(card => normalizeCard(key, card))
       .filter(Boolean)
-      .slice(0, limit);
+      .slice(0, CARD_LIMITS[key]);
     if (!cards.length) continue;
     sections.push({
       key,
+      icon: icon(raw.icon, SECTION_ICONS[key]),
       title: text(raw.title, 120) || SECTION_TITLES[key],
       preview: text(raw.preview, 200),
       cards,
@@ -152,18 +186,11 @@ export function normalizeBreakdown(parsed = {}) {
 
   if (!topCards.length && !sections.length) return null;
 
-  const nextKind = text(parsed.next_action?.kind, 40);
-  const nextLabel = text(parsed.next_action?.label, 80);
-  const nextAction = NEXT_KINDS.has(nextKind) && nextLabel
-    ? { label: nextLabel, kind: nextKind }
-    : null;
-
   return {
-    title: text(parsed.title, 120) || 'Ваш интерьер — в деталях',
+    version: 2,
+    title: text(parsed.title, 120) || 'Как воплотить этот дизайн',
     lead: text(parsed.lead, 200),
     top_cards: topCards,
     sections,
-    next_action: nextAction,
-    questions: list(parsed.questions, 3),
   };
 }

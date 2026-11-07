@@ -216,8 +216,6 @@ export function GenerationPanel({
   onRefreshUser,
   onEdited,
   onSelectVersion,
-  pendingEdit,
-  onPendingEditHandled,
   isAuthed = false,
 }: {
   open: boolean
@@ -229,8 +227,6 @@ export function GenerationPanel({
   onRefreshUser: () => void | Promise<void>
   onEdited?: () => void
   onSelectVersion?: (renderId: string) => void
-  pendingEdit?: { id: string; text: string } | null
-  onPendingEditHandled?: () => void
   isAuthed?: boolean
 }) {
   const { refresh: refreshTasks } = useTasks()
@@ -298,15 +294,6 @@ export function GenerationPanel({
     URL.revokeObjectURL(url)
     urls.current = urls.current.filter((item) => item !== url)
   }
-  const handledPendingEdit = useRef('')
-  useEffect(() => {
-    if (!pendingEdit || handledPendingEdit.current === pendingEdit.id) return
-    handledPendingEdit.current = pendingEdit.id
-    setEditRefs(prev => prev.length >= MAX_EDIT_BLOCKS ? prev : [...prev, { ...emptyEditRef(), text: pendingEdit.text }])
-    onPendingEditHandled?.()
-    requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
-  }, [pendingEdit, onPendingEditHandled])
-
   useEffect(() => () => { urls.current.forEach((url) => URL.revokeObjectURL(url)) }, [])
 
   useEffect(() => {

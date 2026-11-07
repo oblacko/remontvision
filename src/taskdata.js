@@ -3,8 +3,8 @@ import path from 'node:path';
 
 export function breakdownTask(row) {
   const breakdown = row?.meta?.breakdown;
-  // Старые успешные разборы писали только { cost_usd, at } — считаем их готовыми.
-  const status = breakdown?.status || (breakdown?.at ? 'done' : null);
+  // Старый формат { cost_usd, at } без версии не показываем: он требует перезапуска.
+  const status = breakdown?.status || (breakdown?.version === 2 && breakdown?.at ? 'done' : null);
   if (!status) return null;
   return {
     id: `breakdown:${row.id}`,

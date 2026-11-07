@@ -43,7 +43,7 @@ test('breakdownTask keeps done state and skips renders without breakdown meta', 
   assert.equal(breakdownTask(null), null);
 });
 
-test('breakdownTask treats legacy cached breakdown as done', () => {
+test('breakdownTask hides legacy breakdowns but shows versioned completed ones', () => {
   const legacy = breakdownTask({
     id: 'render-4',
     room_id: 'room-4',
@@ -51,7 +51,15 @@ test('breakdownTask treats legacy cached breakdown as done', () => {
     created_at: '2026-11-07T09:00:00.000Z',
     meta: { breakdown: { cost_usd: 0.005, at: '2026-11-07T10:20:00.000Z' } },
   });
+  const versioned = breakdownTask({
+    id: 'render-5',
+    room_id: 'room-5',
+    style: 'Современный',
+    created_at: '2026-11-07T09:00:00.000Z',
+    meta: { breakdown: { version: 2, at: '2026-11-07T10:30:00.000Z' } },
+  });
 
-  assert.equal(legacy.status, 'done');
-  assert.equal(legacy.created_at, '2026-11-07T10:20:00.000Z');
+  assert.equal(legacy, null);
+  assert.equal(versioned.status, 'done');
+  assert.equal(versioned.created_at, '2026-11-07T10:30:00.000Z');
 });
