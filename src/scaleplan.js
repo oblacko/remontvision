@@ -56,6 +56,7 @@ function livingPlan({ width, height }) {
   lines.push('Keep a minimum 60 cm circulation path and a 35–45 cm gap between sofa and coffee table.');
   if (width < 3.0) {
     lines.push('No full dining zone: a dining table plus chairs and a 60 cm path cannot fit across this width. Allow only a compact folding table if it still leaves 60 cm.');
+    lines.push('Omit a central coffee table in a narrow living room; use one small side table instead.');
   } else {
     lines.push('Add a dining table only if its width plus a 90 cm chair zone fits across the room alongside the seating; otherwise omit it and keep the living zone.');
   }

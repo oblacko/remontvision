@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, assessArchitecture, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
@@ -21,6 +21,7 @@ import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
 import { analyzeRoomBrief, buildArtDirection, buildRepairScope } from './artdirector.js';
+import { fitLayoutPlan } from './layoutfit.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -107,6 +108,7 @@ async function processRender(renderId) {
     design_retry: null,
     architect_review: null,
     product_qa: null,
+    architecture_qa: null,
     render_analysis: null,
     failed: null,
   };
@@ -378,6 +380,11 @@ async function processRender(renderId) {
           });
           if (layoutPlan) {
             addCost('layout', layoutPlan.cost);
+            const fitted = fitLayoutPlan({ plan: layoutPlan, dimensions: estimatedDimensions, roomType, artDirection });
+            layoutPlan = fitted.plan;
+            if (fitted.artDirection) artDirection = fitted.artDirection;
+            meta.layout_fit = fitted.fit;
+            if (fitted.dropped.length) log({ event: 'layout_fit_dropped', room_id: room.id, render_id: renderId, dropped: fitted.fit?.dropped, needed_cm: fitted.fit?.neededCm, width_m: fitted.fit?.widthM });
             meta.layout_plan = layoutPlan;
             log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, cost_usd: layoutPlan.cost ?? null, ms: Date.now() - layoutStart });
           } else {
@@ -512,6 +519,47 @@ async function processRender(renderId) {
       out_ratio: Number((outSize.width / outSize.height).toFixed(3)),
       out_px: [outSize.width, outSize.height],
     });
+
+    // Контроль архитектуры: рендер не должен менять окна, двери и пропорции комнаты.
+    let architectureQa = null;
+    const archQaEnabled = !/^(0|false|no|off)$/i.test(String(process.env.ARCHITECTURE_QA_ENABLED ?? 'false'));
+    const archQaEnforce = !/^(0|false|no|off)$/i.test(String(process.env.ARCHITECTURE_QA_ENFORCE ?? 'false'));
+    if (!MOCK_MODE && archQaEnabled) {
+      try {
+        const sourceBuf = await getBuffer(sourceStored);
+        architectureQa = await assessArchitecture({
+          sourceImageUrl: await bufferToDataUrl(sourceBuf),
+          renderImageUrl: await bufferToDataUrl(bytes),
+        });
+        addCost('architecture_qa', architectureQa.cost);
+        meta.architecture_qa = architectureQa;
+        log({
+          event: 'architecture_qa',
+          room_id: room.id,
+          render_id: renderId,
+          accepted: architectureQa.accepted,
+          checks: architectureQa.checks,
+          issues: architectureQa.issues,
+          cost_usd: architectureQa.cost ?? null,
+        });
+        if (!architectureQa.accepted) {
+          const details = architectureQa.issues.slice(0, 3).join('; ') || 'изменились окна, двери или пропорции комнаты';
+          const notice = `Архитектура комнаты изменилась: ${details}. ${archQaEnforce ? 'Кредит возвращён — попробуйте другое фото или ракурс.' : 'Проверьте перед реализацией.'}`;
+          if (archQaEnforce) {
+            const qaTotalCost = sumCostBreakdown();
+            await q.setRenderMeta(renderId, { ...meta, model, cost_usd: qaTotalCost, cost_breakdown: costBreakdown, architecture_qa: architectureQa });
+            await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id, 'architecture_qa');
+            await q.setRoomNotice(notice, room.id);
+            const restored = await restoreCreditForRender(renderId, 'architecture_rejected');
+            log({ event: 'architecture_rejected', room_id: room.id, render_id: renderId, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: qaTotalCost, credit_restored: restored, ms: Date.now() - t0 });
+            return;
+          }
+          await q.setRoomNotice(notice, room.id);
+        }
+      } catch (e) {
+        log({ event: 'architecture_qa_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+      }
+    }
 
     let productQa = null;
     if (iteration && editProduct) {

@@ -392,7 +392,7 @@ ${productRefs ? 'This render includes specific hero products shown in the refere
 ${architectureLock}
 ${repairScopeText}
 ${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
-${layoutPlan ? `\nLAYOUT PLAN — DESIGNED BY THE ARCHITECT\n${layoutPlanToText(layoutPlan)}\nFollow this plan as the primary layout: place each item in the described zone, keep the circulation, and do not collapse the room into a minimal desk+chair+shelf set. Exact centimetres may be adjusted to the photo, but keep the composition and the item list.\n` : ''}
+${layoutPlan ? `\nLAYOUT PLAN — DESIGNED BY THE ARCHITECT\n${layoutPlanToText(layoutPlan)}\nFollow this plan as the primary layout: place each item in the described zone, keep the circulation, and do not collapse the room into a minimal desk+chair+shelf set. Exact centimetres may be adjusted to the photo, but keep the composition and the item list. If the plan lists hard furniture limits, they override the art direction.\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY
 ${keep}.

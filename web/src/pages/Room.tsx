@@ -42,6 +42,7 @@ type RoomData = {
   room_type?: string | null
   status: string
   error?: string | null
+  notice?: string | null
   photo_url?: string | null
   has_purchased?: boolean
   roadmap_items?: RoadmapItem[]
@@ -242,6 +243,7 @@ export default function Room() {
 
       <main className="page-shell py-8">
         {error && <p className="mb-4 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{error}</p>}
+        {room.notice && <p className="mb-4 border border-primary/40 bg-primary/5 px-4 py-3 text-sm leading-5" role="status">{room.notice}</p>}
 
         {busy ? (
           <div className="mx-auto max-w-xl py-16 text-center" role="status" aria-live="polite">

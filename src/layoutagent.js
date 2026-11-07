@@ -68,6 +68,7 @@ export function layoutPlanToText(plan) {
     plan.circulation ? `Circulation: ${plan.circulation}` : '',
     plan.focal_point ? `Focal point: ${plan.focal_point}` : '',
     plan.avoid?.length ? `Avoid: ${plan.avoid.join('; ')}` : '',
+    plan.constraints?.length ? `Hard furniture limits:\n${plan.constraints.map(item => `- ${item}`).join('\n')}` : '',
   ].filter(Boolean).join('\n');
 }
 

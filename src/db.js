@@ -115,11 +115,11 @@ export const q = {
                 finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
                 WHERE id = $2`, [error, id, stage, costUsd]),
-  setRenderRejected: (error, imagePath, costUsd, model, id) =>
-    pool.query(`UPDATE renders SET status='rejected', error = $1, error_stage = 'product_qa', image_path = $2,
+  setRenderRejected: (error, imagePath, costUsd, model, id, stage = 'product_qa') =>
+    pool.query(`UPDATE renders SET status='rejected', error = $1, error_stage = $6, image_path = $2,
                 cost_usd = $3, model = $4, finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
-                WHERE id = $5`, [error, imagePath, costUsd, model, id]),
+                WHERE id = $5`, [error, imagePath, costUsd, model, id, stage]),
   failStaleRender: (id, error, stage = 'timeout') =>
     pool.query(`UPDATE renders SET status='error', error = $2, error_stage = $3,
                 finished_at = now(),
