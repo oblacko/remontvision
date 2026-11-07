@@ -288,3 +288,12 @@ test('empty room without a layout plan still designs from scratch and does not r
   assert.doesNotMatch(prompt, /LAYOUT PLAN/);
   assert.doesNotMatch(prompt, /Keep the existing functional zones and furniture positions/);
 });
+
+test('text-only edit prompt applies a single change without reference wording', () => {
+  const prompt = buildEditPrompt({ roomType: 'Спальня', instruction: 'Поменять шторы на лён' });
+  assert.match(prompt, /Apply only this change: Поменять шторы на лён/);
+  assert.match(prompt, /Keep the rest of the room exactly as in Image 1/);
+  assert.doesNotMatch(prompt, /requested element/);
+  assert.doesNotMatch(prompt, /reference's/);
+  assert.doesNotMatch(prompt, /from the described material/);
+});

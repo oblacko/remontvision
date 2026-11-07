@@ -11,6 +11,7 @@ import {
   Expand,
   Info,
   LoaderCircle,
+  Pencil,
   RotateCcw,
   Share2,
   Search,
@@ -116,16 +117,16 @@ type EditRefDraft = {
   id: string
   file: File | null
   url: string
-  urlDraft: string
   preview: string | null
   name: string
-  description: string
+  text: string
   drag: boolean
 }
 
 const emptyEditRef = (): EditRefDraft => ({
-  id: crypto.randomUUID(), file: null, url: '', urlDraft: '', preview: null, name: '', description: '', drag: false,
+  id: crypto.randomUUID(), file: null, url: '', preview: null, name: '', text: '', drag: false,
 })
+const MAX_EDIT_BLOCKS = 3
 
 type RoomResult = {
   id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
@@ -254,9 +255,7 @@ export function GenerationPanel({
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
-  const [refineText, setRefineText] = useState('')
   const [showAllHints, setShowAllHints] = useState(false)
-  const [editFormOpen, setEditFormOpen] = useState(false)
   const [genStage, setGenStage] = useState('queued')
   const [genMode, setGenMode] = useState<'base' | 'edit'>('base')
   const [elapsed, setElapsed] = useState(0)
@@ -477,21 +476,8 @@ export function GenerationPanel({
     })
   }
 
-  const addEditRef = () => setEditRefs(prev => prev.length >= 4 ? prev : [...prev, emptyEditRef()])
-
-  const addEditRefFromFile = (nextFile?: File) => {
-    if (!nextFile || !nextFile.type.startsWith('image/')) return
-    if (nextFile.size > 15 * 1024 * 1024) { setGenError('Референс больше 15 МБ'); return }
-    const preview = URL.createObjectURL(nextFile)
-    rememberUrl(preview)
-    setEditRefs(prev => prev.length >= 4 ? prev : [...prev, { ...emptyEditRef(), file: nextFile, preview, name: nextFile.name }])
-  }
-
-  const addEditRefFromUrl = (value: string) => {
-    const clean = value.trim()
-    if (!/^https?:\/\//i.test(clean)) return
-    setEditRefs(prev => prev.length >= 4 ? prev : [...prev, { ...emptyEditRef(), url: clean, name: 'Референс по ссылке' }])
-  }
+  const addEditBlock = () => setEditRefs(prev => prev.length >= MAX_EDIT_BLOCKS ? prev : [...prev, emptyEditRef()])
+  const addEditBlockWithText = (text: string) => setEditRefs(prev => prev.length >= MAX_EDIT_BLOCKS ? prev : [...prev, { ...emptyEditRef(), text }])
 
   const removeEditRef = (id: string) => setEditRefs(prev => {
     const target = prev.find(ref => ref.id === id)
@@ -519,14 +505,14 @@ export function GenerationPanel({
     setEditRefs(prev => prev.map(ref => {
       if (ref.id !== id) return ref
       if (ref.preview) releaseUrl(ref.preview)
-      return { ...ref, file: null, url: clean, urlDraft: '', preview: null, name: 'Референс по ссылке' }
+      return { ...ref, file: null, url: clean, preview: null, name: 'Референс по ссылке' }
     }))
   }
 
   const clearEditRefSource = (id: string) => setEditRefs(prev => prev.map(ref => {
     if (ref.id !== id) return ref
     if (ref.preview) releaseUrl(ref.preview)
-    return { ...ref, file: null, url: '', urlDraft: '', preview: null, name: '' }
+    return { ...ref, file: null, url: '', preview: null, name: '' }
   }))
 
   const pasteEditRef = async (id: string) => {
@@ -583,8 +569,8 @@ export function GenerationPanel({
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
     if (!isAuthed) { onRequireLogin(); return }
-    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setRefineText('')
-    setEditFormOpen(false); setShowAllHints(false)
+    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError('')
+    clearEditRefs(); setShowAllHints(false)
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
     try {
       const isBase = !roomId
@@ -739,7 +725,7 @@ export function GenerationPanel({
     loadedRoomRef.current = ''
     clearEditRefs()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
-    setRefineText(''); setGenError(''); setGenStage('queued'); setElapsed(0); setRoomId(''); setBusy(false); setCreditOpen(false)
+    setGenError(''); setGenStage('queued'); setElapsed(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     if (photoInput.current) photoInput.current.value = ''
   }
 
@@ -1073,7 +1059,7 @@ export function GenerationPanel({
                     const visibleEdits = showAllHints ? quickEdits : quickEdits.slice(0, 3)
                     return (
                       <div key={item.id} className="border border-foreground/25">
-                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setRefineText(''); setShowAllHints(false); setEditFormOpen(false) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setShowAllHints(false); setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                           <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span><span className="truncate">{item.request}</span></span>
                           <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
                         </button>
@@ -1091,12 +1077,12 @@ export function GenerationPanel({
                                     <button
                                       key={`${edit.layerLabel}-${editIndex}`}
                                       type="button"
+                                      disabled={editRefs.length >= MAX_EDIT_BLOCKS}
                                       onClick={() => {
-                                        setRefineText(edit.action)
-                                        setEditFormOpen(true)
-                                        requestAnimationFrame(() => document.getElementById('edit-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+                                        addEditBlockWithText(edit.action)
+                                        requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
                                       }}
-                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 flex-col items-start gap-0.5 overflow-hidden border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 flex-col items-start gap-0.5 overflow-hidden border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       <span className="line-clamp-2 w-full break-words text-xs font-medium leading-4" title={edit.action}>{edit.action}</span>
                                       <span className="w-full truncate text-[10px] text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
@@ -1110,23 +1096,13 @@ export function GenerationPanel({
                                 )}
                               </div>
                             ) : <p className="mt-2 text-xs leading-5 text-muted-foreground">Архитектор не оставил подсказок — опишите правку ниже.</p>}
-                            <button type="button" onClick={() => { setEditFormOpen(value => !value); requestAnimationFrame(() => document.getElementById('edit-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} className="mt-3 inline-flex min-h-10 items-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                              Своя правка
-                            </button>
-                            {editFormOpen && (
-                            <div id="edit-form" className="mt-3 flex flex-col gap-2">
-                              <input value={refineText} onChange={(event) => setRefineText(event.target.value)} onPaste={(event) => {
-                                const file = event.clipboardData.files?.[0]
-                                if (file) { event.preventDefault(); addEditRefFromFile(file); return }
-                                const text = event.clipboardData.getData('text').trim()
-                                if (/^https?:\/\//i.test(text)) { event.preventDefault(); addEditRefFromUrl(text) }
-                              }} placeholder="Общий комментарий к правке (необязательно)" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                              {editRefs.map((ref, refIndex) => {
+                            <div id="edit-blocks" className="mt-5 space-y-3">
+                              {editRefs.map((ref) => {
                                 const hasSource = Boolean(ref.file || ref.url)
                                 return (
                                   <div
                                     key={ref.id}
-                                    className={`rounded-none border border-dashed p-2 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
+                                    className={`relative rounded-none border border-dashed p-2 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
                                     onDragOver={(event) => { event.preventDefault(); updateEditRef(ref.id, { drag: true }) }}
                                     onDragLeave={() => updateEditRef(ref.id, { drag: false })}
                                     onDrop={(event) => {
@@ -1137,79 +1113,70 @@ export function GenerationPanel({
                                       if (/^https?:\/\//i.test(text)) setEditRefUrl(ref.id, text)
                                     }}
                                   >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-[11px] text-muted-foreground">Референс {refIndex + 1} · файл, ссылка или буфер</span>
-                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-7 items-center justify-center text-destructive" aria-label="Убрать референс"><X className="size-4" /></button>
-                                    </div>
-                                    <div className="mt-2 space-y-2">
-                                      {hasSource ? (
-                                        <div className="flex items-center gap-2">
-                                          {ref.preview ? (
-                                            <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border object-cover" />
-                                          ) : (
-                                            <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</a>
-                                          )}
-                                          <div className="min-w-0 flex-1">
-                                            <p className="truncate text-xs">{ref.url || ref.name || 'Референс'}</p>
-                                            <p className="text-[11px] text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
-                                          </div>
-                                          <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center border" title="Заменить файл" aria-label="Заменить файл">
-                                            <Upload className="size-4 text-primary-text" />
-                                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
-                                          </label>
-                                          <button type="button" onClick={() => pasteEditRef(ref.id)} className="flex size-9 shrink-0 items-center justify-center border" title="Вставить из буфера" aria-label="Вставить из буфера"><Clipboard className="size-4" /></button>
-                                          <button type="button" onClick={() => clearEditRefSource(ref.id)} className="flex size-9 shrink-0 items-center justify-center border text-destructive" title="Заменить источник" aria-label="Заменить источник"><X className="size-4" /></button>
+                                    <button type="button" onClick={() => removeEditRef(ref.id)} className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center text-destructive" aria-label="Удалить изменение"><X className="size-4" /></button>
+                                    {hasSource ? (
+                                      <div className="flex items-center gap-2 pr-8">
+                                        {ref.preview ? (
+                                          <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border object-cover" />
+                                        ) : (
+                                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</a>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                          <p className="truncate text-xs">{ref.url || ref.name || 'Референс'}</p>
+                                          <p className="text-[11px] text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
                                         </div>
-                                      ) : (
-                                        <div className="space-y-2">
-                                          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                                            <label className="inline-flex min-h-10 min-w-0 cursor-pointer items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
-                                              <Upload className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Выбрать файл</span>
-                                              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
-                                            </label>
-                                            <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 min-w-0 items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
-                                              <Clipboard className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Вставить из буфера</span>
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-                                      <input
-                                        value={ref.description}
-                                        onChange={(event) => updateEditRef(ref.id, { description: event.target.value })}
-                                        onPaste={(event) => {
-                                          const file = event.clipboardData.files?.[0]
-                                          if (file) { event.preventDefault(); setEditRefFile(ref.id, file); return }
-                                          const text = event.clipboardData.getData('text').trim()
-                                          if (!ref.file && !ref.url && /^https?:\/\//i.test(text)) { event.preventDefault(); setEditRefUrl(ref.id, text) }
-                                        }}
-                                        placeholder="Что изменить, например: замените шторы"
-                                        className="h-10 min-w-0 w-full border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
-                                      />
-                                    </div>
+                                        <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center border" title="Заменить файл" aria-label="Заменить файл">
+                                          <Upload className="size-4 text-primary-text" />
+                                          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
+                                        </label>
+                                        <button type="button" onClick={() => pasteEditRef(ref.id)} className="flex size-9 shrink-0 items-center justify-center border" title="Вставить из буфера" aria-label="Вставить из буфера"><Clipboard className="size-4" /></button>
+                                        <button type="button" onClick={() => clearEditRefSource(ref.id)} className="flex size-9 shrink-0 items-center justify-center border text-destructive" title="Заменить источник" aria-label="Заменить источник"><X className="size-4" /></button>
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-2 gap-2 pr-8 sm:flex sm:flex-wrap">
+                                        <label className="inline-flex min-h-10 min-w-0 cursor-pointer items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
+                                          <Upload className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Выбрать файл</span>
+                                          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
+                                        </label>
+                                        <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 min-w-0 items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
+                                          <Clipboard className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Вставить из буфера</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                    <textarea
+                                      value={ref.text}
+                                      onChange={(event) => updateEditRef(ref.id, { text: event.target.value })}
+                                      rows={4}
+                                      placeholder="Введите текст изменения"
+                                      className="mt-2 min-h-20 w-full min-w-0 border bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
+                                    />
                                   </div>
                                 )
                               })}
-                              <p className="text-[11px] leading-4 text-muted-foreground">Можно выбрать файл, перетащить его в блок или вставить картинку/ссылку из буфера.</p>
-                              <button type="button" onClick={addEditRef} disabled={editRefs.length >= 4} className="inline-flex min-h-10 items-center justify-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
-                                <Upload className="size-4 text-primary-text" /> Добавить референс
-                              </button>
+                            </div>
+                            <button type="button" onClick={addEditBlock} disabled={editRefs.length >= MAX_EDIT_BLOCKS} className="mt-3 inline-flex min-h-10 items-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                              <Pencil className="size-4 text-primary-text" /> Внести изменения
+                            </button>
+                            <div className="mt-3">
                               <button
                                 type="button"
-                                disabled={!refineText.trim() && !editRefs.some(ref => ref.file || ref.url)}
+                                disabled={!editRefs.some(ref => ref.text.trim() || ref.file || ref.url)}
                                 onClick={() => {
+                                  const textBlocks = editRefs.filter(ref => !ref.file && !ref.url && ref.text.trim())
+                                    .map((ref, index) => `${index + 1}) ${ref.text.trim()}`)
+                                    .join('\n')
                                   const refs = editRefs.filter(ref => ref.file || ref.url).map(ref => ({
                                     file: ref.file || undefined,
                                     url: ref.url || undefined,
-                                    description: ref.description.trim(),
+                                    description: ref.text.trim(),
                                   }))
-                                  startGeneration(refineText.trim() || 'Применить правки по референсам', item.styleName, { parentId: item.id, refs })
+                                  startGeneration(textBlocks || 'Применить правки по референсам', item.styleName, { parentId: item.id, refs })
                                 }}
                                 className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
                               >
                                 Перегенерировать <RotateCcw className="size-4" />
                               </button>
                             </div>
-                            )}
                           </div>
                         )}
                       </div>

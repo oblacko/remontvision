@@ -492,16 +492,25 @@ ${changes.join('\n')}${instruction ? `\nAlso follow this note: ${instruction}` :
 The reference images describe only their products. Ignore their backgrounds, studio lighting, camera angles, staging and photographic style; preserve the interior's own light and composition.
 ${EDIT_INVARIANTS}`;
   }
-  const targetLabel = SLOT_LABELS[target] || 'the requested element';
+  const targetLabel = SLOT_LABELS[target] || null;
   const roles = hasRef
-    ? `IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.\nImage 2 — reference for the new ${targetLabel}${refLabel ? ` — ${refLabel}` : ''}${refDimensions ? `, dimensions ${refDimensions}` : ''}.`
-    : 'IMAGE ROLES:\nImage 1 — current interior render. Edit only the target object.';
+    ? `IMAGE ROLES:\nImage 1 — current interior render. Edit only the object described below.\nImage 2 — reference for the new ${targetLabel || 'object'}${refLabel ? ` — ${refLabel}` : ''}${refDimensions ? `, dimensions ${refDimensions}` : ''}.`
+    : 'IMAGE ROLES:\nImage 1 — current interior render.';
+  const instructionText = instruction || 'Apply the requested change.';
+  if (hasRef) {
+    return `${roles}
+
+This is a ${roomName}.
+Change only the ${targetLabel || 'object shown in the reference image'}. ${instructionText}
+Match the reference's shape, color, material and finish${refDimensions ? ` and its real dimensions (${refDimensions})` : ''}. Keep the size and realistic position appropriate for the room.
+The reference image describes only the object. Ignore its background, studio lighting, camera angle, staging and photographic style; preserve the interior's own light and composition.
+${EDIT_INVARIANTS}`;
+  }
   return `${roles}
 
 This is a ${roomName}.
-Change only the ${targetLabel}. ${instruction}
-Match the reference's shape, color, material and finish${hasRef ? '' : ' from the described material'}${refDimensions ? ` and its real dimensions (${refDimensions})` : ''}. Keep the size and realistic position appropriate for the room.
-The product reference describes only the product. Ignore its background, studio lighting, camera angle, staging and photographic style; preserve the interior's own light and composition.
+Apply only this change: ${instructionText}
+Keep the rest of the room exactly as in Image 1.
 ${EDIT_INVARIANTS}`;
 }
 
