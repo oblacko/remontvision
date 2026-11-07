@@ -65,7 +65,6 @@ type RoomData = {
   photo_url?: string | null
   render?: Render | null
 }
-type Version = { id: string; room_id: string; status: string; created_at: string; image_url?: string | null; photo_url?: string | null; request_text?: string | null }
 
 const REPAIR_LABELS: Array<[keyof Pick<RepairScope, 'floor' | 'ceiling' | 'walls' | 'doors' | 'windows'>, string]> = [
   ['floor', 'Пол'], ['ceiling', 'Потолок'], ['walls', 'Стены'], ['doors', 'Двери'], ['windows', 'Окна'],
@@ -74,7 +73,6 @@ const repairRows = (scope?: RepairScope | null) => REPAIR_LABELS
   .map(([key, label]) => scope?.[key] ? { label, ...scope[key]! } : null)
   .filter((item): item is { label: string } & RepairAction => Boolean(item))
 
-const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
 const stageLabel = (status?: string) => status === 'analyzing' ? 'Анализ фото' : status === 'rendering' ? 'Генерация изображения' : status === 'matching' ? 'Разбор рендера' : status === 'queued' ? 'В очереди' : 'В процессе'
 const lensLabel = (type?: string | null) => type === 'wide' ? 'широкий угол' : type === 'tele' ? 'теле' : type === 'normal' ? 'нормальный' : ''
 const confidenceLabel = (value?: string) => value === 'high' ? 'высокая' : value === 'medium' ? 'средняя' : value === 'low' ? 'низкая' : ''
@@ -92,17 +90,15 @@ export default function Room() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const [room, setRoom] = useState<RoomData | null>(null)
-  const [versions, setVersions] = useState<Version[]>([])
-  const [selectedRenderId, setSelectedRenderId] = useState<string | null>(null)
   const [tab, setTab] = useState<'editor' | 'design'>('editor')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
   const [finalBusy, setFinalBusy] = useState(false)
 
-  const loadRoom = useCallback(async (renderId?: string | null) => {
+  const loadRoom = useCallback(async () => {
     try {
-      const r = await fetch(`/api/rooms/${id}${renderId ? `?render_id=${encodeURIComponent(renderId)}` : ''}`)
+      const r = await fetch(`/api/rooms/${id}`)
       if (r.status === 401) { setError('Войдите, чтобы открыть комнату'); return null }
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error || 'Комната не найдена'); return null }
@@ -114,46 +110,26 @@ export default function Room() {
     }
   }, [id])
 
-  const loadVersions = useCallback(async () => {
-    try {
-      const r = await fetch('/api/my/generations')
-      if (!r.ok) return
-      const list = await r.json().catch(() => [])
-      const rows = Array.isArray(list) ? list : []
-      setVersions(rows.filter((v: Version) => v.room_id === id))
-    } catch { /* ignore */ }
-  }, [id])
-
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      await Promise.all([loadRoom(), loadVersions()])
+      await loadRoom()
       if (!cancelled) setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [loadRoom, loadVersions])
+  }, [loadRoom])
 
-  const hasActiveVersion = versions.some(v => v.status !== 'done' && v.status !== 'error')
-  const busy = room && !selectedRenderId
-    ? (room.status !== 'done' && room.status !== 'error') || hasActiveVersion
-    : false
+  const busy = room ? room.status !== 'done' && room.status !== 'error' : false
   useEffect(() => {
-    if (!busy || selectedRenderId) return
-    const timer = window.setInterval(() => { void loadRoom(); void loadVersions() }, 5000)
+    if (!busy) return
+    const timer = window.setInterval(() => { void loadRoom() }, 5000)
     return () => window.clearInterval(timer)
-  }, [busy, selectedRenderId, loadRoom, loadVersions])
+  }, [busy, loadRoom])
 
   const render = room?.render || null
   const image = render?.image || room?.photo_url || null
   const nextSteps = render?.analysis?.final?.next_steps || []
-
-  const selectVersion = async (renderId: string) => {
-    setSelectedRenderId(renderId)
-    setLoading(true)
-    await loadRoom(renderId)
-    setLoading(false)
-  }
 
   const makeFinal = async () => {
     if (!render?.id || finalBusy) return
@@ -161,7 +137,7 @@ export default function Room() {
     try {
       const r = await fetch(`/api/renders/${render.id}/final-review`, { method: 'POST' })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || String(r.status))
-      await loadRoom(selectedRenderId)
+      await loadRoom()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось собрать итог')
     } finally {
@@ -234,15 +210,14 @@ export default function Room() {
               {tab === 'editor' && (
                 <div className="mt-6 min-w-0">
                   <GenerationPanel
-                    key={`${id}:${selectedRenderId || 'latest'}`}
+                    key={id}
                     open
                     inline
                     initialRoomId={id}
-                    initialRenderId={selectedRenderId || undefined}
                     onClose={() => {}}
                     onRequireLogin={() => navigate('/')}
                     onRefreshUser={async () => {}}
-                    onEdited={() => { setSelectedRenderId(null); void loadRoom(); void loadVersions() }}
+                    onEdited={() => { void loadRoom() }}
                     isAuthed
                   />
                 </div>
@@ -250,27 +225,6 @@ export default function Room() {
 
               {tab === 'design' && <DesignTab render={render} nextSteps={nextSteps} finalBusy={finalBusy} onMakeFinal={() => void makeFinal()} />}
             </div>
-
-            <aside className="min-w-0 border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className="eyebrow">Версии</p>
-                <span className="text-xs text-muted-foreground">{versions.length}</span>
-              </div>
-              <div className="mt-3 flex flex-col gap-2">
-                {versions.map(version => {
-                  const active = selectedRenderId ? selectedRenderId === version.id : version.id === render?.id
-                  return (
-                    <button key={version.id} type="button" onClick={() => void selectVersion(version.id)} className={`border px-3 py-2 text-left text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>
-                      {dateTime(version.created_at)} · {version.request_text ? 'правка' : 'базовая'} · {version.status}
-                    </button>
-                  )
-                })}
-                {!versions.length && <p className="text-xs text-muted-foreground">Версий пока нет.</p>}
-              </div>
-              {selectedRenderId && (
-                <button type="button" onClick={() => void selectVersion(render?.id || versions[0]?.id || '')} className="mt-4 text-xs underline decoration-border underline-offset-4 hover:decoration-foreground">Вернуться к последней</button>
-              )}
-            </aside>
           </div>
         )}
       </main>
