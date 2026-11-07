@@ -11,11 +11,10 @@ import {
   Expand,
   Info,
   LoaderCircle,
-  Pencil,
+  Plus,
   RotateCcw,
   Share2,
   Search,
-  Trash2,
   Upload,
   X,
   Zap,
@@ -1157,7 +1156,7 @@ export function GenerationPanel({
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <p className="eyebrow">Прикрепить референс</p>
-                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="inline-flex min-h-8 items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><Trash2 className="size-3.5" /> Удалить</button>
+                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><X className="size-4" strokeWidth={1.5} /></button>
                                     </div>
                                     {hasSource ? (
                                       <div className="mt-2 flex items-center gap-3 border border-foreground/25 p-2">
@@ -1198,7 +1197,7 @@ export function GenerationPanel({
                               })}
                             </div>
                             <button type="button" onClick={addEditBlock} disabled={editRefs.length >= MAX_EDIT_BLOCKS} className="mt-3 inline-flex min-h-10 items-center gap-2 border border-foreground px-3 text-xs transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                              <Pencil className="size-4" /> Добавить правку <span className="font-mono text-[11px] opacity-70">{editRefs.length} из {MAX_EDIT_BLOCKS}</span>
+                              <Plus className="size-4 shrink-0 text-primary-text" /> <span className="leading-none">Добавить правку</span> <span className="font-mono text-[11px] leading-none text-primary-text">{editRefs.length} из {MAX_EDIT_BLOCKS}</span>
                             </button>
                             <div className="mt-3">
                               <button
