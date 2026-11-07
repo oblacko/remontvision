@@ -278,6 +278,7 @@ export function GenerationPanel({
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
+  const showResultMain = !inline || heroItems.length > 0
   const productMatches = current?.analysis?.products || []
   const currentChanges = changesFromArchitect(current?.analysis?.architect)
   const selectedOffersList = Object.values(selectedOffers)
@@ -954,8 +955,8 @@ export function GenerationPanel({
 
         {step === 'result' && current && (
           <div className="min-w-0">
-            <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_22rem]">
-              <div className="min-w-0">
+            <div className={showResultMain ? 'grid grid-cols-1 gap-8 xl:grid-cols-[1fr_22rem]' : 'min-w-0'}>
+              {showResultMain && <div className="min-w-0">
                 {!inline && <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
                   <div>
                     <p className="eyebrow">Шаг 03 / Результат</p>
@@ -1055,9 +1056,9 @@ export function GenerationPanel({
                     </div>
                   </section>
                 ) : null}
-              </div>
+              </div>}
 
-              <aside className="min-w-0 border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
+              <aside className={showResultMain ? 'min-w-0 border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0' : 'min-w-0'}>
                 <p className="eyebrow">История правок</p>
                 <div className="mt-4 space-y-2">
                   {iterations.map((item, index) => {
