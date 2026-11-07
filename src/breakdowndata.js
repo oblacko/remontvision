@@ -1,22 +1,10 @@
-// Контракт и нормализация практического гайда «Как воплотить этот дизайн».
-// Чистые функции без БД — используются и сервером, и тестами.
+// Контракт и нормализация разбора интерьера: что подобрать + почему это важно.
+// Чистые функции без БД — используются сервером и тестами.
 import { getArchitectPrompt } from './architectprompts.js';
 
-export const SECTION_TITLES = {
-  buy: 'Что подобрать',
-  calc: 'Что включить в расчёт',
-  check: 'До заказа и начала работ',
-  start: 'С чего начать',
-};
+export const BREAKDOWN_VERSION = 3;
 
-export const SECTION_ICONS = {
-  buy: 'shopping',
-  calc: 'calculator',
-  check: 'check',
-  start: 'rocket',
-};
-
-// Закрытый набор иконок: ключи совпадают с картой в web/src/pages/Room.tsx.
+// Закрытый набор иконок: ключи совпадают с картой в GuideIcon.tsx.
 export const BREAKDOWN_ICON_KEYS = [
   'palette', 'layers', 'paint', 'wallpaper', 'sofa', 'armchair', 'bed', 'table',
   'lamp', 'lightbulb', 'refrigerator', 'cooktop', 'utensils', 'hood', 'washing',
@@ -26,8 +14,7 @@ export const BREAKDOWN_ICON_KEYS = [
 ];
 
 const ICON_SET = new Set(BREAKDOWN_ICON_KEYS);
-const SECTION_KEYS = Object.keys(SECTION_TITLES);
-const CARD_LIMITS = { top: 3, buy: 5, calc: 3, check: 3, start: 1 };
+const MAX_CARDS = 5;
 
 const text = (value, max = 300) => {
   if (typeof value !== 'string' && typeof value !== 'number') return '';
@@ -39,44 +26,41 @@ const icon = (value, fallback = 'sparkles') => {
   return ICON_SET.has(key) ? key : fallback;
 };
 
+const color = value => {
+  const match = String(value || '').trim().match(/^#?([0-9a-f]{6})$/i);
+  return match ? `#${match[1].toUpperCase()}` : null;
+};
+
 export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без markdown-обёрток:
 {
-  "title": "Как воплотить этот дизайн",
-  "lead": "одна строка: что повторить, что купить и что проверить",
-  "top_cards": [
-    {"icon":"иконка из списка","title":"до 6 слов","preview":"до 20 слов"}
-  ],
-  "sections": [
-    {"key":"buy","icon":"shopping","preview":"до 18 слов","cards":[
-      {"icon":"иконка","name":"предмет или отделка","traits":"видимые признаки","clarify":"один параметр уточнить"}
-    ]},
-    {"key":"calc","icon":"calculator","preview":"до 18 слов","cards":[
-      {"icon":"иконка","element":"элемент","note":"какие позиции включить или исключить"}
-    ]},
-    {"key":"check","icon":"check","preview":"до 18 слов","cards":[
-      {"icon":"иконка","what":"что согласовать","when":"до какого действия","why":"зачем"}
-    ]},
-    {"key":"start","icon":"rocket","preview":"до 18 слов","cards":[
-      {"icon":"иконка","action":"одно действие сейчас","why":"что оно позволит проверить"}
-    ]}
+  "title": "Что подобрать",
+  "lead": "одна строка: что важно сохранить при подборе",
+  "cards": [
+    {
+      "icon": "table",
+      "name": "Обеденный стол",
+      "traits": "светлое дерево, тонкие ножки, прямоугольная столешница",
+      "clarify": "длину и ширину по месту у окна",
+      "why": "единственный тёплый материал связывает холодную кухню",
+      "hex": "#A6784F"
+    }
   ]
 }
 
 Правила контракта:
-- top_cards — до 3 карточек. sections — только непустые, каждая key один раз.
-- buy — до 5 позиций, calc — до 3, check — до 3, start — ровно 1.
-- icon — только из списка: ${BREAKDOWN_ICON_KEYS.join(', ')}. Не выдумывай другие имена.
-- Весь ответ — до 350 слов. Никаких длинных абзацев.
-- Не повторяй один вывод в разных разделах.
-- Неприменимые разделы не выводи.
+- cards — до 5 позиций.
+- name — что подобрать, без слова «купить».
+- traits — видимые признаки, которые сохранить.
+- clarify — один параметр, который уточнить до покупки.
+- why — почему это важно для образа: контраст, повторение, свет, тепло, ритм.
+- hex — цвет из изображения, только если очевиден; иначе не указывай. Формат #RRGGBB.
+- icon — только из списка: ${BREAKDOWN_ICON_KEYS.join(', ')}.
+- Не выдумывай бренды, цены, ссылки и точные материалы.
 - Все тексты — на русском. Только JSON.`;
 
 export function buildBreakdownSystem() {
   const prompt = getArchitectPrompt('breakdown');
-  return [
-    prompt?.system || '',
-    BREAKDOWN_SCHEMA,
-  ].filter(Boolean).join('\n\n');
+  return [prompt?.system || '', BREAKDOWN_SCHEMA].filter(Boolean).join('\n\n');
 }
 
 const dimensionText = dimensions => {
@@ -95,102 +79,35 @@ export function buildBreakdownUser({ roomType, style, priceTier, budget, dimensi
     priceTier ? `Класс материалов: ${priceTier}.` : '',
     budget != null ? `Бюджет: ${Math.round(Number(budget))} тыс. ₽.` : '',
     dims ? `Размеры (оценка по изображению): ${dims}.` : '',
-    'Не выдумывай отсутствующие данные. Если данных не хватает, обозначь это в разделе «С чего начать».',
+    'Не выдумывай отсутствующие данные. Если данных не хватает, отрази это в параметре для уточнения.',
   ].filter(Boolean).join('\n');
 }
 
-function normalizeTopCard(raw) {
-  const title = text(raw?.title, 120);
-  if (!title) return null;
+function normalizeCard(raw) {
+  const name = text(raw?.name, 120) || text(raw?.title, 120);
+  if (!name) return null;
   return {
     icon: icon(raw?.icon),
-    title,
-    preview: text(raw?.preview, 200),
-  };
-}
-
-function normalizeCard(key, raw) {
-  const fallbackIcon = SECTION_ICONS[key] || 'sparkles';
-  const cardIcon = icon(raw?.icon, fallbackIcon);
-  if (key === 'buy') {
-    const name = text(raw?.name, 120) || text(raw?.title, 120);
-    if (!name) return null;
-    return {
-      icon: cardIcon,
-      name,
-      traits: text(raw?.traits, 300),
-      clarify: text(raw?.clarify, 300),
-    };
-  }
-  if (key === 'calc') {
-    const element = text(raw?.element, 160) || text(raw?.title, 160) || text(raw?.name, 160);
-    if (!element) return null;
-    return {
-      icon: cardIcon,
-      element,
-      note: text(raw?.note, 400) || text(raw?.body, 400),
-    };
-  }
-  if (key === 'check') {
-    const what = text(raw?.what, 200) || text(raw?.title, 200);
-    if (!what) return null;
-    return {
-      icon: cardIcon,
-      what,
-      when: text(raw?.when, 200),
-      why: text(raw?.why, 300),
-    };
-  }
-  const action = text(raw?.action, 200) || text(raw?.title, 200) || text(raw?.body, 200);
-  if (!action) return null;
-  return {
-    icon: cardIcon,
-    action,
+    name,
+    traits: text(raw?.traits, 300),
+    clarify: text(raw?.clarify, 300),
     why: text(raw?.why, 300),
+    hex: color(raw?.hex),
   };
 }
-
-const readSections = parsed => {
-  if (Array.isArray(parsed?.sections)) return parsed.sections;
-  if (parsed?.sections && typeof parsed.sections === 'object') {
-    return Object.entries(parsed.sections).map(([key, value]) => ({ key, ...(value || {}) }));
-  }
-  return [];
-};
 
 export function normalizeBreakdown(parsed = {}) {
   if (!parsed || typeof parsed !== 'object') return null;
-
-  const topCards = (Array.isArray(parsed.top_cards) ? parsed.top_cards : [])
-    .map(normalizeTopCard)
+  const cards = (Array.isArray(parsed.cards) ? parsed.cards : [])
+    .map(normalizeCard)
     .filter(Boolean)
-    .slice(0, CARD_LIMITS.top);
-
-  const sections = [];
-  for (const raw of readSections(parsed)) {
-    const key = text(raw?.key, 40);
-    if (!SECTION_KEYS.includes(key) || sections.some(section => section.key === key)) continue;
-    const cards = (Array.isArray(raw.cards) ? raw.cards : [])
-      .map(card => normalizeCard(key, card))
-      .filter(Boolean)
-      .slice(0, CARD_LIMITS[key]);
-    if (!cards.length) continue;
-    sections.push({
-      key,
-      icon: icon(raw.icon, SECTION_ICONS[key]),
-      title: text(raw.title, 120) || SECTION_TITLES[key],
-      preview: text(raw.preview, 200),
-      cards,
-    });
-  }
-
-  if (!topCards.length && !sections.length) return null;
+    .slice(0, MAX_CARDS);
+  if (!cards.length) return null;
 
   return {
-    version: 2,
-    title: text(parsed.title, 120) || 'Как воплотить этот дизайн',
+    version: BREAKDOWN_VERSION,
+    title: text(parsed.title, 120) || 'Что подобрать',
     lead: text(parsed.lead, 200),
-    top_cards: topCards,
-    sections,
+    cards,
   };
 }
