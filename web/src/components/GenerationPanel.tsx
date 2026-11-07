@@ -259,7 +259,6 @@ export function GenerationPanel({
   const [iterations, setIterations] = useState<Iteration[]>([])
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [openHistory, setOpenHistory] = useState<string | null>(null)
-  const [showAllHints, setShowAllHints] = useState(false)
   const [genStage, setGenStage] = useState('queued')
   const [genMode, setGenMode] = useState<'base' | 'edit'>('base')
   const [elapsed, setElapsed] = useState(0)
@@ -602,7 +601,7 @@ export function GenerationPanel({
     if (busy) return
     if (!isAuthed) { onRequireLogin(); return }
     setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError('')
-    clearEditRefs(); setShowAllHints(false)
+    clearEditRefs()
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
     try {
       const isBase = !roomId
@@ -1088,10 +1087,9 @@ export function GenerationPanel({
                       impact: change.impact || 0,
                       layerLabel: change.label || change.layer,
                     })).sort((a, b) => b.impact - a.impact)
-                    const visibleEdits = showAllHints ? quickEdits : quickEdits.slice(0, 3)
                     return (
                       <div key={item.id} className="border border-foreground/25">
-                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setShowAllHints(false); setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id); onSelectVersion?.(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id); onSelectVersion?.(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                           <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span><span className="truncate">{item.request}</span></span>
                           <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
                         </button>
@@ -1122,7 +1120,7 @@ export function GenerationPanel({
                                   ))}
                                 </div>
                                 <div className="hidden gap-2 sm:flex sm:flex-wrap">
-                                  {visibleEdits.map((edit, editIndex) => (
+                                  {quickEdits.map((edit, editIndex) => (
                                     <button
                                       key={`${edit.layerLabel}-${editIndex}`}
                                       type="button"
@@ -1138,11 +1136,6 @@ export function GenerationPanel({
                                     </button>
                                   ))}
                                 </div>
-                                {quickEdits.length > 3 && (
-                                  <button type="button" onClick={() => setShowAllHints(value => !value)} className="mt-2 hidden text-xs underline decoration-border underline-offset-4 hover:decoration-foreground sm:inline-flex">
-                                    {showAllHints ? 'Свернуть' : `Ещё ${quickEdits.length - 3}`}
-                                  </button>
-                                )}
                               </div>
                             ) : <p className="mt-2 text-xs leading-5 text-muted-foreground">Архитектор не оставил подсказок — опишите правку ниже.</p>}
                             <div id="edit-blocks" className="mt-5 space-y-3">
