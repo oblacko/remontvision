@@ -1123,7 +1123,6 @@ export function GenerationPanel({
                               }} placeholder="Общий комментарий к правке (необязательно)" className="h-11 min-w-0 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
                               {editRefs.map((ref, refIndex) => {
                                 const hasSource = Boolean(ref.file || ref.url)
-                                const validDraft = /^https?:\/\/\S+$/i.test(ref.urlDraft.trim())
                                 return (
                                   <div
                                     key={ref.id}
@@ -1163,29 +1162,14 @@ export function GenerationPanel({
                                         </div>
                                       ) : (
                                         <div className="space-y-2">
-                                          <div className="flex flex-wrap gap-2">
-                                            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border px-3 text-xs">
-                                              <Upload className="size-4 text-primary-text" /> Выбрать файл
+                                          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                                            <label className="inline-flex min-h-10 min-w-0 cursor-pointer items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
+                                              <Upload className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Выбрать файл</span>
                                               <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
                                             </label>
-                                            <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 items-center gap-2 border px-3 text-xs">
-                                              <Clipboard className="size-4 text-primary-text" /> Вставить из буфера
+                                            <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 min-w-0 items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
+                                              <Clipboard className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Вставить из буфера</span>
                                             </button>
-                                          </div>
-                                          <div className="flex gap-2">
-                                            <input
-                                              value={ref.urlDraft}
-                                              onChange={(event) => updateEditRef(ref.id, { urlDraft: event.target.value })}
-                                              onKeyDown={(event) => {
-                                                if (event.key === 'Enter') {
-                                                  event.preventDefault()
-                                                  if (validDraft) setEditRefUrl(ref.id, ref.urlDraft)
-                                                }
-                                              }}
-                                              placeholder="…или вставьте ссылку https://"
-                                              className="h-10 min-w-0 flex-1 border bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
-                                            />
-                                            <button type="button" disabled={!validDraft} onClick={() => setEditRefUrl(ref.id, ref.urlDraft)} className="min-h-10 border border-foreground px-3 text-xs transition-colors hover:bg-foreground hover:text-background disabled:opacity-40">Добавить</button>
                                           </div>
                                         </div>
                                       )}
@@ -1205,7 +1189,7 @@ export function GenerationPanel({
                                   </div>
                                 )
                               })}
-                              <p className="text-[11px] leading-4 text-muted-foreground">Можно выбрать файл, перетащить его в блок, вставить картинку или ссылку из буфера — либо вставить ссылку в поле «https://».</p>
+                              <p className="text-[11px] leading-4 text-muted-foreground">Можно выбрать файл, перетащить его в блок или вставить картинку/ссылку из буфера.</p>
                               <button type="button" onClick={addEditRef} disabled={editRefs.length >= 4} className="inline-flex min-h-10 items-center justify-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                                 <Upload className="size-4 text-primary-text" /> Добавить референс
                               </button>
