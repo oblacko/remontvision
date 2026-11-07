@@ -88,6 +88,7 @@ const webIndexPath = path.join(WEB_DIST, 'index.html');
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.all(['/cabinet', '/cabinet/', '/cabinet/paid', '/cabinet/paid/', '/cabinet/fail', '/cabinet/fail/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/s/:token', (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
+app.get(['/room/:id', '/room/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
   res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
 });
@@ -1405,15 +1406,27 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       lens: render.meta?.lens || null,
       repair_scope: render.meta?.repair_scope || null,
       design_direction: render.meta?.design_direction ? {
+        styleId: render.meta.design_direction.styleId || null,
         conceptId: render.meta.design_direction.conceptId || null,
         concept: render.meta.design_direction.concept || '',
         mainMove: render.meta.design_direction.mainMove || null,
+        supportingMoves: render.meta.design_direction.supportingMoves || [],
         focalPoint: render.meta.design_direction.focalPoint || '',
         focalZone: render.meta.design_direction.focalZone || null,
         quietAreas: render.meta.design_direction.quietAreas || [],
         materialsStory: render.meta.design_direction.materialsStory || [],
+        materials: render.meta.design_direction.materials || '',
         palette: render.meta.design_direction.palette || [],
         compatibility: render.meta.design_direction.compatibility || 'ok',
+        avoid: render.meta.design_direction.avoid || [],
+      } : null,
+      layout_plan: render.meta?.layout_plan ? {
+        strategy: render.meta.layout_plan.strategy || '',
+        zones: render.meta.layout_plan.zones || [],
+        items: render.meta.layout_plan.items || [],
+        circulation: render.meta.layout_plan.circulation || '',
+        focalPoint: render.meta.layout_plan.focal_point || '',
+        avoid: render.meta.layout_plan.avoid || [],
       } : null,
     } : null,
     items: items.map(p => ({
@@ -1672,6 +1685,15 @@ app.get('/api/share/:token', h(async (req, res) => {
     likes,
     liked,
     comments: comments.map(c => ({ id: c.id, name: c.name, text: c.text, created_at: c.created_at })),
+    design_direction: render.meta?.design_direction ? {
+      concept: render.meta.design_direction.concept || '',
+      mainMove: render.meta.design_direction.mainMove || null,
+      focalPoint: render.meta.design_direction.focalPoint || '',
+      quietAreas: render.meta.design_direction.quietAreas || [],
+      materialsStory: render.meta.design_direction.materialsStory || [],
+      palette: render.meta.design_direction.palette || [],
+    } : null,
+    surfaces: Array.isArray(render.analysis?.surfaces) ? render.analysis.surfaces : [],
   });
 }));
 

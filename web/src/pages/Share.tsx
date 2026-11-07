@@ -7,6 +7,15 @@ type Comment = { id: number; name: string | null; text: string; created_at: stri
 type ShareData = {
   id: string; image: string; style: string; room_type?: string | null;
   created_at: string; likes: number; liked: boolean; comments: Comment[];
+  design_direction?: {
+    concept?: string
+    mainMove?: { target?: string; action?: string; effect?: string } | null
+    focalPoint?: string
+    quietAreas?: string[]
+    materialsStory?: string[]
+    palette?: { hex?: string | null; name?: string }[]
+  } | null
+  surfaces?: { surface?: string; label?: string; hex?: string; ral?: { code?: string; name?: string } | null }[]
 }
 
 const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
@@ -85,6 +94,30 @@ export default function Share() {
           <div><p className="eyebrow">Дизайн интерьера</p><h1 className="display-title mt-2 text-3xl sm:text-4xl">{data.style}</h1><p className="mt-1 text-xs text-muted-foreground">{data.room_type || 'Комната'} · {dateTime(data.created_at)}</p></div>
           <button type="button" onClick={like} disabled={likeBusy} className={`inline-flex min-h-12 items-center gap-2 border px-4 text-sm transition-colors ${data.liked ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`} aria-pressed={data.liked}><Heart className={`size-4 ${data.liked ? 'fill-current' : ''}`} />{data.likes}</button>
         </div>
+
+        {data.design_direction && (
+          <section className="mt-10 border-t pt-6">
+            <p className="eyebrow">Дизайн</p>
+            {data.design_direction.concept && <p className="mt-3 text-base font-medium">{data.design_direction.concept}</p>}
+            {data.design_direction.mainMove?.action && <p className="mt-2 text-sm leading-6 text-muted-foreground">{data.design_direction.mainMove.target ? `${data.design_direction.mainMove.target}: ` : ''}{data.design_direction.mainMove.action}{data.design_direction.mainMove.effect ? ` — ${data.design_direction.mainMove.effect}` : ''}</p>}
+            {!!data.design_direction.palette?.length && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {data.design_direction.palette.map((color, index) => <span key={`${color.hex}-${index}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="size-4 border border-foreground/20" style={{ background: color.hex || 'transparent' }} />{color.name || color.hex}</span>)}
+              </div>
+            )}
+            {!!data.design_direction.materialsStory?.length && <p className="mt-3 text-xs leading-5 text-muted-foreground">Материалы: {data.design_direction.materialsStory.join(', ')}</p>}
+            {data.design_direction.focalPoint && <p className="mt-1 text-xs leading-5 text-muted-foreground">Фокус: {data.design_direction.focalPoint}</p>}
+          </section>
+        )}
+
+        {!!data.surfaces?.length && (
+          <section className="mt-8 border-t pt-6">
+            <p className="eyebrow">Палитра RAL по рендеру</p>
+            <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
+              {data.surfaces.map((surface, index) => <div key={`${surface.surface}-${index}`} className="bg-background p-3"><span className="block h-10 w-full border border-foreground/20" style={{ background: surface.hex || 'transparent' }} /><p className="mt-2 text-xs font-medium">{surface.label || surface.surface}</p><p className="font-mono text-[11px] text-muted-foreground">{surface.ral?.code || surface.hex}</p>{surface.ral?.name ? <p className="text-[11px] text-muted-foreground">{surface.ral.name}</p> : null}</div>)}
+            </div>
+          </section>
+        )}
 
         <section className="mt-10 border-t pt-6">
           <p className="eyebrow flex items-center gap-2"><MessageCircle className="size-4" />Комментарии · {data.comments.length}</p>

@@ -159,7 +159,7 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
   const error = task.status === 'error'
   const active = !done && !error
   const thumb = done ? task.image_url : task.photo_url
-  const to = done && task.room_id ? `/?panel=1&room=${encodeURIComponent(task.room_id)}` : '/cabinet'
+  const to = task.room_id ? `/room/${encodeURIComponent(task.room_id)}` : '/cabinet'
   const label = error ? 'Ошибка' : done ? 'Готово' : 'Идёт генерация'
   const labelClass = error ? 'text-destructive' : done ? 'text-emerald-700' : 'text-muted-foreground'
 

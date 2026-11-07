@@ -2,18 +2,20 @@ import { Routes, Route, useLocation } from 'react-router'
 import Home from './pages/Home'
 import Admin from './pages/Admin'
 import Cabinet from './pages/Cabinet'
+import Room from './pages/Room'
 import Share from './pages/Share'
 import { TaskDock, TasksProvider } from './components/TaskDock'
 
 export default function App() {
   const location = useLocation()
-  const showDock = location.pathname === '/' || location.pathname === '/cabinet'
+  const showDock = location.pathname === '/' || location.pathname === '/cabinet' || location.pathname.startsWith('/room/')
   return (
     <TasksProvider>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/cabinet" element={<Cabinet />} />
+        <Route path="/room/:id" element={<Room />} />
         <Route path="/s/:token" element={<Share />} />
       </Routes>
       {showDock && <TaskDock />}

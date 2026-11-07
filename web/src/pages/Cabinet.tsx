@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpRight, Download, Expand, LoaderCircle, LogOut, Search, Share2, Trash2, X } from 'lucide-react'
+import { Link } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import '../App.css'
 
@@ -57,6 +58,7 @@ export default function Cabinet() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [notice, setNotice] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
+  const [shareRenderId, setShareRenderId] = useState('')
   const [fullscreen, setFullscreen] = useState(false)
   const [error, setError] = useState('')
   const [buyConsent, setBuyConsent] = useState(false)
@@ -354,10 +356,13 @@ export default function Cabinet() {
             </div>
             {filteredGroups.length ? (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredGroups.map(group => <button key={group.roomId} type="button" onClick={() => openRoom(group)} className="group border bg-background text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                {filteredGroups.map(group => <div key={group.roomId} className="group relative border bg-background transition-colors hover:border-foreground">
+                  <Link to={`/room/${encodeURIComponent(group.roomId)}`} className="block text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="absolute left-2 top-2 bg-background/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider">{group.versions.length} {plural(group.versions.length, 'версия', 'версии', 'версий')}</span></div>
                   <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{group.latest.request_text || 'Базовый дизайн'}</p></div><span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel(group.latest.status)}</span></div><div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span className="flex items-center gap-2"><span>{group.credits} кр.</span></span></div></div>
-                </button>)}
+                  </Link>
+                  <button type="button" onClick={() => { setShareRenderId(group.latest.id); setShareOpen(true) }} className="absolute right-2 top-2 flex size-9 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Поделиться дизайном"><Share2 className="size-4" /></button>
+                </div>)}
               </div>
             ) : <div className="mt-8 border border-dashed p-10 text-center"><p className="display-title text-3xl">Пока пусто</p><p className="mt-3 text-sm text-muted-foreground">Создайте первый дизайн — он появится здесь вместе с версиями и сметой.</p><a href="/?panel=1" className="action-primary mt-6">Создать дизайн <ArrowUpRight className="size-4" /></a></div>}
           </div>
@@ -389,7 +394,7 @@ export default function Cabinet() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   {roomData.render?.image && <button type="button" onClick={() => setFullscreen(true)} className="action-secondary"><Expand className="size-4" />На весь экран</button>}
                   {roomData.render?.image && <a href={roomData.render.image} download="remontvision-design.jpg" className="action-secondary"><Download className="size-4" />Скачать</a>}
-                  {roomData.render?.image && <button type="button" onClick={() => setShareOpen(true)} className="action-secondary"><Share2 className="size-4" />Поделиться</button>}
+                  {roomData.render?.image && <button type="button" onClick={() => { setShareRenderId(roomData.render?.id || ''); setShareOpen(true) }} className="action-secondary"><Share2 className="size-4" />Поделиться</button>}
                   <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
                 </div>
@@ -410,7 +415,7 @@ export default function Cabinet() {
           <img src={roomData.render.image} alt="Дизайн комнаты на весь экран" className="max-h-full max-w-full object-contain" onClick={event => event.stopPropagation()} />
         </div>
       )}
-      <ShareDialog renderId={roomData?.render?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <ShareDialog renderId={shareRenderId || roomData?.render?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
     </div>
   )
 }

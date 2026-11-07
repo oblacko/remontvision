@@ -18,6 +18,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+import { Link } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { useTasks } from '@/components/TaskDock'
 
@@ -1229,6 +1230,7 @@ export function GenerationPanel({
               <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="action-secondary"><ArrowLeft className="size-4" />Изменить стиль</button>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
+                <Link to={`/room/${encodeURIComponent(current.roomId)}`} className="action-secondary min-h-14 px-6 text-base">Открыть комнату</Link>
                 <button type="button" onClick={runFinalReview} disabled={finalBusy} className="action-primary min-h-14 px-8 text-base">{finalBusy ? <><LoaderCircle className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <Check className="size-5" /></>}</button>
               </div>
             </div>
