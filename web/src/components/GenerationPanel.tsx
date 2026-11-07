@@ -879,7 +879,7 @@ export function GenerationPanel({
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={() => setStep('photo')} className="action-secondary"><ArrowLeft className="size-4" />Назад</button>
+              <button type="button" onClick={() => setStep('photo')} className="action-secondary hidden sm:inline-flex"><ArrowLeft className="size-4" />Назад</button>
               <button
                 type="button"
                 disabled={busy || !style || (concepts.length > 0 && !conceptKey)}
