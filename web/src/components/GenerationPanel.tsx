@@ -9,7 +9,6 @@ import {
   Clipboard,
   Download,
   Expand,
-  Info,
   LoaderCircle,
   Plus,
   RotateCcw,
@@ -1225,7 +1224,6 @@ export function GenerationPanel({
                     )
                   })}
                 </div>
-                <p className="mt-6 flex gap-2 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-4 shrink-0" />Подборка товаров и стоимость ориентировочные. Проверяйте размеры, цены и наличие перед покупкой.</p>
               </aside>
             </div>
 
