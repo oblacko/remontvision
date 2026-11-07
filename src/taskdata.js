@@ -3,7 +3,9 @@ import path from 'node:path';
 
 export function breakdownTask(row) {
   const breakdown = row?.meta?.breakdown;
-  if (!breakdown?.status) return null;
+  // Старые успешные разборы писали только { cost_usd, at } — считаем их готовыми.
+  const status = breakdown?.status || (breakdown?.at ? 'done' : null);
+  if (!status) return null;
   return {
     id: `breakdown:${row.id}`,
     kind: 'breakdown',
@@ -11,9 +13,9 @@ export function breakdownTask(row) {
     room_id: row.room_id,
     style: 'Разбор интерьера',
     room_type: row.room_type || null,
-    status: breakdown.status,
+    status,
     error: breakdown.error || null,
-    created_at: breakdown.started_at || breakdown.finished_at || row.created_at,
+    created_at: breakdown.started_at || breakdown.finished_at || breakdown.at || row.created_at,
     image_url: row.image_path ? `/renders/${path.basename(row.image_path)}` : null,
     photo_url: row.photo_path ? `/files/${path.basename(row.photo_path)}` : null,
   };

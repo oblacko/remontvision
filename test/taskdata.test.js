@@ -42,3 +42,16 @@ test('breakdownTask keeps done state and skips renders without breakdown meta', 
   assert.equal(breakdownTask({ id: 'render-3', meta: {} }), null);
   assert.equal(breakdownTask(null), null);
 });
+
+test('breakdownTask treats legacy cached breakdown as done', () => {
+  const legacy = breakdownTask({
+    id: 'render-4',
+    room_id: 'room-4',
+    style: 'Современный',
+    created_at: '2026-11-07T09:00:00.000Z',
+    meta: { breakdown: { cost_usd: 0.005, at: '2026-11-07T10:20:00.000Z' } },
+  });
+
+  assert.equal(legacy.status, 'done');
+  assert.equal(legacy.created_at, '2026-11-07T10:20:00.000Z');
+});
