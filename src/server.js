@@ -1449,6 +1449,46 @@ app.get('/api/rooms/:id', h(async (req, res) => {
   });
 }));
 
+app.get('/api/rooms/:id/versions', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const room = await q.getRoom(req.params.id);
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
+  const rows = await q.rendersForRoom(room.id);
+  res.json(rows.map(render => ({
+    id: render.id,
+    image: `/renders/${path.basename(render.image_path)}`,
+    status: render.status,
+    request_text: render.request_text || null,
+    created_at: render.created_at,
+    analysis: render.analysis || null,
+    art_direction: render.meta?.art_direction ? {
+      palette: render.meta.art_direction.palette || [],
+      focalPoint: render.meta.art_direction.focalPoint || '',
+      featureWall: render.meta.art_direction.featureWall || '',
+      lighting: render.meta.art_direction.lighting || '',
+      mood: render.meta.art_direction.mood || '',
+    } : null,
+    dimensions_estimate: render.meta?.room_dimensions_estimate || null,
+    lens: render.meta?.lens || null,
+    repair_scope: render.meta?.repair_scope || null,
+    design_direction: render.meta?.design_direction ? {
+      styleId: render.meta.design_direction.styleId || null,
+      conceptId: render.meta.design_direction.conceptId || null,
+      concept: render.meta.design_direction.concept || '',
+      mainMove: render.meta.design_direction.mainMove || null,
+      supportingMoves: render.meta.design_direction.supportingMoves || [],
+      focalPoint: render.meta.design_direction.focalPoint || '',
+      focalZone: render.meta.design_direction.focalZone || null,
+      quietAreas: render.meta.design_direction.quietAreas || [],
+      materialsStory: render.meta.design_direction.materialsStory || [],
+      materials: render.meta.design_direction.materials || '',
+      palette: render.meta.design_direction.palette || [],
+      compatibility: render.meta.design_direction.compatibility || 'ok',
+      avoid: render.meta.design_direction.avoid || [],
+    } : null,
+  })));
+}));
+
 // отдача файлов: с S3 — 302 на presigned URL, иначе с диска.
 // Фото комнат и рендеры доступны только владельцу комнаты; товары — публично.
 async function serveStored(req, res, dir, name, ownerQuery = null) {

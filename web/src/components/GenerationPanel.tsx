@@ -127,6 +127,7 @@ const emptyEditRef = (): EditRefDraft => ({
   id: crypto.randomUUID(), file: null, url: '', preview: null, name: '', text: '', drag: false,
 })
 const MAX_EDIT_BLOCKS = 3
+const editName = (text?: string | null) => text ? text.replace(/(^|\n)\d+\)\s*/g, '$1').trim() || 'Базовая версия' : 'Базовая версия'
 
 type RoomResult = {
   id: string; status: string; error?: string | null; notice?: string | null; style: string; budget: number; price_tier?: string;
@@ -216,6 +217,7 @@ export function GenerationPanel({
   onRequireLogin,
   onRefreshUser,
   onEdited,
+  onSelectVersion,
   isAuthed = false,
 }: {
   open: boolean
@@ -226,6 +228,7 @@ export function GenerationPanel({
   onRequireLogin: () => void
   onRefreshUser: () => void | Promise<void>
   onEdited?: () => void
+  onSelectVersion?: (renderId: string) => void
   isAuthed?: boolean
 }) {
   const { refresh: refreshTasks } = useTasks()
@@ -380,10 +383,15 @@ export function GenerationPanel({
         }
         const render = d.render
         if (render?.image) {
-          const next: Iteration = {
-            id: render.id,
-            request: render.request_text || 'Базовая версия',
-            image: render.image,
+          const makeIteration = (v: {
+            id: string; image: string; request_text?: string | null;
+            analysis?: Iteration['analysis']; art_direction?: ArtDirection | null;
+            dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null;
+            repair_scope?: RepairScope | null; design_direction?: DesignDirection | null;
+          }): Iteration => ({
+            id: v.id,
+            request: editName(v.request_text),
+            image: v.image,
             styleName: d.style || '',
             items: d.items || [],
             total: d.total || 0,
@@ -394,15 +402,38 @@ export function GenerationPanel({
             roomId: initialRoomId,
             ratio: 4 / 3,
             pricesAsOf: d.prices_as_of,
-            analysis: render.analysis || null,
-            artDirection: render.art_direction || null,
-            dimensionsEstimate: render.dimensions_estimate || null,
-            lens: render.lens || null,
-            repairScope: render.repair_scope || null,
-          }
-          setIterations([next])
-          setCurrentId(next.id)
-          setOpenHistory(next.id)
+            analysis: v.analysis || null,
+            artDirection: v.art_direction || null,
+            dimensionsEstimate: v.dimensions_estimate || null,
+            lens: v.lens || null,
+            repairScope: v.repair_scope || null,
+            designDirection: v.design_direction || null,
+          })
+          let versionRows: Array<Parameters<typeof makeIteration>[0]> = []
+          try {
+            const vr = await fetch(`/api/rooms/${initialRoomId}/versions`)
+            if (vr.ok) {
+              const list = await vr.json().catch(() => [])
+              versionRows = Array.isArray(list) ? list : []
+            }
+          } catch { /* fallback на один рендер */ }
+          const list = versionRows.length
+            ? versionRows.map(makeIteration)
+            : [makeIteration({
+                id: render.id,
+                image: render.image,
+                request_text: render.request_text,
+                analysis: render.analysis,
+                art_direction: render.art_direction,
+                dimensions_estimate: render.dimensions_estimate,
+                lens: render.lens,
+                repair_scope: render.repair_scope,
+                design_direction: render.design_direction,
+              })]
+          setIterations(list)
+          const current = list.find(item => item.id === render.id) || list[list.length - 1]
+          setCurrentId(current.id)
+          setOpenHistory(current.id)
           setStep('result')
         } else {
           setStep('photo')
@@ -1059,7 +1090,7 @@ export function GenerationPanel({
                     const visibleEdits = showAllHints ? quickEdits : quickEdits.slice(0, 3)
                     return (
                       <div key={item.id} className="border border-foreground/25">
-                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setShowAllHints(false); setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setShowAllHints(false); setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id); onSelectVersion?.(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                           <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span><span className="truncate">{item.request}</span></span>
                           <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
                         </button>
@@ -1102,7 +1133,7 @@ export function GenerationPanel({
                                 return (
                                   <div
                                     key={ref.id}
-                                    className={`relative rounded-none border border-dashed p-2 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/35'}`}
+                                    className={`relative border p-3 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/25'}`}
                                     onDragOver={(event) => { event.preventDefault(); updateEditRef(ref.id, { drag: true }) }}
                                     onDragLeave={() => updateEditRef(ref.id, { drag: false })}
                                     onDrop={(event) => {
@@ -1113,33 +1144,35 @@ export function GenerationPanel({
                                       if (/^https?:\/\//i.test(text)) setEditRefUrl(ref.id, text)
                                     }}
                                   >
-                                    <button type="button" onClick={() => removeEditRef(ref.id)} className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center text-destructive" aria-label="Удалить изменение"><X className="size-4" /></button>
+                                    <button type="button" onClick={() => removeEditRef(ref.id)} className="absolute right-2 top-2 flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><X className="size-4" /></button>
                                     {hasSource ? (
-                                      <div className="flex items-center gap-2 pr-8">
+                                      <div className="flex items-center gap-3 pr-8">
                                         {ref.preview ? (
-                                          <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border object-cover" />
+                                          <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border border-foreground/25 object-cover" />
                                         ) : (
-                                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border bg-muted text-[10px] text-muted-foreground">URL</a>
+                                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border border-foreground/25 bg-muted text-[10px] uppercase tracking-widest text-muted-foreground">URL</a>
                                         )}
                                         <div className="min-w-0 flex-1">
-                                          <p className="truncate text-xs">{ref.url || ref.name || 'Референс'}</p>
-                                          <p className="text-[11px] text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
+                                          <p className="truncate text-sm">{ref.url || ref.name || 'Референс'}</p>
+                                          <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
                                         </div>
-                                        <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center border" title="Заменить файл" aria-label="Заменить файл">
-                                          <Upload className="size-4 text-primary-text" />
-                                          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
-                                        </label>
-                                        <button type="button" onClick={() => pasteEditRef(ref.id)} className="flex size-9 shrink-0 items-center justify-center border" title="Вставить из буфера" aria-label="Вставить из буфера"><Clipboard className="size-4" /></button>
-                                        <button type="button" onClick={() => clearEditRefSource(ref.id)} className="flex size-9 shrink-0 items-center justify-center border text-destructive" title="Заменить источник" aria-label="Заменить источник"><X className="size-4" /></button>
+                                        <div className="flex shrink-0 items-stretch gap-px border bg-border">
+                                          <label className="flex w-10 cursor-pointer items-center justify-center bg-background transition-colors hover:bg-muted" title="Заменить файл" aria-label="Заменить файл">
+                                            <Upload className="size-4" />
+                                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
+                                          </label>
+                                          <button type="button" onClick={() => pasteEditRef(ref.id)} className="flex w-10 items-center justify-center bg-background transition-colors hover:bg-muted" title="Вставить из буфера" aria-label="Вставить из буфера"><Clipboard className="size-4" /></button>
+                                          <button type="button" onClick={() => clearEditRefSource(ref.id)} className="flex w-10 items-center justify-center bg-background transition-colors hover:bg-muted" title="Заменить источник" aria-label="Заменить источник"><X className="size-4" /></button>
+                                        </div>
                                       </div>
                                     ) : (
-                                      <div className="grid grid-cols-2 gap-2 pr-8 sm:flex sm:flex-wrap">
-                                        <label className="inline-flex min-h-10 min-w-0 cursor-pointer items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
-                                          <Upload className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Выбрать файл</span>
+                                      <div className="grid grid-cols-2 gap-px border bg-border pr-8">
+                                        <label className="inline-flex min-h-10 min-w-0 cursor-pointer items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
+                                          <Upload className="size-4 shrink-0" /> <span className="min-w-0 break-words">Выбрать файл</span>
                                           <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
                                         </label>
-                                        <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 min-w-0 items-center justify-center gap-2 border px-2 text-[11px] sm:px-3 sm:text-xs">
-                                          <Clipboard className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">Вставить из буфера</span>
+                                        <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 min-w-0 items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
+                                          <Clipboard className="size-4 shrink-0" /> <span className="min-w-0 break-words">Вставить из буфера</span>
                                         </button>
                                       </div>
                                     )}
@@ -1148,14 +1181,14 @@ export function GenerationPanel({
                                       onChange={(event) => updateEditRef(ref.id, { text: event.target.value })}
                                       rows={4}
                                       placeholder="Введите текст изменения"
-                                      className="mt-2 min-h-20 w-full min-w-0 border bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20"
+                                      className="mt-3 min-h-20 w-full min-w-0 border border-foreground/25 bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground focus:ring-2 focus:ring-ring/20"
                                     />
                                   </div>
                                 )
                               })}
                             </div>
-                            <button type="button" onClick={addEditBlock} disabled={editRefs.length >= MAX_EDIT_BLOCKS} className="mt-3 inline-flex min-h-10 items-center gap-2 border border-dashed border-foreground/35 px-3 text-xs transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                              <Pencil className="size-4 text-primary-text" /> Внести изменения
+                            <button type="button" onClick={addEditBlock} disabled={editRefs.length >= MAX_EDIT_BLOCKS} className="mt-3 inline-flex min-h-10 items-center gap-2 border border-foreground px-3 text-xs transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                              <Pencil className="size-4" /> Внести изменения
                             </button>
                             <div className="mt-3">
                               <button
@@ -1163,7 +1196,7 @@ export function GenerationPanel({
                                 disabled={!editRefs.some(ref => ref.text.trim() || ref.file || ref.url)}
                                 onClick={() => {
                                   const textBlocks = editRefs.filter(ref => !ref.file && !ref.url && ref.text.trim())
-                                    .map((ref, index) => `${index + 1}) ${ref.text.trim()}`)
+                                    .map(ref => ref.text.trim())
                                     .join('\n')
                                   const refs = editRefs.filter(ref => ref.file || ref.url).map(ref => ({
                                     file: ref.file || undefined,
@@ -1172,7 +1205,7 @@ export function GenerationPanel({
                                   }))
                                   startGeneration(textBlocks || 'Применить правки по референсам', item.styleName, { parentId: item.id, refs })
                                 }}
-                                className="inline-flex min-h-11 items-center justify-center gap-2 border border-foreground px-4 text-sm transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                                className="action-primary w-full"
                               >
                                 Перегенерировать <RotateCcw className="size-4" />
                               </button>

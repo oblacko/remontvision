@@ -42,6 +42,7 @@ const plural = (n: number, one: string, few: string, many: string) => {
   return many
 }
 const statusLabel = (status: string) => status === 'done' ? 'готово' : status === 'error' ? 'ошибка' : status === 'queued' ? 'в очереди' : status
+const editName = (text: string | null | undefined, fallback: string) => text ? text.replace(/(^|\n)\d+\)\s*/g, '$1').trim() || fallback : fallback
 
 export default function Cabinet() {
   const [me, setMe] = useState<Me | null>(null)
@@ -356,10 +357,10 @@ export default function Cabinet() {
             </div>
             {filteredGroups.length ? (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredGroups.map(group => <div key={group.roomId} className="group relative border bg-background transition-colors hover:border-foreground">
+                {filteredGroups.map(group => <div key={group.roomId} className="group relative min-w-0 border bg-background transition-colors hover:border-foreground">
                   <Link to={`/room/${encodeURIComponent(group.roomId)}`} className="block text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="absolute left-2 top-2 bg-background/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider">{group.versions.length} {plural(group.versions.length, 'версия', 'версии', 'версий')}</span></div>
-                  <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{group.latest.request_text || 'Базовый дизайн'}</p></div><span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel(group.latest.status)}</span></div><div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span className="flex items-center gap-2"><span>{group.credits} кр.</span></span></div></div>
+                  <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{editName(group.latest.request_text, 'Базовый дизайн')}</p></div><span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel(group.latest.status)}</span></div><div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span className="flex items-center gap-2"><span>{group.credits} кр.</span></span></div></div>
                   </Link>
                   <button type="button" onClick={() => { setShareRenderId(group.latest.id); setShareOpen(true) }} className="absolute right-2 top-2 flex size-9 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Поделиться дизайном"><Share2 className="size-4" /></button>
                 </div>)}

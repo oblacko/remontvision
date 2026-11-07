@@ -77,6 +77,10 @@ export const q = {
   renderPathsForRoom: roomId =>
     pool.query(`SELECT image_path, shell_path FROM renders WHERE room_id = $1 AND (image_path IS NOT NULL OR shell_path IS NOT NULL)`, [roomId])
       .then(r => r.rows.flatMap(row => [row.image_path, row.shell_path]).filter(Boolean)),
+  rendersForRoom: roomId =>
+    pool.query(`SELECT id, status, request_text, image_path, created_at, analysis, meta
+                FROM renders WHERE room_id = $1 AND status = 'done' AND image_path IS NOT NULL
+                ORDER BY created_at ASC`, [roomId]).then(r => r.rows),
   setRoomStatus: (status, id) =>
     pool.query(`UPDATE rooms SET status = $1, error = NULL, notice = NULL, updated_at = now() WHERE id = $2`, [status, id]),
   setRoomError: (error, id) =>

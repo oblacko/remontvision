@@ -97,9 +97,9 @@ export default function Room() {
   const [fullscreen, setFullscreen] = useState(false)
   const [finalBusy, setFinalBusy] = useState(false)
 
-  const loadRoom = useCallback(async () => {
+  const loadRoom = useCallback(async (renderId?: string) => {
     try {
-      const r = await fetch(`/api/rooms/${id}`)
+      const r = await fetch(`/api/rooms/${id}${renderId ? `?render_id=${encodeURIComponent(renderId)}` : ''}`)
       if (r.status === 401) { setError('Войдите, чтобы открыть комнату'); return null }
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error || 'Комната не найдена'); return null }
@@ -228,6 +228,7 @@ export default function Room() {
                   onRequireLogin={() => navigate('/')}
                   onRefreshUser={async () => {}}
                   onEdited={() => { void loadRoom() }}
+                  onSelectVersion={(renderId) => { void loadRoom(renderId) }}
                   isAuthed
                 />
               )}

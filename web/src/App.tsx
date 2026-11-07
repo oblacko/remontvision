@@ -8,7 +8,7 @@ import { TaskDock, TasksProvider } from './components/TaskDock'
 
 export default function App() {
   const location = useLocation()
-  const showDock = location.pathname === '/' || location.pathname === '/cabinet' || location.pathname.startsWith('/room/')
+  const showDock = location.pathname === '/' || location.pathname === '/cabinet'
   return (
     <TasksProvider>
       <Routes>
