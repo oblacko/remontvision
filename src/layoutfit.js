@@ -1,9 +1,16 @@
 // Детерминированная проверка расстановки ДО промта: мебель должна влезать.
+// Правило по ширине комнаты:
+//  - ширина >= 4.0 м: поперёк можно до 3 предметов (два у стен + центральный);
+//  - ширина < 4.0 м: только 2 предмета, сумма их глубин <= 1.3 м; центральный стол убираем.
 // Не доверяем арифметике LLM — считаем сами по size_cm.
 
 const FLOORLESS = new Set(['rug', 'light', 'decor', 'decor_art', 'plant', 'mirror', 'curtain', 'textile']);
 const CENTRAL = new Set(['coffee_table', 'dining_table']);
 const STORAGE = new Set(['storage', 'sideboard', 'cabinet', 'wardrobe', 'desk', 'office_chair', 'dining_chair', 'bench']);
+const MAIN = new Set(['sofa', 'bed']);
+
+export const WIDE_ROOM_M = 4.0;
+export const NARROW_MAX_DEPTH_SUM_CM = 130;
 
 export function parseSizeCm(value) {
   const match = String(value || '').match(/(\d+(?:[.,]\d+)?)\s*[x×х]\s*(\d+(?:[.,]\d+)?)/i);
@@ -25,19 +32,23 @@ const crossSection = items => {
   const opposing = deep.slice(0, 2);
   const central = items.find(item => CENTRAL.has(String(item?.type || '')));
   const centralDepth = central ? depthOf(central) : 0;
+  const opposingSumCm = opposing.reduce((sum, entry) => sum + entry.depth, 0);
   return {
-    neededCm: opposing.reduce((sum, entry) => sum + entry.depth, 0) + centralDepth + 60,
-    opposing: opposing.map(entry => entry.item.label || entry.item.type),
-    central: central?.label || null,
+    opposingItems: opposing.map(entry => entry.item),
+    opposingSumCm,
+    centralDepthCm: centralDepth,
+    neededCm: opposingSumCm + centralDepth + 60,
+    central: central || null,
   };
 };
 
 export function fitLayoutPlan({ plan, dimensions, roomType = '', artDirection = '' } = {}) {
   const width = Number(dimensions?.width);
   if (!plan?.items?.length || !Number.isFinite(width) || width <= 0) {
-    return { plan, fit: null, dropped: [] };
+    return { plan, artDirection, fit: null, dropped: [] };
   }
   const widthCm = Math.round(width * 100);
+  const wide = width >= WIDE_ROOM_M;
   const items = [...plan.items];
   const dropped = [];
   const drop = item => {
@@ -45,45 +56,53 @@ export function fitLayoutPlan({ plan, dimensions, roomType = '', artDirection = 
     if (index >= 0) { items.splice(index, 1); dropped.push(item); }
   };
 
-  // В узкой гостиной центральный стол не ставим в принципе (проход важнее).
-  const narrowLiving = /гостин|зал|living/i.test(String(roomType)) && width < 3.0;
-  if (narrowLiving) {
+  // В комнате уже 4 м центральный стол — это третий предмет поперёк; убираем.
+  if (!wide) {
     for (const item of items.filter(entry => CENTRAL.has(String(entry.type || '')))) drop(item);
   }
 
+  const acceptedBy = section => wide
+    ? section.neededCm <= widthCm
+    : section.opposingSumCm <= NARROW_MAX_DEPTH_SUM_CM && section.neededCm <= widthCm;
+
   let section = crossSection(items);
-  if (section.neededCm > widthCm) {
-    for (const item of items.filter(entry => CENTRAL.has(String(entry.type || '')))) {
-      drop(item);
-      section = crossSection(items);
-      if (section.neededCm <= widthCm) break;
-    }
+  while (!acceptedBy(section)) {
+    const central = items.find(entry => CENTRAL.has(String(entry.type || '')));
+    if (central) { drop(central); section = crossSection(items); continue; }
+
+    const shallowOpposing = section.opposingItems
+      .slice()
+      .sort((a, b) => depthOf(a) - depthOf(b))
+      .find(entry => !MAIN.has(String(entry.type || '')) && (STORAGE.has(String(entry.type || '')) || String(entry.type) === 'armchair'));
+    const candidate = shallowOpposing
+      || items.filter(entry => (STORAGE.has(String(entry.type || '')) || String(entry.type) === 'armchair') && !MAIN.has(String(entry.type || '')))
+        .sort((a, b) => depthOf(b) - depthOf(a))[0];
+    if (!candidate) break;
+    drop(candidate);
+    section = crossSection(items);
   }
 
-  if (section.neededCm > widthCm) {
-    const candidates = items
-      .filter(item => STORAGE.has(String(item?.type || '')))
-      .sort((a, b) => depthOf(b) - depthOf(a));
-    for (const item of candidates) {
-      drop(item);
-      section = crossSection(items);
-      if (section.neededCm <= widthCm) break;
-    }
-  }
-
-  const accepted = section.neededCm <= widthCm;
-  const constraints = dropped.map(item => CENTRAL.has(String(item?.type || ''))
-    ? `Use one compact side table instead of a central ${item.type === 'dining_table' ? 'dining' : 'coffee'} table: the ${width} m room width leaves no 60 cm passage with it.`
-    : `Omit ${item.label || item.type}: the ${width} m room width cannot fit it together with a 60 cm passage.`);
-  if (!accepted) constraints.push(`The room is only ${width} m wide: keep at most one deep furniture piece and a 60 cm passage.`);
-
+  const accepted = acceptedBy(section);
   const centralDropped = dropped.some(item => CENTRAL.has(String(item?.type || '')));
+  const constraints = [];
+  if (centralDropped) {
+    constraints.push(`Use one compact side table instead of a central coffee or dining table: the ${width} m room leaves no 60 cm passage with a third piece.`);
+  }
+  if (!wide) {
+    constraints.push(`With a ${width} m width, keep only two furniture pieces across the room and their total depth under 1.3 m.`);
+  }
+  for (const item of dropped.filter(entry => !CENTRAL.has(String(entry.type || '')))) {
+    constraints.push(`Omit ${item.label || item.type}: the ${width} m room cannot fit it with a 60 cm passage.`);
+  }
+  if (!accepted) constraints.push(`The room is only ${width} m wide: keep fewer deep furniture pieces and a 60 cm passage.`);
+
   const replaceRu = value => String(value || '')
     .replace(/журнальн[а-яё]*\s+столик[а-яё]*/gi, 'компактный приставной столик')
     .replace(/обеденн[а-яё]*\s+стол[а-яё]*/gi, 'компактный приставной столик');
   const replaceEn = value => String(value || '')
     .replace(/a low dark stone table in front of it/gi, 'a compact side table')
     .replace(/\b(coffee|dining|stone|low dark stone) table\b/gi, 'compact side table');
+
   const nextPlan = centralDropped
     ? {
         ...plan,
@@ -102,9 +121,11 @@ export function fitLayoutPlan({ plan, dimensions, roomType = '', artDirection = 
     fit: {
       widthM: width,
       neededCm: Math.round(section.neededCm),
+      opposingSumCm: Math.round(section.opposingSumCm),
+      allowedPieces: wide ? 3 : 2,
       accepted,
-      opposing: section.opposing,
-      central: section.central,
+      opposing: section.opposingItems.map(item => item.label || item.type),
+      central: section.central?.label || null,
       dropped: dropped.map(item => item.label || item.type),
     },
     dropped,

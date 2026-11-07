@@ -58,3 +58,36 @@ test('no dimensions leaves the plan untouched', () => {
   assert.equal(result.fit, null);
   assert.equal(result.plan.items.length, source.items.length);
 });
+
+test('under 4 m allows only two pieces and caps their total depth at 1.3 m', () => {
+  const narrow = fitLayoutPlan({
+    plan: { items: [
+      { type: 'sofa', label: 'Диван', size_cm: '200x90' },
+      { type: 'storage', label: 'Тумба', size_cm: '120x45' },
+      { type: 'coffee_table', label: 'Стол', size_cm: '60x60' },
+    ] },
+    dimensions: { width: 3.9, length: 5 },
+    roomType: 'Гостиная (зал)',
+  });
+
+  assert.equal(narrow.fit.allowedPieces, 2);
+  assert.equal(narrow.fit.opposingSumCm, 90);
+  assert.ok(!narrow.plan.items.some(item => item.type === 'storage'));
+  assert.ok(!narrow.plan.items.some(item => item.type === 'coffee_table'));
+});
+
+test('from 4 m three pieces across the width are allowed', () => {
+  const wide = fitLayoutPlan({
+    plan: { items: [
+      { type: 'sofa', label: 'Диван', size_cm: '200x90' },
+      { type: 'storage', label: 'Тумба', size_cm: '120x40' },
+      { type: 'coffee_table', label: 'Стол', size_cm: '60x60' },
+    ] },
+    dimensions: { width: 4.0, length: 5 },
+    roomType: 'Гостиная (зал)',
+  });
+
+  assert.equal(wide.fit.allowedPieces, 3);
+  assert.ok(wide.plan.items.some(item => item.type === 'coffee_table'));
+  assert.ok(wide.plan.items.some(item => item.type === 'storage'));
+});

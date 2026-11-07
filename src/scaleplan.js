@@ -54,11 +54,10 @@ function livingPlan({ width, height }) {
     lines.push('Living room: use the width for clear seating and dining zones; a rug and separate lighting layers may divide the space without blocking the window or door.');
   }
   lines.push('Keep a minimum 60 cm circulation path and a 35–45 cm gap between sofa and coffee table.');
-  if (width < 3.0) {
-    lines.push('No full dining zone: a dining table plus chairs and a 60 cm path cannot fit across this width. Allow only a compact folding table if it still leaves 60 cm.');
-    lines.push('Omit a central coffee table in a narrow living room; use one small side table instead.');
+  if (width < 4.0) {
+    lines.push('Room under 4 m wide: keep at most two furniture pieces across the width; their total depth must be no more than 1.3 m. No central coffee or dining table.');
   } else {
-    lines.push('Add a dining table only if its width plus a 90 cm chair zone fits across the room alongside the seating; otherwise omit it and keep the living zone.');
+    lines.push('Room 4 m or wider: up to three furniture pieces across the width are allowed — two against the walls plus one central table.');
   }
   lines.push('Check the sum: furniture along one wall + the 60 cm path must not exceed the room width; if it does, remove or shrink an item.');
   if (height < 2.6) lines.push('Low ceiling: no pendant over circulation, no oversized shelving, no floor-to-ceiling cabinetry, and keep the ceiling plane unaltered.');
