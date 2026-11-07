@@ -801,7 +801,7 @@ export function GenerationPanel({
                 <p className="eyebrow">Тип комнаты</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{photo ? 'Чтобы в дизайне не появились предметы из другого помещения.' : 'Можно выбрать заранее — сначала загрузите фото.'}</p>
                 <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                  {roomTypes.map(type => <button key={type} type="button" disabled={!photo} aria-pressed={roomType === type} onClick={() => setRoomType(type)} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
+                  {roomTypes.map(type => <button key={type} type="button" disabled={!photo} aria-pressed={roomType === type} onClick={() => setRoomType(type)} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-foreground/60 ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
                 </div>
               </div>
               <div className="mt-4" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
@@ -850,13 +850,15 @@ export function GenerationPanel({
                   const disabled = !style || level === 'conflict'
                   const selected = conceptKey === concept.id
                   return (
-                    <button key={concept.id} type="button" disabled={disabled} aria-pressed={selected} onClick={() => setConceptKey(concept.id)} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
-                      <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                        {concept.name}
-                        {selected ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                    <button key={concept.id} type="button" disabled={disabled} aria-pressed={selected} onClick={() => setConceptKey(concept.id)} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed sm:w-auto ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                      <span className={`block ${disabled ? 'opacity-60' : ''}`}>
+                        <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                          {concept.name}
+                          {selected ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-muted-foreground">{concept.main_move}</span>
+                        <span className="mt-1 block text-[10px] uppercase tracking-wide text-muted-foreground">{level === 'weaken' ? 'ослабленная форма' : level === 'conflict' ? 'несовместимо со стилем' : 'совместимо'}</span>
                       </span>
-                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{concept.main_move}</span>
-                      <span className="mt-1 block text-[10px] uppercase tracking-wide text-muted-foreground">{level === 'weaken' ? 'ослабленная форма' : level === 'conflict' ? 'несовместимо со стилем' : 'совместимо'}</span>
                     </button>
                   )
                 })}
