@@ -1612,7 +1612,10 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
     budget: room.budget,
     dimensions: render.meta?.room_dimensions_estimate || null,
   });
-  if (!result) return res.status(502).json({ error: 'Не удалось собрать разбор интерьера' });
+  if (!result) {
+    log({ event: 'breakdown_error', render_id: render.id, user_id: req.user.id });
+    return res.status(502).json({ error: 'Не удалось собрать разбор интерьера' });
+  }
   const analysis = { ...(render.analysis || {}), breakdown: result.breakdown };
   await q.setRenderAnalysis(render.id, analysis);
   const meta = {

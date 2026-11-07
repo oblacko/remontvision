@@ -304,6 +304,7 @@ export function GenerationPanel({
     handledPendingEdit.current = pendingEdit.id
     setEditRefs(prev => prev.length >= MAX_EDIT_BLOCKS ? prev : [...prev, { ...emptyEditRef(), text: pendingEdit.text }])
     onPendingEditHandled?.()
+    requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
   }, [pendingEdit, onPendingEditHandled])
 
   useEffect(() => () => { urls.current.forEach((url) => URL.revokeObjectURL(url)) }, [])

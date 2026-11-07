@@ -87,14 +87,14 @@ test('buildBreakdownUser passes known inputs and omits unknown ones', () => {
     roomType: 'Кухня',
     style: 'Современный минимализм',
     priceTier: 'comfort',
-    budget: 150000,
+    budget: 150,
     dimensions: { width: 3, length: 4, height: 2.7 },
   });
 
   assert.match(user, /Тип изображения: сгенерированный дизайн/);
   assert.match(user, /Тип комнаты: Кухня/);
   assert.match(user, /Стиль: Современный минимализм/);
-  assert.match(user, /Бюджет: 150000/);
+  assert.match(user, /Бюджет: 150 тыс. ₽/);
   assert.match(user, /3 × 4 × 2,7 м/);
   assert.doesNotMatch(user, /Город:/);
 });

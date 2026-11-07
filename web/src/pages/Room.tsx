@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, ArrowRight, ChevronDown, Download, Expand, LoaderCircle, Share2, X, Zap } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
@@ -151,20 +151,30 @@ export default function Room() {
   const render = room?.render || null
   const image = render?.image || room?.photo_url || null
   const breakdown = render?.analysis?.breakdown || null
+  const selectedRenderId = render?.id || ''
+  const selectedRenderRef = useRef('')
+
+  useEffect(() => {
+    selectedRenderRef.current = selectedRenderId
+    setBreakdownBusy(false)
+    setBreakdownError('')
+  }, [selectedRenderId])
 
   const runBreakdown = async () => {
     if (!render?.id || breakdownBusy) return
+    const targetId = render.id
     setBreakdownBusy(true)
     setBreakdownError('')
     try {
-      const r = await fetch(`/api/renders/${render.id}/breakdown`, { method: 'POST' })
+      const r = await fetch(`/api/renders/${targetId}/breakdown`, { method: 'POST' })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || String(r.status))
-      await loadRoom(render.id)
+      if (selectedRenderRef.current !== targetId) return
+      await loadRoom(targetId)
     } catch (e) {
-      setBreakdownError(e instanceof Error ? e.message : 'Не удалось собрать разбор')
+      if (selectedRenderRef.current === targetId) setBreakdownError(e instanceof Error ? e.message : 'Не удалось собрать разбор')
     } finally {
-      setBreakdownBusy(false)
+      if (selectedRenderRef.current === targetId) setBreakdownBusy(false)
     }
   }
 
@@ -245,35 +255,33 @@ export default function Room() {
               ))}
             </nav>
 
-            <div className="mt-6 min-w-0">
-              {tab === 'editor' && (
-                <GenerationPanel
-                  key={id}
-                  open
-                  inline
-                  initialRoomId={id}
-                  onClose={() => {}}
-                  onRequireLogin={() => navigate('/')}
-                  onRefreshUser={async () => {}}
-                  onEdited={() => { void loadRoom() }}
-                  onSelectVersion={(renderId) => { void loadRoom(renderId) }}
-                  pendingEdit={pendingEdit}
-                  onPendingEditHandled={() => setPendingEdit(null)}
-                  isAuthed
-                />
-              )}
+            <div className={tab === 'editor' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
+              <GenerationPanel
+                key={id}
+                open
+                inline
+                initialRoomId={id}
+                onClose={() => {}}
+                onRequireLogin={() => navigate('/')}
+                onRefreshUser={async () => {}}
+                onEdited={() => { void loadRoom() }}
+                onSelectVersion={(renderId) => { void loadRoom(renderId) }}
+                pendingEdit={pendingEdit}
+                onPendingEditHandled={() => setPendingEdit(null)}
+                isAuthed
+              />
+            </div>
 
-              {tab === 'design' && (
-                <DesignTab
-                  render={render}
-                  breakdown={breakdown}
-                  busy={breakdownBusy}
-                  error={breakdownError}
-                  onRun={() => void runBreakdown()}
-                  onAddChange={addChangeToEditor}
-                  onOpenEditor={() => setTab('editor')}
-                />
-              )}
+            <div className={tab === 'design' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
+              <DesignTab
+                render={render}
+                breakdown={breakdown}
+                busy={breakdownBusy}
+                error={breakdownError}
+                onRun={() => void runBreakdown()}
+                onAddChange={addChangeToEditor}
+                onOpenEditor={() => setTab('editor')}
+              />
             </div>
           </div>
         )}
@@ -305,9 +313,12 @@ function DesignTab({ render, breakdown, busy, error, onRun, onAddChange, onOpenE
   const changeCards = breakdown?.sections.find(section => section.key === 'change')?.cards || []
 
   const runNextAction = () => {
-    if (breakdown?.next_action?.kind === 'change') {
-      onAddChange(changeCards[0]?.edit_instruction || changeCards[0]?.title || '')
-      return
+    const kind = breakdown?.next_action?.kind
+    if (kind === 'change' || kind === 'apply') {
+      const instruction = changeCards.find(card => card.edit_instruction)?.edit_instruction
+        || changeCards[0]?.title
+        || ''
+      if (instruction) { onAddChange(instruction); return }
     }
     onOpenEditor()
   }

@@ -14,7 +14,10 @@ const SECTION_KEYS = Object.keys(SECTION_TITLES);
 const NEXT_KINDS = new Set(['sizes', 'materials', 'change', 'apply']);
 const CARD_LIMITS = { buy: 8, change: 3, default: 5 };
 
-const text = (value, max = 300) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+const text = (value, max = 300) => {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value).replace(/\s+/g, ' ').trim().slice(0, max);
+};
 const list = (value, max = 5) => (Array.isArray(value) ? value : [])
   .map(item => text(item, 400))
   .filter(Boolean)
@@ -46,7 +49,7 @@ export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без ma
 - Все тексты — на русском. Только JSON.`;
 
 const PROGRESSIVE_RULES = `Формат ответа — маршрут для интерфейса, а не статья.
-Сначала 1–3 самых полезных вывода, затем пять раскрываемых разделов. Заголовки описательные, без кликбейта. В карточке сначала вывод, затем одна строка «зачем открывать», внутри — объяснение и конкретный шаг.
+Сначала 1–3 самых полезных вывода, затем до пяти раскрываемых разделов (только непустые). Заголовки описательные, без кликбейта. В карточке сначала вывод, затем одна строка «зачем открывать», внутри — объяснение и конкретный шаг.
 Не дублируй карточки первого уровня внутри разделов: связывай их с подробностью.`;
 
 export function buildBreakdownSystem() {
@@ -72,7 +75,7 @@ export function buildBreakdownUser({ roomType, style, priceTier, budget, dimensi
     roomType ? `Тип комнаты: ${roomType}.` : '',
     style ? `Стиль: ${style}.` : '',
     priceTier ? `Класс материалов: ${priceTier}.` : '',
-    budget != null ? `Бюджет: ${Math.round(Number(budget))}.` : '',
+    budget != null ? `Бюджет: ${Math.round(Number(budget))} тыс. ₽.` : '',
     dims ? `Размеры (оценка по изображению): ${dims}.` : '',
     'Не выдумывай отсутствующие данные. Если данных не хватает, выполни доступный разбор и задай до 3 вопросов в конце.',
   ].filter(Boolean).join('\n');
@@ -91,7 +94,7 @@ function normalizeGenericCard(raw) {
 }
 
 function normalizeBuyCard(raw) {
-  const name = text(raw?.name, 120);
+  const name = text(raw?.name, 120) || text(raw?.title, 120);
   if (!name) return null;
   return {
     name,

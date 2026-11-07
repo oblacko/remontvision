@@ -52,7 +52,20 @@ export async function breakdownInterior({
     return null;
   }
 
-  const breakdown = normalizeBreakdown(parsed);
+  let breakdown = normalizeBreakdown(parsed);
+  // Непустой, но непригодный ответ — пробуем совместимый vision-вызов ещё раз.
+  if (!breakdown && !vision) {
+    try {
+      const { visionJson } = await import('./openrouter.js');
+      const retry = await visionJson({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL });
+      const retried = normalizeBreakdown(retry?.parsed || {});
+      if (retried) {
+        breakdown = retried;
+        parsed = retry?.parsed || parsed;
+        cost = (cost || 0) + (retry?.cost || 0);
+      }
+    } catch { /* остаётся исходный результат */ }
+  }
   if (!breakdown) return null;
   return { breakdown, cost: cost ?? null, parsed };
 }
