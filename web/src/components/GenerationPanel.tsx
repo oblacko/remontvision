@@ -309,6 +309,12 @@ export function GenerationPanel({
   }, [])
 
   useEffect(() => {
+    if (step !== 'style' || !conceptKey) return
+    const el = document.querySelector(`[data-concept-id="${conceptKey}"]`)
+    if (el) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [conceptKey, step])
+
+  useEffect(() => {
     fetch('/api/room-types')
       .then(r => r.ok ? r.json() : null)
       .then(list => {
@@ -720,6 +726,13 @@ export function GenerationPanel({
     if (photoInput.current) photoInput.current.value = ''
   }
 
+  const pickCompatibleConcept = (styleKey: string | null) => {
+    if (!styleKey || !concepts.length) return null
+    const compatible = concepts.filter(concept => (compatibility[concept.id]?.[styleKey] || 'ok') !== 'conflict')
+    if (!compatible.length) return null
+    return compatible[Math.floor(Math.random() * compatible.length)].id
+  }
+
   const activeStep = stepIndex(step)
   const genStages = genMode === 'edit' ? EDIT_GEN_STAGES : [
     ...BASE_GEN_STAGES.slice(0, 1),
@@ -822,17 +835,15 @@ export function GenerationPanel({
             {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите одно направление — оно задаст палитру, материалы и свет.</p>}
             <div className="mt-8 flex snap-x snap-mandatory gap-px overflow-x-auto border bg-border sm:grid sm:grid-cols-3 sm:overflow-visible lg:grid-cols-5">
               {stylePresets.map((item) => (
-                <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { setStyle(item.name); setConceptKey(null) }} className={`group relative w-60 shrink-0 snap-start bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:w-auto ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
-                  <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
-                    <img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
-                    {style === item.name && (
-                      <span className="absolute right-2 top-2 flex size-6 items-center justify-center bg-primary text-primary-foreground">
-                        <Check className="size-4" />
-                      </span>
-                    )}
-                  </span>
-                  <span className={`flex min-h-12 items-center gap-2 px-3 text-sm font-medium ${style === item.name ? 'text-primary-text' : ''}`}>
-                    {item.name}
+                <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { const nextStyle = item.name; const changing = style !== nextStyle; setStyle(nextStyle); if (changing || !conceptKey) setConceptKey(pickCompatibleConcept(item.key)) }} className={`group relative w-60 shrink-0 snap-start bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:w-auto ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                  <span className={`block ${style === item.name ? '' : 'opacity-60'}`}>
+                    <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
+                      <img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                    </span>
+                    <span className={`flex min-h-12 items-center justify-between gap-2 px-3 text-sm font-medium ${style === item.name ? 'text-primary-text' : ''}`}>
+                      {item.name}
+                      {style === item.name ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -850,8 +861,8 @@ export function GenerationPanel({
                   const disabled = !style || level === 'conflict'
                   const selected = conceptKey === concept.id
                   return (
-                    <button key={concept.id} type="button" disabled={disabled} aria-pressed={selected} onClick={() => setConceptKey(concept.id)} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed sm:w-auto ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
-                      <span className={`block ${disabled ? 'opacity-60' : ''}`}>
+                    <button key={concept.id} data-concept-id={concept.id} type="button" disabled={disabled} aria-pressed={selected} onClick={() => setConceptKey(concept.id)} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed sm:w-auto ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                      <span className={`block ${selected ? '' : 'opacity-60'}`}>
                         <span className="flex items-center justify-between gap-2 text-sm font-medium">
                           {concept.name}
                           {selected ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
