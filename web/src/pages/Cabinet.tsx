@@ -5,15 +5,10 @@ import '../App.css'
 
 type Me = { email: string; balance: number }
 type Consents = { offer: boolean; personal: boolean; transfer: boolean }
-type CostBreakdown = {
-  art_direction?: number | null; cleanup?: number | null; design?: number | null; design_retry?: number | null;
-  architect_review?: number | null; architecture_qa?: number | null; product_qa?: number | null; render_analysis?: number | null; failed?: number | null;
-}
 type GenRow = {
   id: string; room_id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
   created_at: string; finished_at: string | null; request_text: string | null;
   credits_spent: number; image_url: string | null; photo_url: string | null;
-  cost_usd?: number | null; cost_breakdown?: CostBreakdown | null;
 }
 type CreditRow = { id: number; delta: number; reason: string; payment_id: number | null; render_id: string | null; note: string | null; created_at: string }
 type Pack = { id: string; title: string; credits: number; price_kopecks: number }
@@ -23,10 +18,10 @@ type ProductMatch = { item: { label: string; category: string }; offers: Product
 type RoomAnalysis = { products?: ProductMatch[] } | null
 type RoomData = {
   id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; keep_furniture?: boolean; use_catalog?: boolean; status: string; error: string | null;
-  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; cost_usd?: number | null; cost_breakdown?: CostBreakdown | null; analysis?: RoomAnalysis } | null;
+  photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; analysis?: RoomAnalysis } | null;
   items: GenItem[]; total: number; prices_as_of: string | null;
 }
-type RoomGroup = { roomId: string; style: string; versions: GenRow[]; latest: GenRow; image: string | null; credits: number; costUsd: number }
+type RoomGroup = { roomId: string; style: string; versions: GenRow[]; latest: GenRow; image: string | null; credits: number }
 
 const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
@@ -46,14 +41,6 @@ const plural = (n: number, one: string, few: string, many: string) => {
   return many
 }
 const statusLabel = (status: string) => status === 'done' ? 'готово' : status === 'error' ? 'ошибка' : status === 'queued' ? 'в очереди' : status
-const usd = (value?: number | null) => typeof value === 'number' ? `$${value.toFixed(4)}` : '—'
-const COST_LABELS: Record<string, string> = {
-  art_direction: 'арт-директор', cleanup: 'очистка', design: 'дизайн', design_retry: 'дизайн-ретрай',
-  architect_review: 'разбор архитектора', architecture_qa: 'QA архитектуры', product_qa: 'QA товара', render_analysis: 'анализ рендера', failed: 'ошибка запроса',
-}
-const costRows = (breakdown?: CostBreakdown | null) => Object.entries(breakdown || {})
-  .filter(([, value]) => typeof value === 'number' && value > 0)
-  .map(([key, value]) => ({ key, label: COST_LABELS[key] || key, value: value as number }))
 
 export default function Cabinet() {
   const [me, setMe] = useState<Me | null>(null)
@@ -160,8 +147,7 @@ export default function Cabinet() {
       const latest = sorted[0]
       const image = sorted.find(v => v.image_url)?.image_url || sorted.find(v => v.photo_url)?.photo_url || null
       const creditsTotal = sorted.reduce((sum, v) => sum + Number(v.credits_spent || 0), 0)
-      const costUsd = sorted.reduce((sum, v) => sum + Number(v.cost_usd || 0), 0)
-      result.push({ roomId, style: latest.style, versions: sorted, latest, image, credits: creditsTotal, costUsd })
+      result.push({ roomId, style: latest.style, versions: sorted, latest, image, credits: creditsTotal })
     }
     return result.sort((a, b) => +new Date(b.latest.created_at) - +new Date(a.latest.created_at))
   }, [generations])
@@ -370,7 +356,7 @@ export default function Cabinet() {
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredGroups.map(group => <button key={group.roomId} type="button" onClick={() => openRoom(group)} className="group border bg-background text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="absolute left-2 top-2 bg-background/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider">{group.versions.length} {plural(group.versions.length, 'версия', 'версии', 'версий')}</span></div>
-                  <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{group.latest.request_text || 'Базовый дизайн'}</p></div><span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel(group.latest.status)}</span></div><div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span className="flex items-center gap-2"><span>{group.credits} кр.</span>{group.costUsd > 0 && <span className="font-mono">{usd(group.costUsd)}</span>}</span></div></div>
+                  <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{group.latest.request_text || 'Базовый дизайн'}</p></div><span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel(group.latest.status)}</span></div><div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span className="flex items-center gap-2"><span>{group.credits} кр.</span></span></div></div>
                 </button>)}
               </div>
             ) : <div className="mt-8 border border-dashed p-10 text-center"><p className="display-title text-3xl">Пока пусто</p><p className="mt-3 text-sm text-muted-foreground">Создайте первый дизайн — он появится здесь вместе с версиями и сметой.</p><a href="/?panel=1" className="action-primary mt-6">Создать дизайн <ArrowUpRight className="size-4" /></a></div>}
@@ -407,24 +393,6 @@ export default function Cabinet() {
                   <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
                 </div>
-                {roomData.render?.cost_usd != null && (
-                  <div className="mt-5 border p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="eyebrow">Себестоимость генерации</p>
-                        <p className="mt-1 text-[11px] leading-5 text-muted-foreground">Сумма всех запросов: арт-директор, очистка, дизайн, QA и анализ рендера.</p>
-                      </div>
-                      <span className="shrink-0 font-mono text-lg">{usd(roomData.render.cost_usd)}</span>
-                    </div>
-                    {costRows(roomData.render.cost_breakdown).length > 0 && (
-                      <dl className="mt-3 grid gap-1 border-t pt-3 text-xs sm:grid-cols-2">
-                        {costRows(roomData.render.cost_breakdown).map(row => (
-                          <div key={row.key} className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">{row.label}</dt><dd className="font-mono">{usd(row.value)}</dd></div>
-                        ))}
-                      </dl>
-                    )}
-                  </div>
-                )}
                 <div className="mt-6 grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-[11px] text-muted-foreground">Подбор по уровню, а не по сумме</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p><p className="mt-1 text-[11px] text-muted-foreground">Смета ориентировочная</p>{roomData.prices_as_of && <p className="mt-1 text-[11px] text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
                 <div className="mt-6"><p className="eyebrow">Версии</p><div className="mt-3 flex flex-wrap gap-2">{selectedRoom.versions.map((v, index) => <button key={v.id} type="button" onClick={() => selectVersion(v.id)} className={`min-h-10 border px-3 text-xs ${selectedRenderId === v.id ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>Версия {selectedRoom.versions.length - index} · {v.request_text ? 'правка' : 'базовая'} · {statusLabel(v.status)}</button>)}</div></div>
                 {realProducts.length > 0 && <div className="mt-6"><p className="eyebrow">Реальные товары · {realOfferCount}</p><div className="mt-3 space-y-5">{realProducts.map((match, index) => <div key={`${match.item.category}-${index}`}><div className="flex items-baseline justify-between gap-3 border-b pb-2"><p className="text-sm font-medium">{match.item.label}</p><span className="text-xs text-muted-foreground">{match.offers.length ? `${match.offers.length} в каталоге` : 'нет в каталоге'}</span></div>{match.offers.length ? <div className="mt-3 grid gap-3 sm:grid-cols-2">{match.offers.map(offer => <a key={offer.id} href={offer.url || '#'} target="_blank" rel={offer.url ? 'noopener nofollow sponsored' : 'noopener nofollow'} className="flex min-w-0 gap-3 border p-2 transition-colors hover:border-foreground">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="size-16 shrink-0 object-cover" loading="lazy" /> : <div className="flex size-16 shrink-0 items-center justify-center bg-muted text-[10px] text-muted-foreground">нет фото</div>}<div className="min-w-0"><p className="line-clamp-2 text-xs font-medium leading-5">{offer.name}</p><p className="mt-1 text-xs">{offer.price === null ? 'цена не указана' : rub(offer.price)}{offer.merchant ? ` · ${offer.merchant}` : ''}</p>{offer.erid ? <p className="text-[10px] text-muted-foreground">реклама · erid {offer.erid}</p> : null}</div></a>)}</div> : <p className="mt-2 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}</div>)}</div></div>}

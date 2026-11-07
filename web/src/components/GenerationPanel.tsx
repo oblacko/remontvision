@@ -210,12 +210,14 @@ export function GenerationPanel({
   onClose,
   onRequireLogin,
   onRefreshUser,
+  isAuthed = false,
 }: {
   open: boolean
   initialRoomId?: string
   onClose: () => void
   onRequireLogin: () => void
   onRefreshUser: () => void | Promise<void>
+  isAuthed?: boolean
 }) {
   const [step, setStep] = useState<Step>('photo')
   const [roomType, setRoomType] = useState<string | null>(null)
@@ -562,6 +564,7 @@ export function GenerationPanel({
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
+    if (!isAuthed) { onRequireLogin(); return }
     setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setRefineText('')
     setEditFormOpen(false); setShowAllHints(false)
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
@@ -589,7 +592,7 @@ export function GenerationPanel({
         fd.append('use_catalog', useCatalog ? '1' : '0')
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
-        if (r.status === 401) { onRequireLogin(); return }
+        if (r.status === 401) { setStep('style'); onRequireLogin(); return }
         if (r.status === 402) { setGenError(''); setStep('style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
         id = d.id
@@ -613,7 +616,7 @@ export function GenerationPanel({
         if (!edit?.refFile && edit?.refUrl) fd.append('ref_url', edit.refUrl)
         const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
-        if (r.status === 401) { onRequireLogin(); return }
+        if (r.status === 401) { setStep(iterations.length ? 'result' : 'style'); onRequireLogin(); return }
         if (r.status === 402) { setGenError(''); setStep(iterations.length ? 'result' : 'style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
       }
@@ -810,15 +813,13 @@ export function GenerationPanel({
                   </div>
                 </div>
               )}
-              {photo && (
-                <div className="mt-5">
-                  <p className="eyebrow">Тип комнаты</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Чтобы в дизайне не появились предметы из другого помещения.</p>
-                  <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                    {roomTypes.map(type => <button key={type} type="button" aria-pressed={roomType === type} onClick={() => { setRoomType(type); setCleaned(null); setCleanupRequested(false); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
-                  </div>
+              <div className="mt-5">
+                <p className="eyebrow">Тип комнаты</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{photo ? 'Чтобы в дизайне не появились предметы из другого помещения.' : 'Можно выбрать заранее — сначала загрузите фото.'}</p>
+                <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
+                  {roomTypes.map(type => <button key={type} type="button" disabled={!photo} aria-pressed={roomType === type} onClick={() => { setRoomType(type); setCleaned(null); setCleanupRequested(false); setCleanupError('') }} className={`min-h-10 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
                 </div>
-              )}
+              </div>
               <div className="mt-4" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
                 {photoError && <p className="mb-3 text-sm text-destructive" role="alert">{photoError}</p>}
                 {photo && !roomType && <p className="mb-3 text-xs text-muted-foreground">Выберите тип комнаты, чтобы продолжить.</p>}
@@ -1260,6 +1261,10 @@ export function GenerationPanel({
                   ))}
                 </div>
 
+                {openSummaryTab === null && (
+                  <p className="mt-5 border-y py-4 text-sm text-muted-foreground">Выберите раздел: план ремонта, что изменить, товары и смета, палитра, розетки или итог.</p>
+                )}
+
                 {openSummaryTab === 'repair' && ((repairRows(current.repairScope).length || current.repairScope?.storage?.length) ? (
                   <section className="mt-5" aria-labelledby="gen-repair">
                     <h4 id="gen-repair" className="eyebrow mb-4">План ремонта</h4>
@@ -1300,7 +1305,7 @@ export function GenerationPanel({
                   <section className="mt-5" aria-labelledby="gen-products">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h4 id="gen-products" className="eyebrow">Товары</h4>
-                      <button type="button" onClick={runProductSearch} disabled={productSearchBusy || current.productsEnabled === false} className="action-secondary min-h-10 px-3 text-xs">{productSearchBusy ? <><LoaderCircle className="size-3.5 animate-spin" /> Ищем…</> : 'Поиск товаров'}</button>
+                      <button type="button" onClick={runProductSearch} disabled={productSearchBusy || current.productsEnabled === false} className="action-primary min-h-11 px-4 text-sm">{productSearchBusy ? <><LoaderCircle className="size-3.5 animate-spin" /> Ищем…</> : 'Собрать смету'}</button>
                     </div>
                     {productSearchError && <p className="mt-3 text-xs text-destructive" role="alert">{productSearchError}</p>}
                     {productMatches.length ? (
@@ -1330,7 +1335,7 @@ export function GenerationPanel({
                           </div>
                         ))}
                       </div>
-                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Товары ещё не собраны. Нажмите «Поиск товаров».'}</p>}
+                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Смета ещё не собрана. Нажмите «Собрать смету» — подберём реальные товары по кадру.'}</p>}
                     {selectedOffersList.length ? (
                       <div className="mt-5 border-t pt-3">
                         <p className="eyebrow">Выбрано</p>

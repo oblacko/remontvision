@@ -21,7 +21,7 @@ type Consents = { offer: boolean; personal: boolean; transfer: boolean }
 const consentsOf = (c: Consents) => ({ offer: c.offer, privacy: c.personal, cross_border: c.transfer })
 
 const faq = [
-  { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатные генерации. Дальше: 8 генераций за 399 ₽, 15 за 599 ₽ или 50 за 1 499 ₽. Один кредит — одна генерация или правка. Подписка не нужна.' },
+  { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатных кредита: два дизайна или дизайн + правка. Дальше: 8 генераций за 399 ₽, 15 за 599 ₽ или 50 за 1 499 ₽. Один кредит — одна генерация или правка. Подписка не нужна.' },
   { q: 'Какое фото подойдёт?', a: 'Чёткое фото комнаты при дневном свете: JPG, PNG или WebP до 15 МБ. Подойдут портретные, квадратные и альбомные кадры. Чем лучше видно стены, пол и мебель, тем полезнее результат.' },
   { q: 'Что я получу, кроме картинки?', a: 'Подбор материалов и товаров с ценами и ссылками на магазины, палитру в RAL и рекомендации по розеткам и выключателям — всё для выбранного интерьера.' },
   { q: 'Можно изменить готовый дизайн?', a: 'Да, результат можно уточнять текстовыми запросами: например, изменить цвет пола, заменить текстиль или сделать интерьер светлее. Каждая версия сохраняется в истории правок.' },
@@ -69,7 +69,6 @@ export default function Home() {
 
   useEffect(() => { void loadMe() }, [])
   useEffect(() => {
-    if (!me) return
     const params = new URLSearchParams(location.search)
     if (params.get('panel') !== '1') return
     const room = params.get('room') || ''
@@ -158,7 +157,6 @@ export default function Home() {
 
   const openPanel = () => {
     setMenuOpen(false)
-    if (!me) { setPendingPanel(true); openLogin(); return }
     setPanelOpen(true)
   }
 
@@ -272,7 +270,7 @@ export default function Home() {
 
               <div className="hero-enter hero-delay-3 mt-8 grid gap-8 border-t border-background/35 pt-6 lg:grid-cols-12 lg:items-start">
                 <p className="max-w-xl text-lg font-light leading-7 text-background sm:text-xl lg:col-span-5">
-                  По вашему фото — дизайн комнаты, реальные товары и смета. <strong className="font-medium text-primary">Сначала увидьте результат, потом тратьте деньги.</strong>
+                  По вашему фото — дизайн комнаты, а затем реальные товары и смета по кнопке. <strong className="font-medium text-primary">Сначала увидьте результат, потом тратьте деньги.</strong>
                 </p>
                 <div className="lg:col-span-7 lg:pl-8">
                   <div className="flex flex-col gap-4 sm:flex-row">
@@ -284,7 +282,7 @@ export default function Home() {
                     </a>
                   </div>
                   <p className="mt-5 flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs uppercase tracking-wider text-background/80">
-                    <span>2 генерации — 0 ₽</span><span>Без подписки</span><span>30–60 секунд</span>
+                    <span>2 кредита — 0 ₽</span><span>Без подписки</span><span>1–4 минуты</span>
                   </p>
                 </div>
               </div>
@@ -302,7 +300,7 @@ export default function Home() {
             {[
               ['[ 01 ]', 'Изображение + подбор', 'Увидьте интерьер и узнайте, из чего его собрать: пол, краска, свет, мебель и отделка.'],
               ['[ 02 ]', 'Бюджет до генерации', 'Задайте сумму заранее — сервис учтёт её при подборе материалов и товаров.'],
-              ['[ 03 ]', 'Без подписки', 'Начните с двух бесплатных генераций. Дальше платите только за нужные кредиты.'],
+              ['[ 03 ]', 'Без подписки', 'Начните с двух бесплатных кредитов. Дальше платите только за нужные кредиты.'],
             ].map(([index, title, text]) => (
               <div key={index} className="border-b border-background/20 py-8 md:border-b-0 md:border-r md:px-8 md:py-10 md:first:pl-0 md:last:border-r-0 md:last:pr-0">
                 <span className="font-mono text-xs text-primary">{index}</span>
@@ -338,7 +336,7 @@ export default function Home() {
               <button type="button" onClick={openPanel} className="action-primary button-shift mt-8 min-h-14 px-8 text-base">
                 <span className="sr-only">Открыть генератор</span><ShiftLabel>Открыть генератор</ShiftLabel><ArrowUpRight className="size-5" />
               </button>
-              <p className="mt-4 text-xs text-muted-foreground">2 генерации бесплатно после регистрации · без подписки</p>
+              <p className="mt-4 text-xs text-muted-foreground">2 кредита бесплатно после регистрации · без подписки</p>
             </div>
             <div className="relative min-h-80 overflow-hidden bg-foreground lg:col-span-7 lg:min-h-full">
               <img src="/images/living-after.webp" alt="Готовая гостиная в современной классике после генерации" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
@@ -416,7 +414,7 @@ export default function Home() {
                 const unit = pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'
                 const price = new Intl.NumberFormat('ru-RU').format(pack.price_kopecks / 100) + ' ₽'
                 const isTarget = pack.id === 'flat'
-                return <div key={pack.id} className={`border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0${isTarget ? ' bg-secondary' : ''}`}><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{pack.title}</p>{isTarget && <p className="mt-2 inline-block border border-primary-text px-2 py-0.5 text-xs text-primary-text">Выгодно</p>}{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 генерации бесплатно</p>}</div>
+                return <div key={pack.id} className={`border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0${isTarget ? ' bg-secondary' : ''}`}><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{pack.title}</p>{isTarget && <p className="mt-2 inline-block border border-primary-text px-2 py-0.5 text-xs text-primary-text">Выгодно</p>}{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 кредита бесплатно</p>}</div>
               })}
             </div>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -444,7 +442,7 @@ export default function Home() {
               <div className="flex items-center justify-between gap-4 border-t border-foreground/30 pt-3 font-mono text-xs uppercase tracking-widest"><span>Ваш интерьер начинается с фото</span><ArrowUpRight className="size-5" /></div>
               <h2 id="final-cta-title" className="display-title section-title mt-8">Посмотрите,<br />что возможно</h2>
               <div className="mt-8 flex flex-col gap-6 border-t border-foreground/30 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="max-w-lg text-sm leading-6">Две генерации бесплатно после регистрации. Дизайн, материалы, цены и ссылки — в одном результате.</p>
+                <p className="max-w-lg text-sm leading-6">Два кредита бесплатно после регистрации: два дизайна или дизайн + правка. Дизайн, материалы, цены и ссылки — в одном результате.</p>
                 <button type="button" onClick={openPanel} className="action-final button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><ArrowRight className="size-4" /></button>
               </div>
             </div>
@@ -469,8 +467,9 @@ export default function Home() {
         open={panelOpen}
         initialRoomId={panelRoomId}
         onClose={() => { setPanelOpen(false); setPanelRoomId('') }}
-        onRequireLogin={() => { setPanelOpen(false); openLogin() }}
+        onRequireLogin={() => { setPendingPanel(true); openLogin() }}
         onRefreshUser={loadMe}
+        isAuthed={Boolean(me)}
       />
     </div>
   )

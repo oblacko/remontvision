@@ -238,8 +238,6 @@ function generationDto(g) {
     credits_spent: g.credits_spent,
     prompt: g.prompt || null,
     model: g.model || null,
-    cost_usd: g.cost_usd ?? null,
-    cost_breakdown: g.meta?.cost_breakdown || null,
     duration_ms: g.duration_ms ?? null,
     image_url: g.image_path ? `/renders/${path.basename(g.image_path)}` : null,
     photo_url: g.photo_path ? `/files/${path.basename(g.photo_path)}` : null,
@@ -311,7 +309,7 @@ app.post('/api/auth/logout', h(async (req, res) => {
 }));
 
 app.get('/api/me', h(async (req, res) => {
-  if (!requireAuth(req, res)) return;
+  if (!req.user) return res.json(null);
   const balance = await q.creditBalance(req.user.id);
   res.json({ email: req.user.email, balance });
 }));
@@ -1388,8 +1386,6 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       status: render.status,
       created_at: render.created_at,
       request_text: render.request_text,
-      cost_usd: render.cost_usd,
-      cost_breakdown: render.meta?.cost_breakdown || null,
       model: render.model,
       edit_target: render.edit_target || null,
       analysis: render.analysis || null,
