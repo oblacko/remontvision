@@ -1215,7 +1215,7 @@ export function GenerationPanel({
                                 }}
                                 className="action-primary w-full"
                               >
-                                Применить <RotateCcw className="size-4" />
+                                Применить <Check className="size-4" />
                               </button>
                             </div>
                           </div>
