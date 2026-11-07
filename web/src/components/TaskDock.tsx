@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronUp, LoaderCircle, X } from 'lucide-react'
+import { Link } from 'react-router'
+import { ArrowUpRight, Check, ChevronDown, ChevronUp, LoaderCircle, Sparkles, X } from 'lucide-react'
 
 // Задача = одна генерация пользователя. Берём из /api/my/generations.
 export type GenTask = {
@@ -10,6 +11,8 @@ export type GenTask = {
   status: string
   error?: string | null
   created_at: string
+  image_url?: string | null
+  photo_url?: string | null
 }
 
 type TasksContextValue = {
@@ -66,7 +69,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // первичная проверка входа
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -130,7 +132,6 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const setPanelOpen = useCallback((open: boolean) => setPanelOpenState(open), [])
 
-  // активные всегда; завершённые — только свежие (10 минут) и не скрытые
   const tasks = useMemo(() => {
     const cutoff = Date.now() - 10 * 60 * 1000
     return all
@@ -157,30 +158,44 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
   const done = task.status === 'done'
   const error = task.status === 'error'
   const active = !done && !error
+  const thumb = done ? task.image_url : task.photo_url
+  const to = done && task.room_id ? `/?panel=1&room=${encodeURIComponent(task.room_id)}` : '/cabinet'
+  const label = error ? 'Ошибка' : done ? 'Готово' : 'Идёт генерация'
+  const labelClass = error ? 'text-destructive' : done ? 'text-emerald-700' : 'text-muted-foreground'
+
   return (
-    <li className="border-t px-3 py-2.5 first:border-t-0">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{task.style}{task.room_type ? ` · ${task.room_type}` : ''}</p>
-          <p className={`mt-0.5 text-[11px] ${error ? 'text-destructive' : done ? 'text-emerald-700' : 'text-muted-foreground'}`}>
-            {error ? 'Ошибка' : done ? 'Готово' : 'Идёт генерация'}
-          </p>
-        </div>
-        {!active && (
-          <button type="button" onClick={onDismiss} className="flex size-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Скрыть задачу">
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
-      {active && (
-        <div className="relative mt-2 h-1 overflow-hidden bg-border" role="progressbar" aria-label="Генерация выполняется">
-          <div className="rv-progress absolute inset-y-0 left-0 w-1/3 bg-primary" />
-        </div>
+    <li className="relative border-t border-foreground/15 first:border-t-0">
+      <Link to={to} className="group flex gap-3 px-3 py-3 pr-8 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden border border-foreground/20 bg-muted">
+          {thumb
+            ? <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
+            : <Sparkles className="size-5 text-muted-foreground" />}
+          {active && <span className="absolute inset-0 bg-foreground/10" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{task.style}{task.room_type ? ` · ${task.room_type}` : ''}</span>
+          <span className={`mt-0.5 block text-[11px] ${labelClass}`}>{label}</span>
+          {active && (
+            <span className="mt-2 block h-1 overflow-hidden bg-border" role="progressbar" aria-label="Генерация выполняется">
+              <span className="rv-progress block h-full w-1/3 bg-primary" />
+            </span>
+          )}
+          {done && (
+            <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-foreground">Открыть <ArrowUpRight className="size-3" /></span>
+          )}
+          {error && task.error && <span className="mt-1 block line-clamp-2 text-[11px] text-muted-foreground">{task.error}</span>}
+        </span>
+      </Link>
+      {!active && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Скрыть задачу"
+        >
+          <X className="size-3.5" />
+        </button>
       )}
-      {done && task.room_id && (
-        <a href={`/?panel=1&room=${encodeURIComponent(task.room_id)}`} className="mt-1.5 inline-flex text-xs font-medium underline decoration-border underline-offset-4 hover:decoration-foreground">Открыть</a>
-      )}
-      {error && task.error && <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{task.error}</p>}
     </li>
   )
 }
@@ -190,18 +205,19 @@ export function TaskDock() {
   const [collapsed, setCollapsed] = useState(false)
   if (panelOpen || !tasks.length) return null
   return (
-    <aside className="fixed inset-x-3 bottom-3 z-[70] border bg-background shadow-[4px_4px_0_oklch(var(--foreground)/0.15)] sm:bottom-4 sm:left-auto sm:right-4 sm:w-[22rem]" aria-label="Мои задачи">
-      <button type="button" onClick={() => setCollapsed(value => !value)} className="flex w-full items-center justify-between gap-2 border-b px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" aria-expanded={!collapsed}>
-        <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+    <aside className="fixed inset-x-3 bottom-3 z-[70] border border-foreground bg-background shadow-[6px_6px_0_oklch(var(--foreground)/0.18)] sm:bottom-4 sm:left-auto sm:right-4 sm:w-[24rem]" aria-label="Мои задачи">
+      <button type="button" onClick={() => setCollapsed(value => !value)} className="flex w-full items-center justify-between gap-2 bg-foreground px-3 py-2 text-left text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-background" aria-expanded={!collapsed}>
+        <span className="flex min-w-0 items-center gap-2">
           {activeCount > 0
-            ? <LoaderCircle className="size-4 shrink-0 animate-spin text-primary-text motion-reduce:animate-none" />
-            : <Check className="size-4 shrink-0 text-emerald-600" />}
-          <span className="truncate">Мои задачи{activeCount > 0 ? ` · ${activeCount}` : ''}</span>
+            ? <LoaderCircle className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+            : <Check className="size-4 shrink-0" />}
+          <span className="truncate font-mono text-[11px] uppercase tracking-[0.18em]">Мои задачи</span>
+          {activeCount > 0 && <span className="border border-background/40 px-1.5 py-0.5 font-mono text-[10px] leading-none">{activeCount}</span>}
         </span>
         {collapsed ? <ChevronUp className="size-4 shrink-0" /> : <ChevronDown className="size-4 shrink-0" />}
       </button>
       {!collapsed && (
-        <ul className="max-h-[50vh] overflow-y-auto">
+        <ul className="max-h-[52vh] overflow-y-auto">
           {tasks.map(task => <TaskRow key={task.id} task={task} onDismiss={() => dismiss(task.id)} />)}
         </ul>
       )}
