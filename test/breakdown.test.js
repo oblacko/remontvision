@@ -58,15 +58,16 @@ test('normalizeBreakdown keeps edit instructions for change cards', () => {
   assert.equal(card.effort, 'подбор предмета');
 });
 
-test('normalizeBreakdown validates next action and limits questions', () => {
+test('normalizeBreakdown keeps actionable next action and drops unsupported kinds', () => {
   const result = normalizeBreakdown({
     sections: [{ key: 'repeat', cards: [{ title: 'Свет' }] }],
-    next_action: { label: 'Добавить размеры', kind: 'sizes' },
+    next_action: { label: 'Применить изменения', kind: 'apply' },
     questions: ['Первый?', 'Второй?', 'Третий?', 'Четвёртый?'],
   });
 
-  assert.deepEqual(result.next_action, { label: 'Добавить размеры', kind: 'sizes' });
+  assert.deepEqual(result.next_action, { label: 'Применить изменения', kind: 'apply' });
   assert.equal(result.questions.length, 3);
+  assert.equal(normalizeBreakdown({ sections: [{ key: 'repeat', cards: [{ title: 'Свет' }] }], next_action: { label: 'Добавить размеры', kind: 'sizes' } }).next_action, null);
 });
 
 test('normalizeBreakdown returns null when there is nothing useful', () => {

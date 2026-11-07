@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ArrowLeft, ArrowRight, ChevronDown, Download, Expand, LoaderCircle, Share2, X, Zap } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
 import { GenerationPanel } from '@/components/GenerationPanel'
+import { useTasks } from '@/components/TaskDock'
 import '../App.css'
 
 type Surface = { surface?: string; label?: string; hex?: string; ral?: { code?: string; name?: string } | null; description?: string }
@@ -26,7 +27,7 @@ type Breakdown = {
   lead?: string
   top_cards: BreakdownCard[]
   sections: BreakdownSection[]
-  next_action?: { label: string; kind: 'sizes' | 'materials' | 'change' | 'apply' } | null
+  next_action?: { label: string; kind: 'change' | 'apply' } | null
   questions: string[]
 }
 type Render = {
@@ -107,8 +108,10 @@ function ChangeCard({ card, onAdd }: { card: BreakdownCard; onAdd: () => void })
 export default function Room() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { refresh: refreshTasks } = useTasks()
   const [room, setRoom] = useState<RoomData | null>(null)
-  const [tab, setTab] = useState<'editor' | 'design'>('editor')
+  const [tab, setTab] = useState<'editor' | 'design'>(() => searchParams.get('tab') === 'design' ? 'design' : 'editor')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
@@ -165,12 +168,14 @@ export default function Room() {
     const targetId = render.id
     setBreakdownBusy(true)
     setBreakdownError('')
+    window.setTimeout(() => { void refreshTasks() }, 1500)
     try {
       const r = await fetch(`/api/renders/${targetId}/breakdown`, { method: 'POST' })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || String(r.status))
       if (selectedRenderRef.current !== targetId) return
       await loadRoom(targetId)
+      void refreshTasks()
     } catch (e) {
       if (selectedRenderRef.current === targetId) setBreakdownError(e instanceof Error ? e.message : 'Не удалось собрать разбор')
     } finally {
@@ -311,9 +316,12 @@ function DesignTab({ render, breakdown, busy, error, onRun, onAddChange, onOpenE
   const surfaces = render?.analysis?.surfaces || []
   const electrical = render?.analysis?.electrical || []
   const changeCards = breakdown?.sections.find(section => section.key === 'change')?.cards || []
+  const nextAction = breakdown?.next_action?.kind === 'change' || breakdown?.next_action?.kind === 'apply'
+    ? breakdown.next_action
+    : null
 
   const runNextAction = () => {
-    const kind = breakdown?.next_action?.kind
+    const kind = nextAction?.kind
     if (kind === 'change' || kind === 'apply') {
       const instruction = changeCards.find(card => card.edit_instruction)?.edit_instruction
         || changeCards[0]?.title
@@ -380,9 +388,9 @@ function DesignTab({ render, breakdown, busy, error, onRun, onAddChange, onOpenE
             ))}
           </div>
 
-          {breakdown.next_action && (
+          {nextAction && (
             <button type="button" onClick={runNextAction} className="action-primary w-full">
-              {breakdown.next_action.label} <ArrowRight className="size-4" />
+              {nextAction.label} <ArrowRight className="size-4" />
             </button>
           )}
 

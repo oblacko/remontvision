@@ -11,7 +11,7 @@ export const SECTION_TITLES = {
 };
 
 const SECTION_KEYS = Object.keys(SECTION_TITLES);
-const NEXT_KINDS = new Set(['sizes', 'materials', 'change', 'apply']);
+const NEXT_KINDS = new Set(['change', 'apply']);
 const CARD_LIMITS = { buy: 8, change: 3, default: 5 };
 
 const text = (value, max = 300) => {
@@ -35,7 +35,7 @@ export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без ma
       {"title":"...","preview":"...","action":"...","body":"...","details":["..."]}
     ]}
   ],
-  "next_action": {"label":"Добавить размеры / Собрать материалы / Добавить изменение / Применить изменения","kind":"sizes|materials|change|apply"},
+  "next_action": {"label":"Добавить изменение / Применить изменения","kind":"change|apply"},
   "questions": ["до 3 вопросов, которые сильнее всего изменят рекомендации"]
 }
 
@@ -45,6 +45,7 @@ export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без ma
 - Для key="change" карточка: {"title":"...","preview":"...","body":"...","effort":"подбор предмета | частичная переделка | требует проектирования","edit_instruction":"самодостаточная инструкция для редактирования изображения"}.
 - Для остальных разделов карточка: {"title":"...","preview":"...","action":"...","body":"...","details":["..."]}.
 - edit_instruction пиши так, чтобы правку можно было применить к изображению без дополнительных пояснений.
+- next_action — только действие редактора: «Добавить изменение» (change) или «Применить изменения» (apply). Если для вывода не хватает данных, не создавай кнопку, а задай вопрос в questions.
 - Не заполняй разделы ради объёма. Только применимые к этому помещению выводы.
 - Все тексты — на русском. Только JSON.`;
 

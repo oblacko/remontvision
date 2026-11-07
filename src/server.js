@@ -14,6 +14,7 @@ import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { reviewDesign } from './architect.js';
 import { breakdownInterior } from './breakdown.js';
+import { breakdownTask } from './taskdata.js';
 import { getCatalogOffer } from './catalogclient.js';
 import { runVisionAgent } from './visionagent.js';
 import { sanitizeImage, fitAspect } from './media.js';
@@ -323,7 +324,16 @@ app.get('/api/my/rooms', h(async (req, res) => {
 
 app.get('/api/my/generations', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
-  res.json((await q.userGenerations(req.user.id)).map(generationDto));
+  const rows = await q.userGenerations(req.user.id);
+  const list = rows.map(row => ({ ...generationDto(row), kind: 'render' }));
+  if (req.query.with === 'breakdown') {
+    for (const row of rows) {
+      const task = breakdownTask(row);
+      if (task) list.push(task);
+    }
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+  res.json(list);
 }));
 
 app.get('/api/credits', h(async (req, res) => {
@@ -1598,12 +1608,25 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
   if (render.analysis?.breakdown) {
     return res.json({ analysis: render.analysis, breakdown: render.analysis.breakdown, cached: true });
   }
+  const baseMeta = render.meta || {};
+  const previous = baseMeta.breakdown || {};
+  if (previous.status === 'running') {
+    const started = new Date(previous.started_at || 0).getTime();
+    if (Date.now() - started < 3 * 60 * 1000) {
+      return res.status(409).json({ error: 'Разбор уже идёт' });
+    }
+  }
   const room = await q.getRoom(render.room_id);
   if (!room) return res.status(404).json({ error: 'Комната не найдена' });
   const buffer = await getBuffer(render.image_path);
   const ext = path.extname(render.image_path).slice(1).toLowerCase();
   const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
   const imageDataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+  const startedAt = new Date().toISOString();
+  await q.setRenderMeta(render.id, {
+    ...baseMeta,
+    breakdown: { ...previous, status: 'running', started_at: startedAt, finished_at: null, error: null },
+  });
   const result = await breakdownInterior({
     imageDataUrl,
     roomType: room.room_type || 'Другое',
@@ -1613,14 +1636,19 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
     dimensions: render.meta?.room_dimensions_estimate || null,
   });
   if (!result) {
+    await q.setRenderMeta(render.id, {
+      ...baseMeta,
+      breakdown: { ...previous, status: 'error', started_at: startedAt, finished_at: new Date().toISOString(), error: 'Не удалось собрать разбор' },
+    });
     log({ event: 'breakdown_error', render_id: render.id, user_id: req.user.id });
     return res.status(502).json({ error: 'Не удалось собрать разбор интерьера' });
   }
   const analysis = { ...(render.analysis || {}), breakdown: result.breakdown };
   await q.setRenderAnalysis(render.id, analysis);
+  const finishedAt = new Date().toISOString();
   const meta = {
-    ...(render.meta || {}),
-    breakdown: { cost_usd: result.cost ?? null, at: new Date().toISOString() },
+    ...baseMeta,
+    breakdown: { status: 'done', started_at: startedAt, finished_at: finishedAt, at: finishedAt, cost_usd: result.cost ?? null },
   };
   await q.setRenderMeta(render.id, meta);
   log({

@@ -5,6 +5,8 @@ import { ArrowUpRight, Check, ChevronDown, ChevronUp, LoaderCircle, Sparkles, X 
 // Задача = одна генерация пользователя. Берём из /api/my/generations.
 export type GenTask = {
   id: string
+  kind?: 'render' | 'breakdown'
+  render_id?: string
   room_id: string
   style: string
   room_type?: string | null
@@ -54,7 +56,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const r = await fetch('/api/my/generations')
+      const r = await fetch('/api/my/generations?with=breakdown')
       if (r.status === 401) {
         setAuthed(false)
         setAll([])
@@ -158,9 +160,12 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
   const done = task.status === 'done'
   const error = task.status === 'error'
   const active = !done && !error
+  const isBreakdown = task.kind === 'breakdown'
   const thumb = done ? task.image_url : task.photo_url
-  const to = task.room_id ? `/room/${encodeURIComponent(task.room_id)}` : '/cabinet'
-  const label = error ? 'Ошибка' : done ? 'Готово' : 'Идёт генерация'
+  const to = task.room_id
+    ? `/room/${encodeURIComponent(task.room_id)}${isBreakdown ? '?tab=design' : ''}`
+    : '/cabinet'
+  const label = error ? 'Ошибка' : done ? (isBreakdown ? 'Разбор готов' : 'Готово') : (isBreakdown ? 'Идёт разбор' : 'Идёт генерация')
   const labelClass = error ? 'text-destructive' : done ? 'text-emerald-700' : 'text-muted-foreground'
 
   return (
@@ -176,7 +181,7 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
           <span className="block truncate text-sm font-medium">{task.style}{task.room_type ? ` · ${task.room_type}` : ''}</span>
           <span className={`mt-0.5 block text-[11px] ${labelClass}`}>{label}</span>
           {active && (
-            <span className="mt-2 block h-1 overflow-hidden bg-border" role="progressbar" aria-label="Генерация выполняется">
+            <span className="mt-2 block h-1 overflow-hidden bg-border" role="progressbar" aria-label={isBreakdown ? 'Разбор выполняется' : 'Генерация выполняется'}>
               <span className="rv-progress block h-full w-1/3 bg-primary" />
             </span>
           )}
