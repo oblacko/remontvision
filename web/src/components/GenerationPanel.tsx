@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Share2,
   Search,
+  Trash2,
   Upload,
   X,
   Zap,
@@ -1144,44 +1145,43 @@ export function GenerationPanel({
                                       if (/^https?:\/\//i.test(text)) setEditRefUrl(ref.id, text)
                                     }}
                                   >
-                                    <button type="button" onClick={() => removeEditRef(ref.id)} className="absolute right-2 top-2 flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><X className="size-4" /></button>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="eyebrow">Прикрепить референс</p>
+                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="inline-flex min-h-8 items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><Trash2 className="size-3.5" /> Удалить</button>
+                                    </div>
                                     {hasSource ? (
-                                      <div className="flex items-center gap-3 pr-8">
+                                      <div className="mt-2 flex items-center gap-3 border border-foreground/25 p-2">
                                         {ref.preview ? (
                                           <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border border-foreground/25 object-cover" />
                                         ) : (
                                           <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border border-foreground/25 bg-muted text-[10px] uppercase tracking-widest text-muted-foreground">URL</a>
                                         )}
                                         <div className="min-w-0 flex-1">
-                                          <p className="truncate text-sm">{ref.url || ref.name || 'Референс'}</p>
+                                          <p className="truncate text-xs">{ref.url || ref.name || 'Референс'}</p>
                                           <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
                                         </div>
-                                        <div className="flex shrink-0 items-stretch gap-px border bg-border">
-                                          <label className="flex w-10 cursor-pointer items-center justify-center bg-background transition-colors hover:bg-muted" title="Заменить файл" aria-label="Заменить файл">
-                                            <Upload className="size-4" />
-                                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
-                                          </label>
-                                          <button type="button" onClick={() => pasteEditRef(ref.id)} className="flex w-10 items-center justify-center bg-background transition-colors hover:bg-muted" title="Вставить из буфера" aria-label="Вставить из буфера"><Clipboard className="size-4" /></button>
-                                          <button type="button" onClick={() => clearEditRefSource(ref.id)} className="flex w-10 items-center justify-center bg-background transition-colors hover:bg-muted" title="Заменить источник" aria-label="Заменить источник"><X className="size-4" /></button>
-                                        </div>
                                       </div>
-                                    ) : (
-                                      <div className="grid grid-cols-2 gap-px border bg-border pr-8">
-                                        <label className="inline-flex min-h-10 min-w-0 cursor-pointer items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
-                                          <Upload className="size-4 shrink-0" /> <span className="min-w-0 break-words">Выбрать файл</span>
-                                          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
-                                        </label>
-                                        <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-10 min-w-0 items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
-                                          <Clipboard className="size-4 shrink-0" /> <span className="min-w-0 break-words">Вставить из буфера</span>
-                                        </button>
-                                      </div>
+                                    ) : null}
+                                    <div className="mt-2 grid grid-cols-2 gap-px border border-foreground/25 bg-border">
+                                      <label className="inline-flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
+                                        <Upload className="size-4 shrink-0" /> <span className="min-w-0 break-words">{hasSource ? 'Заменить файл' : 'Выбрать файл'}</span>
+                                        <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
+                                      </label>
+                                      <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
+                                        <Clipboard className="size-4 shrink-0" /> <span className="min-w-0 break-words">Вставить из буфера</span>
+                                      </button>
+                                    </div>
+                                    {hasSource && (
+                                      <button type="button" onClick={() => clearEditRefSource(ref.id)} className="mt-2 text-[11px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground">Убрать референс</button>
                                     )}
+                                    <p className="eyebrow mt-4">Текст изменения</p>
                                     <textarea
                                       value={ref.text}
                                       onChange={(event) => updateEditRef(ref.id, { text: event.target.value })}
                                       rows={4}
-                                      placeholder="Введите текст изменения"
-                                      className="mt-3 min-h-20 w-full min-w-0 border border-foreground/25 bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground focus:ring-2 focus:ring-ring/20"
+                                      placeholder="Опишите, что изменить"
+                                      aria-label="Текст изменения"
+                                      className="mt-2 min-h-20 w-full min-w-0 border border-foreground/25 bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground focus:ring-2 focus:ring-ring/20"
                                     />
                                   </div>
                                 )
