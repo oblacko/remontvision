@@ -23,7 +23,7 @@ function Progress({ items }: { items: RoadmapItem[] }) {
   return (
     <div className="border border-foreground/25 p-4">
       <div className="flex items-end justify-between gap-3">
-        <p className="text-sm">Выполнено <b>{done}</b> из {active.length}</p>
+        <p className="text-sm">Куплено <b>{done}</b> из {active.length}</p>
         <span className="font-mono text-xs text-primary-text">{percent}%</span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden bg-border">
@@ -37,9 +37,9 @@ function Skeleton() {
   return (
     <div className="space-y-3">
       <div className="border border-foreground/25 p-4">
-        <p className="eyebrow">Роадмап ремонта</p>
-        <h2 className="display-title mt-2 text-3xl sm:text-4xl">План работ по шагам</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">Пол/стены/потолок, электрика, освещение и покраска — по порядку, с чек-листом и прогрессом.</p>
+        <p className="eyebrow">Роадмап покупок</p>
+        <h2 className="display-title mt-2 text-3xl sm:text-4xl">План закупки по шагам</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">Что нужно купить для электрики, стен, пола, потолка, света и финиша — по порядку, с чек-листом и прогрессом.</p>
       </div>
       {[0, 1, 2].map(index => (
         <div key={index} className="border border-foreground/25 opacity-60">
@@ -59,7 +59,7 @@ function Skeleton() {
       ))}
       <div className="border border-foreground bg-primary/5 p-4">
         <p className="eyebrow">Доступно после покупки</p>
-        <p className="mt-2 text-sm leading-6">Роадмап открывается после покупки кредитов. Сейчас видно структуру плана.</p>
+        <p className="mt-2 text-sm leading-6">Роадмап покупок открывается после покупки кредитов. Сейчас видно структуру плана.</p>
         <a href="/cabinet#credits" className="action-primary mt-4 w-full sm:w-auto">Купить кредиты <ArrowRight className="size-4" /></a>
       </div>
     </div>
@@ -69,12 +69,12 @@ function Skeleton() {
 function EmptyRoadmap({ busy, error, onGenerate }: { busy: boolean; error: string; onGenerate: () => void }) {
   return (
     <div className="border border-foreground/25 p-5 sm:p-7">
-      <p className="eyebrow">Роадмап ремонта</p>
-      <h2 className="display-title mt-3 text-2xl sm:text-3xl">Как пройдёт ремонт</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Разложим ремонт на этапы по порядку: демонтаж, черновое, электрика, стены, пол, потолок, освещение, покраска и финиш. С конкретными покупками и работой.</p>
+      <p className="eyebrow">Роадмап покупок</p>
+      <h2 className="display-title mt-3 text-2xl sm:text-3xl">Что нужно купить</h2>
+      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Соберём список закупки по этапам: электрика, стены и фартук, пол, потолок, освещение, окна, мебель. Только то, что реально нужно этому интерьеру.</p>
       {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
       <button type="button" onClick={onGenerate} disabled={busy} className="action-primary mt-5 w-full sm:w-auto">
-        {busy ? <><LoaderCircle className="size-4 animate-spin" /> Составляем…</> : <>Составить роадмап <ArrowRight className="size-4" /></>}
+        {busy ? <><LoaderCircle className="size-4 animate-spin" /> Составляем…</> : <>Составить роадмап покупок <ArrowRight className="size-4" /></>}
       </button>
     </div>
   )
@@ -91,7 +91,9 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
   const [commentDraft, setCommentDraft] = useState('')
   const [addFor, setAddFor] = useState<string | null>(null)
   const [addText, setAddText] = useState('')
+  const [onlyNeeded, setOnlyNeeded] = useState(false)
   const groups = useMemo(() => groupRoadmap(items), [items])
+  const hasNeeded = groups.some(group => group.items.some(item => item.active && !item.done))
 
   if (!hasPurchased) return <Skeleton />
   if (!items.length) return <EmptyRoadmap busy={busy} error={error} onGenerate={actions.onGenerate} />
@@ -116,8 +118,8 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="eyebrow">Роадмап ремонта</p>
-          <h2 className="display-title mt-2 text-3xl sm:text-4xl">План работ</h2>
+          <p className="eyebrow">Роадмап покупок</p>
+          <h2 className="display-title mt-2 text-3xl sm:text-4xl">План закупки</h2>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={actions.onRegenerate} disabled={busy} className="inline-flex min-h-10 items-center gap-2 border border-foreground/30 px-3 text-xs transition-colors hover:border-foreground disabled:opacity-50">
@@ -129,13 +131,33 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {[{ value: false, label: 'Все' }, { value: true, label: 'Только нужное' }].map(option => (
+          <button
+            key={option.label}
+            type="button"
+            aria-pressed={onlyNeeded === option.value}
+            onClick={() => setOnlyNeeded(option.value)}
+            className={`min-h-9 border px-3 text-xs transition-colors ${onlyNeeded === option.value ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       <Progress items={items} />
       {error && <p className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{error}</p>}
+
+      {onlyNeeded && !hasNeeded && (
+        <p className="border border-foreground/25 p-4 text-sm text-muted-foreground">Всё куплено — в списке не осталось нужных позиций.</p>
+      )}
 
       <div className="space-y-3">
         {groups.map(group => {
           const active = group.items.filter(item => item.active)
           const done = active.filter(item => item.done).length
+          const visible = onlyNeeded ? group.items.filter(item => item.active && !item.done) : group.items
+          if (onlyNeeded && !visible.length) return null
           return (
             <details key={group.key} className="group border border-foreground/25">
               <summary className="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
@@ -146,14 +168,14 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
               </summary>
               <div className="border-t border-foreground/25">
                 <ul>
-                  {group.items.map(item => (
+                  {visible.map(item => (
                     <li key={item.id} className={cn('border-t border-foreground/10 first:border-t-0', !item.active && 'opacity-50')}>
                       <div className="flex items-start gap-3 px-3 py-3">
                         <button
                           type="button"
                           role="checkbox"
                           aria-checked={item.done}
-                          aria-label={item.done ? 'Отметить невыполненным' : 'Отметить выполненным'}
+                          aria-label={item.done ? 'Отметить некупленным' : 'Отметить купленным'}
                           onClick={() => actions.onToggleDone(item)}
                           disabled={!item.active}
                           className={cn('mt-0.5 flex size-5 shrink-0 items-center justify-center border transition-colors disabled:pointer-events-none',
@@ -180,14 +202,14 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
                               </div>
                             </div>
                           )}
-                          {!item.active && <button type="button" onClick={() => actions.onToggleActive(item)} className="mt-1 text-[11px] text-primary-text underline decoration-border underline-offset-2">Вернуть в план</button>}
+                          {!item.active && <button type="button" onClick={() => actions.onToggleActive(item)} className="mt-1 text-[11px] text-primary-text underline decoration-border underline-offset-2">Вернуть в список</button>}
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <button type="button" onClick={() => openComment(item)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground" aria-label="Комментарий"><MessageSquare className="size-4" /></button>
                           {item.active ? (
-                            <button type="button" onClick={() => actions.onToggleActive(item)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground" aria-label="Не в плане"><EyeOff className="size-4" /></button>
+                            <button type="button" onClick={() => actions.onToggleActive(item)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground" aria-label="Не нужно"><EyeOff className="size-4" /></button>
                           ) : (
-                            <button type="button" onClick={() => actions.onToggleActive(item)} className="flex size-8 items-center justify-center text-primary-text" aria-label="Вернуть в план"><Eye className="size-4" /></button>
+                            <button type="button" onClick={() => actions.onToggleActive(item)} className="flex size-8 items-center justify-center text-primary-text" aria-label="Вернуть в список"><Eye className="size-4" /></button>
                           )}
                           {item.is_custom && (
                             <button type="button" onClick={() => actions.onDelete(item)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-destructive" aria-label="Удалить свою строку"><Trash2 className="size-4" /></button>

@@ -128,10 +128,10 @@ export default function Share() {
 
         {!!roadmapGroups.length && (
           <section className="mt-8 border-t pt-6">
-            <p className="eyebrow">Роадмап ремонта</p>
+            <p className="eyebrow">Роадмап покупок</p>
             <div className="mt-3 border border-foreground/25 p-4">
               <div className="flex items-end justify-between gap-3">
-                <p className="text-sm">Выполнено <b>{roadmapDone}</b> из {roadmapActive.length}</p>
+                <p className="text-sm">Куплено <b>{roadmapDone}</b> из {roadmapActive.length}</p>
                 <span className="font-mono text-xs text-primary-text">{roadmapActive.length ? Math.round((roadmapDone / roadmapActive.length) * 100) : 0}%</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden bg-border">

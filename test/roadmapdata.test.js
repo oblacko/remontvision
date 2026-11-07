@@ -56,8 +56,8 @@ test('normalizeRoadmap accepts sections as an object and returns null when empty
 
 test('buildRoadmapSystem includes prompt, phase order and JSON contract', () => {
   const system = buildRoadmapSystem();
-  assert.match(system, /роадмап ремонта/i);
-  assert.match(system, /Демонтаж и подготовка/);
+  assert.match(system, /роадмап покупок/i);
+  assert.match(system, /Электрика и слаботочка/);
   assert.match(system, /cards/);
   assert.match(system, /icon/);
 });

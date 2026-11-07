@@ -1691,7 +1691,7 @@ app.post('/api/renders/:id/roadmap', h(async (req, res) => {
   }
   const refresh = Boolean(req.body?.refresh);
   const existingItems = await q.roadmapItemsForRoom(render.room_id);
-  if (!refresh && render.analysis?.roadmap?.version === 1 && existingItems.length) {
+  if (!refresh && render.analysis?.roadmap?.version === 2 && existingItems.length) {
     return res.json({ roadmap: render.analysis.roadmap, items: existingItems, cached: true });
   }
   const room = await q.getRoom(render.room_id);
@@ -1740,7 +1740,7 @@ app.post('/api/renders/:id/roadmap', h(async (req, res) => {
   const finishedAt = new Date().toISOString();
   await q.setRenderMeta(render.id, {
     ...baseMeta,
-    roadmap: { version: 1, status: 'done', started_at: startedAt, finished_at: finishedAt, at: finishedAt, cost_usd: result.cost ?? null },
+    roadmap: { version: 2, status: 'done', started_at: startedAt, finished_at: finishedAt, at: finishedAt, cost_usd: result.cost ?? null },
   });
   const items = await q.roadmapItemsForRoom(room.id);
   log({

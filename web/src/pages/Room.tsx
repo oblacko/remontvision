@@ -342,7 +342,7 @@ export default function Room() {
             )}
 
             <nav className="mt-6 flex overflow-x-auto border-b" aria-label="Разделы комнаты">
-              {([['editor', 'Редактор'], ['design', 'Разбор интерьера'], ['roadmap', 'Роадмап']] as const).map(([key, label]) => (
+              {([['editor', 'Редактор'], ['design', 'Разбор интерьера'], ['roadmap', 'Закупка']] as const).map(([key, label]) => (
                 <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm ${tab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>

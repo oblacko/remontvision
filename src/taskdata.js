@@ -3,14 +3,14 @@ import path from 'node:path';
 
 export function roadmapTask(row) {
   const roadmap = row?.meta?.roadmap;
-  const status = roadmap?.status || (roadmap?.version === 1 && roadmap?.at ? 'done' : null);
+  const status = roadmap?.status || (roadmap?.version === 2 && roadmap?.at ? 'done' : null);
   if (!status) return null;
   return {
     id: `roadmap:${row.id}`,
     kind: 'roadmap',
     render_id: row.id,
     room_id: row.room_id,
-    style: 'Роадмап ремонта',
+    style: 'Роадмап покупок',
     room_type: row.room_type || null,
     status,
     error: roadmap.error || null,

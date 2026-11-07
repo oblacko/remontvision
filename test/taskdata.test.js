@@ -77,12 +77,12 @@ test('roadmapTask maps running and completed roadmap meta', () => {
     id: 'render-7',
     room_id: 'room-7',
     created_at: '2026-11-07T09:00:00.000Z',
-    meta: { roadmap: { version: 1, status: 'done', finished_at: '2026-11-07T10:45:00.000Z' } },
+    meta: { roadmap: { version: 2, status: 'done', finished_at: '2026-11-07T10:45:00.000Z' } },
   });
 
   assert.equal(running.kind, 'roadmap');
   assert.equal(running.id, 'roadmap:render-6');
-  assert.equal(running.style, 'Роадмап ремонта');
+  assert.equal(running.style, 'Роадмап покупок');
   assert.equal(running.status, 'running');
   assert.equal(done.status, 'done');
   assert.equal(roadmapTask({ id: 'render-8', meta: {} }), null);

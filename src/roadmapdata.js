@@ -3,20 +3,17 @@
 import { getArchitectPrompt } from './architectprompts.js';
 import { BREAKDOWN_ICON_KEYS } from './breakdowndata.js';
 
-export const ROADMAP_VERSION = 1;
+export const ROADMAP_VERSION = 2;
 
 export const PHASE_TITLES = {
-  demolition: 'Демонтаж и подготовка',
-  rough: 'Черновые работы',
-  electrics: 'Электрика',
+  electrics: 'Электрика и слаботочка',
   plumbing: 'Сантехника и вентиляция',
-  walls: 'Стены',
+  walls: 'Стены и фартук',
   floor: 'Пол',
   ceiling: 'Потолок',
-  doors: 'Двери и окна',
   lighting: 'Освещение',
-  painting: 'Покраска и финиш',
-  finish: 'Финиш и мебель',
+  doors: 'Окна и двери',
+  furniture: 'Мебель и финиш',
 };
 
 const ICON_SET = new Set(BREAKDOWN_ICON_KEYS);
@@ -35,24 +32,25 @@ const icon = (value, fallback = 'hammer') => {
 
 export const ROADMAP_SCHEMA = `Верни СТРОГО один JSON без markdown-обёрток:
 {
-  "title": "Роадмап ремонта",
+  "title": "Роадмап покупок",
   "sections": [
     {
       "key": "demolition",
       "title": "Демонтаж и подготовка",
       "icon": "hammer",
-      "cards": ["Снять старые обои", "Вынести мебель", "Защитить пол"]
+      "cards": ["Подрозетники и гофра", "Кабель и автоматы", "Светильники и ленты"]
     }
   ]
 }
 
 Правила контракта:
-- 5–9 этапов, в каждом 3–8 карточек.
+- 5–9 этапов, в каждом 3–8 позиций.
 - key — короткий латинский идентификатор этапа, уникальный.
-- title — понятное название этапа по-русски.
-- cards — массив строк, каждая строка — конкретная работа или покупка.
+- title — понятное название этапа закупки по-русски.
+- cards — массив строк, каждая строка — конкретная покупка без слова «купить».
 - icon — только из списка: ${BREAKDOWN_ICON_KEYS.join(', ')}.
-- Этапы идут в порядке выполнения ремонта.
+- Этапы идут в порядке, когда покупки понадобятся.
+- Только покупки: без работ, демонтажа и подготовки.
 - Неприменимые этапы не выводи.
 - Все тексты — на русском. Только JSON.`;
 
@@ -124,7 +122,7 @@ export function normalizeRoadmap(parsed = {}) {
   if (!sections.length) return null;
   return {
     version: ROADMAP_VERSION,
-    title: text(parsed.title, 120) || 'Роадмап ремонта',
+    title: text(parsed.title, 120) || 'Роадмап покупок',
     sections,
   };
 }
