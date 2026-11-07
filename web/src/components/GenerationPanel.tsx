@@ -1173,11 +1173,11 @@ export function GenerationPanel({
                                     ) : null}
                                     <div className="mt-2 grid grid-cols-2 gap-px border border-foreground/25 bg-border">
                                       <label className="inline-flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
-                                        <Upload className="size-4 shrink-0" /> <span className="min-w-0 break-words">{hasSource ? 'Заменить файл' : 'Выбрать файл'}</span>
+                                        <Upload className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">{hasSource ? 'Заменить файл' : 'Выбрать файл'}</span>
                                         <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
                                       </label>
                                       <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
-                                        <Clipboard className="size-4 shrink-0" /> <span className="min-w-0 break-words">Вставить из буфера</span>
+                                        <Clipboard className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words sm:hidden">Из буфера</span><span className="hidden min-w-0 break-words sm:inline">Вставить из буфера</span>
                                       </button>
                                     </div>
                                     {hasSource && (
