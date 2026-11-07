@@ -10,7 +10,6 @@ import {
   Download,
   Expand,
   LoaderCircle,
-  Plus,
   RotateCcw,
   Share2,
   Search,
@@ -1196,7 +1195,7 @@ export function GenerationPanel({
                               })}
                             </div>
                             <button type="button" onClick={addEditBlock} disabled={editRefs.length >= MAX_EDIT_BLOCKS} className="mt-3 inline-flex min-h-10 items-center gap-2 border border-foreground px-3 text-xs transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                              <Plus className="size-4 shrink-0 text-primary-text" /> <span className="leading-none">Добавить правку</span> <span className="font-mono text-[11px] leading-none text-primary-text">{editRefs.length} из {MAX_EDIT_BLOCKS}</span>
+                              <span className="leading-none">Добавить правку</span> <span className="font-mono text-[11px] leading-none text-primary-text">{editRefs.length} из {MAX_EDIT_BLOCKS}</span>
                             </button>
                             <div className="mt-3">
                               <button
