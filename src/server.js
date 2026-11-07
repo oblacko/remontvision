@@ -1623,7 +1623,7 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
   const render = await q.renderOwnedByUser(req.params.id, req.user.id);
   if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
   if (render.status !== 'done' || !render.image_path) return res.status(409).json({ error: 'Дизайн ещё не готов' });
-  if (render.analysis?.breakdown?.version === 3) {
+  if (render.analysis?.breakdown?.version === 4) {
     return res.json({ analysis: render.analysis, breakdown: render.analysis.breakdown, cached: true });
   }
   const baseMeta = render.meta || {};
@@ -1666,7 +1666,7 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
   const finishedAt = new Date().toISOString();
   const meta = {
     ...baseMeta,
-    breakdown: { version: 3, status: 'done', started_at: startedAt, finished_at: finishedAt, at: finishedAt, cost_usd: result.cost ?? null },
+    breakdown: { version: 4, status: 'done', started_at: startedAt, finished_at: finishedAt, at: finishedAt, cost_usd: result.cost ?? null },
   };
   await q.setRenderMeta(render.id, meta);
   log({

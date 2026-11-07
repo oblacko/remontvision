@@ -19,13 +19,27 @@ test('normalizeBreakdown keeps up to 5 cards with why and color', () => {
     ],
   });
 
-  assert.equal(result.version, 3);
+  assert.equal(result.version, 4);
   assert.equal(result.title, 'Что подобрать');
   assert.equal(result.cards.length, 5);
   assert.equal(result.cards[0].hex, '#A6784F');
   assert.equal(result.cards[1].icon, 'sparkles');
   assert.equal(result.cards[1].hex, null);
   assert.equal(result.cards[0].why, 'тёплый акцент');
+});
+
+test('normalizeBreakdown keeps lighting plan, temperature and why', () => {
+  const result = normalizeBreakdown({
+    cards: [{ name: 'Стол' }],
+    lighting: { plan: 'лента на фартук и точечные по потолку', temperature: '2700–3000K', why: 'нижний свет делает фартук светящейся полосой' },
+  });
+
+  assert.deepEqual(result.lighting, {
+    plan: 'лента на фартук и точечные по потолку',
+    temperature: '2700–3000K',
+    why: 'нижний свет делает фартук светящейся полосой',
+  });
+  assert.equal(normalizeBreakdown({ cards: [{ name: 'Стол' }], lighting: {} }).lighting, null);
 });
 
 test('normalizeBreakdown drops empty cards and returns null when nothing useful', () => {
@@ -41,7 +55,9 @@ test('buildBreakdownSystem merges the selection prompt with the JSON contract', 
   assert.match(system, /консультант по подбору материалов/i);
   assert.match(system, /Что подобрать/);
   assert.match(system, /why/);
+  assert.match(system, /lighting/);
   assert.match(system, /hex/);
+  assert.match(system, /СВЕТ/);
   for (const key of BREAKDOWN_ICON_KEYS) assert.ok(system.includes(key), `icon ${key} missing`);
 });
 

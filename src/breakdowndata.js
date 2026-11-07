@@ -2,7 +2,7 @@
 // Чистые функции без БД — используются сервером и тестами.
 import { getArchitectPrompt } from './architectprompts.js';
 
-export const BREAKDOWN_VERSION = 3;
+export const BREAKDOWN_VERSION = 4;
 
 // Закрытый набор иконок: ключи совпадают с картой в GuideIcon.tsx.
 export const BREAKDOWN_ICON_KEYS = [
@@ -44,7 +44,12 @@ export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без ma
       "why": "единственный тёплый материал связывает холодную кухню",
       "hex": "#A6784F"
     }
-  ]
+  ],
+  "lighting": {
+    "plan": "линейная LED-щель в колонне, подсветка фартука и точечные по потолку",
+    "temperature": "2700–3000K, тёплая",
+    "why": "нижний свет делает фартук светящейся полосой, а вертикальная щель даёт акцент без люстры"
+  }
 }
 
 Правила контракта:
@@ -55,6 +60,7 @@ export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без ma
 - why — почему это важно для образа: контраст, повторение, свет, тепло, ритм.
 - hex — цвет из изображения, только если очевиден; иначе не указывай. Формат #RRGGBB.
 - icon — только из списка: ${BREAKDOWN_ICON_KEYS.join(', ')}.
+- lighting — как применить свет именно здесь: plan, temperature, why.
 - Не выдумывай бренды, цены, ссылки и точные материалы.
 - Все тексты — на русском. Только JSON.`;
 
@@ -104,10 +110,18 @@ export function normalizeBreakdown(parsed = {}) {
     .slice(0, MAX_CARDS);
   if (!cards.length) return null;
 
+  const lightingRaw = parsed.lighting && typeof parsed.lighting === 'object' ? parsed.lighting : null;
+  const lighting = lightingRaw ? {
+    plan: text(lightingRaw.plan, 300),
+    temperature: text(lightingRaw.temperature, 120),
+    why: text(lightingRaw.why, 300),
+  } : null;
+
   return {
     version: BREAKDOWN_VERSION,
     title: text(parsed.title, 120) || 'Что подобрать',
     lead: text(parsed.lead, 200),
     cards,
+    lighting: lighting && (lighting.plan || lighting.temperature || lighting.why) ? lighting : null,
   };
 }

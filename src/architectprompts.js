@@ -95,6 +95,13 @@ export const DEFAULT_BREAKDOWN_PROMPT = `Ты — консультант по п
 - Не повторяй один и тот же смысл в разных позициях.
 - Все тексты — на русском.
 
+СВЕТ
+Дополнительно опиши, как лучше применить свет именно в этом интерьере:
+— где общий (ambient), рабочий (task) и акцентный (accent) свет;
+— какая цветовая температура;
+— почему это работает для этого дизайна.
+Не выдумывай светильники, которых не видно, если они не нужны для замысла.
+
 ИКОНКА
 Выбери icon строго из списка: palette, layers, paint, wallpaper, sofa, armchair, bed, table, lamp, lightbulb, refrigerator, cooktop, utensils, hood, washing, shower, water, ruler, zap, calculator, coins, receipt, check, shield, rocket, flag, arrow, hammer, wrench, box, door, blinds, shopping, tag, sparkles.
 Иконка должна отражать суть позиции.`;

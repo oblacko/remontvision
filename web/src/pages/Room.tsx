@@ -22,7 +22,8 @@ type DesignDirection = {
   quietAreas?: string[]
 }
 type BreakdownCard = { icon?: string; name: string; traits?: string; clarify?: string; why?: string; hex?: string | null }
-type Breakdown = { version?: number; title: string; lead?: string; cards: BreakdownCard[] }
+type BreakdownLighting = { plan?: string; temperature?: string; why?: string }
+type Breakdown = { version?: number; title: string; lead?: string; cards: BreakdownCard[]; lighting?: BreakdownLighting | null }
 type Render = {
   id: string
   image: string | null
@@ -107,7 +108,7 @@ export default function Room() {
   const render = room?.render || null
   const image = render?.image || room?.photo_url || null
   const storedBreakdown = render?.analysis?.breakdown || null
-  const breakdown = storedBreakdown?.version === 3 ? storedBreakdown : null
+  const breakdown = storedBreakdown?.version === 4 ? storedBreakdown : null
   const selectedRenderId = render?.id || ''
   const selectedRenderRef = useRef('')
 
@@ -422,6 +423,34 @@ function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
               )
             })}
           </div>
+
+          {breakdown.lighting && (breakdown.lighting.plan || breakdown.lighting.temperature || breakdown.lighting.why) && (
+            <section className="border border-foreground/25 p-4">
+              <div className="flex items-start gap-3">
+                <GuideIcon name="lightbulb" className="mt-0.5" />
+                <div className="min-w-0">
+                  <p className="eyebrow">Световой дизайн</p>
+                  {breakdown.lighting.plan && <p className="mt-1.5 text-sm font-medium leading-5">{breakdown.lighting.plan}</p>}
+                  {breakdown.lighting.temperature && <p className="mt-1 text-xs leading-5 text-muted-foreground">Температура: {breakdown.lighting.temperature}</p>}
+                  {breakdown.lighting.why && (
+                    <p className="mt-1.5 flex gap-1.5 text-[11px] leading-4 text-primary-text">
+                      <GuideIcon name="sparkles" className="mt-0.5 size-3.5" />
+                      <span>{breakdown.lighting.why}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 border-t border-foreground/15 pt-3">
+                <p className="eyebrow">Принципы</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-muted-foreground">
+                  <li>Три слоя света: общий, рабочий и акцентный — на отдельных контурах.</li>
+                  <li>Тёплый свет 2700–3000K, одна температура в комнате.</li>
+                  <li>CRI ≥ 90 — иначе краски и материалы теряют цвет.</li>
+                  <li>Не меньше трёх источников на разной высоте и диммеры.</li>
+                </ul>
+              </div>
+            </section>
+          )}
         </>
       )}
 
