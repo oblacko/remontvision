@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, LoaderCircle, Share2, Trash2, Zap } from 'lucide-react'
-import { ShareDialog } from '@/components/ShareDialog'
+import { ArrowLeft, LoaderCircle, X, Zap } from 'lucide-react'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import '../App.css'
 
@@ -93,7 +92,6 @@ export default function Room() {
   const [tab, setTab] = useState<'editor' | 'design'>('editor')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [shareOpen, setShareOpen] = useState(false)
   const [finalBusy, setFinalBusy] = useState(false)
 
   const loadRoom = useCallback(async () => {
@@ -145,13 +143,6 @@ export default function Room() {
     }
   }
 
-  const removeRoom = async () => {
-    if (!confirm('Удалить комнату и все версии? Это необратимо.')) return
-    const r = await fetch(`/api/rooms/${id}`, { method: 'DELETE' })
-    if (!r.ok) { setError('Не удалось удалить комнату'); return }
-    navigate('/cabinet')
-  }
-
   if (loading && !room) {
     return <main className="page-shell flex min-h-[60vh] items-center justify-center"><LoaderCircle className="size-8 animate-spin text-primary-text" /></main>
   }
@@ -168,19 +159,18 @@ export default function Room() {
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b bg-background">
-        <div className="page-shell flex min-h-16 flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link to="/cabinet" className="inline-flex items-center gap-2 text-sm hover:opacity-60"><ArrowLeft className="size-4" />Кабинет</Link>
-            <span className="min-w-0 truncate text-sm font-medium">{room.style}{room.room_type ? ` · ${room.room_type}` : ''}</span>
+        <div className="page-shell flex min-h-16 items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span></a>
+            <span className="eyebrow hidden sm:inline">/ комната</span>
           </div>
-          <div className="flex items-center gap-2">
-            {render?.image && <button type="button" onClick={() => setShareOpen(true)} className="action-secondary min-h-10 px-3 text-xs"><Share2 className="size-4" />Поделиться</button>}
-            <button type="button" onClick={() => void removeRoom()} className="inline-flex min-h-10 items-center gap-2 border border-destructive/50 px-3 text-xs text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить</button>
-          </div>
+          <button type="button" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/cabinet') }} className="flex size-11 shrink-0 items-center justify-center border border-foreground transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Закрыть">
+            <X className="size-5" />
+          </button>
         </div>
       </header>
 
-      <main className="page-shell py-6">
+      <main className="page-shell py-8">
         {error && <p className="mb-4 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{error}</p>}
 
         {busy ? (
@@ -201,11 +191,11 @@ export default function Room() {
         ) : (
           <div className="grid gap-8 xl:grid-cols-[1fr_22rem]">
             <div className="min-w-0">
-              <div className="flex gap-2 overflow-x-auto border-b pb-2">
+              <nav className="flex overflow-x-auto border-b" aria-label="Разделы комнаты">
                 {([['editor', 'Редактор'], ['design', 'Дизайн']] as const).map(([key, label]) => (
-                  <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-10 shrink-0 border px-4 text-xs transition-colors ${tab === key ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
+                  <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm ${tab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
                 ))}
-              </div>
+              </nav>
 
               {tab === 'editor' && (
                 <div className="mt-6 min-w-0">
@@ -228,8 +218,6 @@ export default function Room() {
           </div>
         )}
       </main>
-
-      {render?.id && <ShareDialog renderId={render.id} open={shareOpen} onClose={() => setShareOpen(false)} />}
     </div>
   )
 }
