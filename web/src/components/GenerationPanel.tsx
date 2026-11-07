@@ -239,7 +239,6 @@ export function GenerationPanel({
   const [concepts, setConcepts] = useState<DesignConcept[]>([])
   const [compatibility, setCompatibility] = useState<DesignCompatibility>({})
   const [conceptKey, setConceptKey] = useState<string | null>(null)
-  const [aiPickBusy, setAiPickBusy] = useState(false)
   const [selectedOffers, setSelectedOffers] = useState<Record<string, ProductOffer>>({})
   const [openSummaryTab, setOpenSummaryTab] = useState<string | null>(null)
   const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
@@ -721,21 +720,6 @@ export function GenerationPanel({
     if (photoInput.current) photoInput.current.value = ''
   }
 
-  const pickRandomDesign = async () => {
-    if (aiPickBusy) return
-    setAiPickBusy(true)
-    try {
-      const r = await fetch('/api/design/random', { method: 'POST' })
-      const d = await r.json().catch(() => ({}))
-      if (!r.ok || !d.style_id || !d.concept_id) return
-      const preset = stylePresets.find(item => item.key === d.style_id)
-      if (preset) setStyle(preset.name)
-      setConceptKey(d.concept_id)
-    } catch { /* тихо: пользователь выберет вручную */ } finally {
-      setAiPickBusy(false)
-    }
-  }
-
   const activeStep = stepIndex(step)
   const genStages = genMode === 'edit' ? EDIT_GEN_STAGES : [
     ...BASE_GEN_STAGES.slice(0, 1),
@@ -855,14 +839,9 @@ export function GenerationPanel({
             </div>
 
             <div className="mt-10 border-t pt-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="eyebrow">Шаг 03 / Концепция</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{style ? 'Выберите главный ход будущего интерьера.' : 'Сначала выберите стиль — покажем совместимые концепции.'}</p>
-                </div>
-                <button type="button" onClick={() => void pickRandomDesign()} disabled={aiPickBusy} className="action-secondary min-h-10 px-3 text-xs">
-                  {aiPickBusy ? <><LoaderCircle className="size-3.5 animate-spin" /> Подбираем…</> : 'На усмотрение ИИ'}
-                </button>
+              <div>
+                <p className="eyebrow">Шаг 03 / Концепция</p>
+                <p className="mt-1 text-sm text-muted-foreground">{style ? 'Выберите главный ход будущего интерьера.' : 'Сначала выберите стиль — покажем совместимые концепции.'}</p>
               </div>
               <div className="mt-4 flex snap-x snap-mandatory gap-px overflow-x-auto border bg-border sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3">
                 {concepts.map((concept) => {
