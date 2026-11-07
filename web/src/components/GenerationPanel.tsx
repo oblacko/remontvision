@@ -1155,7 +1155,7 @@ export function GenerationPanel({
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <p className="eyebrow">Прикрепить референс</p>
-                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><X className="size-4" strokeWidth={1.5} /></button>
+                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><X className="size-4" /></button>
                                     </div>
                                     {hasSource ? (
                                       <div className="mt-2 flex items-center gap-3 border border-foreground/25 p-2">
