@@ -167,6 +167,7 @@ export async function buildRepairScope({
   roomType = 'Другое',
   style = '',
   styleDescription = '',
+  sessionId = null,
 } = {}) {
   if (!originalImageDataUrl) return null;
   const builder = getArchitectPrompt('builder');
@@ -192,6 +193,7 @@ export async function buildRepairScope({
         model: REPAIR_MODEL,
         maxCostUsd: Number(process.env.REPAIR_SCOPE_MAX_COST_USD || 0.02),
         maxSteps: 2,
+        sessionId,
       });
       if (agent.parsed) {
         parsed = agent.parsed;
@@ -204,6 +206,7 @@ export async function buildRepairScope({
         user,
         images: [originalImageDataUrl, cleanedImageDataUrl].filter(Boolean),
         model: REPAIR_MODEL,
+        sessionId,
       });
       parsed = legacy.parsed;
       totalCost = legacy.cost ?? null;
@@ -219,6 +222,7 @@ export async function buildRepairScope({
           user,
           images: [originalImageDataUrl, cleanedImageDataUrl].filter(Boolean),
           model: null,
+          sessionId,
         });
         const retryValidated = validateRepairScope(retry.parsed || {});
         const retryScope = normalizeRepairScope(retryValidated || retry.parsed || {});
@@ -243,6 +247,7 @@ export async function buildArtDirection({
   styleDescription = '',
   dimensions = null,
   keepFurniture = true,
+  sessionId = null,
 } = {}) {
   if (!ART_DIRECTION_ENABLED || !imageDataUrl) return null;
   const room = roomTypeByName(roomType);
@@ -266,6 +271,9 @@ export async function buildArtDirection({
   ].filter(Boolean).join('\n');
   const buildFields = source => ({
     palette: normalizePalette(source.palette),
+    existingFurniture: Array.isArray(source.existing_furniture)
+      ? source.existing_furniture.map(item => clampText(item, 100)).filter(Boolean).slice(0, 12)
+      : null,
     roomDimensions: normalizeRoomDimensions(source.room_dimensions),
     lens: normalizeLens(source.lens),
     focalPoint: clampText(source.focal_point, 240),
@@ -299,12 +307,12 @@ export async function buildArtDirection({
     return text;
   };
 
-  let { parsed, cost } = await visionJson({ system: getArchitectPrompt('designer').system, user, images: [imageDataUrl], model: ART_DIRECTOR_MODEL });
+  let { parsed, cost } = await visionJson({ system: getArchitectPrompt('designer').system, user, images: [imageDataUrl], model: ART_DIRECTOR_MODEL, sessionId });
   let fields = buildFields(parsed);
   let text = buildText(parsed, fields);
   // Страховка: если выбранная модель вернула пусто, пробуем основную vision-модель.
   if (!text && ART_DIRECTOR_MODEL) {
-    const retry = await visionJson({ system: getArchitectPrompt('designer').system, user, images: [imageDataUrl], model: null });
+    const retry = await visionJson({ system: getArchitectPrompt('designer').system, user, images: [imageDataUrl], model: null, sessionId });
     parsed = retry.parsed;
     cost = (cost || 0) + (retry.cost || 0);
     fields = buildFields(parsed);

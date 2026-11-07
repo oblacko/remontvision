@@ -102,6 +102,7 @@ export async function buildDesignDirection({
   roomType = 'Другое',
   dimensions = null,
   usedDirections = [],
+  sessionId = null,
 } = {}) {
   if (!DESIGN_DIRECTION_ENABLED) return null;
   const { system, user, compatibility } = composeDirectionPrompt({ styleId, conceptId, roomType, dimensions, usedDirections });
@@ -115,6 +116,7 @@ export async function buildDesignDirection({
       model: DIRECTION_MODEL,
       maxCostUsd: Number(process.env.DIRECTION_MAX_COST_USD || 0.02),
       maxSteps: 2,
+      sessionId,
     });
     parsed = agent.parsed;
     cost = agent.cost ?? null;
@@ -128,6 +130,7 @@ export async function buildDesignDirection({
         model: undefined,
         maxCostUsd: Number(process.env.DIRECTION_MAX_COST_USD || 0.02),
         maxSteps: 2,
+        sessionId,
       });
       const retryResult = normalizeDirectionResult(retry.parsed, {
         styleId, conceptId, compatibility,

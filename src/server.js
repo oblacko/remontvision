@@ -1592,6 +1592,7 @@ app.post('/api/renders/:id/final-review', h(async (req, res) => {
     style: room.style,
     priceTier: room.price_tier || 'comfort',
     mode: 'final',
+    sessionId: render.meta?.render_session || `render:${render.id}`,
   });
   if (!review) return res.status(502).json({ error: 'Не удалось собрать итог по дизайну' });
   const products = Array.isArray(render.analysis?.products) ? render.analysis.products : [];
@@ -1652,6 +1653,10 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
     priceTier: room.price_tier || 'comfort',
     budget: room.budget,
     dimensions: render.meta?.room_dimensions_estimate || null,
+    repairScope: render.meta?.repair_scope || null,
+    designDirection: render.meta?.design_direction || null,
+    layoutPlan: render.meta?.layout_plan || null,
+    sessionId: render.meta?.render_session || `render:${render.id}`,
   });
   if (!result) {
     await q.setRenderMeta(render.id, {
@@ -1716,6 +1721,9 @@ app.post('/api/renders/:id/roadmap', h(async (req, res) => {
     style: room.style,
     priceTier: room.price_tier || 'comfort',
     repairScope: render.meta?.repair_scope || null,
+    designDirection: render.meta?.design_direction || null,
+    layoutPlan: render.meta?.layout_plan || null,
+    sessionId: render.meta?.render_session || `render:${render.id}`,
   });
   if (!result) {
     await q.setRenderMeta(render.id, {

@@ -20,7 +20,7 @@ import { modelCaps } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
-import { buildArtDirection, buildRepairScope } from './artdirector.js';
+import { analyzeRoomBrief, buildArtDirection, buildRepairScope } from './artdirector.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 
@@ -131,6 +131,7 @@ async function processRender(renderId) {
     let meta = {
       mode: iteration ? 'edit' : 'base',
       pipeline: iteration && render.ref_product_id ? 'design_product_binding_v1' : 'design_first_v1',
+      render_session: `render:${renderId}`,
       room_type: roomType,
       dimensions: roomDimensions,
       price_tier: priceTier,
@@ -247,6 +248,7 @@ async function processRender(renderId) {
             roomType,
             style: room.style,
             styleDescription: styleInfo?.prompt_description || '',
+            sessionId: `render:${renderId}`,
           });
           if (repair?.repairScope) {
             repairScope = repair.repairScope;
@@ -268,6 +270,7 @@ async function processRender(renderId) {
       // арт-директор остаётся fallback-ом для старых комнат (откат).
       let artDirection = '';
       let estimatedDimensions = roomDimensions;
+      let effectiveKeepFurniture = keepFurniture;
       if (!MOCK_MODE) {
         try {
           const adStart = Date.now();
@@ -279,7 +282,20 @@ async function processRender(renderId) {
             styleDescription: styleInfo?.prompt_description || '',
             dimensions: roomDimensions,
             keepFurniture,
+            sessionId: `render:${renderId}`,
           });
+          if (ad && keepFurniture && ad.existingFurniture === null) {
+            // Старый промт дизайнера мог не вернуть existing_furniture — уточняем брифом.
+            try {
+              const brief = await analyzeRoomBrief({ imageDataUrl: await bufferToDataUrl(adBuf), roomType });
+              if (Array.isArray(brief?.existing_furniture)) ad.existingFurniture = brief.existing_furniture;
+            } catch { /* остаётся null */ }
+          }
+          if (ad && keepFurniture && Array.isArray(ad.existingFurniture) && ad.existingFurniture.length === 0) {
+            effectiveKeepFurniture = false;
+            meta.empty_room_detected = true;
+            log({ event: 'empty_room_detected', room_id: room.id, render_id: renderId });
+          }
           if (ad?.roomDimensions) {
             estimatedDimensions = {
               ...ad.roomDimensions,
@@ -303,6 +319,7 @@ async function processRender(renderId) {
                 roomType,
                 dimensions: estimatedDimensions,
                 usedDirections,
+                sessionId: `render:${renderId}`,
               });
             } catch (e) {
               log({ event: 'design_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
@@ -346,7 +363,7 @@ async function processRender(renderId) {
       // Планировщик нужен только для пустой комнаты: он предлагает расстановку,
       // чтобы модель не сводила кабинет к «стол + стул + шкаф».
       let layoutPlan = null;
-      if (!MOCK_MODE && !keepFurniture) {
+      if (!MOCK_MODE && !effectiveKeepFurniture) {
         try {
           const layoutStart = Date.now();
           const layoutBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
@@ -356,6 +373,8 @@ async function processRender(renderId) {
             dimensions: estimatedDimensions,
             style: styleInfo?.key || room.style,
             concept: room.concept_key || '',
+            keepFurniture: effectiveKeepFurniture,
+            sessionId: meta.render_session,
           });
           if (layoutPlan) {
             addCost('layout', layoutPlan.cost);
@@ -380,7 +399,7 @@ async function processRender(renderId) {
         userStyleRef: styleUserRef,
         styleDescription: styleInfo?.prompt_description || '',
         roomType,
-        keepFurniture,
+        keepFurniture: effectiveKeepFurniture,
         // В базовом кадре товаров нет: каталог подключается после генерации.
         // Это сохраняет поведение A/B (products: [], useCatalog: false).
         useCatalog: false,
@@ -548,6 +567,7 @@ async function processRender(renderId) {
           style: room.style,
           priceTier,
           mode: 'hints',
+          sessionId: meta.render_session,
         });
         if (reviewed) {
           parsed = reviewed.parsed;

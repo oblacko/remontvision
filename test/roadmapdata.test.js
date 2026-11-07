@@ -79,3 +79,15 @@ test('buildRoadmapUser includes known inputs and repair scope', () => {
   assert.match(user, /Стены: paint · матовая краска/);
   assert.doesNotMatch(user, /Двери:/);
 });
+
+test('buildRoadmapUser carries accepted design decisions', () => {
+  const user = buildRoadmapUser({
+    roomType: 'Гостиная',
+    designDirection: { concept: 'Тёмный контемпорари', mainMove: { action: 'рейки на потолке' } },
+    layoutPlan: { strategy: 'диван вдоль длинной стены' },
+  });
+
+  assert.match(user, /Направление: Тёмный контемпорари/);
+  assert.match(user, /Главный ход: рейки на потолке/);
+  assert.match(user, /Планировка: диван вдоль длинной стены/);
+});

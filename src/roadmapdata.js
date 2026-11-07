@@ -67,7 +67,7 @@ const REPAIR_LABELS = [
   ['windows', 'Окна'],
 ];
 
-export function buildRoadmapUser({ roomType, style, priceTier, repairScope } = {}) {
+export function buildRoadmapUser({ roomType, style, priceTier, repairScope, designDirection, layoutPlan } = {}) {
   const lines = [
     'Тип изображения: сгенерированный дизайн.',
     roomType ? `Тип комнаты: ${roomType}.` : '',
@@ -84,8 +84,11 @@ export function buildRoadmapUser({ roomType, style, priceTier, repairScope } = {
     })
     .filter(Boolean);
   if (scopeLines.length) lines.push('Уже принятые решения (repair_scope):', ...scopeLines);
+  if (designDirection?.concept) lines.push(`Направление: ${designDirection.concept}`);
+  if (designDirection?.mainMove?.action) lines.push(`Главный ход: ${designDirection.mainMove.action}`);
+  if (layoutPlan?.strategy) lines.push(`Планировка: ${layoutPlan.strategy}`);
 
-  lines.push('Не выдумывай отсутствующие данные и работы, которых не требует этот интерьер.');
+  lines.push('Это уже принятые решения — не противоречь им. Не выдумывай отсутствующие данные и работы, которых не требует этот интерьер.');
   return lines.join('\n');
 }
 

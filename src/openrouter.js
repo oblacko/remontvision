@@ -128,13 +128,14 @@ export async function assertConfig() {
 
 // Единый vision-запрос с JSON-ответом. Используется арт-директором и другими
 // вспомогательными анализами, чтобы не дублировать парсинг/заголовки.
-export async function visionJson({ system = '', user = '', images = [], model = null } = {}) {
+export async function visionJson({ system = '', user = '', images = [], model = null, sessionId = null } = {}) {
   if (MOCK_MODE) return { parsed: {}, cost: null };
   const r = await fetchWithRetry(`${BASE}/chat/completions`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
       model: model || getModelConfig().vision,
+      ...(sessionId ? { session_id: sessionId } : {}),
       messages: [
         ...(system ? [{ role: 'system', content: system }] : []),
         {

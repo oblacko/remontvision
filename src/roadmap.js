@@ -13,17 +13,20 @@ export async function generateRoadmap({
   style = '',
   priceTier = 'comfort',
   repairScope = null,
+  designDirection = null,
+  layoutPlan = null,
+  sessionId = null,
   vision = null,
 } = {}) {
   if (!imageDataUrl) return null;
   const system = buildRoadmapSystem();
-  const user = buildRoadmapUser({ roomType, style, priceTier, repairScope });
+  const user = buildRoadmapUser({ roomType, style, priceTier, repairScope, designDirection, layoutPlan });
   let parsed = {};
   let cost = null;
 
   try {
     if (vision) {
-      const first = await vision({ system, user, images: [imageDataUrl], model: ROADMAP_MODEL });
+      const first = await vision({ system, user, images: [imageDataUrl], model: ROADMAP_MODEL, sessionId });
       parsed = first?.parsed || {};
       cost = first?.cost ?? null;
     } else {
@@ -35,6 +38,7 @@ export async function generateRoadmap({
           model: ROADMAP_MODEL,
           maxCostUsd: Number(process.env.ROADMAP_MAX_COST_USD || 0.08),
           maxSteps: 2,
+          sessionId,
         });
         if (agent.parsed) {
           parsed = agent.parsed;
@@ -43,7 +47,7 @@ export async function generateRoadmap({
       } catch { /* fallback на visionJson ниже */ }
       if (!parsed || !Object.keys(parsed).length) {
         const { visionJson } = await import('./openrouter.js');
-        const legacy = await visionJson({ system, user, images: [imageDataUrl], model: ROADMAP_MODEL });
+        const legacy = await visionJson({ system, user, images: [imageDataUrl], model: ROADMAP_MODEL, sessionId });
         parsed = legacy?.parsed || {};
         cost = legacy?.cost ?? null;
       }
@@ -56,7 +60,7 @@ export async function generateRoadmap({
   if (!roadmap && !vision) {
     try {
       const { visionJson } = await import('./openrouter.js');
-      const retry = await visionJson({ system, user, images: [imageDataUrl], model: ROADMAP_MODEL });
+      const retry = await visionJson({ system, user, images: [imageDataUrl], model: ROADMAP_MODEL, sessionId });
       const retried = normalizeRoadmap(retry?.parsed || {});
       if (retried) {
         roadmap = retried;

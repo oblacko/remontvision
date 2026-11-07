@@ -56,6 +56,8 @@ export async function callAgentJson({
   model = AGENT_MODEL,
   maxCostUsd = 0.02,
   maxSteps = 2,
+  sessionId = null,
+  previousResponseId = null,
 } = {}) {
   const content = [
     { type: 'input_text', text: String(inputText || '') },
@@ -67,14 +69,18 @@ export async function callAgentJson({
     input: [{ role: 'user', content }],
     text: { format: { type: 'json_object' } },
     stopWhen: [stepCountIs(maxSteps), maxCost(maxCostUsd)],
+    ...(sessionId ? { sessionId } : {}),
+    ...(previousResponseId ? { previousResponseId } : {}),
   });
   const text = await result.getText();
   let usage = null;
+  let responseId = null;
   try {
     const response = await result.getResponse();
     usage = response?.usage || null;
+    responseId = response?.id ?? null;
   } catch { /* usage не критичен */ }
-  return { parsed: extractJson(text), text, usage, cost: usage?.cost ?? null };
+  return { parsed: extractJson(text), text, usage, cost: usage?.cost ?? null, responseId };
 }
 
 // Агент с тулами: SDK сам крутит цикл tool-call → execute → model.
@@ -87,6 +93,8 @@ export async function callAgentWithTools({
   maxCostUsd = 0.05,
   maxSteps = 8,
   onToolResult = null,
+  sessionId = null,
+  previousResponseId = null,
 } = {}) {
   const content = [
     { type: 'input_text', text: String(inputText || '') },
@@ -99,6 +107,8 @@ export async function callAgentWithTools({
     tools,
     parallelToolCalls: true,
     stopWhen: [stepCountIs(maxSteps), maxCost(maxCostUsd)],
+    ...(sessionId ? { sessionId } : {}),
+    ...(previousResponseId ? { previousResponseId } : {}),
   });
   if (onToolResult) {
     (async () => {
@@ -111,9 +121,11 @@ export async function callAgentWithTools({
   }
   const text = await result.getText();
   let usage = null;
+  let responseId = null;
   try {
     const response = await result.getResponse();
     usage = response?.usage || null;
+    responseId = response?.id ?? null;
   } catch { /* usage не критичен */ }
-  return { parsed: extractJson(text), text, usage, cost: usage?.cost ?? null };
+  return { parsed: extractJson(text), text, usage, cost: usage?.cost ?? null, responseId };
 }

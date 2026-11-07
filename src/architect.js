@@ -277,6 +277,7 @@ export async function reviewDesign({
   priceTier = 'comfort',
   mode = 'hints',
   vision = null,
+  sessionId = null,
 } = {}) {
   if (!imageDataUrl) return null;
   const callVision = vision || (await import('./openrouter.js')).visionJson;
@@ -298,6 +299,7 @@ export async function reviewDesign({
           model: ARCHITECT_MODEL,
           maxCostUsd: Number(process.env.ARCHITECT_MAX_COST_USD || 0.02),
           maxSteps: 2,
+          sessionId,
         });
         if (agent.parsed) {
           parsed = agent.parsed;

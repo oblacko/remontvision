@@ -29,6 +29,7 @@ export function composeLayoutPrompt({
   style = '',
   concept = '',
   usedStrategies = [],
+  keepFurniture = false,
 } = {}) {
   const styleCard = styleById(style);
   const conceptCard = concept ? conceptById(concept) : null;
@@ -41,7 +42,11 @@ export function composeLayoutPrompt({
     dimensionsText(dimensions),
     styleCard ? `Стиль: ${styleCard.name}. Материалы: ${styleCard.materials}.` : style ? `Стиль: ${style}.` : '',
     conceptCard ? `Концепция: ${conceptCard.name}. Главный ход: ${conceptCard.main_move}.` : '',
-    'Не своди планировку к шаблону «стол + стул + шкаф»; минимум 5 предметов и 2 зоны.',
+    keepFurniture
+      ? 'В комнате уже есть мебель: планируй вокруг неё, не добавляй дубли и лишние предметы. Проверь, что существующая расстановка не блокирует проходы 60 см.'
+      : 'Комната пустая: спланируй наполнение с нуля.',
+    'Жёстко проверь влезаемость: сумма габаритов предметов вдоль одной стены + проход 60 см не должна превышать размер комнаты. Не влезает — убери или уменьши предмет.',
+    'Не своди планировку к шаблону «стол + стул + шкаф»; минимум 5 предметов и 2 зоны добавляй только если они влезают.',
     history,
     'Предложи планировку по схеме. Только JSON.',
   ].filter(Boolean).join('\n');
@@ -73,9 +78,11 @@ export async function buildLayoutPlan({
   style = '',
   concept = '',
   usedStrategies = [],
+  keepFurniture = false,
+  sessionId = null,
 } = {}) {
   if (!LAYOUT_ENABLED || !imageDataUrl) return null;
-  const { system, user } = composeLayoutPrompt({ roomType, dimensions, style, concept, usedStrategies });
+  const { system, user } = composeLayoutPrompt({ roomType, dimensions, style, concept, usedStrategies, keepFurniture });
   let cost = null;
   try {
     const agent = await callAgentJson({
@@ -85,6 +92,7 @@ export async function buildLayoutPlan({
       model: LAYOUT_MODEL,
       maxCostUsd: Number(process.env.LAYOUT_MAX_COST_USD || 0.02),
       maxSteps: 2,
+      sessionId,
     });
     cost = agent.cost ?? null;
     const plan = normalizeLayoutPlan(agent.parsed);
@@ -98,6 +106,7 @@ export async function buildLayoutPlan({
       model: undefined,
       maxCostUsd: Number(process.env.LAYOUT_MAX_COST_USD || 0.02),
       maxSteps: 2,
+      sessionId,
     });
     const plan = normalizeLayoutPlan(retry.parsed);
     return plan ? { ...plan, cost: (cost || 0) + (retry.cost || 0) } : null;

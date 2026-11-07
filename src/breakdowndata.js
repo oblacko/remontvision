@@ -76,8 +76,19 @@ const dimensionText = dimensions => {
   return `${width} × ${length}${heightText}`;
 };
 
-export function buildBreakdownUser({ roomType, style, priceTier, budget, dimensions } = {}) {
+export function buildBreakdownUser({ roomType, style, priceTier, budget, dimensions, repairScope, designDirection, layoutPlan } = {}) {
   const dims = dimensionText(dimensions);
+  const scope = ['floor', 'ceiling', 'walls', 'doors', 'windows']
+    .map(key => {
+      const item = repairScope?.[key];
+      if (!item?.action) return '';
+      return `${key}: ${[item.action, item.material, item.why].filter(Boolean).join(' · ')}`;
+    })
+    .filter(Boolean);
+  const move = designDirection?.mainMove?.action
+    ? `${designDirection.mainMove.target ? `${designDirection.mainMove.target} — ` : ''}${designDirection.mainMove.action}${designDirection.mainMove.effect ? ` · ${designDirection.mainMove.effect}` : ''}`
+    : '';
+  const layout = layoutPlan?.strategy || '';
   return [
     'Тип изображения: сгенерированный дизайн.',
     roomType ? `Тип комнаты: ${roomType}.` : '',
@@ -85,6 +96,11 @@ export function buildBreakdownUser({ roomType, style, priceTier, budget, dimensi
     priceTier ? `Класс материалов: ${priceTier}.` : '',
     budget != null ? `Бюджет: ${Math.round(Number(budget))} тыс. ₽.` : '',
     dims ? `Размеры (оценка по изображению): ${dims}.` : '',
+    'Это результат уже принятых решений — не противоречь им и не переизобретай:',
+    designDirection?.concept ? `- Направление: ${designDirection.concept}` : '',
+    move ? `- Главный ход: ${move}` : '',
+    layout ? `- Планировка: ${layout}` : '',
+    scope.length ? `- Ремонт: ${scope.join('; ')}` : '',
     'Не выдумывай отсутствующие данные. Если данных не хватает, отрази это в параметре для уточнения.',
   ].filter(Boolean).join('\n');
 }

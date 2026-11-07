@@ -13,17 +13,21 @@ export async function breakdownInterior({
   priceTier = 'comfort',
   budget = null,
   dimensions = null,
+  repairScope = null,
+  designDirection = null,
+  layoutPlan = null,
+  sessionId = null,
   vision = null,
 } = {}) {
   if (!imageDataUrl) return null;
   const system = buildBreakdownSystem();
-  const user = buildBreakdownUser({ roomType, style, priceTier, budget, dimensions });
+  const user = buildBreakdownUser({ roomType, style, priceTier, budget, dimensions, repairScope, designDirection, layoutPlan });
   let parsed = {};
   let cost = null;
 
   try {
     if (vision) {
-      const first = await vision({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL });
+      const first = await vision({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL, sessionId });
       parsed = first?.parsed || {};
       cost = first?.cost ?? null;
     } else {
@@ -35,6 +39,7 @@ export async function breakdownInterior({
           model: BREAKDOWN_MODEL,
           maxCostUsd: Number(process.env.BREAKDOWN_MAX_COST_USD || 0.08),
           maxSteps: 2,
+          sessionId,
         });
         if (agent.parsed) {
           parsed = agent.parsed;
@@ -43,7 +48,7 @@ export async function breakdownInterior({
       } catch { /* fallback на visionJson ниже */ }
       if (!parsed || !Object.keys(parsed).length) {
         const { visionJson } = await import('./openrouter.js');
-        const legacy = await visionJson({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL });
+        const legacy = await visionJson({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL, sessionId });
         parsed = legacy?.parsed || {};
         cost = legacy?.cost ?? null;
       }
@@ -57,7 +62,7 @@ export async function breakdownInterior({
   if (!breakdown && !vision) {
     try {
       const { visionJson } = await import('./openrouter.js');
-      const retry = await visionJson({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL });
+      const retry = await visionJson({ system, user, images: [imageDataUrl], model: BREAKDOWN_MODEL, sessionId });
       const retried = normalizeBreakdown(retry?.parsed || {});
       if (retried) {
         breakdown = retried;

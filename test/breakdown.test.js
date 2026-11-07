@@ -77,3 +77,17 @@ test('buildBreakdownUser passes known inputs and omits unknown ones', () => {
   assert.match(user, /3 × 4 × 2,7 м/);
   assert.doesNotMatch(user, /Город:/);
 });
+
+test('buildBreakdownUser carries accepted design decisions', () => {
+  const user = buildBreakdownUser({
+    roomType: 'Гостиная',
+    repairScope: { floor: { action: 'replace', material: 'тёмный дуб' } },
+    designDirection: { concept: 'Тёмный контемпорари', mainMove: { action: 'рейки на потолке' } },
+    layoutPlan: { strategy: 'диван вдоль длинной стены' },
+  });
+
+  assert.match(user, /Направление: Тёмный контемпорари/);
+  assert.match(user, /Главный ход: рейки на потолке/);
+  assert.match(user, /Планировка: диван вдоль длинной стены/);
+  assert.match(user, /Ремонт: floor: replace · тёмный дуб/);
+});
