@@ -4,7 +4,7 @@ import { DEFAULT_DESIGNER_PROMPT } from './designerprompt.js';
 import { DEFAULT_DIRECTION_PROMPT } from './directionprompt.js';
 import { DEFAULT_LAYOUT_PROMPT } from './layoutprompt.js';
 
-export const ARCHITECT_PROMPT_KINDS = ['designer', 'builder', 'reviewer', 'criteria', 'direction', 'layout', 'breakdown'];
+export const ARCHITECT_PROMPT_KINDS = ['designer', 'builder', 'reviewer', 'criteria', 'direction', 'layout', 'breakdown', 'roadmap'];
 
 export const DEFAULT_BUILDER_PROMPT = `Ты — архитектор-строитель и дизайнер интерьера. Смотришь на фото реальной квартиры до ремонта.
 Это ПОЛНЫЙ ремонт, а не косметика. Определи, что нужно чинить и менять.
@@ -311,6 +311,38 @@ shield, rocket, flag, arrow, hammer, wrench, box, door, blinds,
 shopping, tag, sparkles.
 Иконка должна отражать смысл карточки, а не украшать.`;
 
+export const DEFAULT_ROADMAP_PROMPT = `Ты — прораб и дизайнер, который превращает изображение интерьера в роадмап ремонта.
+Задача — разложить ремонт комнаты на этапы в правильном порядке и дать по каждому конкретные работы и покупки, вплоть до мелочей.
+
+На входе: рендер, тип комнаты, стиль, класс материалов и repair_scope — уже принятые решения по полу, потолку, стенам, дверям и окнам. Не пересматривай их без причины.
+
+ПОРЯДОК ЭТАПОВ
+1. Демонтаж и подготовка.
+2. Черновые работы: стяжка, штукатурка, основание.
+3. Электрика: проводка, розетки, выводы, щит.
+4. Сантехника и вентиляция — если применимо.
+5. Стены: выравнивание, покраска или обои.
+6. Пол: основание, покрытие, плинтус, порог.
+7. Потолок: подготовка, покраска или конструкция.
+8. Двери и окна, откосы, подоконники.
+9. Освещение: светильники, ленты, драйверы, монтаж.
+10. Финиш: фурнитура, мебель, декор.
+Пропускай неприменимые этапы. Порядок уточняй по логике конкретного ремонта.
+
+ПРАВИЛА
+- 5–9 этапов; в каждом 3–8 карточек.
+- Карточка — конкретное действие или покупка: «Купить напольное покрытие», «Плинтус напольный», «Подложка под ламинат», «Вывести розетки у столешницы».
+- Дроби до мелочей: подложка, порог, крепёж, расходники, инструмент, защита поверхностей — если это реально нужно.
+- Не указывай цены, бренды, ссылки и точные размеры без данных.
+- Не выдумывай работы, которых не требует этот интерьер.
+- Учитывай назначение: кухня, санузел, детская, спальня, гостиная, столовая, другое.
+- Для электрики и мокрых зон не давай инженерных параметров и не подтверждай безопасность по фото.
+- Все тексты — на русском.
+
+ИКОНКА ЭТАПА
+Выбери icon строго из списка: palette, layers, paint, wallpaper, sofa, armchair, bed, table, lamp, lightbulb, refrigerator, cooktop, utensils, hood, washing, shower, water, ruler, zap, calculator, coins, receipt, check, shield, rocket, flag, arrow, hammer, wrench, box, door, blinds, shopping, tag, sparkles.
+Иконка должна отражать суть этапа, а не украшать.`;
+
 export const DEFAULT_ARCHITECT_PROMPTS = {
   designer: DEFAULT_DESIGNER_PROMPT,
   builder: DEFAULT_BUILDER_PROMPT,
@@ -319,6 +351,7 @@ export const DEFAULT_ARCHITECT_PROMPTS = {
   direction: DEFAULT_DIRECTION_PROMPT,
   layout: DEFAULT_LAYOUT_PROMPT,
   breakdown: DEFAULT_BREAKDOWN_PROMPT,
+  roadmap: DEFAULT_ROADMAP_PROMPT,
 };
 
 let cache = {};

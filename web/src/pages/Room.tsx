@@ -1,54 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Armchair,
-  Bed,
-  Blinds,
-  Box,
-  Calculator,
-  ChevronDown,
-  ClipboardCheck,
-  Coins,
-  CookingPot,
-  DoorOpen,
-  Download,
-  Droplet,
-  Expand,
-  Fan,
-  Flag,
-  Hammer,
-  Lamp,
-  Layers,
-  Lightbulb,
-  LoaderCircle,
-  PaintRoller,
-  Palette,
-  Receipt,
-  Refrigerator,
-  Rocket,
-  Ruler,
-  Share2,
-  ShieldCheck,
-  ShoppingCart,
-  ShowerHead,
-  Sofa,
-  Sparkles,
-  Table,
-  Tag,
-  Utensils,
-  Wallpaper,
-  WashingMachine,
-  Wrench,
-  X,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Download, Expand, LoaderCircle, Share2, X, Zap } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { useTasks } from '@/components/TaskDock'
-import { cn } from '@/lib/utils'
+import { GuideIcon } from '@/components/GuideIcon'
+import { RoadmapTab } from '@/components/RoomRoadmap'
+import type { RoadmapGroup, RoadmapItem } from '@/lib/roadmap'
 import '../App.css'
 
 type Surface = { surface?: string; label?: string; hex?: string; ral?: { code?: string; name?: string } | null; description?: string }
@@ -92,32 +50,18 @@ type RoomData = {
   status: string
   error?: string | null
   photo_url?: string | null
+  has_purchased?: boolean
+  roadmap_items?: RoadmapItem[]
   render?: Render | null
 }
 
-const BREAKDOWN_ICONS: Record<string, LucideIcon> = {
-  palette: Palette, layers: Layers, paint: PaintRoller, wallpaper: Wallpaper,
-  sofa: Sofa, armchair: Armchair, bed: Bed, table: Table, lamp: Lamp,
-  lightbulb: Lightbulb, refrigerator: Refrigerator, cooktop: CookingPot,
-  utensils: Utensils, hood: Fan, washing: WashingMachine, shower: ShowerHead,
-  water: Droplet, ruler: Ruler, zap: Zap, calculator: Calculator, coins: Coins,
-  receipt: Receipt, check: ClipboardCheck, shield: ShieldCheck, rocket: Rocket,
-  flag: Flag, arrow: ArrowRight, hammer: Hammer, wrench: Wrench, box: Box,
-  door: DoorOpen, blinds: Blinds, shopping: ShoppingCart, tag: Tag, sparkles: Sparkles,
-}
-
 const stageLabel = (status?: string) => status === 'analyzing' ? 'Анализ фото' : status === 'rendering' ? 'Генерация изображения' : status === 'matching' ? 'Разбор рендера' : status === 'queued' ? 'В очереди' : 'В процессе'
-
-function BreakdownIcon({ name, className }: { name?: string; className?: string }) {
-  const Icon = (name && BREAKDOWN_ICONS[name]) || Sparkles
-  return <Icon className={cn('size-4 shrink-0 text-primary-text', className)} />
-}
 
 function GuideSection({ icon, title, preview, children }: { icon?: string; title: string; preview?: string; children: ReactNode }) {
   return (
     <details className="group border border-foreground/25">
       <summary className="flex cursor-pointer list-none items-start gap-3 p-4 [&::-webkit-details-marker]:hidden">
-        <BreakdownIcon name={icon} className="mt-0.5" />
+        <GuideIcon name={icon} className="mt-0.5" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium">{title}</span>
           {preview && <span className="mt-1 block text-xs leading-5 text-muted-foreground">{preview}</span>}
@@ -132,7 +76,7 @@ function GuideSection({ icon, title, preview, children }: { icon?: string; title
 function GuideItem({ icon, title, children }: { icon?: string; title: string; children?: ReactNode }) {
   return (
     <div className="flex gap-3 border border-foreground/20 p-3">
-      <BreakdownIcon name={icon} className="mt-0.5" />
+      <GuideIcon name={icon} className="mt-0.5" />
       <div className="min-w-0">
         <p className="text-sm font-medium leading-5">{title}</p>
         {children}
@@ -178,13 +122,19 @@ export default function Room() {
   const [searchParams] = useSearchParams()
   const { refresh: refreshTasks } = useTasks()
   const [room, setRoom] = useState<RoomData | null>(null)
-  const [tab, setTab] = useState<'editor' | 'design'>(() => searchParams.get('tab') === 'design' ? 'design' : 'editor')
+  const [tab, setTab] = useState<'editor' | 'design' | 'roadmap'>(() => {
+    const value = searchParams.get('tab')
+    return value === 'design' || value === 'roadmap' ? value : 'editor'
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [breakdownBusy, setBreakdownBusy] = useState(false)
   const [breakdownError, setBreakdownError] = useState('')
+  const [items, setItems] = useState<RoadmapItem[]>([])
+  const [roadmapBusy, setRoadmapBusy] = useState(false)
+  const [roadmapError, setRoadmapError] = useState('')
 
   const loadRoom = useCallback(async (renderId?: string) => {
     try {
@@ -193,6 +143,7 @@ export default function Room() {
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setError(d.error || 'Комната не найдена'); return null }
       setRoom(d)
+      setItems(Array.isArray(d.roadmap_items) ? d.roadmap_items : [])
       return d as RoomData
     } catch {
       setError('Не удалось открыть комнату')
@@ -247,6 +198,81 @@ export default function Room() {
       if (selectedRenderRef.current === targetId) setBreakdownError(e instanceof Error ? e.message : 'Не удалось собрать разбор')
     } finally {
       if (selectedRenderRef.current === targetId) setBreakdownBusy(false)
+    }
+  }
+
+  const runRoadmap = async (refresh = false) => {
+    if (!render?.id || roadmapBusy) return
+    const targetId = render.id
+    setRoadmapBusy(true)
+    setRoadmapError('')
+    window.setTimeout(() => { void refreshTasks() }, 1500)
+    try {
+      const r = await fetch(`/api/renders/${targetId}/roadmap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(refresh ? { refresh: true } : {}),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      if (selectedRenderRef.current !== targetId) return
+      const fresh = await loadRoom(targetId)
+      if (fresh?.roadmap_items) setItems(fresh.roadmap_items)
+      void refreshTasks()
+    } catch (e) {
+      if (selectedRenderRef.current === targetId) setRoadmapError(e instanceof Error ? e.message : 'Не удалось составить роадмап')
+    } finally {
+      if (selectedRenderRef.current === targetId) setRoadmapBusy(false)
+    }
+  }
+
+  const patchRoadmapItem = async (item: RoadmapItem, patch: Partial<Pick<RoadmapItem, 'done' | 'active' | 'comment' | 'text'>>) => {
+    setItems(prev => prev.map(row => row.id === item.id ? { ...row, ...patch } : row))
+    try {
+      const r = await fetch(`/api/rooms/${id}/roadmap/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', id: item.id, ...patch }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      setItems(prev => prev.map(row => row.id === d.id ? { ...row, ...d } : row))
+    } catch {
+      setItems(prev => prev.map(row => row.id === item.id ? item : row))
+      setRoadmapError('Не удалось сохранить изменение')
+    }
+  }
+
+  const addRoadmapItem = async (group: RoadmapGroup, text: string) => {
+    const sort = Math.max(-1, ...items.filter(row => row.section_key === group.key).map(row => row.sort)) + 1
+    try {
+      const r = await fetch(`/api/rooms/${id}/roadmap/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', section_key: group.key, section_title: group.title, section_icon: group.icon, section_sort: group.sort, sort, text }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      setItems(prev => [...prev, d])
+      return true
+    } catch (e) {
+      setRoadmapError(e instanceof Error ? e.message : 'Не удалось добавить строку')
+      return false
+    }
+  }
+
+  const deleteRoadmapItem = async (item: RoadmapItem) => {
+    setItems(prev => prev.filter(row => row.id !== item.id))
+    try {
+      const r = await fetch(`/api/rooms/${id}/roadmap/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id: item.id }),
+      })
+      if (!r.ok) throw new Error()
+    } catch {
+      setItems(prev => [...prev, item])
+      setRoadmapError('Не удалось удалить строку')
     }
   }
 
@@ -316,7 +342,7 @@ export default function Room() {
             )}
 
             <nav className="mt-6 flex overflow-x-auto border-b" aria-label="Разделы комнаты">
-              {([['editor', 'Редактор'], ['design', 'Разбор интерьера']] as const).map(([key, label]) => (
+              {([['editor', 'Редактор'], ['design', 'Разбор интерьера'], ['roadmap', 'Роадмап']] as const).map(([key, label]) => (
                 <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm ${tab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
               ))}
             </nav>
@@ -344,6 +370,25 @@ export default function Room() {
                 busy={breakdownBusy}
                 error={breakdownError}
                 onRun={() => void runBreakdown()}
+              />
+            </div>
+
+            <div className={tab === 'roadmap' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
+              <RoadmapTab
+                items={items}
+                hasPurchased={Boolean(room.has_purchased)}
+                busy={roadmapBusy}
+                error={roadmapError}
+                actions={{
+                  onGenerate: () => void runRoadmap(false),
+                  onRegenerate: () => void runRoadmap(true),
+                  onShare: () => setShareOpen(true),
+                  onToggleDone: item => void patchRoadmapItem(item, { done: !item.done }),
+                  onToggleActive: item => void patchRoadmapItem(item, { active: !item.active }),
+                  onComment: (item, comment) => void patchRoadmapItem(item, { comment: comment || null }),
+                  onAdd: addRoadmapItem,
+                  onDelete: item => void deleteRoadmapItem(item),
+                }}
               />
             </div>
           </div>
@@ -392,7 +437,7 @@ function DesignTab({ render, style, breakdown, busy, error, onRun }: {
         <>
           <div className="border border-foreground/25 p-4">
             <div className="flex items-start gap-3">
-              <BreakdownIcon name="sparkles" className="mt-0.5" />
+              <GuideIcon name="sparkles" className="mt-0.5" />
               <div className="min-w-0">
                 <p className="eyebrow">Стиль</p>
                 <p className="mt-1 text-sm font-medium">{style}</p>
@@ -417,7 +462,7 @@ function DesignTab({ render, style, breakdown, busy, error, onRun }: {
               <p className="eyebrow">Главное</p>
               {breakdown.top_cards.map((card, index) => (
                 <div key={index} className="flex gap-3 border border-foreground/25 p-3">
-                  <BreakdownIcon name={card.icon} className="mt-0.5" />
+                  <GuideIcon name={card.icon} className="mt-0.5" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium leading-5">{card.title}</p>
                     {card.preview && <p className="mt-1 text-xs leading-5 text-muted-foreground">{card.preview}</p>}
@@ -438,7 +483,7 @@ function DesignTab({ render, style, breakdown, busy, error, onRun }: {
           {startCard && (
             <div className="border border-foreground bg-primary/5 p-4">
               <div className="flex items-start gap-3">
-                <BreakdownIcon name={startCard.icon || 'rocket'} className="mt-0.5" />
+                <GuideIcon name={startCard.icon || 'rocket'} className="mt-0.5" />
                 <div className="min-w-0">
                   <p className="eyebrow">С чего начать</p>
                   <p className="mt-1 text-sm font-medium">{startCard.action}</p>

@@ -3,6 +3,7 @@
 // на машине разработчика DATABASE_URL экспортирован глобально в ~/.bashrc чужим проектом,
 // и процессное окружение перебивает --env-file. Fallback на DATABASE_URL намеренно не делаем.
 import pg from 'pg';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -745,4 +746,61 @@ export const q = {
         `UPDATE architect_prompts SET active = true WHERE id = $2 AND kind = $1 RETURNING *`, [kind, id]);
       return rows[0] || null;
     }),
+
+  hasPurchased: userId =>
+    pool.query(`SELECT EXISTS(SELECT 1 FROM credit_txn WHERE user_id = $1 AND reason = 'purchase') AS purchased`, [userId])
+      .then(r => Boolean(r.rows[0]?.purchased)),
+
+  roadmapItemsForRoom: roomId =>
+    pool.query(`SELECT id, section_key, section_title, section_icon, section_sort, sort, text, done, active, comment, is_custom, created_at
+                FROM roadmap_items WHERE room_id = $1
+                ORDER BY section_sort, sort, created_at`, [roomId]).then(r => r.rows),
+
+  // Заменяет ИИ-пункты, сохраняя done/active/comment по (section_key, text).
+  replaceRoadmapSeed: (roomId, items) =>
+    withTransaction(async client => {
+      const existing = await client.query(
+        `SELECT section_key, text, done, active, comment FROM roadmap_items WHERE room_id = $1 AND is_custom = false`, [roomId]);
+      const carried = new Map(existing.rows.map(row => [`${row.section_key}\u0000${row.text}`, row]));
+      await client.query(`DELETE FROM roadmap_items WHERE room_id = $1 AND is_custom = false`, [roomId]);
+      for (const item of items) {
+        const prev = carried.get(`${item.section_key}\u0000${item.text}`);
+        await client.query(
+          `INSERT INTO roadmap_items (id, room_id, section_key, section_title, section_icon, section_sort, sort, text, done, active, comment, is_custom)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false)`,
+          [crypto.randomUUID(), roomId, item.section_key, item.section_title, item.section_icon || 'hammer',
+            item.section_sort, item.sort, item.text, prev?.done ?? false, prev?.active ?? true, prev?.comment ?? null]);
+      }
+    }),
+
+  addRoadmapItem: ({ roomId, sectionKey, sectionTitle, sectionIcon, sectionSort, sort, text }) => {
+    const id = crypto.randomUUID();
+    return pool.query(
+      `INSERT INTO roadmap_items (id, room_id, section_key, section_title, section_icon, section_sort, sort, text, is_custom)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true) RETURNING *`,
+      [id, roomId, sectionKey, sectionTitle, sectionIcon || 'tag', sectionSort, sort, text]).then(r => r.rows[0]);
+  },
+
+  updateRoadmapItem: (roomId, id, patch = {}) => {
+    const sets = [];
+    const values = [roomId, id];
+    for (const [key, column] of [['done', 'done'], ['active', 'active'], ['comment', 'comment'], ['text', 'text']]) {
+      if (patch[key] !== undefined) {
+        values.push(patch[key]);
+        sets.push(`${column} = $${values.length}`);
+      }
+    }
+    if (!sets.length) {
+      return pool.query(`SELECT * FROM roadmap_items WHERE room_id = $1 AND id = $2`, values)
+        .then(r => r.rows[0] || null);
+    }
+    return pool.query(
+      `UPDATE roadmap_items SET ${sets.join(', ')} WHERE room_id = $1 AND id = $2 RETURNING *`,
+      values).then(r => r.rows[0] || null);
+  },
+
+  // Жёстко удалять можно только свои строки.
+  deleteRoadmapItem: (roomId, id) =>
+    pool.query(`DELETE FROM roadmap_items WHERE room_id = $1 AND id = $2 AND is_custom = true RETURNING id`, [roomId, id])
+      .then(r => r.rows[0] || null),
 };

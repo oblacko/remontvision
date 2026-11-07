@@ -5,7 +5,7 @@ import { ArrowUpRight, Check, ChevronDown, ChevronUp, LoaderCircle, Sparkles, X 
 // Задача = одна генерация пользователя. Берём из /api/my/generations.
 export type GenTask = {
   id: string
-  kind?: 'render' | 'breakdown'
+  kind?: 'render' | 'breakdown' | 'roadmap'
   render_id?: string
   room_id: string
   style: string
@@ -56,7 +56,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const r = await fetch('/api/my/generations?with=breakdown')
+      const r = await fetch('/api/my/generations?with=breakdown,roadmap')
       if (r.status === 401) {
         setAuthed(false)
         setAll([])
@@ -161,11 +161,16 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
   const error = task.status === 'error'
   const active = !done && !error
   const isBreakdown = task.kind === 'breakdown'
+  const isRoadmap = task.kind === 'roadmap'
+  const tabQuery = isBreakdown ? '?tab=design' : isRoadmap ? '?tab=roadmap' : ''
   const thumb = done ? task.image_url : task.photo_url
   const to = task.room_id
-    ? `/room/${encodeURIComponent(task.room_id)}${isBreakdown ? '?tab=design' : ''}`
+    ? `/room/${encodeURIComponent(task.room_id)}${tabQuery}`
     : '/cabinet'
-  const label = error ? 'Ошибка' : done ? (isBreakdown ? 'Разбор готов' : 'Готово') : (isBreakdown ? 'Идёт разбор' : 'Идёт генерация')
+  const doneLabel = isBreakdown ? 'Разбор готов' : isRoadmap ? 'Роадмап готов' : 'Готово'
+  const activeLabel = isBreakdown ? 'Идёт разбор' : isRoadmap ? 'Идёт роадмап' : 'Идёт генерация'
+  const progressLabel = isBreakdown ? 'Разбор выполняется' : isRoadmap ? 'Роадмап составляется' : 'Генерация выполняется'
+  const label = error ? 'Ошибка' : done ? doneLabel : activeLabel
   const labelClass = error ? 'text-destructive' : done ? 'text-emerald-700' : 'text-muted-foreground'
 
   return (
@@ -181,7 +186,7 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
           <span className="block truncate text-sm font-medium">{task.style}{task.room_type ? ` · ${task.room_type}` : ''}</span>
           <span className={`mt-0.5 block text-[11px] ${labelClass}`}>{label}</span>
           {active && (
-            <span className="mt-2 block h-1 overflow-hidden bg-border" role="progressbar" aria-label={isBreakdown ? 'Разбор выполняется' : 'Генерация выполняется'}>
+            <span className="mt-2 block h-1 overflow-hidden bg-border" role="progressbar" aria-label={progressLabel}>
               <span className="rv-progress block h-full w-1/3 bg-primary" />
             </span>
           )}

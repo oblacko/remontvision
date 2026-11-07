@@ -28,7 +28,7 @@ type PromptRow = {
 type UserDetail = { user: AdminUser; credits: CreditRow[]; generations: GenRow[] }
 type ArchitectPromptRow = { id: number; kind: string; version: number; system: string; active: boolean }
 type ArchitectPromptsState = Record<string, { rows: ArchitectPromptRow[]; active: { id: number | null; version: number; system: string } }>
-type ArchitectKind = 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout' | 'breakdown'
+type ArchitectKind = 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout' | 'breakdown' | 'roadmap'
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
 type Style = {
   id: number; key: string; name: string; accent: string; description: string;
@@ -1239,7 +1239,7 @@ export default function Admin() {
               </div>
               {architectNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{architectNotice}</p>}
               <div className="mt-5 flex flex-wrap gap-2">
-                {([['designer', 'Дизайнер'], ['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки'], ['direction', 'Агент направлений'], ['layout', 'Планировщик'], ['breakdown', 'Разбор интерьера']] as const).map(([kind, label]) => (
+                {([['designer', 'Дизайнер'], ['builder', 'Строитель'], ['reviewer', 'Рецензент'], ['criteria', 'Критерий приёмки'], ['direction', 'Агент направлений'], ['layout', 'Планировщик'], ['breakdown', 'Разбор интерьера'], ['roadmap', 'Роадмап ремонта']] as const).map(([kind, label]) => (
                   <button key={kind} type="button" onClick={() => selectArchitectKind(kind)} className={`min-h-10 border px-3 text-sm ${architectKind === kind ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
                 ))}
               </div>

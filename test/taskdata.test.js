@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { breakdownTask } = await import('../src/taskdata.js');
+const { breakdownTask, roadmapTask } = await import('../src/taskdata.js');
 
 test('breakdownTask maps running render meta into a task', () => {
   const task = breakdownTask({
@@ -62,4 +62,28 @@ test('breakdownTask hides legacy breakdowns but shows versioned completed ones',
   assert.equal(legacy, null);
   assert.equal(versioned.status, 'done');
   assert.equal(versioned.created_at, '2026-11-07T10:30:00.000Z');
+});
+
+test('roadmapTask maps running and completed roadmap meta', () => {
+  const running = roadmapTask({
+    id: 'render-6',
+    room_id: 'room-6',
+    room_type: 'Кухня',
+    image_path: 'renders/r6.png',
+    created_at: '2026-11-07T09:00:00.000Z',
+    meta: { roadmap: { status: 'running', started_at: '2026-11-07T10:40:00.000Z' } },
+  });
+  const done = roadmapTask({
+    id: 'render-7',
+    room_id: 'room-7',
+    created_at: '2026-11-07T09:00:00.000Z',
+    meta: { roadmap: { version: 1, status: 'done', finished_at: '2026-11-07T10:45:00.000Z' } },
+  });
+
+  assert.equal(running.kind, 'roadmap');
+  assert.equal(running.id, 'roadmap:render-6');
+  assert.equal(running.style, 'Роадмап ремонта');
+  assert.equal(running.status, 'running');
+  assert.equal(done.status, 'done');
+  assert.equal(roadmapTask({ id: 'render-8', meta: {} }), null);
 });

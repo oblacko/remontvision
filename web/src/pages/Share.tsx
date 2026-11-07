@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
-import { ArrowLeft, Heart, LoaderCircle, MessageCircle, Send } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Heart, LoaderCircle, MessageCircle, Send } from 'lucide-react'
+import { GuideIcon } from '@/components/GuideIcon'
+import { groupRoadmap, type RoadmapItem } from '@/lib/roadmap'
 import '../App.css'
 
 type Comment = { id: number; name: string | null; text: string; created_at: string }
@@ -16,6 +18,7 @@ type ShareData = {
     palette?: { hex?: string | null; name?: string }[]
   } | null
   surfaces?: { surface?: string; label?: string; hex?: string; ral?: { code?: string; name?: string } | null }[]
+  roadmap_items?: RoadmapItem[]
 }
 
 const dateTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
@@ -79,6 +82,10 @@ export default function Share() {
     finally { setCommentBusy(false) }
   }
 
+  const roadmapGroups = useMemo(() => groupRoadmap(data?.roadmap_items || []), [data?.roadmap_items])
+  const roadmapActive = (data?.roadmap_items || []).filter(item => item.active)
+  const roadmapDone = roadmapActive.filter(item => item.done).length
+
   if (loading) return <div className="flex min-h-svh items-center justify-center"><LoaderCircle className="size-8 animate-spin text-primary-text" /></div>
   if (!data) return <div className="mx-auto flex min-h-svh max-w-xl flex-col items-center justify-center p-6 text-center"><p className="eyebrow">Ремонтвижн</p><h1 className="display-title mt-3 text-3xl">Ссылка не найдена</h1><p className="mt-2 text-sm text-muted-foreground">{error}</p><a href="/" className="action-secondary mt-6"><ArrowLeft className="size-4" />На главную</a></div>
 
@@ -115,6 +122,52 @@ export default function Share() {
             <p className="eyebrow">Палитра RAL по рендеру</p>
             <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
               {data.surfaces.map((surface, index) => <div key={`${surface.surface}-${index}`} className="bg-background p-3"><span className="block h-10 w-full border border-foreground/20" style={{ background: surface.hex || 'transparent' }} /><p className="mt-2 text-xs font-medium">{surface.label || surface.surface}</p><p className="font-mono text-[11px] text-muted-foreground">{surface.ral?.code || surface.hex}</p>{surface.ral?.name ? <p className="text-[11px] text-muted-foreground">{surface.ral.name}</p> : null}</div>)}
+            </div>
+          </section>
+        )}
+
+        {!!roadmapGroups.length && (
+          <section className="mt-8 border-t pt-6">
+            <p className="eyebrow">Роадмап ремонта</p>
+            <div className="mt-3 border border-foreground/25 p-4">
+              <div className="flex items-end justify-between gap-3">
+                <p className="text-sm">Выполнено <b>{roadmapDone}</b> из {roadmapActive.length}</p>
+                <span className="font-mono text-xs text-primary-text">{roadmapActive.length ? Math.round((roadmapDone / roadmapActive.length) * 100) : 0}%</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden bg-border">
+                <div className="h-full bg-primary" style={{ width: `${roadmapActive.length ? Math.round((roadmapDone / roadmapActive.length) * 100) : 0}%` }} />
+              </div>
+            </div>
+            <div className="mt-3 space-y-3">
+              {roadmapGroups.map(group => {
+                const active = group.items.filter(item => item.active)
+                const done = active.filter(item => item.done).length
+                return (
+                  <details key={group.key} className="group border border-foreground/25">
+                    <summary className="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                      <GuideIcon name={group.icon} />
+                      <span className="min-w-0 flex-1 text-sm font-medium">{group.title}</span>
+                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{done} из {active.length}</span>
+                      <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                    </summary>
+                    <ul className="border-t border-foreground/25">
+                      {group.items.map(item => (
+                        <li key={item.id} className="border-t border-foreground/10 px-3 py-3 first:border-t-0">
+                          <div className="flex items-start gap-3">
+                            <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${item.done ? 'border-foreground bg-primary text-primary-foreground' : 'border-foreground/40'}`}>
+                              {item.done && <Check className="size-3.5" />}
+                            </span>
+                            <div className="min-w-0">
+                              <p className={`text-sm leading-5 ${item.done || !item.active ? 'text-muted-foreground line-through' : ''}`}>{item.text}</p>
+                              {item.comment && <p className="mt-1 text-xs leading-5 text-muted-foreground">· {item.comment}</p>}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )
+              })}
             </div>
           </section>
         )}

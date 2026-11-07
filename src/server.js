@@ -14,7 +14,8 @@ import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
 import { reviewDesign } from './architect.js';
 import { breakdownInterior } from './breakdown.js';
-import { breakdownTask } from './taskdata.js';
+import { generateRoadmap } from './roadmap.js';
+import { breakdownTask, roadmapTask } from './taskdata.js';
 import { getCatalogOffer } from './catalogclient.js';
 import { runVisionAgent } from './visionagent.js';
 import { sanitizeImage, fitAspect } from './media.js';
@@ -313,8 +314,11 @@ app.post('/api/auth/logout', h(async (req, res) => {
 
 app.get('/api/me', h(async (req, res) => {
   if (!req.user) return res.json(null);
-  const balance = await q.creditBalance(req.user.id);
-  res.json({ email: req.user.email, balance });
+  const [balance, hasPurchased] = await Promise.all([
+    q.creditBalance(req.user.id),
+    q.hasPurchased(req.user.id),
+  ]);
+  res.json({ email: req.user.email, balance, has_purchased: hasPurchased });
 }));
 
 app.get('/api/my/rooms', h(async (req, res) => {
@@ -326,10 +330,17 @@ app.get('/api/my/generations', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const rows = await q.userGenerations(req.user.id);
   const list = rows.map(row => ({ ...generationDto(row), kind: 'render' }));
-  if (req.query.with === 'breakdown') {
+  const include = String(req.query.with || '').split(',');
+  if (include.includes('breakdown') || include.includes('roadmap')) {
     for (const row of rows) {
-      const task = breakdownTask(row);
-      if (task) list.push(task);
+      if (include.includes('breakdown')) {
+        const task = breakdownTask(row);
+        if (task) list.push(task);
+      }
+      if (include.includes('roadmap')) {
+        const task = roadmapTask(row);
+        if (task) list.push(task);
+      }
     }
     list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
@@ -1372,6 +1383,10 @@ app.get('/api/rooms/:id', h(async (req, res) => {
   const items = render ? await q.itemsForRender(render.id) : [];
   const total = render ? await q.totalForRender(render.id) : 0;
   const pricesAsOf = render ? await q.pricesAsOfForRender(render.id) : null;
+  const [roadmapItems, hasPurchased] = await Promise.all([
+    q.roadmapItemsForRoom(room.id),
+    q.hasPurchased(req.user.id),
+  ]);
   res.json({
     id: room.id,
     style: room.style,
@@ -1392,6 +1407,9 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     error: room.error,
     notice: room.notice || null,
     photo_url: `/files/${path.basename(room.photo_path)}`,
+    has_purchased: hasPurchased,
+    roadmap: render?.analysis?.roadmap || null,
+    roadmap_items: roadmapItems,
     render: render ? {
       id: render.id,
       image: render.image_path ? `/renders/${path.basename(render.image_path)}` : null,
@@ -1662,6 +1680,125 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
   res.json({ analysis, breakdown: result.breakdown, cost_usd: result.cost ?? null });
 }));
 
+// «Роадмап ремонта»: только платным, с кэшем и сохранением прогресса.
+app.post('/api/renders/:id/roadmap', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.status !== 'done' || !render.image_path) return res.status(409).json({ error: 'Дизайн ещё не готов' });
+  if (!(await q.hasPurchased(req.user.id))) {
+    return res.status(402).json({ error: 'Роадмап доступен после покупки кредитов', buy_url: '/cabinet#credits' });
+  }
+  const refresh = Boolean(req.body?.refresh);
+  const existingItems = await q.roadmapItemsForRoom(render.room_id);
+  if (!refresh && render.analysis?.roadmap?.version === 1 && existingItems.length) {
+    return res.json({ roadmap: render.analysis.roadmap, items: existingItems, cached: true });
+  }
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  const baseMeta = render.meta || {};
+  const previous = baseMeta.roadmap || {};
+  if (previous.status === 'running') {
+    const started = new Date(previous.started_at || 0).getTime();
+    if (Date.now() - started < 3 * 60 * 1000) return res.status(409).json({ error: 'Роадмап уже составляется' });
+  }
+  const buffer = await getBuffer(render.image_path);
+  const ext = path.extname(render.image_path).slice(1).toLowerCase();
+  const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+  const imageDataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+  const startedAt = new Date().toISOString();
+  await q.setRenderMeta(render.id, {
+    ...baseMeta,
+    roadmap: { ...previous, status: 'running', started_at: startedAt, finished_at: null, error: null },
+  });
+  const result = await generateRoadmap({
+    imageDataUrl,
+    roomType: room.room_type || 'Другое',
+    style: room.style,
+    priceTier: room.price_tier || 'comfort',
+    repairScope: render.meta?.repair_scope || null,
+  });
+  if (!result) {
+    await q.setRenderMeta(render.id, {
+      ...baseMeta,
+      roadmap: { ...previous, status: 'error', started_at: startedAt, finished_at: new Date().toISOString(), error: 'Не удалось составить роадмап' },
+    });
+    log({ event: 'roadmap_error', render_id: render.id, user_id: req.user.id });
+    return res.status(502).json({ error: 'Не удалось составить роадмап' });
+  }
+  const analysis = { ...(render.analysis || {}), roadmap: result.roadmap };
+  await q.setRenderAnalysis(render.id, analysis);
+  const flat = result.roadmap.sections.flatMap(section => section.cards.map((text, index) => ({
+    section_key: section.key,
+    section_title: section.title,
+    section_icon: section.icon,
+    section_sort: section.sort,
+    sort: index,
+    text,
+  })));
+  await q.replaceRoadmapSeed(room.id, flat);
+  const finishedAt = new Date().toISOString();
+  await q.setRenderMeta(render.id, {
+    ...baseMeta,
+    roadmap: { version: 1, status: 'done', started_at: startedAt, finished_at: finishedAt, at: finishedAt, cost_usd: result.cost ?? null },
+  });
+  const items = await q.roadmapItemsForRoom(room.id);
+  log({
+    event: 'roadmap_done',
+    render_id: render.id,
+    user_id: req.user.id,
+    sections: result.roadmap.sections.length,
+    items: flat.length,
+    cost_usd: result.cost ?? null,
+  });
+  res.json({ roadmap: result.roadmap, items, cost_usd: result.cost ?? null });
+}));
+
+// Правки роадмапа: галочка, деактивация, комментарий, своя строка, удаление своей.
+app.post('/api/rooms/:id/roadmap/items', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const room = await q.getRoom(req.params.id);
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Комната не найдена' });
+  const action = String(req.body?.action || '');
+  const id = String(req.body?.id || '');
+  if (action === 'add') {
+    const value = String(req.body?.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!value) return res.status(400).json({ error: 'Введите текст пункта' });
+    const item = await q.addRoadmapItem({
+      roomId: room.id,
+      sectionKey: String(req.body?.section_key || 'custom').slice(0, 60),
+      sectionTitle: String(req.body?.section_title || 'Свои пункты').slice(0, 120),
+      sectionIcon: String(req.body?.section_icon || 'tag').slice(0, 40),
+      sectionSort: Number.isFinite(Number(req.body?.section_sort)) ? Number(req.body.section_sort) : 99,
+      sort: Number.isFinite(Number(req.body?.sort)) ? Number(req.body.sort) : 0,
+      text: value,
+    });
+    return res.status(201).json(item);
+  }
+  if (action === 'update') {
+    if (!id) return res.status(400).json({ error: 'Не указан пункт' });
+    const patch = {};
+    if (req.body?.done !== undefined) patch.done = Boolean(req.body.done);
+    if (req.body?.active !== undefined) patch.active = Boolean(req.body.active);
+    if (req.body?.comment !== undefined) patch.comment = String(req.body.comment || '').slice(0, 1000) || null;
+    if (req.body?.text !== undefined) {
+      const value = String(req.body.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      if (!value) return res.status(400).json({ error: 'Текст пункта не может быть пустым' });
+      patch.text = value;
+    }
+    const item = await q.updateRoadmapItem(room.id, id, patch);
+    if (!item) return res.status(404).json({ error: 'Пункт не найден' });
+    return res.json(item);
+  }
+  if (action === 'delete') {
+    if (!id) return res.status(400).json({ error: 'Не указан пункт' });
+    const deleted = await q.deleteRoadmapItem(room.id, id);
+    if (!deleted) return res.status(404).json({ error: 'Можно удалить только свою строку' });
+    return res.json({ ok: true });
+  }
+  return res.status(400).json({ error: 'Неизвестное действие' });
+}));
+
 // Поиск товаров по кнопке: агент смотрит на рендер и вызывает MCP-инструменты каталога.
 app.post('/api/renders/:id/product-search', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
@@ -1785,10 +1922,11 @@ app.get('/api/share/:token', h(async (req, res) => {
   const render = await q.renderByShareToken(req.params.token);
   if (!render) return res.status(404).json({ error: 'Ссылка не найдена' });
   const visitor = visitorKey(req);
-  const [likes, comments, liked] = await Promise.all([
+  const [likes, comments, liked, roadmapItems] = await Promise.all([
     q.countLikes(render.id),
     q.listComments(render.id),
     q.hasLike(render.id, visitor),
+    q.roadmapItemsForRoom(render.room_id),
   ]);
   res.json({
     id: render.id,
@@ -1808,6 +1946,7 @@ app.get('/api/share/:token', h(async (req, res) => {
       palette: render.meta.design_direction.palette || [],
     } : null,
     surfaces: Array.isArray(render.analysis?.surfaces) ? render.analysis.surfaces : [],
+    roadmap_items: roadmapItems.filter(item => item.active),
   });
 }));
 
