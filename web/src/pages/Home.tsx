@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import '../App.css'
-import { ArrowRight, ArrowUpRight, Menu, X } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Menu, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
@@ -19,8 +19,8 @@ const defaultPacks: PublicPack[] = [
   { id: 'flat', title: 'Вся квартира', credits: 15, price_kopecks: 59900 },
   { id: 'house', title: 'Весь дом', credits: 50, price_kopecks: 149900 },
 ]
-type Consents = { offer: boolean; personal: boolean; transfer: boolean }
-const consentsOf = (c: Consents) => ({ offer: c.offer, privacy: c.personal, cross_border: c.transfer })
+// Согласие действием (вариант A): чекбоксов нет, флаги уходят при клике по кнопке.
+const CONSENTS = { offer: true, privacy: true, cross_border: true }
 
 const faq = [
   { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатных кредита: два дизайна или дизайн + правка. Дальше: 8 генераций за 399 ₽, 15 за 599 ₽ или 50 за 1 499 ₽. Один кредит — одна генерация или правка. Подписка не нужна.' },
@@ -47,7 +47,6 @@ export default function Home() {
   const [loginCode, setLoginCode] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
-  const [consents, setConsents] = useState<Consents>({ offer: false, personal: false, transfer: false })
   const [me, setMe] = useState<Me | null>(null)
   const [pendingPanel, setPendingPanel] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -115,7 +114,6 @@ export default function Home() {
     setLoginStep('email')
     setLoginEmail(localStorage.getItem('rv_last_email') || '')
     setLoginCode(''); setLoginError('')
-    setConsents({ offer: false, personal: false, transfer: false })
     setLoginOpen(true)
   }
 
@@ -130,9 +128,6 @@ export default function Home() {
   const requestLogin = async () => {
     const email = loginEmail.trim().toLowerCase()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setLoginError('Проверьте e-mail'); return }
-    if (!consents.offer || !consents.personal || !consents.transfer) {
-      setLoginError('Отметьте оферту, согласие на ПДн и трансграничную передачу'); return
-    }
     setLoginBusy(true); setLoginError('')
     try {
       const r = await fetch('/api/auth/request-code', {
@@ -153,7 +148,7 @@ export default function Home() {
     try {
       const r = await fetch('/api/auth/verify', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, code: loginCode, consents: consentsOf(consents) }),
+        body: JSON.stringify({ email: loginEmail, code: loginCode, consents: CONSENTS }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || String(r.status))
@@ -168,14 +163,11 @@ export default function Home() {
   }
 
   const yandexLogin = async () => {
-    if (!consents.offer || !consents.personal || !consents.transfer) {
-      setLoginError('Отметьте оферту, согласие на ПДн и трансграничную передачу'); return
-    }
     setLoginBusy(true); setLoginError('')
     try {
       const r = await fetch('/api/auth/yandex/start', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consents: consentsOf(consents), redirect_to: location.pathname }),
+        body: JSON.stringify({ consents: CONSENTS, redirect_to: location.pathname }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || String(r.status))
@@ -213,33 +205,29 @@ export default function Home() {
               <DialogContent className="rounded-none bg-background p-6 sm:max-w-md">
                 {loginStep === 'email' ? (
                   <>
-                    <DialogHeader>
-                      <DialogTitle className="display-title text-3xl">Вход по e-mail</DialogTitle>
-                      <DialogDescription>Пришлём код на почту. Без паролей.</DialogDescription>
+                    <DialogHeader className="text-center">
+                      <DialogTitle className="display-title text-3xl">Войдите или зарегистрируйтесь</DialogTitle>
+                      <DialogDescription>Чтобы создавать дизайны с помощью нейросети</DialogDescription>
                     </DialogHeader>
                     <div className="mt-2 space-y-4">
-                      <div>
-                        <label htmlFor="login-email" className="mb-2 block text-sm font-medium">E-mail</label>
-                        <input id="login-email" type="email" autoComplete="email" autoFocus placeholder="you@example.ru" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="h-12 w-full rounded-none border bg-background px-4 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
+                      <div className="flex items-center justify-center gap-2 border border-border bg-muted/50 px-4 py-2.5 text-center text-sm">
+                        <Sparkles className="size-4 shrink-0 text-primary-text" />
+                        <span><b>2 бесплатные генерации</b> при регистрации</span>
                       </div>
-                      <div className="space-y-2 text-sm">
-                        {([
-                          ['offer', <>Принимаю <a className="underline" href={`${site}/offer`}>публичную оферту</a></>],
-                          ['personal', <>Согласен на <a className="underline" href={`${site}/privacy`}>обработку персональных данных</a></>],
-                          ['transfer', <>Согласен на <a className="underline" href={`${site}/privacy#cross-border`}>трансграничную передачу</a> фото и запросов</>],
-                        ] as const).map(([key, label]) => (
-                          <label key={key} className="flex min-h-11 cursor-pointer items-start gap-3 py-2 leading-5">
-                            <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-primary" checked={consents[key]} onChange={(event) => setConsents(prev => ({ ...prev, [key]: event.target.checked }))} /><span>{label}</span>
-                          </label>
-                        ))}
+                      <button type="button" onClick={yandexLogin} disabled={loginBusy} className="flex h-12 w-full items-center justify-center gap-3 bg-foreground text-base font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50">
+                        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#FC3F1D] text-sm font-bold text-white">Я</span>
+                        Войти через Яндекс
+                      </button>
+                      <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или по почте<span className="h-px flex-1 bg-border" /></div>
+                      <div>
+                        <label htmlFor="login-email" className="sr-only">Почта</label>
+                        <input id="login-email" type="email" autoComplete="email" autoFocus placeholder="Почта" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="h-12 w-full rounded-none border bg-background px-4 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
                       </div>
                       {loginError && <p className="text-sm text-destructive" role="alert">{loginError}</p>}
-                      <Button type="button" disabled={loginBusy} onClick={requestLogin} className="h-12 w-full rounded-none text-base">{loginBusy ? 'Отправляем…' : 'Получить код'}</Button>
-                      <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или<span className="h-px flex-1 bg-border" /></div>
-                      <Button type="button" variant="outline" disabled={loginBusy} onClick={yandexLogin} className="h-12 w-full rounded-none text-base">
-                        <span className="grid size-6 place-items-center bg-[#FC3F1D] text-sm font-semibold text-white">Я</span>
-                        Войти через Яндекс
-                      </Button>
+                      <Button type="button" disabled={loginBusy} onClick={requestLogin} className="h-12 w-full rounded-none text-base">{loginBusy ? 'Отправляем…' : 'Получить код для входа'}</Button>
+                      <p className="text-center text-xs leading-5 text-muted-foreground">
+                        Продолжая, вы соглашаетесь на <a className="underline underline-offset-2" href={`${site}/privacy`}>обработку персональных данных</a>, включая <a className="underline underline-offset-2" href={`${site}/privacy#cross-border`}>трансграничную передачу</a>, и принимаете <a className="underline underline-offset-2" href={`${site}/offer`}>Условия использования</a> и <a className="underline underline-offset-2" href={`${site}/privacy`}>Политику конфиденциальности</a>.
+                      </p>
                     </div>
                   </>
                 ) : (
