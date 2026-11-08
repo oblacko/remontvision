@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-08T09:37:57.342Z
+Generated: 2026-11-08T14:38:02.383Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2354,8 +2354,15 @@ export const MAX_REFERENCES; // 4
 
 - Логотип «Ремонтвижн» заменён на новый знак (разомкнутая рамка + словесный знак) из присланного SVG; рамка — акцентным оранжевым, как основная кнопка. Компонент `web/src/components/Logo.tsx` используется на главной, в кабинете, комнате, публичном шаринге и админке.
 - Статические страницы (`public/*.html`, `/app`) и страница ошибки сервера показывают `/logo.svg`; обновлён `favicon.svg`.
+- Логотип в шапке анимирован по референсу «сборка + мигающая точка»: уголки рамки защёлкиваются, буквы поднимаются, «вижн» загорается оранжевым, в центре рамки мигает точка. При `prefers-reduced-motion` анимация и точка отключаются.
 - Собран `web/dist`.
 - Проверка: `npm run build` OK. `npm run lint` по-прежнему падает на старых правилах в `components/ui/*`, `TaskDock` и `Admin`; новых ошибок нет.
+
+## 2026-11-08 — Яндекс.Метрика
+
+- Счётчик `114132055` (webvisor, clickmap, ecommerce) добавлен в оболочку SPA (`web/index.html`) и в старый редактор `/app` (`public/app.html`).
+- Клиентские переходы React Router учитываются компонентом `Metrika` через `ym('hit')`; первый хит отправляет `init`.
+- Тесты: `npm test` 194/194; build OK.
 
 ## 2026-11-08 — вход через Яндекс ID (OAuth)
 

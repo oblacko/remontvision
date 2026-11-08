@@ -12,6 +12,12 @@
 - Собран `web/dist`.
 - Проверка: `npm run build` OK. `npm run lint` по-прежнему падает на старых правилах в `components/ui/*`, `TaskDock` и `Admin`; новых ошибок нет.
 
+## 2026-11-08 — Яндекс.Метрика
+
+- Счётчик `114132055` (webvisor, clickmap, ecommerce) добавлен в оболочку SPA (`web/index.html`) и в старый редактор `/app` (`public/app.html`).
+- Клиентские переходы React Router учитываются компонентом `Metrika` через `ym('hit')`; первый хит отправляет `init`.
+- Тесты: `npm test` 194/194; build OK.
+
 ## 2026-11-08 — вход через Яндекс ID (OAuth)
 
 - Серверный OAuth Яндекса: `POST /api/auth/yandex/start` (создаёт одноразовый `state` + HttpOnly-cookie, проверяет согласия и возвращает URL авторизации) и `GET /api/auth/yandex/callback` (обмен `code`, профиль через `login.yandex.ru` с заголовком `OAuth`, установка нашей сессии).

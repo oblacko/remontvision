@@ -5,10 +5,12 @@ import Cabinet from './pages/Cabinet'
 import Room from './pages/Room'
 import Share from './pages/Share'
 import { TaskDock, TasksProvider } from './components/TaskDock'
+import { Metrika } from './components/Metrika'
 
 export default function App() {
   return (
     <TasksProvider>
+      <Metrika />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<Admin />} />
