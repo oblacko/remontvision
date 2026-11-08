@@ -206,7 +206,7 @@ export default function Home() {
                 {loginStep === 'email' ? (
                   <>
                     <DialogHeader className="text-center">
-                      <DialogTitle className="display-title text-3xl">Войдите или зарегистрируйтесь</DialogTitle>
+                      <DialogTitle className="display-title break-words text-2xl sm:text-3xl">Войдите или зарегистрируйтесь</DialogTitle>
                       <DialogDescription>Чтобы создавать дизайны с помощью нейросети</DialogDescription>
                     </DialogHeader>
                     <div className="mt-2 space-y-4">

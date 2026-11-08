@@ -306,7 +306,7 @@ export default function Cabinet() {
         <header className="border-b"><div className="page-shell flex min-h-16 items-center justify-between"><Logo /><a href="/" className="text-sm underline decoration-border underline-offset-4">На сайт</a></div></header>
         <main className="mx-auto flex min-h-[75svh] max-w-md flex-col justify-center px-4 py-12">
           <p className="eyebrow">Личный кабинет</p>
-          <h1 className="display-title mt-4 text-4xl">Войдите или зарегистрируйтесь</h1>
+          <h1 className="display-title mt-4 break-words text-3xl sm:text-4xl">Войдите или зарегистрируйтесь</h1>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">Чтобы создавать дизайны с помощью нейросети</p>
           <div className="mt-6 space-y-4">
             {loginStep === 'email' ? (

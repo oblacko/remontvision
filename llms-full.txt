@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-08T09:27:06.989Z
+Generated: 2026-11-08T09:37:57.342Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2364,7 +2364,8 @@ export const MAX_REFERENCES; // 4
 - Склейка аккаунтов: сначала по `auth_identities(provider='yandex', provider_sub)`, затем по e-mail, иначе новый юзер с теми же 2 кредитами за регистрацию. Согласия пишутся в журнал теми же `recordAcceptances`.
 - Миграция 042: таблица `oauth_states` (state, provider, consents, redirect_to, TTL). Повторный callback по тому же state отклоняется.
 - В UI (главная и кабинет) единая форма входа по референсу: бейдж «2 бесплатные генерации», кнопка Яндекса, разделитель «или по почте», поле и «Получить код для входа». Три чекбокса заменены одной строкой-согласием (вариант A, трансграничная передача упомянута), флаги согласий уходят при клике. Ошибка входа возвращает на страницу с `?auth_error=yandex`.
-- Тесты: `npm test` 193/193; build OK. Требуется секрет приложения Яндекса в `.env` для боевого запуска.
+- Заголовок формы адаптивный (`text-2xl/3xl` на мобильном), длинное слово переносится: на 320–390px нет горизонтального скролла.
+- Тесты: `npm test` 194/194; build OK. Требуется секрет приложения Яндекса в `.env` для боевого запуска.
 
 ## 2026-11-07 — расчёт расстановки до промта
 
