@@ -189,7 +189,7 @@ export default function Home() {
 
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
-          <Logo href="#top" />
+          <Logo href="#top" animated />
           <nav className="hidden items-center gap-8 text-sm lg:flex" aria-label="Основная навигация">
             {navItems.map(([label, href, id]) => <a key={id} className={`nav-link ${activeSection === id ? 'nav-link-active' : ''}`} href={href} aria-current={activeSection === id ? 'location' : undefined}>{label}</a>)}
           </nav>

@@ -303,7 +303,7 @@ export default function Cabinet() {
   if (!me) {
     return (
       <div className="min-h-dvh bg-background text-foreground">
-        <header className="border-b"><div className="page-shell flex min-h-16 items-center justify-between"><Logo /><a href="/" className="text-sm underline decoration-border underline-offset-4">На сайт</a></div></header>
+        <header className="border-b"><div className="page-shell flex min-h-16 items-center justify-between"><Logo animated /><a href="/" className="text-sm underline decoration-border underline-offset-4">На сайт</a></div></header>
         <main className="mx-auto flex min-h-[75svh] max-w-md flex-col justify-center px-4 py-12">
           <p className="eyebrow">Личный кабинет</p>
           <h1 className="display-title mt-4 break-words text-3xl sm:text-4xl">Войдите или зарегистрируйтесь</h1>
@@ -349,7 +349,7 @@ export default function Cabinet() {
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><Logo /><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
+          <div className="flex items-center gap-3"><Logo animated /><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
           <div className="flex items-center gap-2 text-sm">
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
             <a href="/?panel=1" className="action-primary hidden min-h-11 items-center px-4 sm:inline-flex">Новый дизайн <ArrowUpRight className="size-4" /></a>
