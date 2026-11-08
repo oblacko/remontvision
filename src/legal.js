@@ -5,7 +5,7 @@ import { q } from './db.js';
 
 export const LEGAL_VERSIONS = {
   offer: '2026-10-26.5',
-  privacy: '2026-10-26.5',
+  privacy: '2026-11-08.1',
   cross_border: '2026-10-26.5',
 };
 
