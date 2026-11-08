@@ -463,6 +463,17 @@ export async function processObjectSearch(jobId, objectId, filters = {}) {
         image: thumb,
         text: query || undefined,
         filters: { categories: object.category ? [object.category] : undefined },
+        product: {
+          label: object.label,
+          description: object.description,
+          color: object.color,
+          material: object.material,
+          size: object.size,
+          category: object.category,
+          product_type: object.product_type,
+          search_query: object.search_query,
+          hex: object.hex,
+        },
         topK: cfg.catalog_top_k,
         minScore: cfg.catalog_min_score,
       }, { baseUrl: cfg.catalog_service_url || undefined });

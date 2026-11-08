@@ -1,0 +1,66 @@
+{
+  "tab": "Очистка",
+  "url": "https://www.remontvision.ru/admin",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "h1": [
+    "АДМИНКА"
+  ],
+  "h2": [],
+  "buttons": [
+    "Выйти",
+    "Пользователи",
+    "Пакеты кредитов",
+    "Комнаты",
+    "Стили",
+    "Промт",
+    "Логи",
+    "Модели",
+    "Очистка",
+    "Генерация",
+    "Статьи",
+    "Поиск",
+    "Поиск (лаб)",
+    "Прокси",
+    "Каталог",
+    "Сбросить",
+    "Сохранить"
+  ],
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "placeholder": "",
+      "value": "on"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "black-forest-labs/flux-3-image-klein"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "768"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "auto"
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "Edit the supplied room photo into an empty, unfurnished room.\n\nThis is a removal and local surface-restoration task only.\nIt is NOT a redesign, renovation, repainting or virtual staging task.\n\nGOAL:\nRemove furniture, decorative objects, electrical outlets, switches,\nlighting fixtures and all visible traces of those removed items.\nPreserve the existing room architecture and surface finishes.\nThe result must look like the same room, photographed from the same\nposition, but cleared of the objects listed below.\n\nREMOVE — FURNITURE AND LOOSE OBJECTS:\n- All freestanding furniture: sofas, armchairs, chairs, tables,\n  beds, desks, dressers, freestanding wardrobes and storage units.\n- Rugs, plants, planters, books, baskets, toys, appliances that\n  are not integrated into cabinetry, and all other loose items.\n- Cushions, blankets, bedding and other removable textiles.\n- Curtains, drapes, blinds and their visible rods, tracks,\n  brackets and mounting hardware.\n\nREMOVE — WALL DECOR AND EQUIPMENT:\n- Decorative mirrors, including framed and frameless mirrors.\n- Artwork, paintings, posters, picture frames and wall clocks.\n- Applied decorative wall panels that are separate mounted objects,\n  not the underlying continuous wall finish.\n- Televisions, display screens, TV brackets and visible cables.\n- Decorative wall shelves, their contents and mounting hardware.\n- Hooks, picture hangers and brackets belonging to removed objects.\n\nREMOVE — ELECTRICAL DEVICES:\n- All visible electrical outlets, sockets, switches and dimmers.\n- Electrical faceplates, frames, data sockets and TV connection plates.\n- Surface-mounted electrical boxes, cable covers and visible wiring.\n- Remove these devices even when they are recessed into a wall,\n  floor, ceiling or preserved cabinet.\n\nREMOVE — LIGHTING:\n- Chandeliers, pendant lights and ceiling-mounted fixtures.\n- Wall sconces, spotlights, track lights and recessed downlights.\n- Floor lamps, table lamps and visible decorative LED strips.\n- All associated bulbs, shades, diffusers, ceiling canopies,\n  mounting plates, tracks, brackets, suspension cords,\n  chains, transformers and visible cables.\n\nIMPORTANT — MIRRORS:\nRemove each decorative mirror completely, including its reflective\nglass, frame, reflected scene and visible mounting hardware.\n\nA decorative mirror is an object to remove, not a window,\ndoorway, opening or architectural feature.\n\nReplace its entire former area with a continuous, non-reflective\nsurface matching the immediately surrounding wall.\n\nDo not replace mirrors with windows, doorways, artwork, niches,\nwall panels or a different reflective surface.\n\nPreserve actual windows, glass doors and mirrored doors that are\nintegral parts of preserved built-in cabinetry.\n\nIMPORTANT — OUTLETS AND SWITCHES:\nRemove the entire visible outlet or switch assembly.\nFill its former location with a seamless continuation of the\nsurrounding surface.\n\nDo not leave holes, electrical boxes, faceplates, outlines,\ndark patches, exposed wires or replacement cover plates.\n\nIMPORTANT — LIGHTING FIXTURES:\nRemove every fixture completely, including its attachment points.\n\nFor recessed lights, fill the openings with a seamless continuation\nof the existing ceiling.\nFor track lights, remove the entire track and all attached components.\nFor pendant lights and chandeliers, remove the ceiling canopy,\nsuspension hardware and any visible ceiling hook.\n\nDo not leave exposed wires, mounting holes, ceiling cups,\nfixture silhouettes, bright rings or glowing outlines.\n\nIMPORTANT — RESIDUAL ARTIFICIAL LIGHT:\nRemove the lighting effects caused by the removed fixtures,\nnot just the physical fixtures themselves.\n\nRemove:\n- Localized bright spots and hotspots on the ceiling and walls.\n- Glowing halos around former light positions.\n- Reflected light patches and specular highlights caused by\n  removed artificial lights.\n- Radial light patterns, light cones and decorative light washes.\n- Warm or cool localized color casts from removed fixtures.\n- Bright rings, luminous outlines and fixture-shaped light traces.\n- Shadows and reflections cast by removed objects.\n\nDo not preserve a bright patch simply because it appears in\nthe source photograph. If it was caused by a removed fixture,\nremove it together with that fixture.\n\nRestore these areas using the surrounding surface material,\ntexture and base color, with plausible daylight illumination.\n\nPreserve natural daylight from existing windows, including broad,\nsoft light gradients and genuine sunlight patterns.\nDo not erase natural window light or flatten the entire ceiling\ninto a uniform white surface.\n\nWhere a light effect is ambiguous, remove clearly localized\nfixture-shaped hotspots while retaining broad daylight gradients.\n\nPRESERVE — ARCHITECTURE:\n- Exact room geometry, dimensions, proportions and ceiling height.\n- Original camera position, perspective, framing and aspect ratio.\n- All existing walls, ceiling planes and floor levels.\n- Windows, doors, door frames and architectural openings.\n- Structural columns, beams, stairs and architectural trim.\n- Baseboards, cornices and continuous architectural moldings.\n- Radiators, heating pipes and ventilation grilles.\n- Built-in kitchen units, sanitary fixtures and integrated cabinetry,\n  unless explicitly requested otherwise.\n\nPRESERVE — EXISTING FINISHES:\n- Existing wall, ceiling and floor materials.\n- Existing paint colors, wallpaper, plaster texture and tile patterns.\n- Existing wood grain, flooring direction, joints and grout lines.\n- Existing architectural paneling and continuous wall cladding.\n- Surface wear and irregularities unrelated to removed objects.\n\nDo not globally repaint, smooth, recolor or replace these finishes.\nOnly reconstruct the local areas revealed by removed objects\nand remove the direct traces of their mounting hardware.\n\nREMOVAL PRIORITY:\nThe explicit REMOVE instructions take precedence over preserving\ndevices or objects attached to otherwise preserved surfaces.\n\nPreserving a wall, ceiling, floor or cabinet does NOT mean preserving\nthe electrical devices, light fixtures or removable objects mounted on it.\n\nRECONSTRUCT REMOVED AREAS:\nContinue the existing walls, flooring, ceiling, baseboards and other\nsurfaces naturally behind every removed object.\n\nUse the nearest visible surrounding surfaces as the reference for:\n- Material and base color.\n- Texture scale and direction.\n- Perspective and geometry.\n- Flooring patterns, joints and grout lines.\n- Baseboard alignment.\n- Natural daylight gradients.\n\nWhere the original surface was hidden, create a plausible,\nconservative continuation of the existing finish.\nDo not invent decorative features or new architectural elements.\n\nFill visible mounting holes and recesses left by removed items.\nDo not leave object-shaped stains, silhouettes, blurred patches,\nrepeated texture artifacts or floating fragments.\n\nEXPOSURE AND DAYLIGHT:\nPreserve the direction and character of natural daylight entering\nthrough the existing windows and openings.\n\nRebalance exposure as needed after removing artificial lighting.\nThe room must remain naturally readable without adding new lights.\n\nDo not preserve artificial illumination merely to match the original\nbrightness. Remove fixture-generated hotspots and color casts.\nAvoid blown-out windows, unnaturally dark corners and excessive HDR.\n\nDO NOT:\n- Add furniture, decor, appliances or replacement objects.\n- Add new lighting fixtures, outlets, switches or visible wiring.\n- Add or remove windows, doors or structural openings.\n- Change the floor plan, room proportions or camera view.\n- Change flooring, wall finishes or ceiling design.\n- Add suspended ceilings, niches or panels to hide removed fixtures.\n- Turn mirrors into architectural openings.\n- Leave reflections, shadows or light halos from removed objects.\n- Apply a new interior style or beautify the room.\n- Blur the image to conceal incomplete removal.\n\nFINAL CHECK:\nBefore completing the edit, inspect the floor, every visible wall,\nthe ceili"
+    }
+  ],
+  "bodyText": "ремонтвижн / АДМИНКА На сайт Кабинет Выйти УПРАВЛЕНИЕ АДМИНКА Пользователи Пакеты кредитов Комнаты Стили Промт Логи Модели Очистка Генерация Статьи Поиск Поиск (лаб) Прокси Каталог ОЧИСТКА КОМНАТЫ ПЕРЕД ДИЗАЙНОМ Первый проход оставляет только архитектуру: стены, пол, потолок, окно, дверь и перспективу. Применяется только когда пользователь выключил «Оставить мебель». Если «Оставить мебель» включено — очистка не запускается. По умолчанию включена. Сбросить Сохранить Очистка включена Если выключить, при «Оставить мебель = выкл» сразу пойдёт обычный дизайн без пустого каркаса. МОДЕЛЬ ОЧИСТКИ sourceful/riverflow-v2.6-pro · refs qwen/qwen-image-2.1-turbo · refs qwen/qwen-image-2.1-pro · refs krea/k3-edit · refs black-forest-labs/flux-3-image-klein · refs google/gemini-nano-banana-2.1 · refs tencent/hy-image-v3.5-preview · refs bytedance-seed/seedream-5-0-flash · refs black-forest-labs/flux-3-image · refs recraft/recraft-v4.1-flash openai/gpt-image-2.5-sunburst · refs openai/gpt-image-2.5-flare · refs microsoft/mai-image-2.6 · refs microsoft/mai-image-2.6-flash · refs meta/muse-image recraft/recraft-v4-styles-pro · refs recraft/recraft-v4-styles-vector · refs recraft/recraft-v4-styles-pro-vector · refs recraft/recraft-v4-styles · refs bytedance-seed/seedream-5-0-lite · refs bytedance-seed/seedream-5-0-pro · refs x-ai/grok-imagine-image-2.0 · refs qwen/qwen-image-3-pro · refs qwen/qwen-image-3 · refs microsoft/mai-image-2.5-pro · refs krea/krea-2-large · refs krea/krea-2-medium · refs krea/krea-2-medium-turbo · refs google/gemini-3.1-flash-lite-image · refs openai/gpt-image-2 · refs openai/gpt-image-1-mini · refs openai/gpt-image-1 · refs google/gemini-3.1-flash-image · refs google/gemini-3-pro-image · refs sourceful/riverflow-v2.5-pro · refs sourceful/riverflow-v2.5-fast · refs microsoft/mai-image-2.5 · refs recraft/recraft-v4.1-pro-vector · refs recraft/recraft-v4.1-vector · refs recraft/recraft-v4.1-utility-pro · refs recraft/recraft-v4.1-utility · refs recraft/recraft-v4.1-pro · refs recraft/recraft-v4.1 · refs recraft/recraft-v4-pro-vector · refs recraft/recraft-v4-vector · refs recraft/recraft-v4-pro · refs recraft/recraft-v4 · refs recraft/recraft-v3 · refs openai/gpt-5.4-image-2 · refs google/gemini-3.1-flash-image-preview · refs sourceful/riverflow-v2-pro · refs sourceful/riverflow-v2-fast · refs black-forest-labs/flux.2-klein-4b · refs bytedance-seed/seedream-4.5 · refs black-forest-labs/flux.2-max · refs black-forest-labs/flux.2-flex · refs black-forest-labs/flux.2-pro · refs google/gemini-3-pro-image-preview · refs openai/gpt-5-image-mini · refs openai/gpt-5-image · refs google/gemini-2.5-flash-image · refs РАЗРЕШЕНИЕ 768 1K 1.5K 2K 4K ASPECT RATIO auto 21:9 2:1 16:9 3:2 7:5 4:3 5:4 1:1 4:5 3:4 5:7 2:3 9:16 1:2 9:21 ПРОМТ ОЧИСТКИ Плейсхолдеры: {room} — тип комнаты, {keep} — что сохранить, {remove} — что удалить. Для кухни/санузла сохраняются встроенные элементы и технические точки. Рекомендуем FLUX 3 Image Klein, 1K, auto. Очистка добавляет второй вызов модели и увеличивает время генерации.",
+  "nav": {
+    "ttfb": 136,
+    "load": 191
+  }
+}

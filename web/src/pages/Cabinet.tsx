@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpRight, Download, Expand, LoaderCircle, LogOut, Search, Share2, Trash2, X } from 'lucide-react'
 import { Link } from 'react-router'
+import { Logo } from '@/components/Logo'
 import { ShareDialog } from '@/components/ShareDialog'
 import '../App.css'
 
@@ -67,7 +68,7 @@ export default function Cabinet() {
   const [loginStep, setLoginStep] = useState<'email' | 'code'>('email')
   const [loginEmail, setLoginEmail] = useState(() => localStorage.getItem('rv_last_email') || '')
   const [loginCode, setLoginCode] = useState('')
-  const [loginError, setLoginError] = useState('')
+  const [loginError, setLoginError] = useState(() => new URLSearchParams(location.search).get('auth_error') ? 'Не удалось войти через Яндекс, попробуйте ещё раз' : '')
   const [loginBusy, setLoginBusy] = useState(false)
   const [consents, setConsents] = useState<Consents>({ offer: false, personal: false, transfer: false })
   const paidRef = useRef(false)
@@ -247,6 +248,22 @@ export default function Cabinet() {
     } catch (e) { setLoginError(e instanceof Error ? e.message : 'Не удалось войти') }
     finally { setLoginBusy(false) }
   }
+  const yandexLogin = async () => {
+    if (!consents.offer || !consents.personal || !consents.transfer) return setLoginError('Отметьте оферту, согласие на ПДн и трансграничную передачу')
+    setLoginBusy(true); setLoginError('')
+    try {
+      const r = await fetch('/api/auth/yandex/start', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consents: { offer: consents.offer, privacy: consents.personal, cross_border: consents.transfer }, redirect_to: '/cabinet' }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      window.location.href = d.url
+    } catch (e) {
+      setLoginError(e instanceof Error ? e.message : 'Не удалось войти через Яндекс')
+      setLoginBusy(false)
+    }
+  }
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     setMe(null); setGenerations([]); setCredits([]); setSelectedRoom(null); setRoomData(null)
@@ -288,7 +305,7 @@ export default function Cabinet() {
   if (!me) {
     return (
       <div className="min-h-dvh bg-background text-foreground">
-        <header className="border-b"><div className="page-shell flex min-h-16 items-center justify-between"><a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span></a><a href="/" className="text-sm underline decoration-border underline-offset-4">На сайт</a></div></header>
+        <header className="border-b"><div className="page-shell flex min-h-16 items-center justify-between"><Logo /><a href="/" className="text-sm underline decoration-border underline-offset-4">На сайт</a></div></header>
         <main className="mx-auto flex min-h-[75svh] max-w-md flex-col justify-center px-4 py-12">
           <p className="eyebrow">Личный кабинет</p>
           <h1 className="display-title mt-4 text-4xl">Вход по e-mail</h1>
@@ -302,6 +319,8 @@ export default function Cabinet() {
                 </div>
                 {loginError && <p className="text-sm text-destructive" role="alert">{loginError}</p>}
                 <button type="button" disabled={loginBusy} onClick={sendLogin} className="action-primary w-full">{loginBusy ? 'Отправляем…' : 'Получить код'}</button>
+                <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или<span className="h-px flex-1 bg-border" /></div>
+                <button type="button" disabled={loginBusy} onClick={yandexLogin} className="flex h-12 w-full items-center justify-center gap-2 border bg-background text-base transition-colors hover:bg-muted disabled:opacity-50"><span className="grid size-6 place-items-center bg-[#FC3F1D] text-sm font-semibold text-white">Я</span>Войти через Яндекс</button>
               </>
             ) : (
               <>
@@ -324,7 +343,7 @@ export default function Cabinet() {
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span></a><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
+          <div className="flex items-center gap-3"><Logo /><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
           <div className="flex items-center gap-2 text-sm">
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
             <a href="/?panel=1" className="action-primary hidden min-h-11 items-center px-4 sm:inline-flex">Новый дизайн <ArrowUpRight className="size-4" /></a>

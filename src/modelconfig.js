@@ -3,7 +3,7 @@
 const DEFAULTS = {
   render: process.env.RENDER_MODEL || 'black-forest-labs/flux-3-image',
   edit: process.env.EDIT_MODEL || '',
-  vision: process.env.VISION_MODEL || 'google/gemini-3-flash-preview',
+  vision: process.env.VISION_MODEL || 'google/gemini-3.1-pro-preview',
   resolution: process.env.RENDER_RESOLUTION || '1K',
   aspectRatio: process.env.RENDER_ASPECT_RATIO || 'auto',
 };

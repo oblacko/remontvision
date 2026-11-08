@@ -136,3 +136,15 @@
 - bbox = `[x,y,w,h]` 0..1. `search_by_image` = `POST /v2/image/search_by_image`; live-проверка на VPS (локально нет `YANDEX_SEARCH_API_KEY`).
 - Учёт запросов: каждый шаг пишет в `search_steps.output.requests` массив `{provider, kind, model, rate, count, unit_cost_usd, cost_usd}` + `requests_count` и `cost_usd`; стоимость vision/grid/ячеек — фактическая из OpenRouter, Yandex — по тарифу: web день `$0.004`, ночь `$0.003` (00:00–07:59 UTC+3), image `$0.0075` за запрос (env `YANDEX_WEB_COST_USD`/`YANDEX_WEB_NIGHT_COST_USD`/`YANDEX_IMAGE_COST_USD`, правятся в админке). Сумма поиска добавляется в `search_jobs.cost_usd`.
 - Старый procurement и `/api/renders/:id/procurement` не тронуты; пользовательский запуск нового поиска — отдельная задача.
+
+## Catalog Service (2026-11-03)
+
+- Отдельный сервис `app/catalog-service/` (Python/FastAPI + Postgres/pgvector): импорт CPA YML, DINOv2 **ViT-B/14** (768d), гибридный поиск. Полное описание — `docs/CATALOG-SERVICE.md`.
+- Загружен Hoff 793: **36 092 оффера, 0 без категории**; эмбеддинги **36 074 / 36 092** (16 картинок 404, 2 без `picture_url`).
+- Search Lab: источник `catalog` (гибрид с Yandex), `search.v1.catalog_enabled`; `affiliate_url`/`erid` (миграция 034). Выключен по умолчанию.
+- Vision: `SEARCH_VISION_MODEL=deepseek/deepseek-v4.1-flash-1017` (каталог/поиск); `VISION_MODEL=google/gemini-3.1-pro-preview` (остальное приложение).
+- MCP `mcp_server.py` (5 инструментов) + агент `scripts/vision_agent.py` (tool-calling); на кухне 16 предметов, room заполнен, `tile=0` честно, кухонные шкафы без прикроватных тумб.
+- Исправлены: кухонные навесные шкафы → `cabinet` (259 офферов), русский стемминг, пустые категории без чужого fallback, переподключение БД, приоритет картинок в очереди эмбеддинга.
+- Следующее: **Task 12 — visual_check** (DINOv2 cosine + vision top-2) + correction loop и логи для дообучения; `/vision-agent` + вкладка UI; DINOv3-бенчмарк (веса gated).
+- Команды: `CATALOG_INSTALL_ML=1 docker compose up -d --build catalog`; `POST /embed {"feed_id":2}`; `cd catalog-service && python3 -m pytest -q`.
+- Ограничения: ViT-B (не L), text→image (dino.txt) нет, ADE20K — семантика, а не инстансы; в Hoff нет `tile`; 18 офферов без эмбеддинга; `mcp<2` (FastMCP).

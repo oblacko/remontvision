@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { ArrowUpRight, Check, LoaderCircle, LogOut, Plus, Search, Upload, X } from 'lucide-react'
+import { Logo } from '@/components/Logo'
 import { SearchLab } from '@/components/SearchLab'
 import '../App.css'
 
@@ -925,7 +926,7 @@ export default function Admin() {
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span></a><span className="eyebrow">/ админка</span></div>
+          <div className="flex items-center gap-3"><Logo /><span className="eyebrow">/ админка</span></div>
           <nav className="flex items-center gap-3 text-sm">
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
             <a href="/cabinet" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">Кабинет</a>

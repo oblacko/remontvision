@@ -1,0 +1,204 @@
+{
+  "page": "prices",
+  "path": "/prices",
+  "viewport": "mobile",
+  "requestedUrl": "https://www.remontvision.ru/prices",
+  "finalUrl": "https://www.remontvision.ru/prices",
+  "shotOk": true,
+  "consoleErrors": [],
+  "exceptions": [],
+  "failedRequests": [],
+  "badResponses": [],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/prices",
+      "status": 200,
+      "type": "text/html",
+      "size": 260
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap",
+      "status": 200,
+      "type": "text/css",
+      "size": 0
+    },
+    {
+      "url": "https://www.remontvision.ru/legal.css",
+      "status": 200,
+      "type": "text/css",
+      "size": 259
+    },
+    {
+      "url": "https://www.remontvision.ru/prices",
+      "status": 200,
+      "type": "text/html",
+      "size": 260
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap",
+      "status": 200,
+      "type": "text/css",
+      "size": 0
+    },
+    {
+      "url": "https://www.remontvision.ru/legal.css",
+      "status": 304,
+      "type": "text/css",
+      "size": 259
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459W1hyzbi.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 0
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wdhyzbi.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 0
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 0
+    }
+  ],
+  "url": "https://www.remontvision.ru/prices",
+  "title": "Услуги и цены — Ремонтвижн",
+  "description": "Стоимость услуг Ремонтвижн: 2 генерации бесплатно после регистрации, 1 кредит = 1 генерация. Пакеты кредитов 2 за 99 ₽, 5 за 229 ₽, 15 за 599 ₽.",
+  "robots": "index, follow",
+  "og": [],
+  "h1": [
+    "Услуги и цены"
+  ],
+  "h2": [
+    "Бесплатно",
+    "Кредиты на генерации",
+    "Что входит в услугу",
+    "Оплата",
+    "Получение заказа",
+    "Аванс, списание и возврат",
+    "Чек",
+    "Документы"
+  ],
+  "buttons": [],
+  "links": [
+    {
+      "text": "ремонтвижн",
+      "href": "https://www.remontvision.ru/"
+    },
+    {
+      "text": "← на главную",
+      "href": "https://www.remontvision.ru/"
+    },
+    {
+      "text": "Попробовать бесплатно",
+      "href": "https://www.remontvision.ru/"
+    },
+    {
+      "text": "«Получение заказа»",
+      "href": "https://www.remontvision.ru/delivery"
+    },
+    {
+      "text": "оферты",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "support@remontvision.ru",
+      "href": "mailto:support@remontvision.ru"
+    },
+    {
+      "text": "support@remontvision.ru",
+      "href": "mailto:support@remontvision.ru"
+    },
+    {
+      "text": "Публичная оферта",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "Получение заказа",
+      "href": "https://www.remontvision.ru/delivery"
+    },
+    {
+      "text": "Контакты и реквизиты",
+      "href": "https://www.remontvision.ru/contacts"
+    },
+    {
+      "text": "Политика конфиденциальности",
+      "href": "https://www.remontvision.ru/privacy"
+    },
+    {
+      "text": "support@remontvision.ru",
+      "href": "mailto:support@remontvision.ru"
+    },
+    {
+      "text": "Услуги и цены",
+      "href": "https://www.remontvision.ru/prices"
+    },
+    {
+      "text": "Оферта",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "Получение",
+      "href": "https://www.remontvision.ru/delivery"
+    },
+    {
+      "text": "Контакты и реквизиты",
+      "href": "https://www.remontvision.ru/contacts"
+    },
+    {
+      "text": "Политика конфиденциальности",
+      "href": "https://www.remontvision.ru/privacy"
+    }
+  ],
+  "forms": 0,
+  "inputs": [],
+  "images": [],
+  "jsonld": [],
+  "bodyText": "ремонтвижн ← на главную Услуги и цены «Ремонтвижн» — онлайн-сервис, который по фотографии комнаты создаёт визуализацию ремонта с помощью искусственного интеллекта и подбирает товары с ориентировочной стоимостью. Услуга оказывается дистанционно в цифровом виде. Попробовать бесплатно 2 генерации бесплатно после регистрации. Дальше — кредиты: 1 кредит = 1 генерация. Бесплатно 2 генерации новому пользователю Две генерации: создание дизайна и правка 0 ₽ Два кредита начисляются после регистрации и входа по e-mail. Регистрация бесплатная. Кредиты на генерации 1 кредит = 1 генерация: создание дизайна по фото или правка текущего дизайна текстовым запросом. Например: «пол → дерево», «люстру проще», «стены светлее». Кредиты не имеют срока действия. 2 кредита — попробовать 2 генерации 99 ₽ 5 кредитов 5 генераций 229 ₽ 15 кредитов — выгодно 15 генераций 599 ₽ Что входит в услугу визуализация ремонта по загруженному фото комнаты; подбор материалов и товаров из каталога под стиль и бюджет; смета с ценами и ссылками на товары; возможность менять дизайн текстовыми запросами; скачивание результата. Визуализация создаётся искусственным интеллектом и носит информационный характер. Она не является проектной документацией. Размеры, пропорции, цвета, количество материалов и цены могут не соответствовать реальности — проверяйте их у специалистов и продавцов перед покупкой и началом работ. Оплата Оплата проходит на защищённой странице ЮKassa. Доступны банковские карты, СБП и ЮMoney. Данные банковской карты вводятся на стороне ЮKassa и не хранятся на сайте «Ремонтвижн». Получение заказа Услуга цифровая: после успешной оплаты кредиты автоматически начисляются на баланс аккаунта на сайте. Физическая доставка не требуется. Подробнее — на странице «Получение заказа». Аванс, списание и возврат Оплата пакета является авансом. Кредит списывается при запуске генерации, а услуга считается оказанной после предоставления результата. При техническом сбое кредит восстанавливается. Возврат неиспользованной части и возврат при недостатках осуществляются по правилам оферты и законодательству РФ. Заявление на возврат направляется на support@remontvision.ru с указанием e-mail аккаунта, даты и суммы платежа. Требования рассматриваются и исполняются в сроки, установленные законом. Чек Чек самозанятого формируется в приложении «Мой налог». Чтобы получить чек или дубликат, напишите на support@remontvision.ru и укажите e-mail аккаунта, дату и сумму платежа. Документы Публичная оферта Получение заказа Контакты и реквизиты Политика конфиденциальности Самозанятый Чернов Олег Геннадьевич, ИНН 526311206266. E-mail: support@remontvision.ru. Услуги и цены · Оферта · Получение · Контакты и реквизиты · Политика конфиденциальности © 2026 Ремонтвижн",
+  "nav": {
+    "ttfb": 32,
+    "domContentLoaded": 76,
+    "load": 102
+  },
+  "resources": [
+    {
+      "name": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap",
+      "type": "link",
+      "transfer": 0,
+      "encoded": 665,
+      "duration": 0
+    },
+    {
+      "name": "https://www.remontvision.ru/legal.css",
+      "type": "link",
+      "transfer": 300,
+      "encoded": 0,
+      "duration": 29
+    },
+    {
+      "name": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459W1hyzbi.woff2",
+      "type": "css",
+      "transfer": 0,
+      "encoded": 23828,
+      "duration": 0
+    },
+    {
+      "name": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wdhyzbi.woff2",
+      "type": "css",
+      "transfer": 0,
+      "encoded": 70688,
+      "duration": 0
+    },
+    {
+      "name": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2",
+      "type": "css",
+      "transfer": 0,
+      "encoded": 37956,
+      "duration": 0
+    }
+  ]
+}

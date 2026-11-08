@@ -1,0 +1,259 @@
+{
+  "tab": "Каталог",
+  "url": "https://www.remontvision.ru/admin",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "h1": [
+    "АДМИНКА"
+  ],
+  "h2": [],
+  "buttons": [
+    "Выйти",
+    "Пользователи",
+    "Пакеты кредитов",
+    "Комнаты",
+    "Стили",
+    "Промт",
+    "Логи",
+    "Модели",
+    "Очистка",
+    "Генерация",
+    "Статьи",
+    "Поиск",
+    "Поиск (лаб)",
+    "Прокси",
+    "Каталог",
+    "Разобрать ссылку",
+    "Разобрать список",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен",
+    "удал.",
+    "активен"
+  ],
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "https://.../product/...",
+      "value": ""
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "https://...\nhttps://...",
+      "value": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "Поиск по названию, категории, источнику",
+      "value": ""
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "start"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "1490"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "start"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "1690"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "comfort"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "4900"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "comfort"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "5600"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "premium"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "12500"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "comfort"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "3200"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "premium"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "7800"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "start"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "2100"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "start"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "890"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "comfort"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "2400"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "comfort"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "2800"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "premium"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "6200"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "atelier"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "9800"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "start"
+    }
+  ],
+  "bodyText": "ремонтвижн / АДМИНКА На сайт Кабинет Выйти УПРАВЛЕНИЕ АДМИНКА Пользователи Пакеты кредитов Комнаты Стили Промт Логи Модели Очистка Генерация Статьи Поиск Поиск (лаб) Прокси Каталог ИМПОРТ ТОВАРА ПО ССЫЛКЕ Вставьте ссылку на товар из allowlist. Мы разберём JSON-LD/OpenGraph, скачаем картинку, проверим дубли, рейтинг и цену. В каталог товар попадёт только после ручного подтверждения. allowlist: 10 доменов Разобрать ссылку МАССОВЫЙ ИМПОРТ По одной ссылке на строку, максимум 20. Каждый товар разбирается отдельно, в каталог попадает только после кнопки «Добавить». Разобрать список КАТАЛОГ 100 активных · 10 черновиков ТОВАР КАТЕГОРИЯ КЛАСС ЦЕНА КОМНАТЫ СТАТУС Ламинат «Дуб натуральный» remontvision catalog · seed floor start comfort premium atelier Спальня,Гостиная (зал),Детская,Столовая,Кабинет,Прихожая,Гардеробная активен удал. Ламинат «Серый камень» remontvision catalog · seed floor start comfort premium atelier Спальня,Гостиная (зал),Детская,Столовая,Кабинет,Прихожая,Гардеробная активен удал. Инженерная доска «Светлый дуб» remontvision catalog · seed floor start comfort premium atelier Спальня,Гостиная (зал),Столовая,Кабинет,Прихожая,Гардеробная активен удал. Инженерная доска «Американский орех» remontvision catalog · seed floor start comfort premium atelier Спальня,Гостиная (зал),Столовая,Кабинет активен удал. Паркет «Французская ёлка, дуб» remontvision catalog · seed floor start comfort premium atelier Спальня,Гостиная (зал),Столовая,Кабинет активен удал. Керамогранит «Бетон» remontvision catalog · seed floor start comfort premium atelier Кухня,Санузел,Прихожая,Балкон / лоджия,Кладовка,Другое активен удал. Керамогранит «Мрамор Calacatta» remontvision catalog · seed floor start comfort premium atelier Санузел,Кухня,Прихожая,Гостиная (зал) активен удал. Виниловая плитка «Дуб» remontvision catalog · seed floor start comfort premium atelier Кухня,Санузел,Детская,Прихожая,Балкон / лоджия,Кладовка активен удал. Краска «Тёплый белый» remontvision catalog · seed paint start comfort premium atelier Спальня,Гостиная (зал),Детская,Кухня,Столовая,Кабинет,Прихожая,Кладовка,Гардеробная активен удал. Краска «Жемчужный беж» remontvision catalog · seed paint start comfort premium atelier Спальня,Гостиная (зал),Детская,Кухня,Столовая,Кабинет,Прихожая,Кладовка,Гардеробная активен удал. Краска «Оливковый шалфей» remontvision catalog · seed paint start comfort premium atelier Спальня,Гостиная (зал),Детская,Кухня,Столовая,Кабинет,Прихожая,Кладовка,Гардеробная активен удал. Краска «Графит» remontvision catalog · seed paint start comfort premium atelier Спальня,Гостиная (зал),Кухня,Столовая,Кабинет,Прихожая,Гардеробная активен удал. Декоративная краска «Известковая» remontvision catalog · seed paint start comfort premium atelier Спальня,Гостиная (зал),Столовая,Кабинет,Прихожая активен удал. Обои «Лён, меловой» remontvision catalog · seed wallpaper start comfort premium atelier Спальня,Гостиная (зал),Детская,Столовая,Кабинет,Прихожая,Гардеробная активен удал. Обои «Рогожка, песочный» remontvision catalog · seed wallpaper start comfort premium atelier Спальня,Гостиная (зал),Столовая,Кабинет,Прихожая,Гардеробная активен удал. Обои «Панно, ар-деко» remontvision catalog · seed wallpaper start comfort premium atelier Спальня,Гостиная (зал),Столовая,Кабинет активен удал. Плитка «Белый кабанчик» remontvision catalog · seed tile start comfort premium atelier Кухня,Санузел активен удал. Плитка «Зеллиж, оливковый» remontvision catalog · seed tile start comfort premium atelier Кухня,Санузел активен удал. Плитка «Мрамор Calacatta» remontvision catalog · seed tile start comfort premium atelier Кухня,Санузел активен удал. Плитка «Терраццо» remontvision catalog · seed tile start comfort premium atelier Кухня,Санузел,Прихожая активен удал. Плинтус «МДФ, белый» remontvision catalog · seed skirting start comfort premium atelier Спальня,Гостиная (зал),Детская,Кухня,Столовая,Кабинет,Прихожая,Гардеробная активен удал. Плинтус «Дуб, шпон» remontvision catalog · seed skirting start comfort premium atelier Спальня,Гостиная (зал),Детская,Столовая,Кабинет,Прихожая,Гардеробная активен удал. Столешница «HPL, дуб» remontvision catalog · seed countertop start comfort premium atelier Кухня,Санузел активен удал. Столешница «Кварц, белый» remontvision catalog · seed countertop start comfort premium atelier Кухня,Санузел активен удал. Столешница «Травертин» remontvision catalog · seed countertop start comfort premium atelier Кухня,Санузел активен удал. Столешница «Мрамор Viola» remontvision catalog · seed countertop start comfort premium atelier Кухня,Санузел активен удал. Фасады «ЛДСП, белый матовый» remontvision catalog · seed cabinet start comfort premium atelier Кухня,Санузел,Прихожая,Кладовка,Гардеробная активен удал. Фасады «МДФ эмаль, тёплый серый» remontvision catalog · seed cabinet start comfort premium atelier Кухня,Санузел,Прихожая,Кладовка,Гардеробная активен удал. Фасады «Шпон дуба» remontvision catalog · seed cabinet start comfort premium atelier Кухня,Санузел,Прихожая,Кладовка,Гардеробная активен удал. Фасады «МДФ, графит, без ручек» remontvision catalog · seed cabinet start comfort premium atelier Кухня,Санузел,Прихожая,Кладовка,Гардеробная активен удал. Смеситель «Хром, классика» remontvision catalog · seed faucet start comfort premium atelier Кухня,Санузел активен удал. Смеситель «Чёрный матовый» remontvision catalog · seed faucet start comfort premium atelier Кухня,Санузел активен удал. Смеситель «Латунь, брашированная» remontvision catalog · seed faucet start comfort premium atelier Кухня,Санузел активен удал. Раковина «Керамика, белая» remontvision catalog · seed sink start comfort premium atelier Кухня,Санузел активен удал. Раковина «Композит, графит» remontvision catalog · seed sink start comfort premium atelier Кухня,Санузел активен удал. Унитаз «Компакт, белый» remontvision catalog · seed toilet start comfort premium atelier Санузел активен удал. Унитаз «Подвесной, белый» remontvision catalog · seed toilet start comfort p",
+  "nav": {
+    "ttfb": 136,
+    "load": 191
+  }
+}

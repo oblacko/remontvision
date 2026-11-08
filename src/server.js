@@ -9,6 +9,7 @@ import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, s
 import { analyzeRoomBrief } from './artdirector.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
+import { startYandex, completeYandexLogin, appBaseUrl, yandexConfigured } from './oauth.js';
 import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
@@ -285,7 +286,7 @@ app.post('/api/design/random', rateLimit, h(async (req, res) => {
   res.json(pickRandomCompatiblePair({ usedPairs }));
 }));
 
-// ---------- авторизация (e-mail код; заделка под OAuth yandex/vk/mailru) ----------
+// ---------- авторизация (e-mail код + OAuth Яндекс) ----------
 app.post('/api/auth/request-code', rateLimit, h(async (req, res) => {
   await requestCode(req.body?.email);
   res.json({ ok: true });
@@ -311,6 +312,40 @@ app.post('/api/auth/logout', h(async (req, res) => {
   clearSessionCookie(res);
   res.json({ ok: true });
 }));
+
+// OAuth Яндекс: старт (валидируем согласия, отдаём URL) и callback (вход и редирект).
+app.post('/api/auth/yandex/start', rateLimit, h(async (req, res) => {
+  if (!yandexConfigured()) {
+    res.status(503).json({ error: 'Вход через Яндекс пока не настроен' });
+    return;
+  }
+  requireConsents(req.body?.consents);
+  const url = await startYandex({ consents: req.body?.consents, redirectTo: req.body?.redirect_to, req, res });
+  res.json({ url });
+}));
+
+app.get('/api/auth/yandex/callback', async (req, res) => {
+  try {
+    const { user, isNew, redirectTo } = await completeYandexLogin({
+      code: req.query?.code,
+      state: req.query?.state,
+      req,
+      res,
+    });
+    await recordAcceptances({
+      userId: user.id,
+      context: isNew ? 'signup' : 'login',
+      req,
+      documents: ['offer', 'privacy', 'cross_border'],
+    });
+    res.redirect(302, `${appBaseUrl(req)}${redirectTo}`);
+  } catch (e) {
+    log({ event: 'oauth_error', provider: 'yandex', error: String(e.message || e).slice(0, 300) });
+    const target = new URL(`${e.redirectTo || '/'}`, appBaseUrl(req));
+    target.searchParams.set('auth_error', 'yandex');
+    res.redirect(302, target.toString());
+  }
+});
 
 app.get('/api/me', h(async (req, res) => {
   if (!req.user) return res.json(null);
@@ -1541,7 +1576,7 @@ app.get('/procurement/:file', h(async (req, res) => serveStored(req, res, 'procu
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
 app.get('/covers/:file', h(async (req, res) => serveStored(req, res, 'covers', req.params.file)));
 function notFoundPage(title, text) {
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} — ремонтвижн</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>body{margin:0;background:#f5f2ec;color:#1e1c19;font-family:Georgia,'Times New Roman',serif;display:flex;min-height:100vh;align-items:center;justify-content:center}.box{max-width:520px;padding:40px 24px;text-align:center}.logo{font-family:system-ui,sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px;color:#1e1c19;text-decoration:none}h1{font-size:clamp(32px,6vw,56px);line-height:1.05;margin:24px 0 12px}p{color:#6b645c;line-height:1.6}a.btn{display:inline-block;margin-top:24px;padding:14px 22px;background:#1e1c19;color:#f5f2ec;text-decoration:none;font-family:system-ui,sans-serif;font-size:14px}</style></head><body><div class="box"><a class="logo" href="/">ремонтвижн</a><h1>${title}</h1><p>${text}</p><a class="btn" href="/">На главную</a></div></body></html>`;
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} — ремонтвижн</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>body{margin:0;background:#f5f2ec;color:#1e1c19;font-family:Georgia,'Times New Roman',serif;display:flex;min-height:100vh;align-items:center;justify-content:center}.box{max-width:520px;padding:40px 24px;text-align:center}.logo{display:inline-block}.logo img{display:block;height:20px;width:auto;margin:0 auto}h1{font-size:clamp(32px,6vw,56px);line-height:1.05;margin:24px 0 12px}p{color:#6b645c;line-height:1.6}a.btn{display:inline-block;margin-top:24px;padding:14px 22px;background:#1e1c19;color:#f5f2ec;text-decoration:none;font-family:system-ui,sans-serif;font-size:14px}</style></head><body><div class="box"><a class="logo" href="/" aria-label="Ремонтвижн — на главную"><img src="/logo.svg" alt="Ремонтвижн"></a><h1>${title}</h1><p>${text}</p><a class="btn" href="/">На главную</a></div></body></html>`;
 }
 
 app.get('/articles/:slug', h(async (req, res) => {

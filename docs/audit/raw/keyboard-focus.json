@@ -1,0 +1,28 @@
+{
+  "url": "https://www.remontvision.ru/",
+  "tabs": 22,
+  "order": [
+    "A |  | #main | К содержанию",
+    "A |  | #top | ремонтвижн®",
+    "A |  | #examples | До / после",
+    "A |  | #result | Что вы получите",
+    "A |  | #how | Как работает",
+    "A |  | #prices | Цены",
+    "BUTTON |  |  | Войти",
+    "BUTTON |  |  | Попробовать",
+    "BUTTON |  |  | Создать мой дизайн Создать мой дизайн Создать мой дизайн",
+    "A |  | #how | Как это работает Как это работает Как это работает",
+    "BUTTON |  |  | Предыдущий пример",
+    "BUTTON |  |  | Следующий пример",
+    "INPUT |  |  | 50",
+    "BUTTON |  |  | 01 Спальня",
+    "BUTTON |  |  | 02 Гостиная",
+    "BUTTON |  |  | 03 Кухня",
+    "BUTTON |  |  | Открыть генератор Открыть генератор Открыть генератор",
+    "BUTTON |  |  | Собрать мой дизайн",
+    "BUTTON |  |  | Начать бесплатно",
+    "A |  | /cabinet#credits | Купить кредиты",
+    "A |  | https://www.remontvision.ru/prices | Все условия и цены",
+    "A |  | mailto:support@remontvision.ru | support@remontvision.ru"
+  ]
+}

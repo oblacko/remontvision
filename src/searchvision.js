@@ -5,6 +5,7 @@ export const DEFAULT_VISION_PROMPT = `Ты — аналитик интерьер
   "photo_quality": {"score": 0.0, "recommend_mode": "A"},
   "objects": [{
     "category": "bed",
+    "product_type": "мягкая",
     "label": "Кровать",
     "description": "краткое описание видимого предмета",
     "color": "беж",
@@ -27,10 +28,50 @@ export const DEFAULT_VISION_PROMPT = `Ты — аналитик интерьер
 - bbox — нормализованные координаты [x, y, w, h] от 0 до 1 относительно всего кадра; если предмет не видно, null.
 - Без брендов, цен и выдуманных артикулов.
 - Описывай видимые материал, цвет и форму; для кровати не путай бельё с каркасом, для светильника — плафон и подвес.
-- search_query — короткий запрос по-русски для поиска аналога (тип, материал, цвет, размер).
+- color — цвет обивки/каркаса самого товара; игнорируй бельё, подушки, пледы, декор и фон. Если цветов несколько — основной цвет обивки.
+- product_type — тип изделия: мягкая, деревянная, металлическая, стеклянная, каменная, смешанная (для кровати — мягкая обивка или деревянный каркас).
+- description — 1–2 предложения со ВСЕМИ видимыми деталями: опоры, форма, ручки/фурнитура, ящики/двери/полки, обивка/изголовье/подлокотники, материал, цвет.
+- ОБЯЗАТЕЛЬНО про опоры: если видишь ножки — «на ножках»; цоколь — «на цоколе»; подвесной — «подвесной»; если не видно — не выдумывай.
+- search_query — короткий запрос по-русски для поиска аналога с ключевыми деталями (тип, опоры, материал, цвет, размер).
 - photo_quality.score — 0..1, насколько фото пригодно для подбора; recommend_mode = "A" для чётких фото, "B" для мелких, перекрывающихся или шумных предметов.
 - visibility: seen для видимых, hidden для очевидно нужных но скрытых, not_seen если не применимо.
 Только JSON.`;
+
+// Категории, с которыми работает каталог. Vision обязан выбирать из этого списка.
+export const ALLOWED_CATEGORIES = [
+  'bed', 'mattress', 'sofa', 'armchair', 'office_chair', 'dining_chair',
+  'bench', 'wardrobe', 'sideboard', 'storage', 'dining_table', 'coffee_table',
+  'desk', 'dressing_table', 'cabinet', 'countertop', 'light', 'rug', 'mirror',
+  'clock', 'decor', 'decor_art', 'curtain', 'bedding', 'bath_textile',
+  'table_textile', 'textile', 'wall_covering', 'floor_covering', 'tile',
+  'skirting', 'faucet', 'sink', 'shower', 'bathtub', 'toilet',
+  'bath_accessories', 'appliance', 'other',
+];
+
+const CATEGORY_LABELS = {
+  bed: 'кровать', mattress: 'матрас', sofa: 'диван', armchair: 'кресло',
+  office_chair: 'офисное/компьютерное кресло', dining_chair: 'стул/табурет',
+  bench: 'пуф/банкетка/скамья', wardrobe: 'шкаф/гардероб/двери-купе',
+  sideboard: 'комод/тумба/прикроватная тумба/ТВ-тумба/консоль/стенка',
+  storage: 'стеллаж/полки/коробки/корзины/хранение',
+  dining_table: 'обеденный/кухонный стол', coffee_table: 'журнальный/кофейный стол',
+  desk: 'письменный/компьютерный стол', dressing_table: 'туалетный столик',
+  cabinet: 'кухонный гарнитур/кухонные шкафы/фасады (НЕ тумба)',
+  countertop: 'столешница', light: 'светильник/люстра/бра/торшер/лампа',
+  rug: 'ковёр', mirror: 'зеркало', clock: 'часы', decor: 'декор/ваза/свеча/цветы/кашпо',
+  decor_art: 'картина/постер/фоторамка', curtain: 'шторы/тюль/карниз',
+  bedding: 'постельное бельё/одеяло/подушка/плед', bath_textile: 'полотенца/халаты',
+  table_textile: 'скатерти/салфетки', textile: 'прочий текстиль',
+  wall_covering: 'обои/краска/штукатурка', floor_covering: 'ламинат/паркет/линолеум',
+  tile: 'плитка/мозаика', skirting: 'плинтус', faucet: 'смеситель',
+  sink: 'раковина/мойка', shower: 'душевая/поддон', bathtub: 'ванна',
+  toilet: 'унитаз/биде', bath_accessories: 'аксессуары для ванной',
+  appliance: 'бытовая техника', other: 'если ничего не подходит',
+};
+
+const CATEGORY_CONSTRAINT = `\n\nКатегория: поле category ОБЯЗАТЕЛЬНО из списка (ключ — значение):\n` +
+  ALLOWED_CATEGORIES.map(key => `- ${key} — ${CATEGORY_LABELS[key] || key}`).join('\n') +
+  `\nВАЖНО: тумба/комод/прикроватная тумба/ТВ-тумба → sideboard (НЕ cabinet). cabinet — только кухонный гарнитур/кухонные шкафы/фасады. стеллаж/полки/коробки/корзины → storage. Если ничего не подходит — "other".`;
 
 function finiteNumber(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -82,7 +123,10 @@ export function normalizeSearchVision(raw, { maxObjects = 12 } = {}) {
 
     objects.push({
       index: objects.length,
-      category: trimmed(item.category, 40),
+      category: ALLOWED_CATEGORIES.includes(trimmed(item.category, 40))
+        ? trimmed(item.category, 40)
+        : 'other',
+      product_type: trimmed(item.product_type, 40),
       label,
       description: trimmed(item.description, 300),
       color: trimmed(item.color, 80),
@@ -117,7 +161,7 @@ export async function parseSearchImage(imageB64, mime = 'image/png', {
   }
 
   const { parsed, cost } = await visionJson({
-    system: prompt || DEFAULT_VISION_PROMPT,
+    system: (prompt || DEFAULT_VISION_PROMPT) + CATEGORY_CONSTRAINT,
     user: `Разбери фото для поиска товаров. Тип комнаты: ${roomType || 'определи сам'}.`,
     images: [`data:${mime};base64,${imageB64}`],
     model,

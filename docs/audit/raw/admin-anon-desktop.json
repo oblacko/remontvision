@@ -1,0 +1,196 @@
+{
+  "page": "admin-anon",
+  "path": "/admin",
+  "viewport": "desktop",
+  "requestedUrl": "https://www.remontvision.ru/admin",
+  "finalUrl": "https://www.remontvision.ru/admin",
+  "shotOk": true,
+  "consoleErrors": [],
+  "exceptions": [],
+  "failedRequests": [
+    {
+      "url": "817403FEEC3A83FE3E2E70FFF8402BA3",
+      "error": "net::ERR_ABORTED",
+      "blocked": ""
+    }
+  ],
+  "badResponses": [],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/admin",
+      "status": 200,
+      "type": "text/html",
+      "size": 281
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-BoKPgYgy.css",
+      "status": 200,
+      "type": "text/css",
+      "size": 260
+    },
+    {
+      "url": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 260
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-DM-kudMC.js",
+      "status": 200,
+      "type": "application/javascript",
+      "size": 260
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-1.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 260
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-0.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 260
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-light-0.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 260
+    }
+  ],
+  "url": "https://www.remontvision.ru/admin",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "robots": "index, follow, max-image-preview:large, max-snippet:-1",
+  "og": [
+    [
+      "og:type",
+      "website"
+    ],
+    [
+      "og:site_name",
+      "Ремонтвижн"
+    ],
+    [
+      "og:locale",
+      "ru_RU"
+    ],
+    [
+      "og:title",
+      "Ремонтвижн — дизайн по фото с материалами и ценами"
+    ],
+    [
+      "og:description",
+      "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки."
+    ],
+    [
+      "og:url",
+      "https://www.remontvision.ru/"
+    ],
+    [
+      "og:image",
+      "https://www.remontvision.ru/assets/og-1200x630.jpg"
+    ],
+    [
+      "og:image:type",
+      "image/jpeg"
+    ],
+    [
+      "og:image:width",
+      "1200"
+    ],
+    [
+      "og:image:height",
+      "630"
+    ],
+    [
+      "og:image:alt",
+      "Пример визуализации интерьера после ремонта"
+    ]
+  ],
+  "h1": [
+    "АДМИНКА"
+  ],
+  "h2": [],
+  "buttons": [
+    "Войти"
+  ],
+  "links": [
+    {
+      "text": "ремонтвижн",
+      "href": "https://www.remontvision.ru/"
+    },
+    {
+      "text": "На сайт",
+      "href": "https://www.remontvision.ru/"
+    },
+    {
+      "text": "Кабинет",
+      "href": "https://www.remontvision.ru/cabinet"
+    }
+  ],
+  "forms": 1,
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "password",
+      "placeholder": "X-Admin-Key",
+      "aria": ""
+    }
+  ],
+  "images": [],
+  "jsonld": [
+    "\n    {\n      \"@context\": \"https://schema.org\",\n      \"@graph\": [\n        {\n          \"@type\": \"WebSite\",\n          \"@id\": \"https://www.remontvision.ru/#website\",\n          \"url\": \"https://www.remontvision.ru/\",\n          \"name\": \"Ремонтвижн\",\n          \"inLanguage\": \"ru-RU\",\n          \"description\":"
+  ],
+  "bodyText": "ремонтвижн / АДМИНКА На сайт Кабинет ДОСТУП АДМИНКА Введите ключ администратора. Он хранится только в этом браузере. Войти",
+  "nav": {
+    "ttfb": 110,
+    "domContentLoaded": 216,
+    "load": 216
+  },
+  "resources": [
+    {
+      "name": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "type": "link",
+      "transfer": 300,
+      "encoded": 226868,
+      "duration": 35
+    },
+    {
+      "name": "https://www.remontvision.ru/web-assets/index-DM-kudMC.js",
+      "type": "script",
+      "transfer": 300,
+      "encoded": 218094,
+      "duration": 36
+    },
+    {
+      "name": "https://www.remontvision.ru/web-assets/index-BoKPgYgy.css",
+      "type": "link",
+      "transfer": 300,
+      "encoded": 24586,
+      "duration": 31
+    },
+    {
+      "name": "https://www.remontvision.ru/fonts/onest-1.woff2",
+      "type": "css",
+      "transfer": 300,
+      "encoded": 90544,
+      "duration": 39
+    },
+    {
+      "name": "https://www.remontvision.ru/fonts/onest-0.woff2",
+      "type": "css",
+      "transfer": 300,
+      "encoded": 90296,
+      "duration": 41
+    },
+    {
+      "name": "https://www.remontvision.ru/fonts/onest-light-0.woff2",
+      "type": "css",
+      "transfer": 300,
+      "encoded": 90436,
+      "duration": 36
+    }
+  ]
+}

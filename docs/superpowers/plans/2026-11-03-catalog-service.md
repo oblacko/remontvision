@@ -399,3 +399,59 @@ def test_embed_pending_uses_fetcher_and_skips_private():
 - [ ] **Step 1:** Script loads DINOv2 + dino.txt, embeds a directory of catalog images and query crops, prints Top-1/Top-3 and cosine scores for manual labeling.
 - [ ] **Step 2:** Run on 20–30 offers from feed 789 vs render crops; record `min_score` and dim in the spec's open questions.
 - [ ] **Step 3:** Do not block the service on the spike; thresholds are config.
+
+---
+
+### Task 11: DINOv3 benchmark before mass re-embedding (запланировано)
+
+**Статус:** отложено по просьбе пользователя; сначала доделываем маски/поиск, затем сравнение.
+
+**Почему:** DINOv3 (facebookresearch/dinov3) может дать лучшее качество глобальных и локальных признаков. Но это **другое векторное пространство** — каталог придётся переэмбеддить целиком; смешивать с DINOv2 нельзя. Лицензия DINOv3 отдельная (не Apache 2.0) — проверить для коммерции.
+
+**Блокер:** веса DINOv3 закрыты (HF gated: `facebook/dinov3-*`; альтернатива — форма Meta `ai.meta.com/.../dinov3-downloads/`). Нужен `HF_TOKEN` с доступом.
+
+**Модели для теста (web-веса LVD-1689M, не SAT):**
+- `vit_small_patch16_dinov3.lvd1689m` (HF `facebook/dinov3-vits16-pretrain-lvd1689m`) — первый кандидат для CPU;
+- `vit_small_plus_patch16_dinov3.lvd1689m` — сравнить;
+- `vit_base_patch16_dinov3.lvd1689m` — если Small мало.
+- `vit_base`/`vit_large` — только для второго этапа (dense/sparse matching поверх top-K), не для всего каталога.
+
+**Как тестировать:** `catalog-service/scripts/bench_dino.py` (DINOv2 timm vs DINOv3 transformers): instance Top-1/3, category Top-1/3, мс/картинку на одних и тех же 200–500 товарах. Препроцессинг DINOv3: 256×256, patch 16, ImageNet mean/std. После выбора — полный re-embed.
+
+- [ ] Получить доступ/токен HF для DINOv3.
+- [ ] Прогнать `bench_dino.py` на выборке (200–500) и записать метрики.
+- [ ] Выбрать модель (S/S+/B) и переэмбеддить каталог целиком.
+
+---
+
+### Task 12: Visual verification + correction loop в одной сессии агента (запланировано)
+
+**Статус:** записано по идее пользователя; не реализовано.
+
+**Цель:** агент не просто ищет по тексту/атрибутам, а **проверяет выдачу по картинке** и исправляет запрос, если найденное не похоже.
+
+**Схема (одна сессия агента):**
+1. vision (DeepSeek/Gemini) видит фото и объект.
+2. `search_offers` (MCP) → top-K кандидатов.
+3. `visual_check(offer_id)`:
+   - дешёвый уровень: DINOv2-cosine (кроп запроса vs эмбеддинг оффера из БД);
+   - семантический: vision-модель с двумя изображениями (запрос + картинка товара) → `{same, score, differences}`;
+   - гибрид: DINOv2 отсекает, vision проверяет top-2.
+4. Если ни один не прошёл — `resolve_category` / `category_stats` / переформулировка `search_query` и повтор.
+5. Если пусто — «нет в каталоге», без чужих категорий.
+6. Финал: только проверенные `offer_id` + `match_score` + `why`.
+
+**MCP:** `visual_check` добавляется в `catalog_tools.py` и `mcp_server.py`; агент может работать через MCP-клиент (одна сессия) или напрямую (текущий вариант). MCP-сервер stateless, контекст живёт в агенте.
+
+**Логи для дообучения:** каждая проверка (query_crop, offer_id, verdict, score, differences) пишется в файл/БД.
+
+**Будущее дообучение:** reranker на замороженных DINOv2-фичах или metric learning (triplet/ArcFace) на парах: same product / same model different color (hard negative) / same category different product.
+
+**Лимиты:** `max_steps`, `max_checks` (top-2 на объект), `max_cost_usd`, `temperature: 0`, строгий JSON.
+
+**Шаги:**
+- [ ] Добавить `visual_check` (DINOv2 cosine + optional vision two-image) в tools и MCP.
+- [ ] Внедрить в `vision_agent.py`: проверка top-2, уточнение и повтор.
+- [ ] Логировать вердикты.
+- [ ] Прогнать на кухне/спальне, сравнить precision до/после.
+- [ ] После накопления пар — обучить reranker/metric learning.

@@ -1,0 +1,145 @@
+{
+  "key": "admin-auth",
+  "vp": "desktop",
+  "cdp": {
+    "ws": {},
+    "id": 8,
+    "pending": {},
+    "handlers": [
+      null
+    ],
+    "_target": "472BBD56053C3EB9B4E7543D69176AD3"
+  },
+  "target": {
+    "description": "",
+    "devtoolsFrontendUrl": "https://chrome-devtools-frontend.appspot.com/serve_rev/@1d17a2e2ee147bb7d6ae2ab6abdb3a2510c17775/inspector.html?ws=127.0.0.1:9555/devtools/page/472BBD56053C3EB9B4E7543D69176AD3",
+    "id": "472BBD56053C3EB9B4E7543D69176AD3",
+    "title": "",
+    "type": "page",
+    "url": "about:blank",
+    "webSocketDebuggerUrl": "ws://127.0.0.1:9555/devtools/page/472BBD56053C3EB9B4E7543D69176AD3"
+  },
+  "consoleErrors": [],
+  "exceptions": [],
+  "bad": [],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/admin",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-BoKPgYgy.css",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-DM-kudMC.js",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-1.woff2",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-0.woff2",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/favicon.svg",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-light-0.woff2",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/admin",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-BoKPgYgy.css",
+      "status": 304
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-DM-kudMC.js",
+      "status": 304
+    },
+    {
+      "url": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-0.woff2",
+      "status": 304
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-1.woff2",
+      "status": 304
+    },
+    {
+      "url": "https://www.remontvision.ru/api/admin/users",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/api/admin/settings/room-types",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/api/admin/users?q=",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-light-0.woff2",
+      "status": 304
+    },
+    {
+      "url": "https://www.remontvision.ru/api/admin/products",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-3.woff2",
+      "status": 200
+    }
+  ],
+  "url": "https://www.remontvision.ru/admin",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "h1": [
+    "АДМИНКА"
+  ],
+  "h2": [],
+  "buttons": [
+    "Выйти",
+    "Пользователи",
+    "Пакеты кредитов",
+    "Комнаты",
+    "Стили",
+    "Промт",
+    "Логи",
+    "Модели",
+    "Очистка",
+    "Генерация",
+    "Статьи",
+    "Поиск",
+    "Поиск (лаб)",
+    "Прокси",
+    "Каталог",
+    "Найти"
+  ],
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "Поиск по e-mail",
+      "value": ""
+    }
+  ],
+  "bodyText": "ремонтвижн / АДМИНКА На сайт Кабинет Выйти УПРАВЛЕНИЕ АДМИНКА Пользователи Пакеты кредитов Комнаты Стили Промт Логи Модели Очистка Генерация Статьи Поиск Поиск (лаб) Прокси Каталог Найти E-MAIL БАЛАНС КОМНАТ ГЕНЕРАЦИЙ ПОСЛЕДНЯЯ audit-test-20261104@remontvision.test 04.11.2026, 15:30 1 кр. 1 1 04.11.2026, 15:33 yaoblacko@gmail.com 26.10.2026, 21:45 75 кр. 83 112 04.11.2026, 14:39 366079@mail.ru 26.10.2026, 19:14 0 кр. 2 3 26.10.2026, 20:46 support@remontvision.ru 26.10.2026, 16:42 0 кр. 2 2 27.10.2026, 15:04 Выберите пользователя, чтобы увидеть кредиты и историю генераций.",
+  "nav": {
+    "ttfb": 136,
+    "load": 191
+  }
+}

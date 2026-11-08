@@ -1,0 +1,73 @@
+{
+  "page": "article-404",
+  "path": "/articles/nonexistent",
+  "viewport": "desktop",
+  "requestedUrl": "https://www.remontvision.ru/articles/nonexistent",
+  "finalUrl": "https://www.remontvision.ru/articles/nonexistent",
+  "shotOk": true,
+  "consoleErrors": [],
+  "exceptions": [],
+  "failedRequests": [
+    {
+      "url": "E35AC16B188FE8B8F224628F50847F35",
+      "error": "net::ERR_ABORTED",
+      "blocked": ""
+    }
+  ],
+  "badResponses": [
+    {
+      "url": "https://www.remontvision.ru/articles/nonexistent",
+      "status": 404,
+      "type": "text/html",
+      "size": 222
+    },
+    {
+      "url": "https://www.remontvision.ru/favicon.ico",
+      "status": 404,
+      "type": "text/html",
+      "size": 245
+    }
+  ],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/articles/nonexistent",
+      "status": 404,
+      "type": "text/html",
+      "size": 222
+    },
+    {
+      "url": "https://www.remontvision.ru/favicon.ico",
+      "status": 404,
+      "type": "text/html",
+      "size": 245
+    }
+  ],
+  "url": "https://www.remontvision.ru/articles/nonexistent",
+  "title": "",
+  "description": "",
+  "robots": "",
+  "og": [],
+  "h1": [],
+  "h2": [],
+  "buttons": [],
+  "links": [],
+  "forms": 0,
+  "inputs": [],
+  "images": [],
+  "jsonld": [],
+  "bodyText": "Статья не найдена",
+  "nav": {
+    "ttfb": 33,
+    "domContentLoaded": 45,
+    "load": 46
+  },
+  "resources": [
+    {
+      "name": "https://www.remontvision.ru/favicon.ico",
+      "type": "other",
+      "transfer": 450,
+      "encoded": 150,
+      "duration": 33
+    }
+  ]
+}

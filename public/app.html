@@ -141,8 +141,7 @@
   @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
   .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;gap:10px}
-  .logo{font-weight:800;font-size:17px;letter-spacing:-0.6px}
-  .logo em{font-style:normal;color:var(--accent)}
+  .logo img{display:block;height:20px;width:auto}
   .top-right{display:flex;align-items:center;gap:8px;min-height:30px}
   .credits{font-size:11px;font-weight:700;color:var(--ink);border:1.5px dashed var(--muted);padding:5px 10px;border-radius:20px;cursor:pointer;background:var(--card)}
   .credits b{color:var(--accent)}
@@ -342,7 +341,7 @@
   <!-- ЭКРАН 1: фото -->
   <section class="screen active" id="s1">
     <div class="top">
-      <div class="logo">ремонт<em>вижн</em></div>
+      <div class="logo"><img src="/logo.svg" alt="Ремонтвижн"></div>
       <div class="top-right" id="userBlock"></div>
       <div class="mock-badge" id="mockBadge">демо-режим</div>
     </div>
@@ -389,7 +388,7 @@
 
   <!-- ЭКРАН 2: ожидание -->
   <section class="screen" id="s2">
-    <div class="top"><div class="logo">ремонт<em>вижн</em></div></div>
+    <div class="top"><div class="logo"><img src="/logo.svg" alt="Ремонтвижн"></div></div>
     <div class="load-stage">
       <div class="load-img">
         <img id="loadImg" src="" alt="">
@@ -411,7 +410,7 @@
 
   <!-- ЭКРАН 3: результат -->
   <section class="screen" id="s3">
-    <div class="top"><div class="logo">ремонт<em>вижн</em></div><div class="top-right" id="userBlock2"></div></div>
+    <div class="top"><div class="logo"><img src="/logo.svg" alt="Ремонтвижн"></div><div class="top-right" id="userBlock2"></div></div>
 
     <div class="compare" id="compare">
       <img id="imgBefore" src="" alt="Было">

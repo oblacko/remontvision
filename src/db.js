@@ -202,6 +202,19 @@ export const q = {
   addIdentity: (userId, provider, sub, email) =>
     pool.query(`INSERT INTO auth_identities (user_id, provider, provider_sub, email) VALUES ($1,$2,$3,$4)
                 ON CONFLICT (provider, provider_sub) DO NOTHING`, [userId, provider, sub, email]),
+  findIdentity: (provider, sub) =>
+    pool.query(`SELECT ai.*, u.email AS user_email FROM auth_identities ai
+                JOIN users u ON u.id = ai.user_id
+                WHERE ai.provider = $1 AND ai.provider_sub = $2`, [provider, sub]).then(r => r.rows[0] || null),
+  createOauthState: (state, provider, consents, redirectTo, ttlMin) =>
+    pool.query(`INSERT INTO oauth_states (state, provider, consents, redirect_to, expires_at)
+                VALUES ($1,$2,$3,$4, now() + ($5 || ' minutes')::interval)`,
+      [state, provider, JSON.stringify(consents || {}), redirectTo, String(ttlMin)]),
+  // Атомарно помечает state использованным: повторный callback по тому же state не пройдёт.
+  consumeOauthState: (state, provider) =>
+    pool.query(`UPDATE oauth_states SET used_at = now()
+                WHERE state = $1 AND provider = $2 AND used_at IS NULL AND expires_at > now()
+                RETURNING *`, [state, provider]).then(r => r.rows[0] || null),
   createOtp: (email, codeHash, ttlMin) =>
     pool.query(`INSERT INTO otp_codes (email, code_hash, expires_at) VALUES ($1,$2, now() + ($3 || ' minutes')::interval)`,
       [email, codeHash, String(ttlMin)]),

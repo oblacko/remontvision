@@ -1,0 +1,112 @@
+{
+  "key": "auth-cabinet",
+  "vp": "desktop",
+  "cdp": {
+    "ws": {},
+    "id": 7,
+    "pending": {},
+    "handlers": [
+      null
+    ],
+    "_target": "1119598D8D1F8901F03225C14571CB0C"
+  },
+  "target": {
+    "description": "",
+    "devtoolsFrontendUrl": "https://chrome-devtools-frontend.appspot.com/serve_rev/@1d17a2e2ee147bb7d6ae2ab6abdb3a2510c17775/inspector.html?ws=127.0.0.1:9555/devtools/page/1119598D8D1F8901F03225C14571CB0C",
+    "id": "1119598D8D1F8901F03225C14571CB0C",
+    "title": "",
+    "type": "page",
+    "url": "about:blank",
+    "webSocketDebuggerUrl": "ws://127.0.0.1:9555/devtools/page/1119598D8D1F8901F03225C14571CB0C"
+  },
+  "consoleErrors": [],
+  "exceptions": [],
+  "bad": [],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/cabinet",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-BoKPgYgy.css",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-DM-kudMC.js",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/favicon.svg",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/api/me",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/api/packs",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/api/credits",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/api/my/generations",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/renders/a2f75276-b222-4bf0-b0d5-4c4471d49f0a.png",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-1.woff2",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-0.woff2",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-3.woff2",
+      "status": 200
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-light-0.woff2",
+      "status": 200
+    }
+  ],
+  "url": "https://www.remontvision.ru/cabinet",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "h1": [
+    "МОИ ДИЗАЙНЫ"
+  ],
+  "h2": [],
+  "buttons": [
+    "Выйти",
+    "История",
+    "Кредиты",
+    "Все",
+    "Готовые",
+    "С ошибками",
+    "1 ВЕРСИЯ\n\nСкандинавский · Спальня\n\nБазовый дизайн\n\nготово\n04.11.2026, 15:33\n1 кр.\n$0.0512"
+  ],
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "Стиль или запрос правки",
+      "value": ""
+    }
+  ],
+  "bodyText": "ремонтвижн / КАБИНЕТ На сайт Новый дизайн 1 кр. Выйти ЛИЧНЫЙ КАБИНЕТ МОИ ДИЗАЙНЫ audit-test-20261104@remontvision.test 1 КОМНАТА 1 ГЕНЕРАЦИЯ 1 КР. ИСПОЛЬЗОВАНО История Кредиты Все Готовые С ошибками 1 ВЕРСИЯ Скандинавский · Спальня Базовый дизайн готово 04.11.2026, 15:33 1 кр. $0.0512",
+  "nav": {
+    "ttfb": 529,
+    "load": 805
+  }
+}

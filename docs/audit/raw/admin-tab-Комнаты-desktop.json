@@ -1,0 +1,122 @@
+{
+  "tab": "Комнаты",
+  "url": "https://www.remontvision.ru/admin",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "h1": [
+    "АДМИНКА"
+  ],
+  "h2": [],
+  "buttons": [
+    "Выйти",
+    "Пользователи",
+    "Пакеты кредитов",
+    "Комнаты",
+    "Стили",
+    "Промт",
+    "Логи",
+    "Модели",
+    "Очистка",
+    "Генерация",
+    "Статьи",
+    "Поиск",
+    "Поиск (лаб)",
+    "Прокси",
+    "Каталог",
+    "новый",
+    "Гостиная (зал)\n11 кат. · 10 слотов · sort 0",
+    "Спальня\n10 кат. · 9 слотов · sort 1",
+    "Детская\n11 кат. · 10 слотов · sort 2",
+    "Кухня\n11 кат. · 10 слотов · sort 3",
+    "Санузел\n12 кат. · 9 слотов · sort 4",
+    "Кладовка\n6 кат. · 6 слотов · sort 5",
+    "Прихожая\n10 кат. · 8 слотов · sort 6",
+    "Столовая\n11 кат. · 10 слотов · sort 7",
+    "Кабинет\n11 кат. · 10 слотов · sort 8",
+    "Балкон / лоджия\n4 кат. · 4 слотов · sort 9",
+    "Гардеробная\n6 кат. · 6 слотов · sort 10",
+    "Другое\n16 кат. · 4 слотов · sort 11",
+    "Сбросить всё",
+    "Сохранить тип",
+    "удалить тип"
+  ],
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "Например: Гостиная (зал)",
+      "value": "Гостиная (зал)"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "living room",
+      "value": "living room"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "0"
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "placeholder": "",
+      "value": "on"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "floor, paint, light, outlets",
+      "value": "sofa, armchair, coffee_table, rug, floor, paint, wallpaper, skirting, light, outlets, textile"
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "the sofa, armchairs, coffee table, TV/media console and their realistic proportions; the architecture, camera, walls, windows, doors and ceiling height. Do not block doors or windows."
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "floor finish, wall finish, lighting, textiles, decor and styling. Replace or restyle the sofa, armchairs, coffee table and storage using the listed furniture. You may rearrange freestanding furniture to improve composition and flow while keeping it functional."
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "A sofa or armchairs, coffee table, TV/media console, shelving, rug and layered lighting are appropriate."
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "No bed, no kitchen cabinets, countertop, sink or faucet, no toilet, shower or bathroom fixtures. Do not replace the floor with large-format porcelain tile unless a floor product is provided."
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "Style the sofa with cushions and a throw; add a rug, coffee-table books, ceramics, a tray, candles, art, plants, a floor lamp and a sculptural chair. Layer textiles and warm light; make it feel collected, not staged. If there is a TV, mount it flush with hidden cables or use a frame TV; cover the radiator with a slim grille. Add a warm cove or wall wash. Replace old blinds with floor-length curtains or a clean Roman blind; hide the cornice. Add a gallery wall, open shelving with books and ceramics, and a modern laptop, headphones or speaker styled on the console or coffee table — visible and on a surface, never on the floor. Hide all cables, chargers and straps."
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "[\n  {\n    \"key\": \"sofa\",\n    \"categories\": [\n      \"sofa\"\n    ]\n  },\n  {\n    \"key\": \"floor\",\n    \"categories\": [\n      \"floor\"\n    ]\n  },\n  {\n    \"key\": \"wall\",\n    \"categories\": [\n      \"paint\",\n      \"wallpaper\"\n    ]\n  },\n  {\n    \"key\": \"coffee_table\",\n    \"categories\": [\n      \"coffee_table\"\n    ]\n  },\n  {\n    \"key\": \"armchair\",\n    \"categories\": [\n      \"armchair\"\n    ]\n  },\n  {\n    \"key\": \"light\",\n    \"categories\": [\n      \"light\"\n    ]\n  },\n  {\n    \"key\": \"rug\",\n    \"categories\": [\n      \"rug\"\n    ]\n  },\n  {\n    \"key\": \"skirting\",\n    \"categories\": [\n      \"skirting\"\n    ]\n  },\n  {\n    \"key\": \"outlets\",\n    \"categories\": [\n      \"outlets\"\n    ]\n  },\n  {\n    \"key\": \"textile\",\n    \"categories\": [\n      \"textile\"\n    ]\n  }\n]"
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": "textarea",
+      "placeholder": "",
+      "value": "[\n  {\n    \"title\": \"Розетки у дивана\",\n    \"text\": \"2–4 розетки + USB, 300 мм от пола, чтобы заряжать технику и торшер.\"\n  },\n  {\n    \"title\": \"ТВ-зона\",\n    \"text\": \"4 розетки + интернет за ТВ-панелью, скрытый кабель-канал.\"\n  },\n  {\n    \"title\": \"Свет\",\n    \"text\": \"Люстра, бра и торшер — отдельные группы; проходные выключатели у двух входов.\"\n  }\n]"
+    }
+  ],
+  "bodyText": "ремонтвижн / АДМИНКА На сайт Кабинет Выйти УПРАВЛЕНИЕ АДМИНКА Пользователи Пакеты кредитов Комнаты Стили Промт Логи Модели Очистка Генерация Статьи Поиск Поиск (лаб) Прокси Каталог СПРАВОЧНИК КОМНАТ новый Тип комнаты задаёт допустимые категории товаров, слоты сметы, правила сохранения/замены, электрику и стилизацию для промта. Выключенные типы не показываются пользователям, но старые комнаты продолжают работать. Гостиная (зал) 11 кат. · 10 слотов · sort 0 Спальня 10 кат. · 9 слотов · sort 1 Детская 11 кат. · 10 слотов · sort 2 Кухня 11 кат. · 10 слотов · sort 3 Санузел 12 кат. · 9 слотов · sort 4 Кладовка 6 кат. · 6 слотов · sort 5 Прихожая 10 кат. · 8 слотов · sort 6 Столовая 11 кат. · 10 слотов · sort 7 Кабинет 11 кат. · 10 слотов · sort 8 Балкон / лоджия 4 кат. · 4 слотов · sort 9 Гардеробная 6 кат. · 6 слотов · sort 10 Другое 16 кат. · 4 слотов · sort 11 РЕДАКТИРОВАНИЕ ТИПА Изменения применяются к новым генерациям. Переименование не обновляет старые комнаты, style references и товары, поэтому для вывода из использования лучше снять «активен». Сбросить всё НАЗВАНИЕ PROMPT ДЛЯ МОДЕЛИ (АНГЛИЙСКИЙ) СОРТИРОВКА активен для пользователей КАТЕГОРИИ ТОВАРОВ Через запятую. Доступны: bed, wardrobe, sofa, armchair, coffee_table, dining_table, dining_chair, sideboard, desk, office_chair, storage, bench, rug, floor, paint, wallpaper, tile, skirting, countertop, cabinet, faucet, sink, toilet, shower, bathtub, light, outlets, appliance, textile. KEEP — ЧТО СОХРАНИТЬ CHANGE — ЧТО МОЖНО МЕНЯТЬ GUIDANCE — ЧТО УМЕСТНО FORBID — ЧТО ЗАПРЕЩЕНО STYLING — PINTEREST-СТАЙЛИНГ СЛОТЫ СМЕТЫ (JSON) Массив объектов { key, categories }. Категории слота должны входить в категории комнаты. ЭЛЕКТРИКА (JSON) Массив объектов { title, text } для рекомендаций по розеткам и свету. Сохранить тип удалить тип Заводской справочник: 12 типов. «Сбросить всё» вернёт их и удалит пользовательские изменения.",
+  "nav": {
+    "ttfb": 136,
+    "load": 191
+  }
+}

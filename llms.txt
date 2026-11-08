@@ -4,7 +4,7 @@
 
 Repo: https://github.com/oblacko/remontvision (private)  
 Prod: https://www.remontvision.ru  
-Last updated: 2026-10-30
+Last updated: 2026-11-03
 
 ## Start here
 
@@ -14,6 +14,7 @@ Last updated: 2026-10-30
 - [docs/GENERATION.md](https://github.com/oblacko/remontvision/blob/main/docs/GENERATION.md) — generation pipeline and prompt.
 - [docs/GENERATION-FLOW.md](https://github.com/oblacko/remontvision/blob/main/docs/GENERATION-FLOW.md) — full flow diagram: data sources, dependencies and per-request cost.
 - [docs/CATALOG.md](https://github.com/oblacko/remontvision/blob/main/docs/CATALOG.md) — products, styles, import, orders.
+- [docs/CATALOG-SERVICE.md](https://github.com/oblacko/remontvision/blob/main/docs/CATALOG-SERVICE.md) — separate catalog/search service: feeds, DINOv2 embeddings, hybrid search, MCP and vision agent.
 - [docs/PROCUREMENT.md](https://github.com/oblacko/remontvision/blob/main/docs/PROCUREMENT.md) — future product search and low-cost pilot plan.
 - [docs/ADMIN.md](https://github.com/oblacko/remontvision/blob/main/docs/ADMIN.md) — admin tabs.
 - [docs/PROMPT-RULES.md](https://github.com/oblacko/remontvision/blob/main/docs/PROMPT-RULES.md) — editable prompt rules.
@@ -43,7 +44,7 @@ Last updated: 2026-10-30
 - Share page `/s/:token` with likes/comments.
 - Payments on (Robokassa default, YooKassa fallback), refunds off. Robokassa sends fiscal `Receipt` (service, tax none) for Roboчеки СМЗ.
 - Product procurement on: 1 credit per render, Yandex Search API + store allowlist, product list only (no estimate/quantities).
-- Catalog service (2026-11-03): separate `catalog-service/` (Python/FastAPI + Postgres/pgvector) imports CPA YML feeds, vectorizes images with DINOv2 (ViT-L/14 reg4 + dino.txt), and serves vector `/search`. Remontvision uses it as an extra hybrid source in Search Lab (`search.v1.catalog_enabled`, `src/catalogclient.js`); results carry `affiliate_url`/`erid` (migration `034`). Not deployed/enabled by default.
+- Catalog service (2026-11-03): separate `catalog-service/` (Python/FastAPI + Postgres/pgvector) imports CPA YML feeds, vectorizes images with **DINOv2 ViT-B/14 (768d)**, and serves hybrid `/search` + `/search-text`. Hoff 793: 36 092 offers, 0 without category; **36 074/36 092 embeddings** (16 images 404, 2 without picture). Remontvision uses it as an extra hybrid source in Search Lab (`search.v1.catalog_enabled`, `src/catalogclient.js`); results carry `affiliate_url`/`erid` (migration `034`). Not deployed/enabled by default. MCP server (`mcp_server.py`, 5 tools) and DeepSeek vision agent (`scripts/vision_agent.py`, tool-calling) are in the image. Full description: `docs/CATALOG-SERVICE.md`.
 - Main launch blocker: no real product URLs → no real orders.
 
 ## Architecture (short)
@@ -67,6 +68,7 @@ Last updated: 2026-10-30
 ## Key files
 
 - `src/server.js` — HTTP API/auth/admin/share/payments.
+- `src/auth.js`, `src/oauth.js` — вход по e-mail коду и OAuth (Яндекс): сессии, state, склейка аккаунтов.
 - `src/jobs.js` — worker.
 - `src/openrouter.js` — provider, prompt, vision, matching.
 - `src/promptconfig.js` — prompt defaults/config.

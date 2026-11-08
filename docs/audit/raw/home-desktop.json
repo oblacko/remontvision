@@ -1,0 +1,440 @@
+{
+  "page": "home",
+  "path": "/",
+  "viewport": "desktop",
+  "requestedUrl": "https://www.remontvision.ru/",
+  "finalUrl": "https://www.remontvision.ru/",
+  "shotOk": true,
+  "consoleErrors": [],
+  "exceptions": [],
+  "failedRequests": [
+    {
+      "url": "C2A7FF6C0F5399742C7821CA727BC5CF",
+      "error": "net::ERR_ABORTED",
+      "blocked": ""
+    }
+  ],
+  "badResponses": [
+    {
+      "url": "https://www.remontvision.ru/api/me",
+      "status": 401,
+      "type": "application/json",
+      "size": 228
+    }
+  ],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/",
+      "status": 200,
+      "type": "text/html",
+      "size": 281
+    },
+    {
+      "url": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 278
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-BoKPgYgy.css",
+      "status": 200,
+      "type": "text/css",
+      "size": 280
+    },
+    {
+      "url": "https://www.remontvision.ru/web-assets/index-DM-kudMC.js",
+      "status": 200,
+      "type": "application/javascript",
+      "size": 290
+    },
+    {
+      "url": "https://www.remontvision.ru/api/me",
+      "status": 401,
+      "type": "application/json",
+      "size": 228
+    },
+    {
+      "url": "https://www.remontvision.ru/api/room-types",
+      "status": 200,
+      "type": "application/json",
+      "size": 226
+    },
+    {
+      "url": "https://www.remontvision.ru/api/styles",
+      "status": 200,
+      "type": "application/json",
+      "size": 240
+    },
+    {
+      "url": "https://www.remontvision.ru/api/packs",
+      "status": 200,
+      "type": "application/json",
+      "size": 226
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-0.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 277
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-light-0.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 277
+    },
+    {
+      "url": "https://www.remontvision.ru/fonts/onest-1.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 277
+    },
+    {
+      "url": "https://www.remontvision.ru/images/room-before.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 276
+    },
+    {
+      "url": "https://www.remontvision.ru/favicon.svg",
+      "status": 200,
+      "type": "image/svg+xml",
+      "size": 277
+    },
+    {
+      "url": "https://www.remontvision.ru/images/room-after.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 278
+    },
+    {
+      "url": "https://www.remontvision.ru/images/living-after.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 279
+    },
+    {
+      "url": "https://www.remontvision.ru/images/materials-editorial.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 278
+    }
+  ],
+  "url": "https://www.remontvision.ru/",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "robots": "index, follow, max-image-preview:large, max-snippet:-1",
+  "og": [
+    [
+      "og:type",
+      "website"
+    ],
+    [
+      "og:site_name",
+      "Ремонтвижн"
+    ],
+    [
+      "og:locale",
+      "ru_RU"
+    ],
+    [
+      "og:title",
+      "Ремонтвижн — дизайн по фото с материалами и ценами"
+    ],
+    [
+      "og:description",
+      "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки."
+    ],
+    [
+      "og:url",
+      "https://www.remontvision.ru/"
+    ],
+    [
+      "og:image",
+      "https://www.remontvision.ru/assets/og-1200x630.jpg"
+    ],
+    [
+      "og:image:type",
+      "image/jpeg"
+    ],
+    [
+      "og:image:width",
+      "1200"
+    ],
+    [
+      "og:image:height",
+      "630"
+    ],
+    [
+      "og:image:alt",
+      "Пример визуализации интерьера после ремонта"
+    ]
+  ],
+  "h1": [
+    "ПРИМЕРЬТЕ РЕМОНТ\nДО ПОКУПОК"
+  ],
+  "h2": [
+    "ИЗОБРАЖЕНИЕ + ПОДБОР",
+    "БЮДЖЕТ ДО ГЕНЕРАЦИИ",
+    "БЕЗ ПОДПИСКИ",
+    "ОДНА КОМНАТА.\nНОВАЯ ЖИЗНЬ.",
+    "ЧЕТЫРЕ ШАГА\nДО СМЕТЫ",
+    "ОТ ИДЕИ\nК ПОКУПКАМ",
+    "ОТ ФОТО\nДО РЕШЕНИЯ",
+    "БЕЗ ПОДПИСКИ.\nБЕЗ СЮРПРИЗОВ.",
+    "ПЕРЕД\nНАЧАЛОМ",
+    "ПОСМОТРИТЕ,\nЧТО ВОЗМОЖНО"
+  ],
+  "buttons": [
+    "Войти",
+    "Попробовать",
+    "Создать мой дизайн\nСоздать мой дизайн\nСоздать мой дизайн",
+    "01 Спальня",
+    "02 Гостиная",
+    "03 Кухня",
+    "Открыть генератор\nОткрыть генератор\nОткрыть генератор",
+    "Собрать мой дизайн",
+    "Начать бесплатно",
+    "Сколько стоит дизайн по фото?",
+    "Какое фото подойдёт?",
+    "Что я получу, кроме картинки?",
+    "Можно изменить готовый дизайн?",
+    "Можно сразу закупаться по смете?",
+    "Загрузить комнату\nЗагрузить комнату\nЗагрузить комнату"
+  ],
+  "links": [
+    {
+      "text": "К содержанию",
+      "href": "https://www.remontvision.ru/#main"
+    },
+    {
+      "text": "ремонтвижн®",
+      "href": "https://www.remontvision.ru/#top"
+    },
+    {
+      "text": "До / после",
+      "href": "https://www.remontvision.ru/#examples"
+    },
+    {
+      "text": "Что вы получите",
+      "href": "https://www.remontvision.ru/#result"
+    },
+    {
+      "text": "Как работает",
+      "href": "https://www.remontvision.ru/#how"
+    },
+    {
+      "text": "Цены",
+      "href": "https://www.remontvision.ru/#prices"
+    },
+    {
+      "text": "Как это работает\nКак это работает\nКак это работает",
+      "href": "https://www.remontvision.ru/#how"
+    },
+    {
+      "text": "Купить кредиты",
+      "href": "https://www.remontvision.ru/cabinet#credits"
+    },
+    {
+      "text": "Все условия и цены",
+      "href": "https://www.remontvision.ru/prices"
+    },
+    {
+      "text": "support@remontvision.ru",
+      "href": "mailto:support@remontvision.ru"
+    },
+    {
+      "text": "ремонтвижн®",
+      "href": "https://www.remontvision.ru/#top"
+    },
+    {
+      "text": "Услуги и цены",
+      "href": "https://www.remontvision.ru/prices"
+    },
+    {
+      "text": "Оферта",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "Получение",
+      "href": "https://www.remontvision.ru/delivery"
+    },
+    {
+      "text": "Контакты",
+      "href": "https://www.remontvision.ru/contacts"
+    },
+    {
+      "text": "Конфиденциальность",
+      "href": "https://www.remontvision.ru/privacy"
+    }
+  ],
+  "forms": 0,
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "range",
+      "placeholder": "",
+      "aria": "Спальня: сравнить фото до и после"
+    },
+    {
+      "tag": "INPUT",
+      "type": "file",
+      "placeholder": "",
+      "aria": ""
+    }
+  ],
+  "images": [
+    {
+      "src": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "alt": "Светлая гостиная с дубовой мебелью, льняным диваном и мягким естественным светом",
+      "w": 2048,
+      "h": 1152
+    },
+    {
+      "src": "https://www.remontvision.ru/images/room-after.webp",
+      "alt": "Спальня после дизайна в стиле «Тёплый минимализм»",
+      "w": 1024,
+      "h": 1536
+    },
+    {
+      "src": "https://www.remontvision.ru/images/room-before.webp",
+      "alt": "Спальня до ремонта",
+      "w": 398,
+      "h": 596
+    },
+    {
+      "src": "https://www.remontvision.ru/images/living-after.webp",
+      "alt": "Готовая гостиная в современной классике после генерации",
+      "w": 1536,
+      "h": 1024
+    },
+    {
+      "src": "https://www.remontvision.ru/images/materials-editorial.webp",
+      "alt": "Подбор материалов для интерьера: дуб, травертин, лён, керамика и тёплые оттенки краски",
+      "w": 1200,
+      "h": 800
+    },
+    {
+      "src": "https://www.remontvision.ru/images/bedroom-editorial.webp",
+      "alt": "Спокойная спальня в тёплых натуральных оттенках с льняным постельным бельём",
+      "w": 0,
+      "h": 0
+    }
+  ],
+  "jsonld": [
+    "\n    {\n      \"@context\": \"https://schema.org\",\n      \"@graph\": [\n        {\n          \"@type\": \"WebSite\",\n          \"@id\": \"https://www.remontvision.ru/#website\",\n          \"url\": \"https://www.remontvision.ru/\",\n          \"name\": \"Ремонтвижн\",\n          \"inLanguage\": \"ru-RU\",\n          \"description\":"
+  ],
+  "bodyText": "К содержанию ремонтвижн® До / после Что вы получите Как работает Цены Войти Попробовать 4 200 MM 2 800 MM 01 / ПЛАН КОМНАТЫ [ 01 ] / AI INTERIOR STUDIO ФОТО → ДИЗАЙН → СМЕТА ПРИМЕРЬТЕ РЕМОНТ ДО ПОКУПОК По вашему фото — дизайн комнаты, реальные товары и смета. Сначала увидьте результат, потом тратьте деньги. Создать мой дизайн Создать мой дизайн Создать мой дизайн Как это работает Как это работает Как это работает 2 ГЕНЕРАЦИИ — 0 ₽ БЕЗ ПОДПИСКИ 30–60 СЕКУНД ГОСТИНАЯ / ТЁПЛЫЙ МИНИМАЛИЗМ ВАШ ИНТЕРЬЕР НАЧИНАЕТСЯ ЗДЕСЬ [ 01 ] ИЗОБРАЖЕНИЕ + ПОДБОР Увидьте интерьер и узнайте, из чего его собрать: пол, краска, свет, мебель и отделка. [ 02 ] БЮДЖЕТ ДО ГЕНЕРАЦИИ Задайте сумму заранее — сервис учтёт её при подборе материалов и товаров. [ 03 ] БЕЗ ПОДПИСКИ Начните с двух бесплатных генераций. Дальше платите только за нужные кредиты. [ 02 ] ДО / ПОСЛЕ ОДНА КОМНАТА. НОВАЯ ЖИЗНЬ. Листайте примеры и двигайте ползунок. Каждый формат сохраняет пропорции — без случайной обрезки. 01 / 03 СПАЛЬНЯ Тёплый минимализм · Портрет 2:3 ДО ПОСЛЕ 01 Спальня 02 Гостиная 03 Кухня ПОТЯНИТЕ ПОЛЗУНОК [ 03 ] ГЕНЕРАТОР ЧЕТЫРЕ ШАГА ДО СМЕТЫ Фото комнаты, пресет стиля или ваш референс, правки текстом — а в финале товары, цвета RAL и разметка розеток. 01 Загрузите фото комнаты 02 Выберите пресет стиля или референс 03 Правьте результат текстом 04 Получите смету, RAL и электрику Открыть генератор Открыть генератор Открыть генератор 2 генерации бесплатно после регистрации · без подписки Собрать мой дизайн [ 04 ] НЕ ТОЛЬКО КАРТИНКА ОТ ИДЕИ К ПОКУПКАМ Не тратьте время на поиск «такого же пола» или «похожего светильника» после рендера. Сервис покажет позиции, цены и ссылки на магазины в одном результате. 01 Пол, краска и отделка 02 Свет, мебель и товары 03 Цены и ссылки на магазины ПРИМЕР РЕЗУЛЬТАТА СПАЛЬНЯ / СМЕТА 6 позиций Краска для стен 8 400 ₽ 10 л Ламинат дуб натуральный 41 800 ₽ 18 м² Плинтус и профиль 9 600 ₽ 1 комплект Шторы и карниз 18 900 ₽ 1 комплект Прикроватный светильник 7 800 ₽ 2 шт. Потолочный свет 12 400 ₽ 1 комплект Итого, оценка 98 900 ₽ Состав и суммы демонстрационные. Это не оферта и не актуальный прайс магазинов. МАТЕРИАЛЫ / ПАЛИТРА РЕАЛЬНЫЕ ТЕКСТУРЫ [ 05 ] / ПРОЦЕСС ОТ ФОТО ДО РЕШЕНИЯ Без установки программ и освоения 3D-редактора. Всё происходит в браузере. 01 СФОТОГРАФИРУЙТЕ КОМНАТУ Подойдёт чёткий кадр при дневном свете. Загрузите JPG, PNG или WebP до 15 МБ. 02 ВЫБЕРИТЕ СТИЛЬ И ПАЛИТРУ Задайте направление интерьера, цветовую схему или загрузите свой референс. 03 ПОЛУЧИТЕ ДИЗАЙН И ПРАВЬТЕ ТЕКСТОМ Каждая версия сохраняется в истории — можно вернуться к любой. 04 СОБЕРИТЕ СМЕТУ Товары с ценами, цвета RAL и рекомендации по розеткам и выключателям. [ 06 ] ПРОЗРАЧНАЯ ОПЛАТА БЕЗ ПОДПИСКИ. БЕЗ СЮРПРИЗОВ. Один кредит — одна генерация или правка. Покупайте только то, что нужно сейчас. 08 КРЕДИТОВ 399 ₽ Одна комната До этого — 2 генерации бесплатно 15 КРЕДИТОВ 599 ₽ Вся квартира Выгодно 50 КРЕДИТОВ 1 499 ₽ Весь дом Начать бесплатно Купить кредиты Все условия и цены [ 07 ] ВОПРОСЫ ПЕРЕД НАЧАЛОМ Остался вопрос? support@remontvision.ru Сколько стоит дизайн по фото? После регистрации доступны 2 бесплатные генерации. Дальше: 8 генераций за 399 ₽, 15 за 599 ₽ или 50 за 1 499 ₽. Один кредит — одна генерация или правка. Подписка не нужна. Какое фото подойдёт? Что я получу, кроме картинки? Можно изменить готовый дизайн? Можно сразу закупаться по смете? ВАШ ИНТЕРЬЕР НАЧИНАЕТСЯ С ФОТО ПОСМОТРИТЕ, ЧТО ВОЗМОЖНО Две генерации бесплатно после регистрации. Дизайн, материалы, цены и ссылки — в одном результате. Загрузить комнату Загрузить комнату Загрузить комнату СПАЛЬНЯ / ВДОХНОВЕНИЕ ремонтвижн® Самозанятый Чернов Олег Геннадьевич ИНН 526311206266 Услуги и цены Оферта Получение Контакты Конфиденциальность",
+  "nav": {
+    "ttfb": 228,
+    "domContentLoaded": 588,
+    "load": 588
+  },
+  "resources": [
+    {
+      "name": "https://www.remontvision.ru/images/hero-editorial.webp",
+      "type": "link",
+      "transfer": 227168,
+      "encoded": 226868,
+      "duration": 243
+    },
+    {
+      "name": "https://www.remontvision.ru/web-assets/index-DM-kudMC.js",
+      "type": "script",
+      "transfer": 218394,
+      "encoded": 218094,
+      "duration": 249
+    },
+    {
+      "name": "https://www.remontvision.ru/web-assets/index-BoKPgYgy.css",
+      "type": "link",
+      "transfer": 24886,
+      "encoded": 24586,
+      "duration": 179
+    },
+    {
+      "name": "https://www.remontvision.ru/fonts/onest-0.woff2",
+      "type": "css",
+      "transfer": 90596,
+      "encoded": 90296,
+      "duration": 218
+    },
+    {
+      "name": "https://www.remontvision.ru/fonts/onest-1.woff2",
+      "type": "css",
+      "transfer": 90844,
+      "encoded": 90544,
+      "duration": 269
+    },
+    {
+      "name": "https://www.remontvision.ru/fonts/onest-light-0.woff2",
+      "type": "css",
+      "transfer": 90736,
+      "encoded": 90436,
+      "duration": 226
+    },
+    {
+      "name": "https://www.remontvision.ru/api/styles",
+      "type": "fetch",
+      "transfer": 1157,
+      "encoded": 857,
+      "duration": 47
+    },
+    {
+      "name": "https://www.remontvision.ru/api/room-types",
+      "type": "fetch",
+      "transfer": 537,
+      "encoded": 237,
+      "duration": 41
+    },
+    {
+      "name": "https://www.remontvision.ru/api/me",
+      "type": "fetch",
+      "transfer": 359,
+      "encoded": 59,
+      "duration": 39
+    },
+    {
+      "name": "https://www.remontvision.ru/api/packs",
+      "type": "fetch",
+      "transfer": 543,
+      "encoded": 243,
+      "duration": 49
+    },
+    {
+      "name": "https://www.remontvision.ru/images/room-after.webp",
+      "type": "img",
+      "transfer": 224744,
+      "encoded": 224444,
+      "duration": 244
+    },
+    {
+      "name": "https://www.remontvision.ru/images/room-before.webp",
+      "type": "img",
+      "transfer": 41050,
+      "encoded": 40750,
+      "duration": 169
+    },
+    {
+      "name": "https://www.remontvision.ru/favicon.svg",
+      "type": "other",
+      "transfer": 701,
+      "encoded": 401,
+      "duration": 163
+    },
+    {
+      "name": "https://www.remontvision.ru/images/living-after.webp",
+      "type": "img",
+      "transfer": 145518,
+      "encoded": 145218,
+      "duration": 214
+    },
+    {
+      "name": "https://www.remontvision.ru/images/materials-editorial.webp",
+      "type": "img",
+      "transfer": 156388,
+      "encoded": 156088,
+      "duration": 111
+    }
+  ]
+}

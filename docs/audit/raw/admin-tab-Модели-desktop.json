@@ -1,0 +1,65 @@
+{
+  "tab": "Модели",
+  "url": "https://www.remontvision.ru/admin",
+  "title": "Ремонтвижн — дизайн по фото с материалами и ценами",
+  "description": "Примерьте ремонт до покупок: дизайн вашей комнаты по фото, реальные товары и смета. Две генерации бесплатно, без подписки.",
+  "h1": [
+    "АДМИНКА"
+  ],
+  "h2": [],
+  "buttons": [
+    "Выйти",
+    "Пользователи",
+    "Пакеты кредитов",
+    "Комнаты",
+    "Стили",
+    "Промт",
+    "Логи",
+    "Модели",
+    "Очистка",
+    "Генерация",
+    "Статьи",
+    "Поиск",
+    "Поиск (лаб)",
+    "Прокси",
+    "Каталог",
+    "Сохранить модели"
+  ],
+  "inputs": [
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "black-forest-labs/flux-3-image"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "black-forest-labs/flux-3-image-klein"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "1K"
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "value": "auto"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "value": "google/gemini-3-flash-preview"
+    }
+  ],
+  "bodyText": "ремонтвижн / АДМИНКА На сайт Кабинет Выйти УПРАВЛЕНИЕ АДМИНКА Пользователи Пакеты кредитов Комнаты Стили Промт Логи Модели Очистка Генерация Статьи Поиск Поиск (лаб) Прокси Каталог МОДЕЛИ ГЕНЕРАЦИИ Генерация и vision-разбор. Изменения применяются к новым рендерам; уже готовые не меняются. Seedream 5.0 Flash в OpenRouter: bytedance-seed/seedream-5-0-flash. МОДЕЛЬ ГЕНЕРАЦИИ black-forest-labs/flux-3-image · refs black-forest-labs/flux-3-image-klein · refs black-forest-labs/flux.2-flex · refs black-forest-labs/flux.2-klein-4b · refs black-forest-labs/flux.2-max · refs black-forest-labs/flux.2-pro · refs bytedance-seed/seedream-4.5 · refs bytedance-seed/seedream-5-0-flash · refs bytedance-seed/seedream-5-0-lite · refs bytedance-seed/seedream-5-0-pro · refs google/gemini-2.5-flash-image · refs google/gemini-3-pro-image · refs google/gemini-3-pro-image-preview · refs google/gemini-3.1-flash-image · refs google/gemini-3.1-flash-image-preview · refs google/gemini-3.1-flash-lite-image · refs google/gemini-nano-banana-2.1 · refs krea/k3-edit · refs krea/krea-2-large · refs krea/krea-2-medium · refs krea/krea-2-medium-turbo · refs meta/muse-image microsoft/mai-image-2.5 · refs microsoft/mai-image-2.5-pro · refs microsoft/mai-image-2.6 · refs microsoft/mai-image-2.6-flash · refs openai/gpt-5-image · refs openai/gpt-5-image-mini · refs openai/gpt-5.4-image-2 · refs openai/gpt-image-1 · refs openai/gpt-image-1-mini · refs openai/gpt-image-2 · refs openai/gpt-image-2.5-flare · refs openai/gpt-image-2.5-sunburst · refs qwen/qwen-image-2.1-pro · refs qwen/qwen-image-2.1-turbo · refs qwen/qwen-image-3 · refs qwen/qwen-image-3-pro · refs recraft/recraft-v3 · refs recraft/recraft-v4 · refs recraft/recraft-v4-pro · refs recraft/recraft-v4-pro-vector · refs recraft/recraft-v4-styles · refs recraft/recraft-v4-styles-pro · refs recraft/recraft-v4-styles-pro-vector · refs recraft/recraft-v4-styles-vector · refs recraft/recraft-v4-vector · refs recraft/recraft-v4.1 · refs recraft/recraft-v4.1-flash recraft/recraft-v4.1-pro · refs recraft/recraft-v4.1-pro-vector · refs recraft/recraft-v4.1-utility · refs recraft/recraft-v4.1-utility-pro · refs recraft/recraft-v4.1-vector · refs sourceful/riverflow-v2-fast · refs sourceful/riverflow-v2-pro · refs sourceful/riverflow-v2.5-fast · refs sourceful/riverflow-v2.5-pro · refs sourceful/riverflow-v2.6-pro · refs tencent/hy-image-v3.5-preview · refs x-ai/grok-imagine-image-2.0 · refs Поддерживает input_references — фото комнаты, референсы стиля и товаров уйдут в модель. МОДЕЛЬ РЕДАКТИРОВАНИЯ Как у генерации (black-forest-labs/flux-3-image) black-forest-labs/flux-3-image · refs black-forest-labs/flux-3-image-klein · refs black-forest-labs/flux.2-flex · refs black-forest-labs/flux.2-klein-4b · refs black-forest-labs/flux.2-max · refs black-forest-labs/flux.2-pro · refs bytedance-seed/seedream-4.5 · refs bytedance-seed/seedream-5-0-flash · refs bytedance-seed/seedream-5-0-lite · refs bytedance-seed/seedream-5-0-pro · refs google/gemini-2.5-flash-image · refs google/gemini-3-pro-image · refs google/gemini-3-pro-image-preview · refs google/gemini-3.1-flash-image · refs google/gemini-3.1-flash-image-preview · refs google/gemini-3.1-flash-lite-image · refs google/gemini-nano-banana-2.1 · refs krea/k3-edit · refs krea/krea-2-large · refs krea/krea-2-medium · refs krea/krea-2-medium-turbo · refs meta/muse-image microsoft/mai-image-2.5 · refs microsoft/mai-image-2.5-pro · refs microsoft/mai-image-2.6 · refs microsoft/mai-image-2.6-flash · refs openai/gpt-5-image · refs openai/gpt-5-image-mini · refs openai/gpt-5.4-image-2 · refs openai/gpt-image-1 · refs openai/gpt-image-1-mini · refs openai/gpt-image-2 · refs openai/gpt-image-2.5-flare · refs openai/gpt-image-2.5-sunburst · refs qwen/qwen-image-2.1-pro · refs qwen/qwen-image-2.1-turbo · refs qwen/qwen-image-3 · refs qwen/qwen-image-3-pro · refs recraft/recraft-v3 · refs recraft/recraft-v4 · refs recraft/recraft-v4-pro · refs recraft/recraft-v4-pro-vector · refs recraft/recraft-v4-styles · refs recraft/recraft-v4-styles-pro · refs recraft/recraft-v4-styles-pro-vector · refs recraft/recraft-v4-styles-vector · refs recraft/recraft-v4-vector · refs recraft/recraft-v4.1 · refs recraft/recraft-v4.1-flash recraft/recraft-v4.1-pro · refs recraft/recraft-v4.1-pro-vector · refs recraft/recraft-v4.1-utility · refs recraft/recraft-v4.1-utility-pro · refs recraft/recraft-v4.1-vector · refs sourceful/riverflow-v2-fast · refs sourceful/riverflow-v2-pro · refs sourceful/riverflow-v2.5-fast · refs sourceful/riverflow-v2.5-pro · refs sourceful/riverflow-v2.6-pro · refs tencent/hy-image-v3.5-preview · refs x-ai/grok-imagine-image-2.0 · refs Используется для правок и точечных изменений по референсам. Должна поддерживать input_references; для нескольких референсов подходит black-forest-labs/flux-3-image-klein. Пусто — берётся модель генерации. РАЗРЕШЕНИЕ 768 1K 1.5K 2K 4K ASPECT RATIO auto 21:9 2:1 16:9 3:2 7:5 4:3 5:4 1:1 4:5 3:4 5:7 2:3 9:16 1:2 9:21 Seedream 5.0 Flash: 1K/2K + auto. FLUX.2 Pro: разрешение задаёт модель, параметр resolution не отправляется. Для Gemini resolution тоже не отправляется. Итоговое изображение всегда приводится к пропорции загруженного кадра. МОДЕЛЬ РАЗБОРА (VISION) Обычно оставляем Gemini для разбора изображения и сметы. Сохранить модели",
+  "nav": {
+    "ttfb": 136,
+    "load": 191
+  }
+}

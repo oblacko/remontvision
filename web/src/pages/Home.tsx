@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { ExamplesCarousel } from '@/components/ExamplesCarousel'
 import { GenerationPanel } from '@/components/GenerationPanel'
+import { Logo } from '@/components/Logo'
 import { useTasks } from '@/components/TaskDock'
 
 const site = 'https://www.remontvision.ru'
@@ -28,14 +29,6 @@ const faq = [
   { q: 'Можно изменить готовый дизайн?', a: 'Да, результат можно уточнять текстовыми запросами: например, изменить цвет пола, заменить текстиль или сделать интерьер светлее. Каждая версия сохраняется в истории правок.' },
   { q: 'Можно сразу закупаться по смете?', a: 'Смета помогает сориентироваться, но ИИ может ошибаться. Перед покупкой проверьте размеры, количество, цены и наличие товаров в магазинах.' },
 ]
-
-function Logo() {
-  return (
-    <a href="#top" className="text-lg font-medium tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4" aria-label="Ремонтвижн — на главную">
-      ремонт<span className="text-primary-text">вижн</span><span className="align-super text-xs">®</span>
-    </a>
-  )
-}
 
 function ShiftLabel({ children }: { children: string }) {
   return <span className="shift-label" aria-hidden="true"><span>{children}</span><span>{children}</span></span>
@@ -75,6 +68,17 @@ export default function Home() {
   }
 
   useEffect(() => { void loadMe() }, [])
+  // Возврат с неудачного OAuth: открываем вход и объясняем, что пошло не так.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (!params.get('auth_error')) return
+    params.delete('auth_error')
+    history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : '') + location.hash)
+    setLoginStep('email')
+    setLoginEmail(localStorage.getItem('rv_last_email') || '')
+    setLoginError('Не удалось войти через Яндекс, попробуйте ещё раз')
+    setLoginOpen(true)
+  }, [])
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     if (params.get('panel') !== '1') return
@@ -163,6 +167,25 @@ export default function Home() {
     finally { setLoginBusy(false) }
   }
 
+  const yandexLogin = async () => {
+    if (!consents.offer || !consents.personal || !consents.transfer) {
+      setLoginError('Отметьте оферту, согласие на ПДн и трансграничную передачу'); return
+    }
+    setLoginBusy(true); setLoginError('')
+    try {
+      const r = await fetch('/api/auth/yandex/start', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consents: consentsOf(consents), redirect_to: location.pathname }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      window.location.href = d.url
+    } catch (e) {
+      setLoginError(e instanceof Error ? e.message : 'Не удалось войти через Яндекс')
+      setLoginBusy(false)
+    }
+  }
+
   const openPanel = () => {
     setMenuOpen(false)
     setPanelOpen(true)
@@ -174,7 +197,7 @@ export default function Home() {
 
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
-          <Logo />
+          <Logo href="#top" />
           <nav className="hidden items-center gap-8 text-sm lg:flex" aria-label="Основная навигация">
             {navItems.map(([label, href, id]) => <a key={id} className={`nav-link ${activeSection === id ? 'nav-link-active' : ''}`} href={href} aria-current={activeSection === id ? 'location' : undefined}>{label}</a>)}
           </nav>
@@ -212,6 +235,11 @@ export default function Home() {
                       </div>
                       {loginError && <p className="text-sm text-destructive" role="alert">{loginError}</p>}
                       <Button type="button" disabled={loginBusy} onClick={requestLogin} className="h-12 w-full rounded-none text-base">{loginBusy ? 'Отправляем…' : 'Получить код'}</Button>
+                      <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или<span className="h-px flex-1 bg-border" /></div>
+                      <Button type="button" variant="outline" disabled={loginBusy} onClick={yandexLogin} className="h-12 w-full rounded-none text-base">
+                        <span className="grid size-6 place-items-center bg-[#FC3F1D] text-sm font-semibold text-white">Я</span>
+                        Войти через Яндекс
+                      </Button>
                     </div>
                   </>
                 ) : (
@@ -464,7 +492,7 @@ export default function Home() {
 
       <footer className="page-shell py-8">
         <div className="grid gap-8 border-t pt-8 md:grid-cols-12">
-          <div className="md:col-span-5"><Logo /><p className="mt-4 max-w-md text-xs leading-5 text-muted-foreground"><a href="/contacts" className="underline underline-offset-2">Реквизиты</a></p></div>
+          <div className="md:col-span-5"><Logo href="#top" /><p className="mt-4 max-w-md text-xs leading-5 text-muted-foreground"><a href="/contacts" className="underline underline-offset-2">Реквизиты</a></p></div>
           <nav className="flex flex-wrap content-start gap-x-6 gap-y-3 text-xs text-muted-foreground md:col-span-7 md:justify-end" aria-label="Юридическая информация">
             <a className="footer-link" href={`${site}/prices`}>Услуги и цены</a><a className="footer-link" href={`${site}/offer`}>Оферта</a><a className="footer-link" href={`${site}/delivery`}>Получение</a><a className="footer-link" href={`${site}/contacts`}>Контакты</a><a className="footer-link" href={`${site}/privacy`}>Конфиденциальность</a>
           </nav>

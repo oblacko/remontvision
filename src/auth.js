@@ -163,6 +163,14 @@ export async function verifyCode(emailRaw, codeRaw) {
   return { token, user, isNew };
 }
 
+// Создать сессию и поставить куку. Используется и email-входом, и OAuth-callback.
+export async function startSession(user, req, res) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  await q.createSession(user.id, sha256(token), SESSION_DAYS);
+  setSessionCookie(res, token, req);
+  return token;
+}
+
 // middleware: цепляет req.user, если валидная сессия
 export async function sessionUser(req, _res, next) {
   try {

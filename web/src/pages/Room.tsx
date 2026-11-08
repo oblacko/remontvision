@@ -5,6 +5,7 @@ import { ShareDialog } from '@/components/ShareDialog'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { useTasks } from '@/components/TaskDock'
 import { GuideIcon } from '@/components/GuideIcon'
+import { Logo } from '@/components/Logo'
 import { RoadmapTab } from '@/components/RoomRoadmap'
 import type { RoadmapGroup, RoadmapItem } from '@/lib/roadmap'
 import '../App.css'
@@ -232,7 +233,7 @@ export default function Room() {
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span></a>
+            <Logo />
             <span className="eyebrow hidden sm:inline">/ комната</span>
           </div>
           <button type="button" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/cabinet') }} className="flex size-11 shrink-0 items-center justify-center border border-foreground transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Закрыть">

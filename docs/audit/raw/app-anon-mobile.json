@@ -1,0 +1,456 @@
+{
+  "page": "app-anon",
+  "path": "/app",
+  "viewport": "mobile",
+  "requestedUrl": "https://www.remontvision.ru/app",
+  "finalUrl": "https://www.remontvision.ru/app",
+  "shotOk": true,
+  "consoleErrors": [],
+  "exceptions": [],
+  "failedRequests": [
+    {
+      "url": "67FBA4678476E7C0D58548CAF3F41FA3",
+      "error": "net::ERR_ABORTED",
+      "blocked": ""
+    }
+  ],
+  "badResponses": [
+    {
+      "url": "https://www.remontvision.ru/api/me",
+      "status": 401,
+      "type": "application/json",
+      "size": 228
+    }
+  ],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/app",
+      "status": 200,
+      "type": "text/html",
+      "size": 260
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap",
+      "status": 200,
+      "type": "text/css",
+      "size": 0
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459W1hyzbi.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 0
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2",
+      "status": 200,
+      "type": "font/woff2",
+      "size": 0
+    },
+    {
+      "url": "https://www.remontvision.ru/assets/kitchen_before.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 260
+    },
+    {
+      "url": "https://www.remontvision.ru/api/health",
+      "status": 200,
+      "type": "application/json",
+      "size": 197
+    },
+    {
+      "url": "https://www.remontvision.ru/api/me",
+      "status": 401,
+      "type": "application/json",
+      "size": 228
+    },
+    {
+      "url": "https://www.remontvision.ru/api/legal",
+      "status": 200,
+      "type": "application/json",
+      "size": 198
+    },
+    {
+      "url": "https://www.remontvision.ru/assets/kitchen_after.webp",
+      "status": 200,
+      "type": "image/webp",
+      "size": 260
+    }
+  ],
+  "url": "https://www.remontvision.ru/app",
+  "title": "Ремонт по фото — AI-дизайн интерьера | Ремонтвижн",
+  "description": "Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и подберёт товары с ценами. 2 генерации бесплатно.",
+  "robots": "noindex, nofollow",
+  "og": [
+    [
+      "og:type",
+      "website"
+    ],
+    [
+      "og:site_name",
+      "Ремонтвижн"
+    ],
+    [
+      "og:locale",
+      "ru_RU"
+    ],
+    [
+      "og:title",
+      "Ремонт по фото — AI-дизайн интерьера и смета материалов"
+    ],
+    [
+      "og:description",
+      "Загрузите фото комнаты — AI покажет ремонт за 30–60 секунд и подберёт товары с ценами. 2 генерации бесплатно."
+    ],
+    [
+      "og:url",
+      "https://www.remontvision.ru/"
+    ],
+    [
+      "og:image",
+      "https://www.remontvision.ru/assets/og-1200x630.jpg"
+    ],
+    [
+      "og:image:type",
+      "image/jpeg"
+    ],
+    [
+      "og:image:width",
+      "1200"
+    ],
+    [
+      "og:image:height",
+      "630"
+    ],
+    [
+      "og:image:alt",
+      "Визуализация кухни после ремонта, созданная нейросетью"
+    ]
+  ],
+  "h1": [
+    "Дизайн ремонта по фото — обычно 30–60 секунд"
+  ],
+  "h2": [
+    "Дизайн ремонта по фото с помощью ИИ",
+    "Каталог товаров",
+    "Аккаунты"
+  ],
+  "buttons": [
+    "Войти",
+    "выбрать другое фото",
+    "Сделать дизайн →",
+    "Попробовать снова",
+    "Новая комната",
+    "Войти",
+    "↑",
+    "Новая комната",
+    "×",
+    "Получить код",
+    "Войти",
+    "×",
+    "×",
+    "Сохранить",
+    "Сохранить товар",
+    "Сброс",
+    "Найти"
+  ],
+  "links": [
+    {
+      "text": "услуги и цены",
+      "href": "https://www.remontvision.ru/prices"
+    },
+    {
+      "text": "о сервисе",
+      "href": "https://www.remontvision.ru/app#about"
+    },
+    {
+      "text": "Подробнее в оферте",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "Скачать фото",
+      "href": "https://www.remontvision.ru/app#"
+    },
+    {
+      "text": "support@remontvision.ru",
+      "href": "mailto:support@remontvision.ru"
+    },
+    {
+      "text": "Услуги и цены",
+      "href": "https://www.remontvision.ru/prices"
+    },
+    {
+      "text": "Оферта",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "Получение",
+      "href": "https://www.remontvision.ru/delivery"
+    },
+    {
+      "text": "Контакты и реквизиты",
+      "href": "https://www.remontvision.ru/contacts"
+    },
+    {
+      "text": "Политика конфиденциальности",
+      "href": "https://www.remontvision.ru/privacy"
+    },
+    {
+      "text": "публичную оферту",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "обработку персональных данных",
+      "href": "https://www.remontvision.ru/privacy"
+    },
+    {
+      "text": "трансграничную передачу",
+      "href": "https://www.remontvision.ru/privacy#cross-border"
+    },
+    {
+      "text": "оферту",
+      "href": "https://www.remontvision.ru/offer"
+    },
+    {
+      "text": "условия и цены",
+      "href": "https://www.remontvision.ru/prices"
+    },
+    {
+      "text": "← на главную",
+      "href": "https://www.remontvision.ru/app#"
+    }
+  ],
+  "forms": 0,
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "file",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "range",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "Например: пол → дерево, люстру проще",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "email",
+      "placeholder": "you@yandex.ru",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "123456",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "password",
+      "placeholder": "ключ из .env (ADMIN_KEY)",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "hidden",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "Керамогранит Atlas Concorde Brave",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "number",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "современный,темный",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "керамогранит,пол,грейдж",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "https://...",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "file",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "https://...jpg",
+      "aria": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "placeholder": "support@...",
+      "aria": ""
+    }
+  ],
+  "images": [
+    {
+      "src": "https://www.remontvision.ru/assets/kitchen_before.webp",
+      "alt": "Комната до",
+      "w": 900,
+      "h": 600
+    },
+    {
+      "src": "https://www.remontvision.ru/assets/kitchen_after.webp",
+      "alt": "Комната после",
+      "w": 900,
+      "h": 600
+    },
+    {
+      "src": "",
+      "alt": "Ваша комната",
+      "w": 0,
+      "h": 0
+    },
+    {
+      "src": "https://www.remontvision.ru/app",
+      "alt": "",
+      "w": 0,
+      "h": 0
+    },
+    {
+      "src": "https://www.remontvision.ru/app",
+      "alt": "Было",
+      "w": 0,
+      "h": 0
+    },
+    {
+      "src": "https://www.remontvision.ru/app",
+      "alt": "Стало",
+      "w": 0,
+      "h": 0
+    }
+  ],
+  "jsonld": [
+    "\n{\n  \"@context\": \"https://schema.org\",\n  \"@graph\": [\n    {\n      \"@type\": \"WebSite\",\n      \"@id\": \"https://www.remontvision.ru/#website\",\n      \"url\": \"https://www.remontvision.ru/\",\n      \"name\": \"Ремонтвижн\",\n      \"inLanguage\": \"ru-RU\",\n      \"description\": \"AI-сервис визуализации ремонта по фото"
+  ],
+  "bodyText": "ремонтвижн Войти Дизайн ремонта по фото — обычно 30–60 секунд Загрузите фото комнаты. Получите визуализацию и товары из каталога со ссылками на магазины и ценами. 2 генерации бесплатно после регистрации. Сервис использует искусственный интеллект. Результат может содержать ошибки: размеры, цвета, количество материалов и цены могут не соответствовать реальности. Проверяйте перед покупкой и началом работ. до после пример AI-визуализации Загрузить фото или перетащите сюда · JPG, PNG, до 15 МБ услуги и цены · о сервисе Дизайн ремонта по фото с помощью ИИ «Ремонтвижн» показывает, как будет выглядеть комната после ремонта. Загрузите фотографию, выберите стиль и бюджет — нейросеть создаст реалистичную визуализацию за 30–60 секунд. Вместе с дизайном вы получите смету: реальные материалы и товары с ценами. Как это работает Загрузите фото комнаты — кухни, гостиной, спальни или другого помещения. Выберите стиль интерьера и бюджет на материалы. Нейросеть нарисует дизайн и подберёт товары из каталога. Скачайте результат и посмотрите смету с ценами. Почему это удобно Реалистичная визуализация ремонта по вашему фото. Товары из каталога со ссылками на магазины и ценами. Правки дизайна текстовыми запросами. Работает в браузере без установки приложения. Частые вопросы Сколько стоит дизайн ремонта по фото? Какие фото подойдут для визуализации? Сколько времени занимает рендер? Можно ли купить материалы из сметы? Сервис работает только для кухни? Самозанятый Чернов Олег Геннадьевич, ИНН 526311206266. E-mail: support@remontvision.ru. Услуги и цены · Оферта · Получение · Контакты и реквизиты · Политика конфиденциальности",
+  "nav": {
+    "ttfb": 30,
+    "domContentLoaded": 81,
+    "load": 104
+  },
+  "resources": [
+    {
+      "name": "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap",
+      "type": "link",
+      "transfer": 0,
+      "encoded": 665,
+      "duration": 2
+    },
+    {
+      "name": "https://www.remontvision.ru/assets/kitchen_before.webp",
+      "type": "img",
+      "transfer": 300,
+      "encoded": 24718,
+      "duration": 29
+    },
+    {
+      "name": "https://www.remontvision.ru/api/health",
+      "type": "fetch",
+      "transfer": 300,
+      "encoded": 188,
+      "duration": 29
+    },
+    {
+      "name": "https://www.remontvision.ru/api/legal",
+      "type": "fetch",
+      "transfer": 300,
+      "encoded": 368,
+      "duration": 30
+    },
+    {
+      "name": "https://www.remontvision.ru/api/me",
+      "type": "fetch",
+      "transfer": 359,
+      "encoded": 59,
+      "duration": 29
+    },
+    {
+      "name": "https://www.remontvision.ru/assets/kitchen_after.webp",
+      "type": "img",
+      "transfer": 300,
+      "encoded": 25182,
+      "duration": 31
+    }
+  ]
+}

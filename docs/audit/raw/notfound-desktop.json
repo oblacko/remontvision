@@ -1,0 +1,47 @@
+{
+  "page": "notfound",
+  "path": "/nonexistent",
+  "viewport": "desktop",
+  "requestedUrl": "https://www.remontvision.ru/nonexistent",
+  "finalUrl": "https://www.remontvision.ru/nonexistent",
+  "shotOk": true,
+  "consoleErrors": [],
+  "exceptions": [],
+  "failedRequests": [],
+  "badResponses": [
+    {
+      "url": "https://www.remontvision.ru/nonexistent",
+      "status": 404,
+      "type": "text/html",
+      "size": 245
+    }
+  ],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/nonexistent",
+      "status": 404,
+      "type": "text/html",
+      "size": 245
+    }
+  ],
+  "url": "https://www.remontvision.ru/nonexistent",
+  "title": "Error",
+  "description": "",
+  "robots": "",
+  "og": [],
+  "h1": [],
+  "h2": [],
+  "buttons": [],
+  "links": [],
+  "forms": 0,
+  "inputs": [],
+  "images": [],
+  "jsonld": [],
+  "bodyText": "Cannot GET /nonexistent",
+  "nav": {
+    "ttfb": 30,
+    "domContentLoaded": 39,
+    "load": 39
+  },
+  "resources": []
+}

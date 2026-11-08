@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 import { ArrowLeft, Check, ChevronDown, Heart, LoaderCircle, MessageCircle, Send } from 'lucide-react'
 import { GuideIcon } from '@/components/GuideIcon'
+import { Logo } from '@/components/Logo'
 import { groupRoadmap, type RoadmapItem } from '@/lib/roadmap'
 import '../App.css'
 
@@ -92,7 +93,7 @@ export default function Share() {
   return (
     <div className="min-h-svh bg-background">
       <header className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <a href="/" className="text-lg font-medium tracking-tight">ремонт<span className="text-primary-text">вижн</span><span className="align-super text-xs">®</span></a>
+        <Logo />
         <a href="/" className="action-secondary"><ArrowLeft className="size-4" />На главную</a>
       </header>
       <main className="mx-auto max-w-5xl px-4 pb-16 sm:px-6">

@@ -1,0 +1,47 @@
+{
+  "page": "article-404",
+  "path": "/articles/nonexistent",
+  "viewport": "mobile",
+  "requestedUrl": "https://www.remontvision.ru/articles/nonexistent",
+  "finalUrl": "https://www.remontvision.ru/articles/nonexistent",
+  "shotOk": true,
+  "consoleErrors": [],
+  "exceptions": [],
+  "failedRequests": [],
+  "badResponses": [
+    {
+      "url": "https://www.remontvision.ru/articles/nonexistent",
+      "status": 404,
+      "type": "text/html",
+      "size": 222
+    }
+  ],
+  "responses": [
+    {
+      "url": "https://www.remontvision.ru/articles/nonexistent",
+      "status": 404,
+      "type": "text/html",
+      "size": 222
+    }
+  ],
+  "url": "https://www.remontvision.ru/articles/nonexistent",
+  "title": "",
+  "description": "",
+  "robots": "",
+  "og": [],
+  "h1": [],
+  "h2": [],
+  "buttons": [],
+  "links": [],
+  "forms": 0,
+  "inputs": [],
+  "images": [],
+  "jsonld": [],
+  "bodyText": "Статья не найдена",
+  "nav": {
+    "ttfb": 31,
+    "domContentLoaded": 43,
+    "load": 43
+  },
+  "resources": []
+}
