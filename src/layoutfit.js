@@ -9,6 +9,10 @@ const CENTRAL = new Set(['coffee_table', 'dining_table']);
 const STORAGE = new Set(['storage', 'sideboard', 'cabinet', 'wardrobe', 'desk', 'office_chair', 'dining_chair', 'bench']);
 const MAIN = new Set(['sofa', 'bed']);
 
+const priorityOf = item => Number(item?.priority) || 2;
+const isCentral = item => CENTRAL.has(String(item?.type || ''));
+const canDrop = item => !MAIN.has(String(item?.type || '')) && (isCentral(item) || priorityOf(item) > 1);
+
 export const WIDE_ROOM_M = 4.0;
 export const NARROW_MAX_DEPTH_SUM_CM = 130;
 
@@ -67,15 +71,15 @@ export function fitLayoutPlan({ plan, dimensions, roomType = '', artDirection = 
 
   let section = crossSection(items);
   while (!acceptedBy(section)) {
-    const central = items.find(entry => CENTRAL.has(String(entry.type || '')));
+    const central = items.find(entry => canDrop(entry) && CENTRAL.has(String(entry.type || '')));
     if (central) { drop(central); section = crossSection(items); continue; }
 
     const shallowOpposing = section.opposingItems
       .slice()
       .sort((a, b) => depthOf(a) - depthOf(b))
-      .find(entry => !MAIN.has(String(entry.type || '')) && (STORAGE.has(String(entry.type || '')) || String(entry.type) === 'armchair'));
+      .find(entry => canDrop(entry) && (STORAGE.has(String(entry.type || '')) || String(entry.type) === 'armchair'));
     const candidate = shallowOpposing
-      || items.filter(entry => (STORAGE.has(String(entry.type || '')) || String(entry.type) === 'armchair') && !MAIN.has(String(entry.type || '')))
+      || items.filter(entry => canDrop(entry) && (STORAGE.has(String(entry.type || '')) || String(entry.type) === 'armchair'))
         .sort((a, b) => depthOf(b) - depthOf(a))[0];
     if (!candidate) break;
     drop(candidate);

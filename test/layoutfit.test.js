@@ -91,3 +91,21 @@ test('from 4 m three pieces across the width are allowed', () => {
   assert.ok(wide.plan.items.some(item => item.type === 'coffee_table'));
   assert.ok(wide.plan.items.some(item => item.type === 'storage'));
 });
+
+test('priority-1 furniture is preserved; optional armchair is dropped first', () => {
+  const result = fitLayoutPlan({
+    plan: { items: [
+      { type: 'sofa', label: 'Диван', size_cm: '200x90', priority: 1 },
+      { type: 'sideboard', label: 'ТВ-тумба', size_cm: '150x40', priority: 1 },
+      { type: 'armchair', label: 'Кресло', size_cm: '80x80', priority: 2 },
+      { type: 'coffee_table', label: 'Стол', size_cm: '60x60', priority: 2 },
+    ] },
+    dimensions: { width: 3.0, length: 4 },
+    roomType: 'Гостиная (зал)',
+  });
+
+  assert.equal(result.fit.accepted, true);
+  assert.ok(result.plan.items.some(item => item.type === 'sideboard'));
+  assert.ok(!result.plan.items.some(item => item.type === 'armchair'));
+  assert.ok(!result.plan.items.some(item => item.type === 'coffee_table'));
+});
