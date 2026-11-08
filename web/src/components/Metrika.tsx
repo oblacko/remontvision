@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
 
-const COUNTER_ID = 114132055
+const COUNTER_ID = 114132104
 
 declare global {
   interface Window {

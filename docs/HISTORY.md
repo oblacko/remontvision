@@ -14,7 +14,7 @@
 
 ## 2026-11-08 — Яндекс.Метрика
 
-- Счётчик `114132055` (webvisor, clickmap, ecommerce) добавлен в оболочку SPA (`web/index.html`) и в старый редактор `/app` (`public/app.html`).
+- Счётчик `114132104` (webvisor, clickmap, ecommerce) добавлен в оболочку SPA (`web/index.html`) и в старый редактор `/app` (`public/app.html`).
 - Клиентские переходы React Router учитываются компонентом `Metrika` через `ym('hit')`; первый хит отправляет `init`.
 - Тесты: `npm test` 194/194; build OK.
 
