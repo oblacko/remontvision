@@ -8,6 +8,7 @@ import { ExamplesCarousel } from '@/components/ExamplesCarousel'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { Logo } from '@/components/Logo'
 import { useTasks } from '@/components/TaskDock'
+import { goal } from '@/lib/analytics'
 
 const site = 'https://www.remontvision.ru'
 const navItems = [['До / после', '#examples', 'examples'], ['Что вы получите', '#result', 'result'], ['Как работает', '#how', 'how'], ['Цены', '#prices', 'prices']] as const
@@ -77,6 +78,15 @@ export default function Home() {
     setLoginEmail(localStorage.getItem('rv_last_email') || '')
     setLoginError('Не удалось войти через Яндекс, попробуйте ещё раз')
     setLoginOpen(true)
+  }, [])
+  // Возврат после успешного OAuth: бэкенд добавляет ?auth=yandex&new=1|0.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (!params.get('auth')) return
+    goal(params.get('new') === '1' ? 'signup' : 'login')
+    params.delete('auth')
+    params.delete('new')
+    history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : '') + location.hash)
   }, [])
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -152,6 +162,7 @@ export default function Home() {
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || String(r.status))
+      goal(d.is_new ? 'signup' : 'login')
       localStorage.setItem('rv_last_email', loginEmail)
       await loadMe()
       void refreshTasks()
@@ -179,6 +190,7 @@ export default function Home() {
   }
 
   const openPanel = () => {
+    goal('generator_open')
     setMenuOpen(false)
     setPanelOpen(true)
   }

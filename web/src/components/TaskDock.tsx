@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowUpRight, Check, ChevronDown, ChevronUp, LoaderCircle, Sparkles, X } from 'lucide-react'
+import { goal } from '@/lib/analytics'
 
 // Задача = одна генерация пользователя. Берём из /api/my/generations.
 export type GenTask = {
@@ -53,6 +54,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [dismissed, setDismissed] = useState<Set<string>>(readDismissed)
   const [authed, setAuthed] = useState(false)
   const [panelOpen, setPanelOpenState] = useState(false)
+  const primed = useRef(false)
+  const seenDone = useRef<Set<string>>(new Set())
 
   const refresh = useCallback(async () => {
     try {
@@ -64,8 +67,21 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       }
       if (!r.ok) return
       const list = await r.json()
+      const items: GenTask[] = Array.isArray(list) ? list : []
+      if (primed.current) {
+        for (const task of items) {
+          if (task.status === 'done' && (task.kind || 'render') === 'render' && !seenDone.current.has(task.id)) {
+            seenDone.current.add(task.id)
+            goal('render_done', { room_id: task.room_id })
+          }
+        }
+      } else {
+        // Первый ответ только запоминаем: не считаем готовыми старые генерации.
+        primed.current = true
+        for (const task of items) if (task.status === 'done') seenDone.current.add(task.id)
+      }
       setAuthed(true)
-      setAll(Array.isArray(list) ? list : [])
+      setAll(items)
     } catch {
       /* сеть недоступна — оставляем прошлое состояние */
     }

@@ -3,6 +3,7 @@ import { ArrowUpRight, Download, Expand, LoaderCircle, LogOut, Search, Share2, S
 import { Link } from 'react-router'
 import { Logo } from '@/components/Logo'
 import { ShareDialog } from '@/components/ShareDialog'
+import { goal } from '@/lib/analytics'
 import '../App.css'
 
 type Me = { email: string; balance: number }
@@ -102,6 +103,7 @@ export default function Cabinet() {
     if (!me || paidRef.current) return
     const params = new URLSearchParams(location.search)
     const paid = Boolean(params.get('paid')) || /\/cabinet\/paid\/?$/.test(location.pathname)
+    const paidId = params.get('paid') || 'robokassa'
     const failed = /\/cabinet\/fail\/?$/.test(location.pathname)
     if (!paid && !failed) return
     paidRef.current = true
@@ -130,12 +132,23 @@ export default function Cabinet() {
       await loadMe()
       await loadData()
       setNotice(updated ? 'Оплата прошла — баланс обновлён' : 'Оплата ещё обрабатывается — обновите страницу через минуту')
+      if (updated) goal('purchase', { pack_id: paidId })
       history.replaceState(null, '', '/cabinet' + location.hash)
     })()
   }, [me])
 
   useEffect(() => {
     if (location.hash.includes('credits')) setTab('credits')
+  }, [])
+
+  // Возврат после успешного OAuth: бэкенд добавляет ?auth=yandex&new=1|0.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (!params.get('auth')) return
+    goal(params.get('new') === '1' ? 'signup' : 'login')
+    params.delete('auth')
+    params.delete('new')
+    history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : '') + location.hash)
   }, [])
 
   const groups = useMemo<RoomGroup[]>(() => {
@@ -241,6 +254,7 @@ export default function Cabinet() {
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || String(r.status))
+      goal(d.is_new ? 'signup' : 'login')
       localStorage.setItem('rv_last_email', loginEmail)
       setLoading(true)
       await loadMe(); await loadData(); setLoading(false)
@@ -276,6 +290,7 @@ export default function Cabinet() {
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || String(r.status))
+      goal('buy_click', { pack_id: pack.id })
       if (d.confirmation_url) window.location.href = d.confirmation_url
       else throw new Error('Не удалось получить ссылку на оплату')
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось начать оплату') }

@@ -1,13 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
-
-const COUNTER_ID = 114132104
-
-declare global {
-  interface Window {
-    ym?: (counterId: number, action: string, ...args: unknown[]) => void
-  }
-}
+import { COUNTER_ID } from '@/lib/analytics'
 
 // Первый хит отправляет init из index.html; здесь считаем клиентские переходы React Router.
 export function Metrika() {

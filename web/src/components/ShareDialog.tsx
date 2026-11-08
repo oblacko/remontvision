@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check, Copy, LoaderCircle, Send, Share2, X } from 'lucide-react'
+import { goal } from '@/lib/analytics'
 
 export function ShareDialog({ renderId, open, onClose }: { renderId: string; open: boolean; onClose: () => void }) {
   const [link, setLink] = useState('')
@@ -17,6 +18,7 @@ export function ShareDialog({ renderId, open, onClose }: { renderId: string; ope
         const d = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(d.error || String(r.status))
         if (!cancelled) setLink(d.url || '')
+        if (!cancelled) goal('share', { render_id: renderId })
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Не удалось создать ссылку')
       } finally {

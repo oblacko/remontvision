@@ -338,7 +338,10 @@ app.get('/api/auth/yandex/callback', async (req, res) => {
       req,
       documents: ['offer', 'privacy', 'cross_border'],
     });
-    res.redirect(302, `${appBaseUrl(req)}${redirectTo}`);
+    const target = new URL(`${appBaseUrl(req)}${redirectTo}`);
+    target.searchParams.set('auth', 'yandex');
+    target.searchParams.set('new', isNew ? '1' : '0');
+    res.redirect(302, target.toString());
   } catch (e) {
     log({ event: 'oauth_error', provider: 'yandex', error: String(e.message || e).slice(0, 300) });
     const target = new URL(`${e.redirectTo || '/'}`, appBaseUrl(req));

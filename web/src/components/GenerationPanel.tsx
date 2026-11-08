@@ -20,6 +20,7 @@ import {
 import { Link } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { useTasks } from '@/components/TaskDock'
+import { goal } from '@/lib/analytics'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -627,6 +628,7 @@ export function GenerationPanel({
         if (r.status === 401) { setStep('style'); onRequireLogin(); return }
         if (r.status === 402) { setGenError(''); setStep('style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
+        goal('render_start', { style: styleName, room_type: roomType })
         id = d.id
         setRoomId(id)
         void refreshTasks()
@@ -652,6 +654,7 @@ export function GenerationPanel({
         if (r.status === 401) { setStep(iterations.length ? 'result' : 'style'); onRequireLogin(); return }
         if (r.status === 402) { setGenError(''); setStep(iterations.length ? 'result' : 'style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
+        goal('edit_request', { target: edit?.target || 'custom' })
       }
 
       const room = await pollRoom(id)

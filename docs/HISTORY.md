@@ -16,6 +16,7 @@
 
 - Счётчик `114132104` (webvisor, clickmap, ecommerce) добавлен в оболочку SPA (`web/index.html`) и в старый редактор `/app` (`public/app.html`).
 - Клиентские переходы React Router учитываются компонентом `Metrika` через `ym('hit')`; первый хит отправляет `init`.
+- Ключевые цели (helper `web/src/lib/analytics.ts`): `signup`, `login`, `generator_open`, `render_start`, `render_done`, `edit_request`, `buy_click`, `purchase`, `share`. OAuth-редирект помечается `?auth=yandex&new=1|0`, фронт отправляет цель и чистит параметр.
 - Политика конфиденциальности обновлена под Метрику (редакция `2026-11-08.1`): добавлены данные веб-аналитики, Webvisor, cookie и Яндекс как получатель данных; убрана фраза «аналитические cookie не используются».
 - Тесты: `npm test` 194/194; build OK.
 
