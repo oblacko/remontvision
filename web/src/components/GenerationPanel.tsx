@@ -275,8 +275,6 @@ export function GenerationPanel({
   const [shareOpen, setShareOpen] = useState(false)
   const [finalBusy, setFinalBusy] = useState(false)
   const [finalError, setFinalError] = useState('')
-  const [productSearchBusy, setProductSearchBusy] = useState(false)
-  const [productSearchError, setProductSearchError] = useState('')
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
@@ -752,29 +750,6 @@ export function GenerationPanel({
       setFinalError(e instanceof Error ? e.message : 'Не удалось собрать итог')
     } finally {
       setFinalBusy(false)
-    }
-  }
-
-  const runProductSearch = async () => {
-    if (!current || productSearchBusy) return
-    setProductSearchBusy(true); setProductSearchError('')
-    try {
-      const r = await fetch(`/api/renders/${encodeURIComponent(current.id)}/product-search`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { onRequireLogin(); return }
-      if (!r.ok) throw new Error(d.error || 'Не удалось подобрать товары')
-      setIterations(prev => prev.map(item => item.id === current.id ? { ...item, analysis: d.analysis || item.analysis } : item))
-      setOpenSummaryTab('products')
-      setSelectedOffers({})
-      setStep('estimates')
-    } catch (e) {
-      setProductSearchError(e instanceof Error ? e.message : 'Не удалось подобрать товары')
-    } finally {
-      setProductSearchBusy(false)
     }
   }
 
@@ -1315,7 +1290,6 @@ export function GenerationPanel({
               </div>
             </div>}
             {finalError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{finalError}</p>}
-            {productSearchError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{productSearchError}</p>}
           </div>
         )}
 
@@ -1384,9 +1358,12 @@ export function GenerationPanel({
                   <section className="mt-5" aria-labelledby="gen-products">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h4 id="gen-products" className="eyebrow">Товары</h4>
-                      <button type="button" onClick={runProductSearch} disabled={productSearchBusy || current.productsEnabled === false} className="action-primary min-h-11 px-4 text-sm">{productSearchBusy ? <><LoaderCircle className="size-3.5 animate-spin" /> Ищем…</> : 'Собрать смету'}</button>
+                      {current.productsEnabled === false ? (
+                        <button type="button" disabled className="action-primary min-h-11 px-4 text-sm">Подбор выключен</button>
+                      ) : (
+                        <a href={`/room/${encodeURIComponent(current.roomId)}/procurement`} target="_blank" rel="noopener noreferrer" className="action-primary min-h-11 px-4 text-sm">Найти товары <ArrowUpRight className="size-4" /></a>
+                      )}
                     </div>
-                    {productSearchError && <p className="mt-3 text-xs text-destructive" role="alert">{productSearchError}</p>}
                     {productMatches.length ? (
                       <div className="mt-4 space-y-4">
                         {productMatches.map((match, index) => (
@@ -1414,7 +1391,7 @@ export function GenerationPanel({
                           </div>
                         ))}
                       </div>
-                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Смета ещё не собрана. Нажмите «Собрать смету» — подберём реальные товары по кадру.'}</p>}
+                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Подбор товаров ещё не запущен. Откройте «Найти товары» в новой вкладке — подберём похожие товары по кадру.'}</p>}
                     {selectedOffersList.length ? (
                       <div className="mt-5 border-t pt-3">
                         <p className="eyebrow">Выбрано</p>
