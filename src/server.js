@@ -26,7 +26,7 @@ import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
 import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
-import { getModelConfig, loadModelConfig, saveModelConfig } from './modelconfig.js';
+import { getModelConfig, loadModelConfig, saveModelConfig, resolveModelSelection, inheritPrivate } from './modelconfig.js';
 import { validateModelOptions, modelCaps } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
@@ -264,7 +264,10 @@ app.get('/api/health', (_req, res) => res.json({
   procurement_configured: getProcurementConfig().configured,
   refunds_enabled: REFUNDS_ENABLED,
 }));
-app.get('/api/models', h(async (_req, res) => { res.json(await listImageModels()); }));
+app.get('/api/models', h(async (_req, res) => {
+  const models = await q.listRenderModels(true);
+  res.json({ models: models.map(m => ({ key: m.id, label: m.label, credits: m.credits })) });
+}));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
 app.get('/api/styles', h(async (_req, res) => {
   res.json((await q.styles(true)).map(styleDto));
@@ -392,7 +395,12 @@ app.get('/api/my/generations', h(async (req, res) => {
 
 app.get('/api/credits', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
-  res.json({ balance: await q.creditBalance(req.user.id), history: await q.creditHistory(req.user.id) });
+  const [balance, history, hasPurchased] = await Promise.all([
+    q.creditBalance(req.user.id),
+    q.creditHistory(req.user.id),
+    q.hasSucceededPayment(req.user.id),
+  ]);
+  res.json({ balance, history, has_purchased: hasPurchased });
 }));
 
 // ---------- оплата ----------
@@ -1349,6 +1357,14 @@ app.post('/api/rooms', rateLimit, upload.fields([
       return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: bal });
     }
   }
+  // Выбор модели: явная должна быть активной, иначе 400; дефолт — активная модель
+  // с model_id === runtime render-модели, затем первая активная по sort.
+  const models = await q.listRenderModels(true);
+  const modelSelection = resolveModelSelection(req.body?.model, models, getModelConfig().render);
+  if (modelSelection === null) return res.status(400).json({ error: 'Модель недоступна' });
+  const isPrivate = req.body?.private === true;
+  // Task 0.3: передать modelSelection.key / modelSelection.credits / isPrivate в enqueueRender
+  // и сохранить их на созданном рендере (renders.model_key / model_credits / is_private).
   const id = crypto.randomUUID();
   const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
   const requestedStyle = String(req.body?.style || '').trim();
@@ -2060,6 +2076,12 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', max
     parent = await q.latestRender(room.id);
   }
   if (!parent) return res.status(409).json({ error: 'Нет рендера для правки' });
+
+  // Правка наследует модель и приватность от родителя; клиентские model/private игнорируются.
+  const modelKey = parent.model_key ?? null;
+  const modelCredits = parent.model_credits ?? 1;
+  const isPrivate = inheritPrivate(parent.is_private);
+  // Task 0.3: передать modelKey / modelCredits / isPrivate в enqueueRender.
 
   let target = String(req.body?.target || '').trim();
   if (target && !SLOT_LABELS[target]) return res.status(400).json({ error: 'Неизвестный объект правки' });

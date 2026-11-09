@@ -404,6 +404,14 @@ export const q = {
   },
   deletePack: id => pool.query(`DELETE FROM credit_packs WHERE id = $1`, [id]).then(r => r.rowCount > 0),
 
+  // модели рендера (биллинг v2)
+  listRenderModels: (activeOnly = true) =>
+    pool.query(`SELECT * FROM render_models ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)
+      .then(r => r.rows),
+  getRenderModel: key =>
+    pool.query(`SELECT * FROM render_models WHERE id = $1 OR model_id = $1 LIMIT 1`, [key])
+      .then(r => r.rows[0] || null),
+
   // lookbook-статьи (контент-движок)
   createArticle: f =>
     pool.query(`INSERT INTO articles (slug, title, style, room_type, tier, cover_path, palette, body, products, status, meta)
@@ -762,6 +770,9 @@ export const q = {
 
   hasPurchased: userId =>
     pool.query(`SELECT EXISTS(SELECT 1 FROM credit_txn WHERE user_id = $1 AND reason = 'purchase') AS purchased`, [userId])
+      .then(r => Boolean(r.rows[0]?.purchased)),
+  hasSucceededPayment: userId =>
+    pool.query(`SELECT EXISTS(SELECT 1 FROM payments WHERE user_id = $1 AND status = 'succeeded') AS purchased`, [userId])
       .then(r => Boolean(r.rows[0]?.purchased)),
 
   roadmapItemsForRoom: roomId =>

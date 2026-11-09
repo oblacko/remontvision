@@ -2,7 +2,16 @@
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-05. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-09 — API моделей и приватность рендеров
+
+- `GET /api/models` теперь отдаёт модели рендера из таблицы `render_models` (активные, по `sort`): `{ models: [{ key, label, credits }] }`, где `key` — короткий `id`.
+- `POST /api/rooms` принимает `model` (опционально) и `private` (boolean). Явная неизвестная/неактивная модель → `400 { error: 'Модель недоступна' }`; дефолт — активная модель с `model_id` текущего render-движка, затем первая активная по `sort`, иначе `{ key: null, credits: 1 }`.
+- `POST /api/rooms/:id/iterate` игнорирует клиентские `model`/`private`: правка наследует `model_key`/`model_credits`/`is_private` от родительского рендера.
+- `GET /api/credits` добавляет `has_purchased` (успешный платёж в `payments` со статусом `succeeded`).
+- Чистые хелперы в `src/modelconfig.js`: `resolveModelSelection`, `inheritPrivate`, `modelCreditsOrOne`; `src/db.js`: `listRenderModels`, `getRenderModel`, `hasSucceededPayment`.
+- Тесты: `npm test` 217/217.
 
 ## 2026-11-08 — новый логотип
 

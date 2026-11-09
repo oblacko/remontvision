@@ -28,6 +28,46 @@ export async function loadModelConfig() {
   return getModelConfig();
 }
 
+// ---------- выбор модели и приватность рендера (чистые функции без БД) ----------
+
+// Нормализация цены модели в кредитах: БД гарантирует credits >= 1 (CHECK),
+// но для DB-free тестов и защитного кода значение меньше 1 трактуем как 1.
+export function modelCreditsOrOne(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+// Разрешение модели рендера для запроса.
+// requestedKey — явно переданный `model` из тела (null/undefined/'' = не задан).
+// models — строки render_models (активность перепроверяем по полю active).
+// defaultModelId — runtime-модель рендера из конфига (getModelConfig().render),
+// чтобы дефолт предпочитал строку с совпадающим model_id.
+// Возвращает { key, credits } (key = render_models.id, короткий ключ API) либо
+// null, если requestedKey задан, но такой активной модели нет (→ HTTP 400).
+export function resolveModelSelection(requestedKey, models, defaultModelId = null) {
+  const active = (Array.isArray(models) ? models : []).filter(m => m && m.active === true);
+  const match = key => active.find(m => m.id === key || m.model_id === key);
+
+  if (requestedKey !== undefined && requestedKey !== null && requestedKey !== '') {
+    const found = match(String(requestedKey));
+    return found ? { key: found.id, credits: modelCreditsOrOne(found.credits) } : null;
+  }
+
+  const preferred = defaultModelId ? active.find(m => m.model_id === defaultModelId) : null;
+  const sorted = [...active].sort(
+    (a, b) => (a.sort ?? 0) - (b.sort ?? 0) || String(a.id).localeCompare(String(b.id)),
+  );
+  const chosen = preferred || sorted[0];
+  if (!chosen) return { key: null, credits: 1 };
+  return { key: chosen.id, credits: modelCreditsOrOne(chosen.credits) };
+}
+
+// Правка всегда наследует флаг приватности от родительского рендера;
+// клиентский `private` у правки игнорируется.
+export function inheritPrivate(parentIsPrivate) {
+  return parentIsPrivate === true;
+}
+
 export async function saveModelConfig({ render, edit, vision, resolution, aspectRatio }) {
   if (render) state.render = render;
   if (edit !== undefined) state.edit = String(edit || '');
