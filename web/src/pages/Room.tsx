@@ -4,8 +4,6 @@ import { ArrowLeft, ArrowRight, Download, Expand, LoaderCircle, Scan, Share2, X,
 import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
 import { GenerationPanel } from '@/components/GenerationPanel'
-import { goal } from '@/lib/analytics'
-import { buildMoveInstruction, buildObjectAction, buildObjectText, cropObjectFile, moveDirection, ruLabel } from '@/lib/objects'
 import { useTasks } from '@/components/TaskDock'
 import { GuideIcon } from '@/components/GuideIcon'
 import { Logo } from '@/components/Logo'
@@ -80,10 +78,6 @@ export default function Room() {
   const [roadmapError, setRoadmapError] = useState('')
   const [objectsOn, setObjectsOn] = useState(false)
   const [selectedObject, setSelectedObject] = useState<number | null>(null)
-  const [objectDelta, setObjectDelta] = useState<{ dx: number; dy: number } | null>(null)
-  const [objectText, setObjectText] = useState('')
-  const [objectBusy, setObjectBusy] = useState(false)
-  const [objectError, setObjectError] = useState('')
   const [renderRatio, setRenderRatio] = useState(1.5)
 
   const loadRoom = useCallback(async (renderId?: string) => {
@@ -123,32 +117,6 @@ export default function Room() {
   const visibleObjects = (render?.analysis?.visible || []).filter(
     (object): object is { label?: string; bbox: number[]; area?: number } => typeof object === 'object' && object !== null && Array.isArray(object.bbox) && object.bbox.length === 4,
   )
-  const selectedObj = selectedObject !== null ? visibleObjects[selectedObject] : null
-
-  const sendObjectEdit = async (instruction: string, label?: string, bbox?: number[]) => {
-    if (!render?.id || objectBusy) return
-    setObjectBusy(true); setObjectError('')
-    try {
-      const fd = new FormData()
-      fd.append('text', instruction)
-      fd.append('parent_id', render.id)
-      const ref = image && bbox ? await cropObjectFile(image, bbox) : null
-      if (ref) {
-        fd.append('refs', ref)
-        fd.append('ref_meta', JSON.stringify([{ description: `Выбранный объект: ${ruLabel(label)}. Изменяйте только его, похожие объекты не трогайте.` }]))
-      }
-      const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
-      const d = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d.error || 'Не удалось запустить редактирование')
-      goal('edit_request', { target: 'object' })
-      setObjectsOn(false); setSelectedObject(null); setObjectDelta(null); setObjectText('')
-      await loadRoom()
-    } catch (e) {
-      setObjectError(e instanceof Error ? e.message : 'Не удалось запустить редактирование')
-    } finally {
-      setObjectBusy(false)
-    }
-  }
   const storedBreakdown = render?.analysis?.breakdown || null
   const breakdown = storedBreakdown?.version === 4 ? storedBreakdown : null
   const selectedRenderId = render?.id || ''
@@ -318,46 +286,20 @@ export default function Room() {
                     ratio={renderRatio}
                     objects={visibleObjects}
                     selectedIndex={selectedObject}
-                    onSelect={(index) => { setSelectedObject(index); setObjectDelta(null); setObjectText('') }}
-                    onMove={(index, dx, dy) => { setSelectedObject(index); setObjectDelta({ dx, dy }) }}
+                    onSelect={(index) => setSelectedObject(index)}
                   />
                 ) : (
                   <img src={image} alt="Дизайн комнаты" className="max-h-[62svh] w-full object-contain" onLoad={event => setRenderRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                 )}
                 <div className="absolute right-3 top-3 flex gap-2">
                   {visibleObjects.length > 0 && (
-                    <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null); setObjectDelta(null); setObjectText(''); setObjectError('') }} className={`flex size-12 items-center justify-center border backdrop-blur-sm transition-colors ${objectsOn ? 'border-primary bg-primary text-primary-foreground' : 'border-background/40 bg-foreground/60 text-background hover:bg-background hover:text-foreground'}`} aria-label="Выбрать объект на рендере"><Scan className="size-5" /></button>
+                    <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null) }} className={`flex size-12 items-center justify-center border backdrop-blur-sm transition-colors ${objectsOn ? 'border-primary bg-primary text-primary-foreground' : 'border-background/40 bg-foreground/60 text-background hover:bg-background hover:text-foreground'}`} aria-label="Выбрать объект на рендере"><Scan className="size-5" /></button>
                   )}
                   <button type="button" onClick={() => setFullscreen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Во весь экран"><Expand className="size-5" /></button>
                   <a href={image} download="remontvision-design.webp" className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Скачать"><Download className="size-5" /></a>
                   {render?.id && <button type="button" onClick={() => setShareOpen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Поделиться"><Share2 className="size-5" /></button>}
                 </div>
               </div>
-            )}
-
-            {objectsOn && render && (
-              <section className="mt-4 border p-4" aria-labelledby="room-objects-title">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p id="room-objects-title" className="eyebrow">Объекты на рендере</p>
-                  <button type="button" onClick={() => { setObjectsOn(false); setSelectedObject(null); setObjectDelta(null); setObjectText('') }} className="text-xs underline">Скрыть</button>
-                </div>
-                {objectError && <p className="mt-2 text-xs text-destructive" role="alert">{objectError}</p>}
-                {!selectedObj && <p className="mt-2 text-sm leading-6 text-muted-foreground">Нажмите на объект, чтобы выбрать его. Потяните объект — появится инструкция перемещения.</p>}
-                {selectedObj && (
-                  <div className="mt-3 space-y-3">
-                    <p className="text-sm font-medium">{ruLabel(selectedObj.label)} <span className="font-normal text-muted-foreground">· {Math.round((selectedObj.bbox[2] || 0) * 100)}% × {Math.round((selectedObj.bbox[3] || 0) * 100)}% кадра</span></p>
-                    {objectDelta && (() => { const dir = moveDirection(objectDelta.dx, objectDelta.dy); return <p className="kit-ban text-sm">Перемещение: {dir.text} примерно на {dir.percent}% кадра.</p> })()}
-                    <div className="flex flex-wrap gap-2">
-                      {objectDelta && <button type="button" disabled={objectBusy} className="action-primary min-h-11 px-4 text-sm" onClick={() => void sendObjectEdit(buildMoveInstruction({ label: selectedObj.label, bbox: selectedObj.bbox, dx: objectDelta.dx, dy: objectDelta.dy }), selectedObj.label, selectedObj.bbox)}>Переместить</button>}
-                      {(['replace', 'color', 'bigger', 'smaller'] as const).map(action => <button key={action} type="button" disabled={objectBusy} className="action-secondary min-h-11 px-4 text-sm" onClick={() => void sendObjectEdit(buildObjectAction(selectedObj.label, action, selectedObj.bbox), selectedObj.label, selectedObj.bbox)}>{action === 'replace' ? 'Заменить' : action === 'color' ? 'Другой цвет' : action === 'bigger' ? 'Крупнее' : 'Мельче'}</button>)}
-                    </div>
-                    <form onSubmit={(event) => { event.preventDefault(); if (!objectText.trim()) return; void sendObjectEdit(buildObjectText(selectedObj.label, objectText, selectedObj.bbox), selectedObj.label, selectedObj.bbox) }} className="flex flex-col gap-2 sm:flex-row">
-                      <input value={objectText} onChange={event => setObjectText(event.target.value)} placeholder={`Что сделать с «${ruLabel(selectedObj.label)}»?`} className="kit-field min-w-0 flex-1 text-sm" />
-                      <button type="submit" disabled={objectBusy} className="action-primary min-h-12 px-4 text-sm">{objectBusy ? 'Запускаем…' : 'Применить'}</button>
-                    </form>
-                  </div>
-                )}
-              </section>
             )}
 
             <nav className="mt-6 flex overflow-x-auto border-b" aria-label="Разделы комнаты">
@@ -378,6 +320,8 @@ export default function Room() {
                 onEdited={() => { void loadRoom() }}
                 onSelectVersion={(renderId) => { void loadRoom(renderId) }}
                 isAuthed
+                objectTarget={selectedObject !== null ? visibleObjects[selectedObject] : null}
+                onClearObject={() => setSelectedObject(null)}
               />
             </div>
 

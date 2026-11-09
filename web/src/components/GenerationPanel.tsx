@@ -25,7 +25,7 @@ import { ObjectLayer } from '@/components/ObjectLayer'
 import { useTasks } from '@/components/TaskDock'
 import { goal } from '@/lib/analytics'
 import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
-import { buildMoveInstruction, buildObjectAction, buildObjectText, cropObjectFile, moveDirection, ruLabel } from '@/lib/objects'
+import { buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
 import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
@@ -225,6 +225,8 @@ export function GenerationPanel({
   onEdited,
   onSelectVersion,
   isAuthed = false,
+  objectTarget = null,
+  onClearObject,
 }: {
   open: boolean
   initialRoomId?: string
@@ -236,6 +238,8 @@ export function GenerationPanel({
   onEdited?: () => void
   onSelectVersion?: (renderId: string) => void
   isAuthed?: boolean
+  objectTarget?: { label?: string; bbox: number[] } | null
+  onClearObject?: () => void
 }) {
   const { refresh: refreshTasks } = useTasks()
   const [step, setStep] = useState<Step>(initialRoomId ? 'result' : 'photo')
@@ -283,9 +287,7 @@ export function GenerationPanel({
   const [finalError, setFinalError] = useState('')
   const [objectsOn, setObjectsOn] = useState(false)
   const [selectedObject, setSelectedObject] = useState<number | null>(null)
-  const [objectDelta, setObjectDelta] = useState<{ dx: number; dy: number } | null>(null)
-  const [objectText, setObjectText] = useState('')
-  const [objectsNotice, setObjectsNotice] = useState('')
+  const [editObjectTarget, setEditObjectTarget] = useState<{ label?: string; bbox: number[] } | null>(null)
   const [passportNotice, setPassportNotice] = useState('')
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
@@ -301,7 +303,15 @@ export function GenerationPanel({
   const visibleObjects = (current?.analysis?.visible || []).filter(
     (object): object is { label?: string; bbox: number[]; area?: number } => typeof object === 'object' && object !== null && Array.isArray(object.bbox) && object.bbox.length === 4,
   )
-  const selected = selectedObject !== null ? visibleObjects[selectedObject] : null
+  const effectiveObjectTarget = objectTarget || editObjectTarget
+
+  // Выбор объекта на кадре открывает текущую версию и создаёт блок правки.
+  useEffect(() => {
+    if (!objectTarget) return
+    setEditObjectTarget(objectTarget)
+    if (current) setOpenHistory(current.id)
+    if (!editRefs.length) addEditBlock()
+  }, [objectTarget])
   const currentChanges = changesFromArchitect(current?.analysis?.architect)
   const selectedOffersList = Object.values(selectedOffers)
   const toggleOffer = (offer: ProductOffer) => setSelectedOffers(prev => {
@@ -1075,8 +1085,16 @@ export function GenerationPanel({
                         ratio={current.ratio}
                         objects={visibleObjects}
                         selectedIndex={selectedObject}
-                        onSelect={(index) => { setSelectedObject(index); setObjectDelta(null); setObjectText('') }}
-                        onMove={(index, dx, dy) => { setSelectedObject(index); setObjectDelta({ dx, dy }); setObjectsNotice('') }}
+                        onSelect={(index) => {
+                          setSelectedObject(index)
+                          const object = visibleObjects[index]
+                          if (!object) return
+                          setEditObjectTarget(object)
+                          setObjectsOn(false)
+                          if (!editRefs.length) addEditBlock()
+                          if (current) setOpenHistory(current.id)
+                          requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+                        }}
                       />
                     ) : (
                       <img src={current.image} alt="Сгенерированный дизайн интерьера" className="h-full max-h-[62svh] w-full object-contain" />
@@ -1084,7 +1102,7 @@ export function GenerationPanel({
                   </div>
                   <div className="absolute right-3 top-3 flex gap-2">
                     {visibleObjects.length > 0 && (
-                      <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null); setObjectDelta(null); setObjectText(''); setObjectsNotice('') }} className={`flex size-12 items-center justify-center border backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${objectsOn ? 'border-primary bg-primary text-primary-foreground' : 'border-background/40 bg-foreground/60 text-background hover:bg-background hover:text-foreground'}`} aria-label="Выбрать объект на рендере">
+                      <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null) }} className={`flex size-12 items-center justify-center border backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${objectsOn ? 'border-primary bg-primary text-primary-foreground' : 'border-background/40 bg-foreground/60 text-background hover:bg-background hover:text-foreground'}`} aria-label="Выбрать объект на рендере">
                         <Scan className="size-5" />
                       </button>
                     )}
@@ -1099,36 +1117,6 @@ export function GenerationPanel({
                     </button>
                   </div>
                 </div>}
-                {!inline && objectsOn && (
-                  <section className="mt-4 border p-4" aria-labelledby="objects-title">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p id="objects-title" className="eyebrow">Объекты на рендере</p>
-                      <button type="button" onClick={() => { setObjectsOn(false); setSelectedObject(null); setObjectDelta(null); setObjectText('') }} className="text-xs underline">Скрыть</button>
-                    </div>
-                    {objectsNotice && <p className="mt-2 text-xs text-muted-foreground">{objectsNotice}</p>}
-                    {!selected && <p className="mt-2 text-sm leading-6 text-muted-foreground">Нажмите на объект, чтобы выбрать его. Потяните объект — появится инструкция перемещения.</p>}
-                    {selected && (
-                      <div className="mt-3 space-y-3">
-                        <p className="text-sm font-medium">{ruLabel(selected.label)} <span className="font-normal text-muted-foreground">· {Math.round((selected.bbox[2] || 0) * 100)}% × {Math.round((selected.bbox[3] || 0) * 100)}% кадра</span></p>
-                        {objectDelta && (() => { const dir = moveDirection(objectDelta.dx, objectDelta.dy); return <p className="kit-ban text-sm">Перемещение: {dir.text} примерно на {dir.percent}% кадра.</p> })()}
-                        <div className="flex flex-wrap gap-2">
-                          {objectDelta && (
-                            <button type="button" className="action-primary min-h-11 px-4 text-sm" onClick={async () => { const instruction = buildMoveInstruction({ label: selected.label, bbox: selected.bbox, dx: objectDelta.dx, dy: objectDelta.dy }); const ref = await cropObjectFile(current.image, selected.bbox); setObjectsOn(false); setObjectDelta(null); void startGeneration(instruction, current.styleName, { parentId: current.id, refs: ref ? [{ file: ref, description: `Выбранный объект: ${ruLabel(selected.label)}. Изменяйте только его, похожие объекты не трогайте.` }] : undefined }) }}>Переместить</button>
-                          )}
-                          {(['replace', 'color', 'bigger', 'smaller'] as const).map(action => (
-                            <button key={action} type="button" className="action-secondary min-h-11 px-4 text-sm" onClick={async () => { const instruction = buildObjectAction(selected.label, action, selected.bbox); const ref = await cropObjectFile(current.image, selected.bbox); setObjectsOn(false); void startGeneration(instruction, current.styleName, { parentId: current.id, refs: ref ? [{ file: ref, description: `Выбранный объект: ${ruLabel(selected.label)}. Изменяйте только его, похожие объекты не трогайте.` }] : undefined }) }}>
-                              {action === 'replace' ? 'Заменить' : action === 'color' ? 'Другой цвет' : action === 'bigger' ? 'Крупнее' : 'Мельче'}
-                            </button>
-                          ))}
-                        </div>
-                        <form onSubmit={async (event) => { event.preventDefault(); if (!objectText.trim()) return; const instruction = buildObjectText(selected.label, objectText, selected.bbox); const ref = await cropObjectFile(current.image, selected.bbox); setObjectsOn(false); setObjectText(''); void startGeneration(instruction, current.styleName, { parentId: current.id, refs: ref ? [{ file: ref, description: `Выбранный объект: ${ruLabel(selected.label)}. Изменяйте только его, похожие объекты не трогайте.` }] : undefined }) }} className="flex flex-col gap-2 sm:flex-row">
-                          <input value={objectText} onChange={event => setObjectText(event.target.value)} placeholder={`Что сделать с «${ruLabel(selected.label)}»?`} className="kit-field min-w-0 flex-1 text-sm" />
-                          <button type="submit" className="action-primary min-h-12 px-4 text-sm">Применить</button>
-                        </form>
-                      </div>
-                    )}
-                  </section>
-                )}
                 {!inline && current.artDirection && (current.artDirection.palette?.length || current.artDirection.focalPoint || current.artDirection.mood) ? (
                   <section className="mt-6 border p-4" aria-labelledby="art-direction">
                     <p id="art-direction" className="eyebrow">Авторский бриф</p>
@@ -1232,6 +1220,27 @@ export function GenerationPanel({
                               <p className="text-xs leading-5 text-muted-foreground">Эта версия показана на экране. Запустите редактирование от неё — новая версия добавится в историю.</p>
                             </div>
                             <p className="eyebrow mt-5">Быстрое редактирование</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">Первые 3 редактирования дизайна бесплатны, каждое следующее — 1 кредит.</p>
+                            {(() => {
+                              const objects = (item.analysis?.visible || []).filter((object): object is { label?: string; bbox: number[] } => typeof object === 'object' && object !== null && Array.isArray(object.bbox) && object.bbox.length === 4)
+                              if (!objects.length) return null
+                              const keyOf = (object: { label?: string; bbox: number[] }) => `${object.label || ''}|${object.bbox.join(',')}`
+                              return (
+                                <div className="mt-3">
+                                  <p className="eyebrow">Объект на кадре (необязательно)</p>
+                                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                                    {objects.map((object, objectIndex) => {
+                                      const active = effectiveObjectTarget ? keyOf(effectiveObjectTarget) === keyOf(object) : false
+                                      return (
+                                        <button key={`${keyOf(object)}-${objectIndex}`} type="button" aria-pressed={active} onClick={() => { setEditObjectTarget(object); setSelectedObject(null); if (!editRefs.length) addEditBlock() }} className={`min-h-11 shrink-0 border px-3 text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{ruLabel(object.label)}</button>
+                                      )
+                                    })}
+                                    {effectiveObjectTarget && <button type="button" onClick={() => { setEditObjectTarget(null); onClearObject?.(); setSelectedObject(null) }} className="min-h-11 shrink-0 border px-3 text-xs text-muted-foreground">Сбросить</button>}
+                                  </div>
+                                  {effectiveObjectTarget && <p className="mt-2 text-xs leading-5 text-muted-foreground">Редактирование применяется к объекту «{ruLabel(effectiveObjectTarget.label)}» — в инструкцию уйдёт область кадра и кроп объекта.</p>}
+                                </div>
+                              )
+                            })()}
                             {quickEdits.length ? (
                               <div className="mt-3">
                                 <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 sm:hidden">
@@ -1336,16 +1345,25 @@ export function GenerationPanel({
                               <button
                                 type="button"
                                 disabled={!editRefs.some(ref => ref.text.trim() || ref.file || ref.url)}
-                                onClick={() => {
+                                onClick={async () => {
                                   const textBlocks = editRefs.filter(ref => !ref.file && !ref.url && ref.text.trim())
                                     .map(ref => ref.text.trim())
                                     .join('\n')
-                                  const refs = editRefs.filter(ref => ref.file || ref.url).map(ref => ({
+                                  const refs: Array<{ file?: File; url?: string; description: string }> = editRefs.filter(ref => ref.file || ref.url).map(ref => ({
                                     file: ref.file || undefined,
                                     url: ref.url || undefined,
                                     description: ref.text.trim(),
                                   }))
-                                  startGeneration(textBlocks || 'Применить редактирование по референсам', item.styleName, { parentId: item.id, refs })
+                                  const target = effectiveObjectTarget
+                                  const base = textBlocks || (target ? 'Измените этот объект по стилю комнаты' : 'Применить редактирование по референсам')
+                                  const instruction = target ? buildObjectText(target.label, base, target.bbox) : base
+                                  if (target) {
+                                    const objectRef = await cropObjectFile(item.image, target.bbox)
+                                    if (objectRef) refs.push({ file: objectRef, description: `Выбранный объект: ${ruLabel(target.label)}. Изменяйте только его, похожие объекты не трогайте.` })
+                                  }
+                                  void startGeneration(instruction, item.styleName, { parentId: item.id, refs })
+                                  setEditObjectTarget(null)
+                                  onClearObject?.()
                                 }}
                                 className="action-primary w-full"
                               >
