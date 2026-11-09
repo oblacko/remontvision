@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findCopyViolations } from '../scripts/check-copy.mjs';
+import { findCopyViolations, collectFiles } from '../scripts/check-copy.mjs';
 
 test('detects forbidden «генераци» in a string', () => {
   const v = findCopyViolations([{ path: 'web/src/pages/Home.tsx', content: "const t = 'одна генерация за 399 ₽'" }]);
@@ -42,4 +42,9 @@ test('does not hide strings behind a URL containing //', () => {
     { path: 'web/src/z.tsx', content: "const url = 'https://example.com'; const t = 'генерация'" },
   ]);
   assert.equal(v.length, 1);
+});
+
+test('real repo tree is clean under the scanner', () => {
+  const violations = findCopyViolations(collectFiles());
+  assert.deepEqual(violations, []);
 });

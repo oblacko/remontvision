@@ -11,9 +11,9 @@
 // Запуск: npm run check:copy  (exit 1 при нарушениях, 0 если чисто).
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const ROOT = process.cwd();
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // Файлы, которые пока не входят в проверку (не пользовательский текст или
 // отложены на другие задачи). При выполнении Task 0.8 строки offer.html и
@@ -98,7 +98,7 @@ export function findCopyViolations(files) {
   return violations;
 }
 
-function collectFiles() {
+export function collectFiles() {
   const files = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
