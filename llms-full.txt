@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-09T17:07:41.394Z
+Generated: 2026-11-09T17:13:48.865Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2351,6 +2351,12 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-09 — единый текст отклонения загрузки + Node-20-безопасные клиентские тесты
+
+- `src/imageupload.js`: экспортирован `UPLOAD_REJECT_MESSAGE = 'Только JPG/PNG/WebP/HEIC'` — единый источник для multer-фильтра и обработчика ошибок в `src/server.js` (раньше обработчик сравнивал со старой строкой `'Только JPG/PNG/WebP'`, из-за чего неверный тип падал в 500 вместо 400).
+- Клиентские тесты, импортирующие `.ts`-хелперы (`test/heic.test.js`, `test/utm.test.js`), стали Node-20-безопасными: импорт обёрнут в `try/catch`, при неудаче (Node < 23.6 без type stripping) тесты помечаются `test.skip` с пояснением, а не роняют весь `npm test`. Полноценные клиентские тесты требуют Node ≥ 24 (локально); на Node 20 (Docker) они пропускаются.
+- Тесты: `test/uploadformats.test.js` дополнен проверкой `UPLOAD_REJECT_MESSAGE`. Итог `npm test` 268/268 (1 skip).
 
 ## 2026-11-09 — клиентская конвертация HEIC/HEIF в JPEG (lazy heic2any)
 

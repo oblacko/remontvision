@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import sharp from 'sharp';
 
 // Без БД: модуль не импортирует db.js, поэтому его можно поднять напрямую.
-const { UPLOAD_MIME, isHeic, convertHeicIfNeeded } = await import('../src/imageupload.js');
+const { UPLOAD_MIME, UPLOAD_REJECT_MESSAGE, isHeic, convertHeicIfNeeded } = await import('../src/imageupload.js');
+
+test('UPLOAD_REJECT_MESSAGE is the single reject string for unsupported types', () => {
+  assert.equal(UPLOAD_REJECT_MESSAGE, 'Только JPG/PNG/WebP/HEIC');
+});
 
 test('UPLOAD_MIME maps heic/heif to .jpg and keeps jpeg/png/webp', () => {
   assert.equal(UPLOAD_MIME['image/heic'], '.jpg');

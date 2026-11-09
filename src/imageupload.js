@@ -10,6 +10,10 @@ export const UPLOAD_MIME = {
   'image/heif': '.jpg',
 };
 
+// Единый текст отклонения неподдерживаемого типа: используется и в multer-фильтре,
+// и в обработчике ошибок (чтобы не рассинхронизировать строки).
+export const UPLOAD_REJECT_MESSAGE = 'Только JPG/PNG/WebP/HEIC';
+
 const HEIC_MIME = new Set(['image/heic', 'image/heif']);
 
 export function isHeic(mimetype) {

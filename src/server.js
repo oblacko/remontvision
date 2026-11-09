@@ -20,7 +20,7 @@ import { breakdownTask, roadmapTask } from './taskdata.js';
 import { getCatalogOffer } from './catalogclient.js';
 import { runVisionAgent } from './visionagent.js';
 import { sanitizeImage, fitAspect } from './media.js';
-import { UPLOAD_MIME, isHeic, convertHeicIfNeeded } from './imageupload.js';
+import { UPLOAD_MIME, UPLOAD_REJECT_MESSAGE, isHeic, convertHeicIfNeeded } from './imageupload.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES, activeRoomTypeNames, roomTypeByName, isRoomTypeActive, getRoomTypeConfig, getRoomTypeDefaults, saveRoomTypes, resetRoomTypes, loadRoomTypes } from './roomtypes.js';
 import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
@@ -124,7 +124,7 @@ const memUpload = () => multer({
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ok = Object.keys(IMG_EXT).includes(file.mimetype);
-    cb(ok ? null : new Error('Только JPG/PNG/WebP/HEIC'), ok);
+    cb(ok ? null : new Error(UPLOAD_REJECT_MESSAGE), ok);
   },
 });
 const upload = memUpload();
@@ -2215,7 +2215,7 @@ app.use((err, _req, res, next) => {
     const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
     return res.status(status).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Файл больше 15 МБ' : err.message });
   }
-  if (err?.message === 'Только JPG/PNG/WebP') return res.status(400).json({ error: err.message });
+  if (err?.message === UPLOAD_REJECT_MESSAGE) return res.status(400).json({ error: err.message });
   next(err);
 });
 
