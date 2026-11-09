@@ -9,6 +9,7 @@ import {
   Clipboard,
   Download,
   Expand,
+  Info,
   LoaderCircle,
   RotateCcw,
   Share2,
@@ -1020,6 +1021,10 @@ export function GenerationPanel({
             </ol>
             <p className="mt-6 text-xs leading-5 text-muted-foreground">
               Прошло {elapsedLabel}. {elapsed >= 180 ? 'Идёт дольше обычного — можно не закрывать окно, результат сохранится в кабинете.' : 'Можно переключиться на другую вкладку, процесс продолжится.'}
+            </p>
+            <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span className="min-w-0">Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов.</span>
             </p>
           </div>
         )}

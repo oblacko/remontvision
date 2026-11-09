@@ -196,6 +196,8 @@ export const q = {
   adminProducts: () => pool.query(`SELECT p.*, (SELECT COUNT(*) FROM product_clicks pc WHERE pc.product_id = p.id)::int AS clicks FROM products p ORDER BY p.active DESC, p.id`).then(r => r.rows),
 
   // users / auth
+  getUserById: id =>
+    pool.query(`SELECT id, email FROM users WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   findUserByEmail: email =>
     pool.query(`SELECT * FROM users WHERE email = $1`, [email]).then(r => r.rows[0] || null),
   createUser: email => pool.query(`INSERT INTO users (email) VALUES ($1) RETURNING *`, [email]).then(r => r.rows[0]),

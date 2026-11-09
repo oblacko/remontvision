@@ -24,6 +24,7 @@ import { analyzeRoomBrief, buildArtDirection, buildRepairScope } from './artdire
 import { fitLayoutPlan } from './layoutfit.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
+import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -692,6 +693,9 @@ async function processRender(renderId) {
     await q.setRenderDone(renderKey, totalCost, model, render.id);
     await q.setRoomStatus('done', room.id);
     log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_breakdown: costBreakdown, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
+
+    // Уведомление «Готово» по e-mail: fire-and-forget, ошибки не влияют на результат рендера.
+    if (room.user_id) notifyOwner(room, render);
   } catch (e) {
     const msg = String(e.message || e).slice(0, 500);
     addCost('failed', e.cost);
@@ -708,6 +712,30 @@ async function processRender(renderId) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Уведомление «Готово»: ищем e-mail владельца комнаты и шлём письмо со ссылкой на результат.
+// Fire-and-forget — не блокирует завершение рендера; ошибки только пишутся в лог.
+function notifyOwner(room, render) {
+  void (async () => {
+    try {
+      const user = await q.getUserById(room.user_id);
+      if (!user || !user.email) return;
+      let shareUrl = null;
+      try {
+        const token = render.share_token || crypto.randomBytes(18).toString('base64url');
+        if (!render.share_token) await q.setRenderShareToken(render.id, token);
+        shareUrl = renderShareUrl(token);
+      } catch { /* ссылка не критична — письмо уйдёт без неё */ }
+      await sendRenderDoneEmail(user.email, {
+        roomType: room.room_type || null,
+        style: room.style || null,
+        shareUrl,
+      });
+    } catch (e) {
+      log({ event: 'email_error', room_id: room.id, render_id: render.id, error: String(e.message || e).slice(0, 300) });
+    }
+  })();
+}
 
 let running = 0;
 export function startWorker() {
