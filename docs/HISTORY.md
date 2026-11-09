@@ -4,6 +4,14 @@
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-09 — приём HEIC/HEIF на загрузке с серверной конвертацией в JPEG
+
+- Новый модуль `src/imageupload.js`: `UPLOAD_MIME` (маппинг MIME → расширение, `image/heic`/`image/heif` → `.jpg`), `isHeic(mimetype)` и `convertHeicIfNeeded(buffer, mimetype, { convert })`. Для JPEG/PNG/WebP буфер возвращается без изменений; для HEIC/HEIF вызывается конвертер `sharp(buffer).rotate().jpeg({ quality: 92 }).toBuffer()`. При ошибке декодирования выбрасывается `Error` с `status=400` и сообщением «Не удалось прочитать HEIC. Сохраните фото как JPG или включите в настройках iPhone „Наиболее совместимые“».
+- `src/server.js`: `IMG_EXT` теперь берётся из `UPLOAD_MIME`; multer-фильтр принимает `image/heic`/`image/heif`, текст ошибки «Только JPG/PNG/WebP/HEIC»; `saveUpload` конвертирует HEIC/HEIF в JPEG до `sanitizeImage` и сохраняет результат с расширением `.jpg` и MIME `image/jpeg`. Лимит 15 МБ и поведение `sanitizeImage` не менялись.
+- UI-подсказки загрузки обновлены до «JPG, PNG, WebP или HEIC до 15 МБ»: `web/src/components/GenerationPanel.tsx` (проверка типа, текст ошибки, список требований, `accept` файлового поля, подсказка перетаскивания) и `web/src/pages/Home.tsx` (FAQ и шаг инструкции).
+- Тесты: `test/uploadformats.test.js` (6 тестов: маппинг UPLOAD_MIME, `isHeic`, неизменный буфер для JPEG/PNG/WebP без вызова конвертера, вызов подставленного конвертера для HEIC/HEIF, русская 400-ошибка при отказе конвертера, реальный декод HEIC пропускается без поддержки HEVC в libheif). Итог `npm test` 261/261 (1 skip).
+- Ограничение: локально sharp не может ни закодировать, ни декодировать HEIC (нет HEVC в libheif), поэтому реальный декод проверяется вручную на VPS/iPhone; при недоступном декодировании пользователь видит чистую русскую ошибку 400, а не 500.
+
 ## 2026-11-09 — UTM-персистентность + цели render_error и product_click
 
 - Новый модуль `web/src/lib/utm.ts`: first-touch UTM-персистентность. Чистые функции `captureUtmOnce({ search, storage, now })` и `readUtm({ storage, now })` хранят `{ utm, ts }` в `localStorage` под ключом `rv_utm`, TTL 30 дней, распознают `utm_source/medium/campaign/term/content` и `yclid`; `readUtm` возвращает `null` для просроченной/отсутствующей/битой записи. Браузерные обёртки `captureUtm()` и `getUtm()` защищены от отсутствия `window`/`localStorage` (SSR/тесты) и не бросают исключений.

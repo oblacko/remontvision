@@ -20,6 +20,7 @@ import { breakdownTask, roadmapTask } from './taskdata.js';
 import { getCatalogOffer } from './catalogclient.js';
 import { runVisionAgent } from './visionagent.js';
 import { sanitizeImage, fitAspect } from './media.js';
+import { UPLOAD_MIME, isHeic, convertHeicIfNeeded } from './imageupload.js';
 import { LEGAL_VERSIONS, LEGAL_URLS, currentLegal, clientIp, requireConsents, recordAcceptances } from './legal.js';
 import { ROOM_TYPE_NAMES, activeRoomTypeNames, roomTypeByName, isRoomTypeActive, getRoomTypeConfig, getRoomTypeDefaults, saveRoomTypes, resetRoomTypes, loadRoomTypes } from './roomtypes.js';
 import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
@@ -116,24 +117,28 @@ for (const [route, file] of Object.entries(LEGAL_PAGES)) {
 }
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
-const IMG_EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+const IMG_EXT = UPLOAD_MIME;
 // файлы принимаем в память и складываем в storage (S3 или диск)
 const memUpload = () => multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ok = Object.keys(IMG_EXT).includes(file.mimetype);
-    cb(ok ? null : new Error('Только JPG/PNG/WebP'), ok);
+    cb(ok ? null : new Error('Только JPG/PNG/WebP/HEIC'), ok);
   },
 });
 const upload = memUpload();
 const productUpload = memUpload();
 
 async function saveUpload(file, dir) {
-  const ext = IMG_EXT[file.mimetype] || '.jpg';
+  const heic = isHeic(file.mimetype);
+  const buffer = await convertHeicIfNeeded(file.buffer, file.mimetype);
+  // HEIC/HEIF храним как JPEG: расширение и MIME должны совпадать с содержимым.
+  const mimetype = heic ? 'image/jpeg' : file.mimetype;
+  const ext = IMG_EXT[mimetype] || '.jpg';
   const key = `${dir}/${crypto.randomUUID()}${ext}`;
-  const clean = await sanitizeImage(file.buffer);
-  await putBuffer(key, clean, file.mimetype);
+  const clean = await sanitizeImage(buffer);
+  await putBuffer(key, clean, mimetype);
   return key;
 }
 

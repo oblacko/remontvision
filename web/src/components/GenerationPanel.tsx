@@ -479,8 +479,8 @@ export function GenerationPanel({
 
   const acceptPhoto = (nextFile?: File) => {
     if (!nextFile) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(nextFile.type)) {
-      setPhotoError('Подойдёт файл JPG, PNG или WebP')
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(nextFile.type)) {
+      setPhotoError('Подойдёт файл JPG, PNG, WebP или HEIC')
       return
     }
     if (nextFile.size > 15 * 1024 * 1024) {
@@ -812,13 +812,13 @@ export function GenerationPanel({
               <h3 className="display-title mt-6 text-4xl sm:text-5xl">Загрузите фото своей комнаты</h3>
               <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Чёткий кадр при дневном свете — стены, пол и мебель в кадре. Подойдёт вертикальное, квадратное или горизонтальное фото, пропорции сохранятся.</p>
               <ul className="mt-8 space-y-3 border-t pt-6 text-sm">
-                <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />JPG, PNG или WebP до 15 МБ</li>
+                <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />JPG, PNG, WebP или HEIC до 15 МБ</li>
                 <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Любое соотношение сторон</li>
                 <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Фото используется только для создания дизайна</li>
               </ul>
             </div>
             <div onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
-              <input ref={photoInput} id="gen-photo" type="file" accept="image/jpeg,image/png,image/webp" className="peer sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptPhoto(event.target.files?.[0])} />
+              <input ref={photoInput} id="gen-photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="peer sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptPhoto(event.target.files?.[0])} />
               {photo ? (
                 <div className="gen-photo-preview relative mx-auto border border-foreground bg-foreground" style={{ '--photo-ratio': photoRatio } as PanelStyle}>
                   <img src={cleaned && cleanupRequested ? cleaned.url : photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
@@ -831,7 +831,7 @@ export function GenerationPanel({
                 <label htmlFor="gen-photo" className="flex min-h-80 cursor-pointer flex-col items-center justify-center border border-dashed border-foreground/40 bg-background px-4 text-center transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
                   <Upload className="mb-4 size-8 text-primary-text" />
                   <span className="text-base font-medium">Загрузить фото комнаты</span>
-                  <span className="mt-2 text-sm leading-6 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP · до 15 МБ</span>
+                  <span className="mt-2 text-sm leading-6 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP или HEIC · до 15 МБ</span>
                 </label>
               )}
               {photo && (
