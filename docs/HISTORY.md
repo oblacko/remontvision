@@ -4,6 +4,13 @@
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-09 — baseline-замер скорости пайплайна
+
+- Новый чистый модуль `src/speedreport.js` (без БД): `percentile(values, p)` (линейная интерполяция, p ∈ [0,1], пустой вход → null), `summarizeStages(renders, { limit })` (p50/p90/mean по `meta.<stage>.ms`, средняя себестоимость по `renders.cost_usd` + `meta.cost_breakdown`), `formatReport(summary)` (Markdown-таблица).
+- Скрипт `scripts/ops/speed-report.mjs`: read-only SELECT последних N успешных рендеров (`status='done'`), печатает и пишет отчёт в `docs/ops/speed-2026-11.md`; флаги `--limit N` / `--out path`; при отсутствии `RV_DATABASE_URL` или недоступной БД пишет методику с «н/д», не выдумывая цифры; секреты не печатает.
+- Baseline на локальной БД (34 успешных рендера): время этапов фиксируют только `art_direction` (p50 8.5 с), `design_direction` (p50 34 с) и `cleanup`; полное wall-clock время лежит в `renders.duration_ms` и в этот отчёт не входит. Цифры для прода — перезапуск на VPS командой `node --env-file=.env scripts/ops/speed-report.mjs`.
+- Тесты: `test/speedreport.test.js` (8 DB-free тестов: процентили, пропуск отсутствующих ms/cost, limit/порядок, пустой вход, формат отчёта).
+
 ## 2026-11-09 — реферальная программа «+2 кредита обоим»
 
 - Миграция `migrations/044_referral.sql`: таблицы `referral_codes` (один уникальный код на пользователя, `code UNIQUE`) и `referral_rewards` (`PRIMARY KEY(invitee_id)` — вознаграждение однократно на приглашённого).
