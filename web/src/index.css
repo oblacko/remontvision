@@ -147,6 +147,8 @@
     box-shadow: 4px 4px 0 oklch(var(--primary));
   }
   @media (min-width: 640px) { .kit-toast { right: auto; max-width: 24rem; } }
+  /* UI-кит: иконки — штрих 1.5 px. */
+  .lucide { stroke-width: 1.5; }
 }
 
 @keyframes rv-progress-slide {

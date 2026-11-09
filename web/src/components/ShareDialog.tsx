@@ -52,11 +52,11 @@ export function ShareDialog({ renderId, open, onClose }: { renderId: string; ope
   const encoded = encodeURIComponent(link)
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/60 p-4" role="dialog" aria-modal="true" aria-label="Поделиться дизайном" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="w-full max-w-md border bg-background p-5 shadow-xl">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-foreground/60 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Поделиться дизайном" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="max-h-[92svh] w-full max-w-md overflow-y-auto border-t-2 bg-background p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl sm:border sm:pb-5">
         <div className="flex items-start justify-between gap-4">
           <div><p className="eyebrow">Поделиться</p><h2 className="display-title mt-2 text-2xl">Красивый дизайн</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">По ссылке видно визуализацию и направление дизайна. Можно поставить лайк и оставить комментарий.</p></div>
-          <button type="button" onClick={onClose} className="flex size-10 shrink-0 items-center justify-center border hover:bg-muted" aria-label="Закрыть"><X className="size-4" /></button>
+          <button type="button" onClick={onClose} className="flex size-11 shrink-0 items-center justify-center border hover:bg-muted" aria-label="Закрыть"><X className="size-4" /></button>
         </div>
         {busy ? <div className="flex min-h-32 items-center justify-center"><LoaderCircle className="size-6 animate-spin text-primary-text" /></div> : error ? <p className="mt-4 border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</p> : (
           <>

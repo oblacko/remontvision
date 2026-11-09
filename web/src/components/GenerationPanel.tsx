@@ -854,7 +854,11 @@ export function GenerationPanel({
                   </div>
                 </div>
               ) : (
-                <label htmlFor="gen-photo" className="flex min-h-80 cursor-pointer flex-col items-center justify-center border border-dashed border-foreground/40 bg-background px-4 text-center transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
+                <label htmlFor="gen-photo" className="relative flex min-h-80 cursor-pointer flex-col items-center justify-center border border-dashed border-foreground/40 bg-background px-4 text-center transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
+                  <span className="pointer-events-none absolute -left-px -top-px size-5 border-l-2 border-t-2 border-foreground" aria-hidden="true" />
+                  <span className="pointer-events-none absolute -right-px -top-px size-5 border-r-2 border-t-2 border-foreground" aria-hidden="true" />
+                  <span className="pointer-events-none absolute -bottom-px -left-px size-5 border-b-2 border-l-2 border-foreground" aria-hidden="true" />
+                  <span className="pointer-events-none absolute -bottom-px -right-px size-5 border-b-2 border-r-2 border-foreground" aria-hidden="true" />
                   <Upload className="mb-4 size-8 text-primary-text" />
                   <span className="text-base font-medium">Загрузить фото комнаты</span>
                   <span className="mt-2 text-sm leading-6 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP или HEIC · до 15 МБ</span>
@@ -1384,7 +1388,7 @@ export function GenerationPanel({
               </div>
 
               <div>
-                <div className="flex gap-2 overflow-x-auto border-b pb-2">
+                <div className="flex gap-2 overflow-x-auto border-b pb-2" style={{ maskImage: 'linear-gradient(90deg,#000 88%,transparent)', WebkitMaskImage: 'linear-gradient(90deg,#000 88%,transparent)' }}>
                   {SUMMARY_TABS.map(([id, label]) => (
                     <button key={id} type="button" onClick={() => setOpenSummaryTab(openSummaryTab === id ? null : id)} className={`min-h-11 shrink-0 border px-3 text-xs transition-colors ${openSummaryTab === id ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
                   ))}
@@ -1554,8 +1558,8 @@ export function GenerationPanel({
 
       <ShareDialog renderId={current?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
       {creditOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/80 p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
-          <div className="w-full max-w-md border border-foreground bg-background p-6 shadow-[8px_8px_0_oklch(var(--foreground))]">
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-foreground/80 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
+          <div className="max-h-[92svh] w-full max-w-md overflow-y-auto border-t-2 border-foreground bg-background p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[8px_8px_0_oklch(var(--foreground))] sm:border sm:pb-6">
             <p className="eyebrow">Баланс</p>
             <h3 className="display-title mt-3 text-3xl">Кредиты закончились</h3>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">Каждый дизайн или платное редактирование стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
