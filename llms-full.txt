@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-09T17:04:21.958Z
+Generated: 2026-11-09T17:07:41.394Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2351,6 +2351,15 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-09 — клиентская конвертация HEIC/HEIF в JPEG (lazy heic2any)
+
+- Выяснено, что sharp на сервере собран без HEVC (`sharp.format.heif.input.fileSuffix` — только `['.avif']`), поэтому серверная конвертация HEIC не срабатывает для реальных фото с iPhone. Добавлена клиентская конвертация, чтобы пользователь не упирался в серверный фолбэк с ошибкой.
+- Новая зависимость `heic2any` (browser WASM, MIT) в `web/package.json`; подгружается лениво динамическим `import('heic2any')`, поэтому WASM-бандл (`heic2any-*.js`, ~1.35 МБ / 341 КБ gzip) — отдельный lazy-chunk, а основной бандл вырос на ~2 КБ.
+- Новый модуль `web/src/lib/heic.ts`: `shouldConvertHeic(file)` (true для `image/heic`/`image/heif` по MIME или по окончанию имени `.heic`/`.heif`, регистронезависимо) и `convertHeicToJpeg(file)` (heic2any → JPEG `quality 0.92`, имя `<basename>.jpg`, MIME `image/jpeg`; при ошибке — русское «Не удалось прочитать HEIC… „Наиболее совместимые“»).
+- `web/src/components/GenerationPanel.tsx`: `acceptPhoto` стал async и конвертирует HEIC/HEIF в JPEG до проверки типа/превью (работает и для file input, и для drag&drop; вставка осталась как была). Имя файла после конвертации обновляется на `.jpg`.
+- Серверный приём HEIC/HEIF и чистый 400-фолбэк из прошлого коммита сохранены (для прямых/crafted-загрузок в обход UI); подсказка «JPG, PNG, WebP или HEIC до 15 МБ» не менялась.
+- Тесты: `test/heic.test.js` (6 тестов `shouldConvertHeic`: MIME, расширение, jpeg/png/webp false, null/undefined false, регистронезависимость, пустой объект). Node 24 импортирует `.ts`-хелпер нативно (type stripping); heic2any в тестах не импортируется. Итог `npm test` 267/267 (1 skip).
 
 ## 2026-11-09 — приём HEIC/HEIF на загрузке с серверной конвертацией в JPEG
 

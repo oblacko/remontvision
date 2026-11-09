@@ -21,6 +21,7 @@ import { Link } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { useTasks } from '@/components/TaskDock'
 import { goal } from '@/lib/analytics'
+import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -477,23 +478,34 @@ export function GenerationPanel({
     return () => window.clearInterval(interval)
   }, [step])
 
-  const acceptPhoto = (nextFile?: File) => {
+  const acceptPhoto = async (nextFile?: File) => {
     if (!nextFile) return
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(nextFile.type)) {
+    let photoFile = nextFile
+    // HEIC/HEIF конвертируем в JPEG прямо в браузере, чтобы пользователь не
+    // упирался в серверный фолбэк с ошибкой (libheif на сервере без HEVC).
+    if (shouldConvertHeic(photoFile)) {
+      try {
+        photoFile = await convertHeicToJpeg(photoFile)
+      } catch (e) {
+        setPhotoError(e instanceof Error ? e.message : 'Не удалось прочитать HEIC')
+        return
+      }
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(photoFile.type)) {
       setPhotoError('Подойдёт файл JPG, PNG, WebP или HEIC')
       return
     }
-    if (nextFile.size > 15 * 1024 * 1024) {
+    if (photoFile.size > 15 * 1024 * 1024) {
       setPhotoError('Файл больше 15 МБ. Выберите фото меньшего размера')
       return
     }
     releaseUrl(photo)
-    const url = URL.createObjectURL(nextFile)
+    const url = URL.createObjectURL(photoFile)
     rememberUrl(url)
     setPhoto(url)
-    setFile(nextFile)
+    setFile(photoFile)
     setPhotoRatio(4 / 3)
-    setPhotoName(nextFile.name)
+    setPhotoName(photoFile.name)
     setPhotoError(''); setGenError('')
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setRoomType(null)
