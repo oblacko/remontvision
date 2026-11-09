@@ -26,6 +26,7 @@ import { useTasks } from '@/components/TaskDock'
 import { goal } from '@/lib/analytics'
 import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
 import { buildMoveInstruction, buildObjectAction, buildObjectText, moveDirection, ruLabel } from '@/lib/objects'
+import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -285,6 +286,7 @@ export function GenerationPanel({
   const [objectDelta, setObjectDelta] = useState<{ dx: number; dy: number } | null>(null)
   const [objectText, setObjectText] = useState('')
   const [objectsNotice, setObjectsNotice] = useState('')
+  const [passportNotice, setPassportNotice] = useState('')
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
@@ -1530,6 +1532,39 @@ export function GenerationPanel({
                         {current.analysis.final.next_steps?.length ? <div><dt className="eyebrow">Что дальше</dt><dd className="mt-1"><ul className="list-disc space-y-1 pl-5">{current.analysis.final.next_steps.map((step, index) => <li key={`final-step-${index}`}>{step}</li>)}</ul></dd></div> : null}
                       </dl>
                     ) : <p className="border-y py-4 text-sm text-muted-foreground">Итог ещё не собран. Нажмите «Готово · итог».</p>}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="action-secondary min-h-11 px-4 text-sm"
+                        onClick={() => {
+                          const text = buildMasterBrief({
+                            roomType,
+                            style: current.styleName,
+                            dimensions: current.dimensionsEstimate,
+                            surfaces: current.analysis?.surfaces,
+                            electrical: current.analysis?.electrical,
+                            repairScope: current.repairScope,
+                            nextSteps: current.analysis?.final?.next_steps || current.analysis?.architect?.summary?.next_steps,
+                            concept: current.analysis?.final?.concept,
+                          })
+                          downloadText(`tz-${current.roomId}.txt`, text)
+                          goal('master_brief_download', { room_id: current.roomId })
+                        }}
+                      >
+                        <Download className="size-4" /> ТЗ для мастера (.txt)
+                      </button>
+                      <button
+                        type="button"
+                        className="action-secondary min-h-11 px-4 text-sm"
+                        onClick={() => {
+                          goal('passport_click', { room_id: current.roomId })
+                          setPassportNotice('Готовим PDF-паспорт ремонта — скоро. Пока можно скачать ТЗ для мастера выше.')
+                        }}
+                      >
+                        Паспорт ремонта (PDF) — скоро
+                      </button>
+                    </div>
+                    {passportNotice && <p className="mt-2 text-xs leading-5 text-muted-foreground">{passportNotice}</p>}
                   </section>
                 )}
               </div>
