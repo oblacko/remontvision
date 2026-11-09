@@ -167,7 +167,7 @@ const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
   procurement: 'подбор товаров', procurement_refund: 'возврат за подбор товаров',
   render: 'генерация', iterate: 'правка', iterate_refund: 'возврат кредита', refund: 'возврат',
-  admin_adjust: 'корректировка', admin_test: 'корректировка',
+  admin_adjust: 'корректировка', admin_test: 'корректировка', referral: 'реферальная программа',
 }
 
 function AdminImage({ src, kind, alt = '' }: { src?: string | null; kind: 'renders' | 'files'; alt?: string }) {

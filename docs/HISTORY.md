@@ -4,6 +4,16 @@
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-09 — реферальная программа «+2 кредита обоим»
+
+- Миграция `migrations/044_referral.sql`: таблицы `referral_codes` (один уникальный код на пользователя, `code UNIQUE`) и `referral_rewards` (`PRIMARY KEY(invitee_id)` — вознаграждение однократно на приглашённого).
+- Новый модуль `src/referral.js`: `generateCode()` (8 символов из алфавита без 0/O/1/I, crypto-random), `normalizeCode` (верхний регистр + trim), `getOrCreateCode(userId)` (с повтором при коллизии), `resolveCode(code)` (код → owner user_id или null), `rewardDecision({ ownerId, inviteeId, alreadyRewarded })` (чистое решение: `self`/`already`/`ok`), `rewardPair(ownerId, inviteeId)` (атомарно: вставка `referral_rewards` с `ON CONFLICT DO NOTHING`, при вставке — по +2 кредита обоим через `grantCredits(..., 'referral', client)`), хелперы куки `rv_ref` (`referralCookieValue`/`setReferralCookie`/`clearReferralCookie`).
+- `src/payments.js`: `grantCredits` принимает необязательный `client` транзакции, чтобы начисление коммитилось вместе с reward-строкой (без клиента — как раньше, через pool).
+- `src/db.js`: `referralCodeByUser`, `insertReferralCode` (`ON CONFLICT DO NOTHING`), `referralCodeByCode`, `referralInvitedCount`.
+- `src/server.js`: `GET /r/:code` (валидный код → cookie `rv_ref` на 30 дней, редирект на `/`; невалидный — тоже на `/`); `GET /api/referral` (auth) → `{ code, link, invited }`; после регистрации по e-mail и по Яндекс OAuth (`isNew`) читается `rv_ref`, начисляется награда, кука стирается; ошибка начисления пишется в `referral_error` и не ломает регистрацию.
+- UI `web/src/pages/Cabinet.tsx`: блок «Пригласите друга — +2 кредита обоим» во вкладке «Кредиты» со ссылкой и кнопкой копирования, toast «Ссылка скопирована»; подпись причины `referral` в истории кредитов. В админке (`web/src/pages/Admin.tsx`) добавлена метка причины `referral` → «реферальная программа».
+- Тесты: `test/referral.test.js` (7 DB-free тестов: формат/длина/без похожих символов/уникальность `generateCode`, нормализация кода, решения `rewardDecision`). Итог `npm test` 283/283 (1 skip).
+
 ## 2026-11-09 — уведомление «Готово» по e-mail
 
 - Новый модуль `src/mailer.js`: общий транспорт писем (Resend API → SMTP → dev-лог) с `sendEmail({ to, subject, text, html, template })`, возвращает `true`/`false`. Вынесен из `src/auth.js`, чтобы OTP-коды и уведомления не дублировали выбор транспорта. Поведение OTP сохранено: template id для Resend (переменные кода/ttl), dev-лог кода при отсутствии транспорта; SMTP теперь получает и HTML-часть (контент тот же).

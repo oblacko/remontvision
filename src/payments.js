@@ -265,7 +265,15 @@ export async function syncPayment(providerPaymentId, options = {}) {
 }
 
 // ---------- кредиты ----------
-export async function grantCredits(userId, delta, reason, paymentId = null) {
+// Необязательный client — транзакция (используется в referral.js, чтобы начисление
+// коммитилось вместе с reward-строкой); без client — обычное начисление через pool.
+export async function grantCredits(userId, delta, reason, paymentId = null, client = null) {
+  if (client) {
+    await client.query(
+      `INSERT INTO credit_txn (user_id, delta, reason, payment_id) VALUES ($1, $2, $3, $4)`,
+      [userId, delta, reason, paymentId]);
+    return;
+  }
   await q.addCreditTxn(userId, delta, reason, paymentId);
 }
 

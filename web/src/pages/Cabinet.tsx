@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Download, Expand, LoaderCircle, LogOut, Search, Share2, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowUpRight, Copy, Download, Expand, Gift, LoaderCircle, LogOut, Search, Share2, Sparkles, Trash2, X } from 'lucide-react'
 import { Link } from 'react-router'
 import { Logo } from '@/components/Logo'
 import { ShareDialog } from '@/components/ShareDialog'
@@ -16,6 +16,7 @@ type GenRow = {
 }
 type CreditRow = { id: number; delta: number; reason: string; payment_id: number | null; render_id: string | null; note: string | null; created_at: string }
 type Pack = { id: string; title: string; credits: number; price_kopecks: number }
+type Referral = { code: string; link: string; invited: number }
 type GenItem = { name: string; price: number; qty: number; unit: string; url: string; link_label?: string; direct_url?: boolean; source?: string; match_score?: number; presentation_status?: 'curated' | 'matched' | 'verified' }
 type ProductOffer = { id: string; name: string; price: number | null; currency: string; merchant?: string | null; url: string | null; image_url?: string | null; erid?: string | null }
 type ProductMatch = { item: { label: string; category: string }; offers: ProductOffer[]; note?: string }
@@ -32,6 +33,7 @@ const reasonNames: Record<string, string> = {
   render: 'создание дизайна', iterate: 'правка', iterate_refund: 'возврат кредита',
   procurement: 'подбор товаров', procurement_refund: 'возврат за подбор товаров',
   refund: 'возврат', admin_adjust: 'корректировка администратором', admin_test: 'корректировка',
+  referral: 'реферальная программа',
 }
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 const tierNames: Record<string, string> = { start: 'Старт', comfort: 'Комфорт', premium: 'Премиум', atelier: 'Ателье' }
@@ -53,6 +55,7 @@ export default function Cabinet() {
   const [generations, setGenerations] = useState<GenRow[]>([])
   const [credits, setCredits] = useState<CreditRow[]>([])
   const [packs, setPacks] = useState<Pack[]>([])
+  const [referral, setReferral] = useState<Referral | null>(null)
   const [tab, setTab] = useState<'history' | 'credits'>(() => location.hash.includes('credits') ? 'credits' : 'history')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'done' | 'error'>('all')
@@ -65,6 +68,8 @@ export default function Cabinet() {
   const [shareRenderId, setShareRenderId] = useState('')
   const [fullscreen, setFullscreen] = useState(false)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+  const toastTimer = useRef<number | null>(null)
   const [buyConsent, setBuyConsent] = useState(false)
   const [buying, setBuying] = useState('')
   const [loginStep, setLoginStep] = useState<'email' | 'code'>('email')
@@ -80,15 +85,17 @@ export default function Cabinet() {
     setMe(await r.json()); return true
   }
   const loadData = async () => {
-    const [g, c, p] = await Promise.all([
+    const [g, c, p, ref] = await Promise.all([
       fetch('/api/my/generations').then(r => r.ok ? r.json() : []),
       fetch('/api/credits').then(r => r.ok ? r.json() : { balance: 0, history: [] }),
       fetch('/api/packs').then(r => r.ok ? r.json() : []),
+      fetch('/api/referral').then(r => r.ok ? r.json() : null),
     ])
     setGenerations(Array.isArray(g) ? g : [])
     setCredits(Array.isArray(c.history) ? c.history : [])
     if (typeof c.balance === 'number' && me) setMe({ ...me, balance: c.balance })
     setPacks(Array.isArray(p) ? p : [])
+    setReferral(ref && typeof ref.link === 'string' ? ref : null)
   }
 
   useEffect(() => {
@@ -280,6 +287,27 @@ export default function Cabinet() {
     await fetch('/api/auth/logout', { method: 'POST' })
     setMe(null); setGenerations([]); setCredits([]); setSelectedRoom(null); setRoomData(null)
   }
+  const showToast = (text: string) => {
+    setToast(text)
+    if (toastTimer.current) window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(''), 2000)
+  }
+  const copyReferral = async () => {
+    if (!referral) return
+    try {
+      await navigator.clipboard.writeText(referral.link)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = referral.link
+      el.style.position = 'fixed'
+      el.style.opacity = '0'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    showToast('Ссылка скопирована')
+  }
   const buyPack = async (pack: Pack) => {
     if (!buyConsent) return setError('Отметьте акцепт оферты перед оплатой')
     setBuying(pack.id); setError('')
@@ -411,6 +439,15 @@ export default function Cabinet() {
           <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_24rem]">
             <section>
               <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="text-xs text-muted-foreground">1 кредит = дизайн (в каждом 3 бесплатные правки) или подбор товаров</span></div>
+              <div className="mt-6 border p-4">
+                <div className="flex items-start gap-3"><Gift className="size-5 shrink-0 text-primary-text" /><div className="min-w-0"><p className="text-sm font-medium">Пригласите друга — +2 кредита обоим</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Друг получит 2 кредита за регистрацию по ссылке, вы — ещё 2 за приглашение.</p></div></div>
+                {referral ? (
+                  <div className="mt-4">
+                    <div className="flex gap-2"><input readOnly value={referral.link} onFocus={e => e.currentTarget.select()} className="h-11 min-w-0 flex-1 border bg-muted/50 px-3 text-xs outline-none focus:border-primary" aria-label="Реферальная ссылка" /><button type="button" onClick={copyReferral} className="action-secondary min-h-11 shrink-0 px-3 text-sm"><Copy className="size-4" /><span className="hidden sm:inline">Скопировать</span></button></div>
+                    <p className="mt-2 text-xs text-muted-foreground">{referral.invited > 0 ? `Приглашено по ссылке: ${referral.invited}` : 'Поделитесь ссылкой — вы оба получите по 2 кредита.'}</p>
+                  </div>
+                ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем ссылку…</p>}
+              </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {packs.map(pack => <div key={pack.id} className={`border p-4${pack.id === 'flat' ? ' bg-secondary' : ''}`}><div className="flex items-end justify-between gap-2"><span className="display-title text-4xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'}</span></div><p className="mt-4 text-xl font-light">{rub(pack.price_kopecks / 100)}</p><p className="mt-1 text-xs text-muted-foreground">{pack.title}</p>{pack.id === 'flat' && <p className="mt-1 inline-block border border-primary-text px-2 py-0.5 text-xs text-primary-text">Выгодно</p>}<button type="button" onClick={() => buyPack(pack)} disabled={buying === pack.id} className="action-primary mt-4 w-full">{buying === pack.id ? 'Переходим…' : 'Купить'} <ArrowUpRight className="size-4" /></button></div>)}
               </div>
@@ -457,6 +494,7 @@ export default function Cabinet() {
         </div>
       )}
       <ShareDialog renderId={shareRenderId || roomData?.render?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
+      {toast && <div className="fixed bottom-4 left-1/2 z-[90] -translate-x-1/2 whitespace-nowrap border border-primary bg-background px-4 py-2 text-sm shadow-lg" role="status">{toast}</div>}
     </div>
   )
 }

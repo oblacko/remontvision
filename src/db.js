@@ -259,6 +259,17 @@ export const q = {
                 WHERE ct.user_id = $1 ORDER BY ct.created_at DESC, ct.id DESC LIMIT 100`, [userId])
       .then(r => r.rows),
 
+  // реферальная программа
+  referralCodeByUser: userId =>
+    pool.query(`SELECT code FROM referral_codes WHERE user_id = $1`, [userId]).then(r => r.rows[0] || null),
+  insertReferralCode: (userId, code) =>
+    pool.query(`INSERT INTO referral_codes (user_id, code) VALUES ($1, $2)
+                ON CONFLICT DO NOTHING RETURNING code`, [userId, code]).then(r => r.rows[0] || null),
+  referralCodeByCode: code =>
+    pool.query(`SELECT user_id FROM referral_codes WHERE code = $1`, [code]).then(r => r.rows[0] || null),
+  referralInvitedCount: userId =>
+    pool.query(`SELECT COUNT(*)::int AS n FROM referral_rewards WHERE owner_id = $1`, [userId]).then(r => r.rows[0].n),
+
   // комнаты юзера (история в UI)
   myRooms: userId =>
     pool.query(`SELECT id, style, budget, price_tier, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])

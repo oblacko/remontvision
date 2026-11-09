@@ -10,6 +10,7 @@ import { analyzeRoomBrief } from './artdirector.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
 import { startYandex, completeYandexLogin, appBaseUrl, yandexConfigured } from './oauth.js';
+import { getOrCreateCode, resolveCode, rewardPair, referralCookieValue, setReferralCookie, clearReferralCookie } from './referral.js';
 import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
@@ -99,6 +100,14 @@ const webIndexPath = path.join(WEB_DIST, 'index.html');
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.all(['/cabinet', '/cabinet/', '/cabinet/paid', '/cabinet/paid/', '/cabinet/fail', '/cabinet/fail/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/s/:token', (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
+
+// Реферальная ссылка: ставим cookie rv_ref на 30 дней и ведём на главную.
+// Невалидный код тоже ведёт на главную (отдельной страницы 404 нет).
+app.get('/r/:code', h(async (req, res) => {
+  const ownerId = await resolveCode(req.params.code);
+  if (ownerId) setReferralCookie(res, req.params.code);
+  res.redirect(302, '/');
+}));
 app.get(['/room/:id', '/room/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
@@ -156,6 +165,21 @@ function requireAdmin(req, res) {
     return false;
   }
   return true;
+}
+
+// Реферальная программа: после создания нового пользователя начисляем +2 обоим,
+// если в куке был валидный rv_ref. Ошибка начисления не ломает регистрацию.
+async function applyReferral(userId, req, res) {
+  const rawCode = referralCookieValue(req);
+  if (!rawCode) return;
+  try {
+    const ownerId = await resolveCode(rawCode);
+    if (ownerId) await rewardPair(ownerId, userId);
+  } catch (e) {
+    log({ event: 'referral_error', user_id: userId, error: String(e.message || e).slice(0, 300) });
+  } finally {
+    clearReferralCookie(res);
+  }
 }
 
 const visitorKey = req => crypto.createHash('sha256')
@@ -318,6 +342,7 @@ app.post('/api/auth/verify', rateLimit, h(async (req, res) => {
     documents: ['offer', 'privacy', 'cross_border'],
   });
   setSessionCookie(res, token, req);
+  if (isNew) await applyReferral(user.id, req, res);
   res.json({ ok: true, email: user.email, is_new: Boolean(isNew) });
 }));
 
@@ -354,6 +379,7 @@ app.get('/api/auth/yandex/callback', async (req, res) => {
       req,
       documents: ['offer', 'privacy', 'cross_border'],
     });
+    if (isNew) await applyReferral(user.id, req, res);
     const target = new URL(`${appBaseUrl(req)}${redirectTo}`);
     target.searchParams.set('auth', 'yandex');
     target.searchParams.set('new', isNew ? '1' : '0');
@@ -373,6 +399,14 @@ app.get('/api/me', h(async (req, res) => {
     q.hasPurchased(req.user.id),
   ]);
   res.json({ email: req.user.email, balance, has_purchased: hasPurchased });
+}));
+
+// Реферальная ссылка текущего пользователя + счётчик приглашённых.
+app.get('/api/referral', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const code = await getOrCreateCode(req.user.id);
+  const invited = await q.referralInvitedCount(req.user.id);
+  res.json({ code, link: `${APP_URL}/r/${code}`, invited });
 }));
 
 app.get('/api/my/rooms', h(async (req, res) => {
