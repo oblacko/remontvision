@@ -101,13 +101,6 @@ app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webInde
 app.all(['/cabinet', '/cabinet/', '/cabinet/paid', '/cabinet/paid/', '/cabinet/fail', '/cabinet/fail/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/s/:token', (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 
-// Реферальная ссылка: ставим cookie rv_ref на 30 дней и ведём на главную.
-// Невалидный код тоже ведёт на главную (отдельной страницы 404 нет).
-app.get('/r/:code', h(async (req, res) => {
-  const ownerId = await resolveCode(req.params.code);
-  if (ownerId) setReferralCookie(res, req.params.code);
-  res.redirect(302, '/');
-}));
 app.get(['/room/:id', '/room/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
@@ -153,6 +146,15 @@ async function saveUpload(file, dir) {
 
 // async-обработчики: единая точка 500
 const h = fn => (req, res, next) => fn(req, res, next).catch(next);
+
+// Реферальная ссылка: ставим cookie rv_ref на 30 дней и ведём на главную.
+// Невалидный код тоже ведёт на главную (отдельной страницы 404 нет).
+// Важно: маршрут объявлен после `const h` — иначе TDZ-падение на старте.
+app.get('/r/:code', h(async (req, res) => {
+  const ownerId = await resolveCode(req.params.code);
+  if (ownerId) setReferralCookie(res, req.params.code);
+  res.redirect(302, '/');
+}));
 
 function requireAuth(req, res) {
   if (!req.user) { res.status(401).json({ error: 'Войдите, чтобы продолжить' }); return false; }
