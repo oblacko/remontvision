@@ -6,6 +6,7 @@ import { roomTypeByName } from './roomtypes.js';
 import { getArchitectPrompt } from './architectprompts.js';
 import { callAgentJson } from './openrouteragent.js';
 import { validateRepairScope } from './agentcontracts.js';
+import { isArtDirectionEnabled } from './modelconfig.js';
 
 // Категории, которые арт-директор может просить из каталога. Локальный список,
 // чтобы не зависеть от searchvision.js (он может отличаться в разных сборках).
@@ -15,7 +16,6 @@ const PRODUCT_PLAN_CATEGORIES = [
   'toilet', 'cabinet', 'sideboard', 'desk', 'office_chair', 'storage', 'curtain', 'mirror',
 ];
 
-export const ART_DIRECTION_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.ART_DIRECTION_ENABLED ?? 'true'));
 // Модель арт-директора. Пусто — VISION_MODEL (админка/модели). Можно задать
 // отдельно, например deepseek/deepseek-v4.1-flash-1017, чтобы не трогать остальной vision.
 const ART_DIRECTOR_MODEL = process.env.ART_DIRECTOR_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
@@ -248,8 +248,9 @@ export async function buildArtDirection({
   dimensions = null,
   keepFurniture = true,
   sessionId = null,
+  modelKey = null,
 } = {}) {
-  if (!ART_DIRECTION_ENABLED || !imageDataUrl) return null;
+  if (!isArtDirectionEnabled(modelKey) || !imageDataUrl) return null;
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || roomType || 'room';
   const hasDimensions = dimensions

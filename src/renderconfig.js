@@ -2,31 +2,46 @@
 // в базовый кадр (shoppable-рендер). По умолчанию выключено (design-first).
 export const RENDER_CONFIG_KEY = 'render.product_refs.v1';
 
-export const DEFAULT_RENDER_CONFIG = {
-  product_refs_enabled: false,
-  max_products: 3,
-  // Подбор реальных товаров после генерации. Не влияет на базовый кадр.
-  product_matching_enabled: true,
-};
-
-let cache = { ...DEFAULT_RENDER_CONFIG };
-
 const clampInt = (value, min, max, fallback) => {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.max(min, Math.min(max, Math.round(number)));
 };
 
+// Разумный потолок паузы между image-вызовами: больше двух минут не нужно.
+export const IMAGE_MIN_GAP_MAX_MS = 120_000;
+// Фолбэк на env сохранён: пока app_settings не задаёт image_min_gap_ms,
+// берём IMAGE_MIN_GAP_MS (как раньше в openrouter.js), иначе 10 секунд.
+const ENV_IMAGE_MIN_GAP_MS = clampInt(process.env.IMAGE_MIN_GAP_MS, 0, IMAGE_MIN_GAP_MAX_MS, 10_000);
+
+export const DEFAULT_RENDER_CONFIG = {
+  product_refs_enabled: false,
+  max_products: 3,
+  // Подбор реальных товаров после генерации. Не влияет на базовый кадр.
+  product_matching_enabled: true,
+  // Минимальная пауза между вызовами image-модели (анти-429). 0 — без паузы.
+  image_min_gap_ms: ENV_IMAGE_MIN_GAP_MS,
+};
+
+let cache = { ...DEFAULT_RENDER_CONFIG };
+
 const validate = (input = {}) => {
   const out = {};
   if ('product_refs_enabled' in input) out.product_refs_enabled = Boolean(input.product_refs_enabled);
   if ('product_matching_enabled' in input) out.product_matching_enabled = Boolean(input.product_matching_enabled);
   if ('max_products' in input) out.max_products = clampInt(input.max_products, 2, 4, DEFAULT_RENDER_CONFIG.max_products);
+  if ('image_min_gap_ms' in input) out.image_min_gap_ms = clampInt(input.image_min_gap_ms, 0, IMAGE_MIN_GAP_MAX_MS, DEFAULT_RENDER_CONFIG.image_min_gap_ms);
   return out;
 };
 
 export function getRenderConfig() {
   return { ...cache };
+}
+
+// Пауза между image-вызовами, как её видит openrouter.js. Читает текущий кеш,
+// поэтому не требует БД и безопасно импортируется из openrouter.js (без цикла).
+export function getImageMinGapMs() {
+  return clampInt(cache.image_min_gap_ms, 0, IMAGE_MIN_GAP_MAX_MS, DEFAULT_RENDER_CONFIG.image_min_gap_ms);
 }
 
 export function getRenderDefaults() {

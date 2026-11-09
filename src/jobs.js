@@ -286,6 +286,7 @@ async function processRender(renderId) {
             dimensions: roomDimensions,
             keepFurniture,
             sessionId: `render:${renderId}`,
+            modelKey: render.model_key || getModelConfig().render,
           });
           if (ad && keepFurniture && ad.existingFurniture === null) {
             // Старый промт дизайнера мог не вернуть existing_furniture — уточняем брифом.

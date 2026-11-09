@@ -28,7 +28,7 @@ import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
 import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
-import { getModelConfig, loadModelConfig, saveModelConfig, resolveModelSelection, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
+import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
 import { validateModelOptions, modelCaps } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
@@ -667,6 +667,7 @@ app.post('/api/admin/models', h(async (req, res) => {
   const parsed = validateModelInput(req.body);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
   const row = await q.createOrUpdateRenderModel(parsed.value);
+  await loadRenderModels();
   res.json(row);
 }));
 
@@ -674,6 +675,7 @@ app.post('/api/admin/models/:id/toggle', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const row = await q.toggleRenderModel(String(req.params.id));
   if (!row) return res.status(404).json({ error: 'Не найдено' });
+  await loadRenderModels();
   res.json(row);
 }));
 
@@ -2272,6 +2274,7 @@ async function main() {
   await migrate();          // накат миграций Postgres
   await seedStyleReferences(); // сгенерированные референсы стилей (style-refs/seed.json)
   await loadModelConfig();  // модели из app_settings / env
+  await loadRenderModels(); // строки render_models: per-model флаги (art_direction_enabled)
   await loadProxyConfig();  // прокси из app_settings / env
   await loadPromptConfig(); // редактируемые правила промта из app_settings
   await loadCleanupConfig(); // очистка комнаты: модель/промт из app_settings

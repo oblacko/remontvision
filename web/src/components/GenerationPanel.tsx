@@ -1024,7 +1024,7 @@ export function GenerationPanel({
             </p>
             <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
               <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0">Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов.</span>
+              <span className="min-w-0">Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов.</span>
             </p>
           </div>
         )}

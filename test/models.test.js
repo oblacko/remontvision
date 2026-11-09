@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // Чистые хелперы без БД — не импортируем src/db.js.
-const { resolveModelSelection, inheritPrivate, modelCreditsOrOne, validateModelInput, privateAllowed } = await import('../src/modelconfig.js');
+const { resolveModelSelection, inheritPrivate, modelCreditsOrOne, validateModelInput, privateAllowed, isArtDirectionEnabled, setRenderModelsForTests } = await import('../src/modelconfig.js');
 
 const models = [
   { id: 'flux-3-image', label: 'FLUX 3 Image', model_id: 'black-forest-labs/flux-3-image', credits: 1, active: true, sort: 0 },
@@ -135,4 +135,36 @@ test('private is allowed only with a purchase when requested', () => {
   assert.equal(privateAllowed(true, false), false);
   assert.equal(privateAllowed('1', false), false);
   assert.equal(privateAllowed('true', false), false);
+});
+
+// ---------- isArtDirectionEnabled (per-model флаг, env-фолбэк, без БД) ----------
+
+test('model flag false disables art direction even when env is true', () => {
+  setRenderModelsForTests([
+    { id: 'flux-3-image', model_id: 'black-forest-labs/flux-3-image', art_direction_enabled: false, active: true },
+    { id: 'seedream', model_id: 'bytedance/seedream', art_direction_enabled: true, active: true },
+  ]);
+  assert.equal(isArtDirectionEnabled('flux-3-image'), false);
+  assert.equal(isArtDirectionEnabled('black-forest-labs/flux-3-image'), false);
+  assert.equal(isArtDirectionEnabled('seedream'), true);
+});
+
+test('unknown model key falls back to env flag', () => {
+  setRenderModelsForTests([{ id: 'flux-3-image', model_id: 'black-forest-labs/flux-3-image', art_direction_enabled: true, active: true }]);
+  assert.equal(isArtDirectionEnabled('missing'), true);
+  assert.equal(isArtDirectionEnabled(null), true);
+  assert.equal(isArtDirectionEnabled(undefined), true);
+});
+
+test('env false disables art direction for unknown keys', () => {
+  const previous = process.env.ART_DIRECTION_ENABLED;
+  process.env.ART_DIRECTION_ENABLED = '0';
+  try {
+    setRenderModelsForTests([]);
+    assert.equal(isArtDirectionEnabled('missing'), false);
+    assert.equal(isArtDirectionEnabled(null), false);
+  } finally {
+    if (previous === undefined) delete process.env.ART_DIRECTION_ENABLED;
+    else process.env.ART_DIRECTION_ENABLED = previous;
+  }
 });

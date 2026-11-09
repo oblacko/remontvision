@@ -127,3 +127,48 @@ export async function saveModelConfig({ render, edit, vision, resolution, aspect
   await q.setSetting('model.aspect_ratio', state.aspectRatio);
   return getModelConfig();
 }
+
+// ---------- per-model флаги (render_models) ----------
+
+// Кеш строк render_models для per-model флагов (art_direction_enabled и пр.).
+// Наполняется loadRenderModels() при старте и после правок моделей в админке.
+// Ключи — и короткий id, и полный model_id (slug OpenRouter).
+const renderModelsById = new Map();
+const renderModelsByModelId = new Map();
+
+function indexRenderModels(rows) {
+  renderModelsById.clear();
+  renderModelsByModelId.clear();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row || typeof row !== 'object') continue;
+    if (row.id) renderModelsById.set(String(row.id), row);
+    if (row.model_id) renderModelsByModelId.set(String(row.model_id), row);
+  }
+}
+
+// Для DB-free тестов: подменить набор строк render_models.
+export function setRenderModelsForTests(rows) {
+  indexRenderModels(rows);
+}
+
+export async function loadRenderModels() {
+  try {
+    const { q } = await import('./db.js');
+    indexRenderModels(await q.listRenderModels(false));
+  } catch { /* таблицы может ещё не быть — фолбэк на env */ }
+}
+
+function findRenderModelRow(key) {
+  if (key === undefined || key === null || key === '') return null;
+  const k = String(key);
+  return renderModelsById.get(k) || renderModelsByModelId.get(k) || null;
+}
+
+// Арт-направление включается per-model через render_models.art_direction_enabled.
+// Фолбэк — env ART_DIRECTION_ENABLED, когда ключ модели не найден (старые рендеры
+// без model_key или строка ещё не загружена).
+export function isArtDirectionEnabled(modelKey) {
+  const row = findRenderModelRow(modelKey);
+  if (row) return row.art_direction_enabled !== false;
+  return !/^(0|false|no|off)$/i.test(String(process.env.ART_DIRECTION_ENABLED ?? 'true'));
+}

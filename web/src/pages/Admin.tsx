@@ -260,7 +260,7 @@ export default function Admin() {
   const [cleanupConfig, setCleanupConfig] = useState<CleanupConfig | null>(null)
   const [cleanupBusy, setCleanupBusy] = useState(false)
   const [cleanupNotice, setCleanupNotice] = useState('')
-  const [renderConfig, setRenderConfig] = useState<{ product_refs_enabled: boolean; max_products: number; product_matching_enabled: boolean } | null>(null)
+  const [renderConfig, setRenderConfig] = useState<{ product_refs_enabled: boolean; max_products: number; product_matching_enabled: boolean; image_min_gap_ms: number } | null>(null)
   const [renderBusy, setRenderBusy] = useState(false)
   const [renderNotice, setRenderNotice] = useState('')
   const [articles, setArticles] = useState<Array<{ id: number; slug: string; title: string; style?: string | null; room_type?: string | null; status: string; created_at: string }>>([])
@@ -1557,6 +1557,18 @@ export default function Admin() {
                     <p className="text-xs text-muted-foreground">Источник — catalog-service (Hoff). Включать только после A/B-проверки, что качество не проседает.</p>
                   </div>
                 ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
+              </div>
+              <div>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div><p className="eyebrow">Скорость</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Пауза между вызовами image-модели снижает риск 429 от OpenRouter. Меняется на следующей генерации без рестарта.</p></div>
+                </div>
+                {renderConfig ? (
+                  <div className="mt-4">
+                    <label htmlFor="image-min-gap" className="eyebrow mb-2 block">Минимальный интервал между image-вызовами, мс</label>
+                    <input id="image-min-gap" type="number" min={0} step={1000} value={renderConfig.image_min_gap_ms} onChange={e => setRenderConfig({ ...renderConfig, image_min_gap_ms: Math.max(0, Math.min(120000, Number(e.target.value) || 0)) })} className="h-11 w-56 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                    <p className="mt-2 text-xs text-muted-foreground">0 — без паузы; меньше 10 000 может участить 429.</p>
+                  </div>
+                ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем настройки…</p>}
               </div>
             </div>
           )}

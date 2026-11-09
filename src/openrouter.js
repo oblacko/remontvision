@@ -9,6 +9,7 @@ import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 import { getPromptConfig } from './promptconfig.js';
 import { buildScalePlan } from './scaleplan.js';
 import { layoutPlanToText } from './layoutagent.js';
+import { getImageMinGapMs } from './renderconfig.js';
 import { proxyFetch } from './proxy.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
@@ -28,11 +29,10 @@ export function log(obj) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let imageChain = Promise.resolve();
 let lastImageStart = 0;
-const IMAGE_MIN_GAP_MS = Math.max(0, Number(process.env.IMAGE_MIN_GAP_MS || 10_000));
 
 function withImageSlot(fn) {
   const run = imageChain.then(async () => {
-    const wait = Math.max(0, IMAGE_MIN_GAP_MS - (Date.now() - lastImageStart));
+    const wait = Math.max(0, getImageMinGapMs() - (Date.now() - lastImageStart));
     if (wait) await sleep(wait);
     lastImageStart = Date.now();
     return fn();

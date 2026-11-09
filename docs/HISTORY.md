@@ -4,6 +4,18 @@
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-09 — конфигурируемая скорость и per-model арт-директор
+
+- `src/renderconfig.js`: добавлена настройка `image_min_gap_ms` (дефолт 10000 мс, целое, clamp 0–120000) в дефолты/валидацию/сохранение; экспорт `getImageMinGapMs()` (читает кеш, без БД). Фолбэк на env `IMAGE_MIN_GAP_MS` сохранён, пока `app_settings` не задаёт поле.
+- `src/openrouter.js`: убран модульный `IMAGE_MIN_GAP_MS`; `withImageSlot` теперь берёт паузу через `getImageMinGapMs()` на каждом вызове — настройку можно менять в админке без рестарта.
+- `src/modelconfig.js`: кеш строк `render_models` (`setRenderModelsForTests`/`loadRenderModels`) и `isArtDirectionEnabled(modelKey)` — per-model флаг `render_models.art_direction_enabled`, фолбэк на env `ART_DIRECTION_ENABLED`, когда ключ неизвестен.
+- `src/artdirector.js`: `buildArtDirection` принимает `modelKey` и пропускает арт-директора, если флаг модели выключен (вместо глобальной константы `ART_DIRECTION_ENABLED`).
+- `src/jobs.js`: в `buildArtDirection` передаётся `render.model_key || getModelConfig().render`.
+- `src/server.js`: `loadRenderModels()` при старте и после создания/переключения моделей в админке — смена флага действует на следующие генерации без рестарта.
+- UI: в админке «Генерация → Скорость» добавлено числовое поле «Минимальный интервал между image-вызовами, мс» (min 0, step 1000, подсказка «0 — без паузы; меньше 10 000 может участить 429»). В прогресс-этапе генерации подпись обновлена до «Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов» (объединено с прежней заметкой про письмо, без дубля).
+- Документация: `docs/ops/speed-2026-11.md` дополнен блоком «После изменений» (конфиг настраивается; after-baseline требует новых рендеров после деплоя; платные генерации не запускались).
+- Тесты: `test/renderconfig.test.js` (+4: дефолт/кламп/валидация/getter паузы), `test/models.test.js` (+3: per-model флаг, unknown → env, env false). Итог `npm test` 303/303 (1 skip).
+
 ## 2026-11-09 — baseline-замер скорости пайплайна
 
 - Новый чистый модуль `src/speedreport.js` (без БД): `percentile(values, p)` (линейная интерполяция, p ∈ [0,1], пустой вход → null), `summarizeStages(renders, { limit })` (p50/p90/mean по `meta.<stage>.ms`, средняя себестоимость по `renders.cost_usd` + `meta.cost_breakdown`), `formatReport(summary)` (Markdown-таблица).
