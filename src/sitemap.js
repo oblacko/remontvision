@@ -13,14 +13,14 @@ export function escapeXml(value) {
 
 const SITEMAP_NS = 'http://www.sitemaps.org/schemas/sitemap/0.9';
 
-// Статические страницы сайта. lastmod подставляется «сегодня» (fallback),
-// changefreq/priority повторяют прежний public/sitemap.xml.
+// Статические страницы сайта. lastmod — фиксированная дата, чтобы файл не
+// «дёргался» при каждой генерации (статьи получают lastmod из created_at/published_at).
 export const STATIC_ENTRIES = [
-  { loc: '/', changefreq: 'weekly', priority: '1.0' },
-  { loc: '/prices', changefreq: 'monthly', priority: '0.8' },
-  { loc: '/delivery', changefreq: 'yearly', priority: '0.4' },
-  { loc: '/privacy', changefreq: 'yearly', priority: '0.4' },
-  { loc: '/offer', changefreq: 'yearly', priority: '0.4' },
+  { loc: '/', lastmod: '2026-11-09', changefreq: 'weekly', priority: '1.0' },
+  { loc: '/prices', lastmod: '2026-11-09', changefreq: 'monthly', priority: '0.8' },
+  { loc: '/delivery', lastmod: '2026-11-09', changefreq: 'yearly', priority: '0.4' },
+  { loc: '/privacy', lastmod: '2026-11-09', changefreq: 'yearly', priority: '0.4' },
+  { loc: '/offer', lastmod: '2026-11-09', changefreq: 'yearly', priority: '0.4' },
 ];
 
 function toIsoDate(value) {
@@ -52,7 +52,7 @@ export function buildSitemapXml({
     const loc = isString ? entry : entry.loc;
     urls.push({
       loc: String(loc || '').startsWith('http') ? loc : `${base}${loc}`,
-      lastmod: isString ? todayIso() : lastmodOrToday(entry.lastmod),
+      lastmod: isString ? null : (entry.lastmod || null),
       changefreq: isString ? null : (entry.changefreq || null),
       priority: isString ? null : (entry.priority != null ? String(entry.priority) : null),
     });
@@ -62,7 +62,7 @@ export function buildSitemapXml({
     if (article?.status !== 'published') continue;
     urls.push({
       loc: `${base}/articles/${encodeURIComponent(String(article.slug || ''))}`,
-      lastmod: lastmodOrToday(article.created_at || article.published_at),
+      lastmod: lastmodOrToday(article.published_at || article.created_at),
       changefreq: null,
       priority: null,
     });

@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-09T16:47:00.850Z
+Generated: 2026-11-09T16:52:22.638Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2358,7 +2358,8 @@ export const MAX_REFERENCES; // 4
 - `public/privacy.html`: платёжные сервисы Robokassa + ЮKassa (ЮKassa — резервный), текст переведён с «генерации/сметы» на «дизайн/подборка товаров», добавлен раздел «12. Приватный режим и использование результатов» (приватность — без примеров/галереи; согласие на использование в примерах — отдельная отметка; фото не удаляются автоматически).
 - Новый модуль `src/sitemap.js`: чистая функция `buildSitemapXml({ staticEntries, articles, baseUrl })` с XML-экранированием (`escapeXml`), статические страницы `/, /prices, /delivery, /privacy, /offer` + опубликованные статьи (`status='published'`, `lastmod` из `created_at` в формате `YYYY-MM-DD`, фолбэк — сегодня). Статический `public/sitemap.xml` удалён; маршрут `GET /sitemap.xml` (`src/server.js`) возвращает `application/xml`.
 - `scripts/check-copy.mjs`: `public/offer.html` и `public/privacy.html` выведены из исключений (теперь проходят проверку); послабление «смета» на оферте сужено до явной фразы «Сервис не составляет смету». Тест `test/copycheck.test.js` дополнен кейсом про общее «не … смета».
-- Тесты: `test/sitemap.test.js` (7 тестов: объявление/urlset, опубликованная статья, отсев неопубликованных, `/offer`, фолбэк lastmod, экранирование `&<>"'`). Итог `npm test` 248/248.
+- Правки по ревью: `/offer` переведён с `noindex` на `index, follow` (публичная юридическая страница индексируется, `<!--noindex-->` вокруг реквизитов сохранён); ссылка на «Услуги и цены» в оферте стала кликабельной (`<a href="/prices">`); статические записи sitemap получили фиксированный `lastmod` 2026-11-09 (файл не «дёргается» ежедневно), а у статей `lastmod` берётся из `published_at || created_at`.
+- Тесты: `test/sitemap.test.js` (9 тестов: объявление/urlset, опубликованная статья, отсев неопубликованных, `/offer`, фиксированный lastmod статических записей, приоритет `published_at`, фолбэк lastmod, экранирование `&<>"'`). Итог `npm test` 250/250.
 
 ## 2026-11-09 — честные тексты «дизайны вместо генераций» + авто-проверка
 

@@ -36,6 +36,24 @@ test('sitemap: includes static /offer entry', () => {
   assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/offer<\/loc>/);
 });
 
+test('sitemap: static entries use a fixed lastmod, not today', () => {
+  const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles: [] });
+  assert.ok(xml.includes('<lastmod>2026-11-09</lastmod>'));
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== '2026-11-09') {
+    assert.ok(!xml.includes(`<lastmod>${today}</lastmod>`));
+  }
+});
+
+test('sitemap: article lastmod prefers published_at over created_at', () => {
+  const xml = buildSitemapXml({
+    staticEntries: [],
+    articles: [{ slug: 'p', status: 'published', created_at: '2026-11-01T00:00:00Z', published_at: '2026-11-05T00:00:00Z' }],
+  });
+  assert.match(xml, /<lastmod>2026-11-05<\/lastmod>/);
+  assert.ok(!xml.includes('<lastmod>2026-11-01</lastmod>'));
+});
+
 test('sitemap: lastmod falls back to today when date is missing', () => {
   const xml = buildSitemapXml({
     staticEntries: [],

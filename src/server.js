@@ -1638,6 +1638,9 @@ app.get('/articles/:slug', h(async (req, res) => {
   res.type('html').send(articlePage(article));
 }));
 app.get('/sitemap.xml', h(async (_req, res) => {
+  // Маршрут зарегистрирован после express.static('public'); статический
+  // public/sitemap.xml удалён, чтобы он не «перекрывал» динамический вывод
+  // (иначе опубликованные статьи не попадали бы в sitemap).
   const articles = await q.listArticles();
   const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles, baseUrl: APP_URL });
   res.type('application/xml').send(xml);
