@@ -51,7 +51,7 @@ type RoomData = {
   render?: Render | null
 }
 
-const stageLabel = (status?: string) => status === 'analyzing' ? 'Анализ фото' : status === 'rendering' ? 'Генерация изображения' : status === 'matching' ? 'Разбор рендера' : status === 'queued' ? 'В очереди' : 'В процессе'
+const stageLabel = (status?: string) => status === 'analyzing' ? 'Анализ фото' : status === 'rendering' ? 'Создание дизайна' : status === 'matching' ? 'Разбор рендера' : status === 'queued' ? 'В очереди' : 'В процессе'
 
 const displayColor = (value?: string | null) => /^#[0-9a-f]{6}$/i.test(value || '') ? value! : null
 
@@ -258,7 +258,7 @@ export default function Room() {
           <div className="mx-auto max-w-xl py-16 text-center">
             {image && <img src={image} alt="Фото комнаты" className="mx-auto max-h-[40svh] w-auto border object-contain" />}
             <h1 className="display-title mt-6 text-3xl">Не удалось</h1>
-            <p className="mt-3 text-sm text-destructive">{room.error || 'Генерация завершилась ошибкой'}</p>
+            <p className="mt-3 text-sm text-destructive">{room.error || 'Не удалось создать дизайн'}</p>
             <Link to="/cabinet" className="action-secondary mt-6 inline-flex"><ArrowLeft className="size-4" />В кабинет</Link>
           </div>
         ) : (

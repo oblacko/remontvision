@@ -180,7 +180,7 @@ const stepLabels = ['Фото', 'Стиль', 'Результат', 'Итог'] 
 const BASE_GEN_STAGES = [
   { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик' },
   { key: 'analyzing', label: 'Анализ фото', hint: 'Разбираем комнату, свет и материалы' },
-  { key: 'rendering', label: 'Генерация кадра', hint: 'Модель рисует изображение — обычно 1–4 минуты' },
+  { key: 'rendering', label: 'Создание дизайна', hint: 'Модель рисует изображение — обычно 1–4 минуты' },
   { key: 'matching', label: 'Разбор и товары', hint: 'Архитектор смотрит кадр, даёт подсказки и ищет товары в каталоге' },
   { key: 'done', label: 'Готово', hint: 'Открываем визуализацию' },
 ] as const
@@ -597,7 +597,7 @@ export function GenerationPanel({
     const started = Date.now()
     while (true) {
       if (Date.now() - started > 20 * 60 * 1000) {
-        setGenError('Генерация идёт дольше 20 минут. Проверьте кабинет — результат может появиться позже.')
+        setGenError('Дизайн создаётся дольше 20 минут. Проверьте кабинет — результат может появиться позже.')
         setStep(iterations.length ? 'result' : 'style')
         return null
       }
@@ -613,7 +613,7 @@ export function GenerationPanel({
       if (d.status) setGenStage(d.status)
       if (d.status === 'done') return d
       if (d.status === 'error') {
-        setGenError(d.error || 'Генерация не удалась')
+        setGenError(d.error || 'Не удалось создать дизайн')
         setStep(iterations.length ? 'result' : 'style')
         return null
       }
@@ -632,13 +632,13 @@ export function GenerationPanel({
       const isBase = !roomId
       let id = roomId
       if (isBase) {
-        if (!file) throw new Error('Для новой генерации нужно фото комнаты')
+        if (!file) throw new Error('Для нового дизайна нужно фото комнаты')
         let cleanupFile = cleaned?.file || null
         if (cleanupRequested && !cleanupFile) {
           setGenStage('cleanup')
           cleanupFile = await cleanupRoom()
         }
-        if (cleanupRequested && !cleanupFile) setGenError('Очистка не удалась — генерируем по оригиналу. Можно выключить очистку и попробовать снова.')
+        if (cleanupRequested && !cleanupFile) setGenError('Очистка не удалась — создаём дизайн по исходному фото. Можно выключить очистку и попробовать снова.')
         const usingCleaned = Boolean(cleanupFile)
         const fd = new FormData()
         fd.append('photo', file)
@@ -728,7 +728,7 @@ export function GenerationPanel({
       onEdited?.()
       await onRefreshUser()
     } catch (e) {
-      setGenError(e instanceof Error ? e.message : 'Не удалось выполнить генерацию')
+      setGenError(e instanceof Error ? e.message : 'Не удалось создать дизайн')
       setStep(iterations.length ? 'result' : 'style')
       void refreshTasks()
     } finally { setBusy(false); setProductBinding(false) }
@@ -790,7 +790,7 @@ export function GenerationPanel({
       {!inline && <div className="flex min-h-16 items-center justify-between gap-4 border-b px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-6">
           <p className="display-title text-lg">Генератор дизайна</p>
-          <ol className="hidden items-center gap-4 md:flex" aria-label="Шаги генерации">
+          <ol className="hidden items-center gap-4 md:flex" aria-label="Шаги создания">
             {stepLabels.map((label, index) => (
               <li key={label} className={`gen-step ${index === activeStep ? 'gen-step-active' : ''} ${index < activeStep ? 'gen-step-done' : ''}`} aria-current={index === activeStep ? 'step' : undefined}>
                 <span className="font-mono text-[0.65rem]">0{index + 1}</span> {label}
@@ -814,7 +814,7 @@ export function GenerationPanel({
               <ul className="mt-8 space-y-3 border-t pt-6 text-sm">
                 <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />JPG, PNG или WebP до 15 МБ</li>
                 <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Любое соотношение сторон</li>
-                <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Фото используется только для генерации</li>
+                <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Фото используется только для создания дизайна</li>
               </ul>
             </div>
             <div onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
@@ -839,7 +839,7 @@ export function GenerationPanel({
                   <button type="button" aria-pressed={cleanupRequested} onClick={() => setCleanupRequested(value => !value)} className={`flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cleanupRequested ? '' : 'opacity-90'}`}>
                     <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${cleanupRequested ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{cleanupRequested ? <Check className="size-3.5" /> : null}</span>
                     <span>
-                      <span className="block text-sm font-medium">Очистить комнату перед генерацией</span>
+                      <span className="block text-sm font-medium">Очистить комнату перед созданием дизайна</span>
                       <span className="mt-1 block text-xs leading-5 text-muted-foreground">{cleanupRequested ? 'Уберём мебель, технику, декор и свет. Оставим стены, окна, двери и пропорции.' : 'По умолчанию выключено: сохраняем вашу мебель и планировку.'}</span>
                     </span>
                   </button>
@@ -975,7 +975,7 @@ export function GenerationPanel({
                 }}
                 className="action-primary min-h-14 px-8 text-base disabled:opacity-40"
               >
-                {busy ? 'Запускаем…' : 'Сгенерировать'} <ArrowUpRight className="size-5" />
+                {busy ? 'Запускаем…' : 'Создать дизайн'} <ArrowUpRight className="size-5" />
               </button>
             </div>
           </div>
@@ -1015,7 +1015,7 @@ export function GenerationPanel({
         {step === 'searching' && (
           <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-16 text-center" role="status" aria-live="polite">
             <Search className="size-10 animate-pulse text-primary-text motion-reduce:animate-none" />
-            <h3 className="display-title mt-8 text-4xl">Собираем смету</h3>
+            <h3 className="display-title mt-8 text-4xl">Собираем подборку</h3>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">Ищем товары по фактурам и цветам из вашего дизайна, переводим оттенки в RAL и готовим разметку электрики.</p>
           </div>
         )}
@@ -1295,7 +1295,7 @@ export function GenerationPanel({
 
         {step === 'estimates' && current && (
           <div>
-            <p className="eyebrow">Шаг 04 / Смета и электрика</p>
+            <p className="eyebrow">Шаг 04 / Товары и электрика</p>
             <div className="mt-6 grid gap-10 xl:grid-cols-2">
               <div>
                 <div className="relative mx-auto w-full bg-foreground" style={{ aspectRatio: String(current.ratio), width: `min(100%, calc(58svh * ${current.ratio}))` }}>
@@ -1315,7 +1315,7 @@ export function GenerationPanel({
                 </div>
 
                 {openSummaryTab === null && (
-                  <p className="mt-5 border-y py-4 text-sm text-muted-foreground">Выберите раздел: план ремонта, что изменить, товары и смета, палитра, розетки или итог.</p>
+                  <p className="mt-5 border-y py-4 text-sm text-muted-foreground">Выберите раздел: план ремонта, что изменить, товары и стоимость, палитра, розетки или итог.</p>
                 )}
 
                 {openSummaryTab === 'repair' && ((repairRows(current.repairScope).length || current.repairScope?.storage?.length) ? (
@@ -1482,7 +1482,7 @@ export function GenerationPanel({
           <div className="w-full max-w-md border border-foreground bg-background p-6 shadow-[8px_8px_0_oklch(var(--foreground))]">
             <p className="eyebrow">Баланс</p>
             <h3 className="display-title mt-3 text-3xl">Кредиты закончились</h3>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">Каждая генерация или правка стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">Каждый дизайн или платная правка стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <a href="/cabinet#credits" target="_blank" rel="noopener" onClick={() => setCreditOpen(false)} className="action-primary">Пополнить <ArrowUpRight className="size-4" /></a>
               <button type="button" onClick={() => setCreditOpen(false)} className="action-secondary">Позже</button>

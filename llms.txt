@@ -1,6 +1,6 @@
 # Remontvision (ремонтвижн)
 
-> AI-сервис редизайна интерьера по фото: генерация визуализации, подбор материалов и товаров, смета, RAL, электрика, точечные правки, кабинет, публичный шаринг и админка.
+> AI-сервис редизайна интерьера по фото: визуализация, подбор материалов и товаров, ориентировочная стоимость, RAL, электрика, точечные правки, кабинет, публичный шаринг и админка.
 
 Repo: https://github.com/oblacko/remontvision (private)  
 Prod: https://www.remontvision.ru  
@@ -43,6 +43,7 @@ Last updated: 2026-11-03
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
 - Payments on (Robokassa default, YooKassa fallback), refunds off. Robokassa sends fiscal `Receipt` (service, tax none) for Roboчеки СМЗ.
+- Billing: packs 10/20/60 credits (399/599/1 499 ₽); 1 design = result + 3 free edits, the 4th and later edits cost 1 credit; each render model has its own credit price (admin). Product procurement is a separate 1-credit action.
 - Product procurement on: 1 credit per render, Yandex Search API + store allowlist, product list only (no estimate/quantities).
 - Catalog service (2026-11-03): separate `catalog-service/` (Python/FastAPI + Postgres/pgvector) imports CPA YML feeds, vectorizes images with **DINOv2 ViT-B/14 (768d)**, and serves hybrid `/search` + `/search-text`. Hoff 793: 36 092 offers, 0 without category; **36 074/36 092 embeddings** (16 images 404, 2 without picture). Remontvision uses it as an extra hybrid source in Search Lab (`search.v1.catalog_enabled`, `src/catalogclient.js`); results carry `affiliate_url`/`erid` (migration `034`). Not deployed/enabled by default. MCP server (`mcp_server.py`, 5 tools) and DeepSeek vision agent (`scripts/vision_agent.py`, tool-calling) are in the image. Full description: `docs/CATALOG-SERVICE.md`.
 - Main launch blocker: no real product URLs → no real orders.

@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-09T16:14:26.770Z
+Generated: 2026-11-09T16:32:23.537Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -12,7 +12,7 @@ The canonical source is the repository; if this file is stale, read the linked f
 
 # ремонтвижн
 
-AI-сервис редизайна интерьера по фото: визуализация комнаты, подбор материалов и товаров, смета и ссылки на товары.
+AI-сервис редизайна интерьера по фото: визуализация комнаты, подбор материалов и товаров, ориентировочная стоимость и ссылки на товары.
 
 **Прод:** https://www.remontvision.ru  
 **Репозиторий:** https://github.com/oblacko/remontvision (private)  
@@ -35,6 +35,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Очистка комнаты | При выключенной мебели: FLUX 3 Image Klein, 1K, auto; настройки в админке |
 | Шаринг | `/s/:token`, лайки, комментарии |
 | Платежи | Robokassa (по умолчанию), ЮKassa как альтернатива; возвраты выключены |
+| Пакеты и биллинг | 10/20/60 кредитов (399/599/1 499 ₽); 1 дизайн = результат + 3 бесплатные правки, 4-я и далее — 1 кредит; у моделей своя цена в кредитах |
 | Подбор товаров | 1 кредит за запуск, Yandex Search API + allowlist магазинов, список без сметы |
 | Админка | Пользователи, кредиты, пакеты, комнаты, стили, промт, логи, модели, прокси, каталог |
 | Мобильный редактор `/app` | Старый монолитный интерфейс, не в новом стиле |
@@ -352,7 +353,7 @@ node --check src/openrouter.js
 
 # Remontvision (ремонтвижн)
 
-> AI-сервис редизайна интерьера по фото: генерация визуализации, подбор материалов и товаров, смета, RAL, электрика, точечные правки, кабинет, публичный шаринг и админка.
+> AI-сервис редизайна интерьера по фото: визуализация, подбор материалов и товаров, ориентировочная стоимость, RAL, электрика, точечные правки, кабинет, публичный шаринг и админка.
 
 Repo: https://github.com/oblacko/remontvision (private)  
 Prod: https://www.remontvision.ru  
@@ -395,6 +396,7 @@ Last updated: 2026-11-03
 - Order links use `/go/:productId?r=renderId`; demo products fall back to search.
 - Share page `/s/:token` with likes/comments.
 - Payments on (Robokassa default, YooKassa fallback), refunds off. Robokassa sends fiscal `Receipt` (service, tax none) for Roboчеки СМЗ.
+- Billing: packs 10/20/60 credits (399/599/1 499 ₽); 1 design = result + 3 free edits, the 4th and later edits cost 1 credit; each render model has its own credit price (admin). Product procurement is a separate 1-credit action.
 - Product procurement on: 1 credit per render, Yandex Search API + store allowlist, product list only (no estimate/quantities).
 - Catalog service (2026-11-03): separate `catalog-service/` (Python/FastAPI + Postgres/pgvector) imports CPA YML feeds, vectorizes images with **DINOv2 ViT-B/14 (768d)**, and serves hybrid `/search` + `/search-text`. Hoff 793: 36 092 offers, 0 without category; **36 074/36 092 embeddings** (16 images 404, 2 without picture). Remontvision uses it as an extra hybrid source in Search Lab (`search.v1.catalog_enabled`, `src/catalogclient.js`); results carry `affiliate_url`/`erid` (migration `034`). Not deployed/enabled by default. MCP server (`mcp_server.py`, 5 tools) and DeepSeek vision agent (`scripts/vision_agent.py`, tool-calling) are in the image. Full description: `docs/CATALOG-SERVICE.md`.
 - Main launch blocker: no real product URLs → no real orders.
@@ -2349,6 +2351,13 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-09 — честные тексты «дизайны вместо генераций» + авто-проверка
+
+- Новый скрипт `scripts/check-copy.mjs` (`npm run check:copy`) + тест `test/copycheck.test.js`: падает (exit 1) на слова «генераци…» и фразу «реальные товары» в пользовательских текстах (`web/src/**/*.{ts,tsx}`, `web/index.html`, `public/*.html`); слово «смета» запрещено, кроме `public/offer.html` в отрицательной формулировке и строк с пометками «демо-пример»/«демонстрационный пример». Для `.ts/.tsx` перед проверкой убираются `//` и `/* */`-комментарии (строки не трогаются); чистая функция `findCopyViolations(files)` тестируется без I/O. Исключены из проверки: `Admin.tsx` (админ-консоль), `public/app.html` (устаревший редактор `/app`, 301 на главную) и `offer.html`/`privacy.html` (Task 0.8 уберёт их из исключения).
+- Пользовательские тексты переведены на «дизайн»: `web/index.html` (title/description/keywords/OG/twitter/JSON-LD — 10/20/60, «2 бесплатных дизайна», «3 бесплатные правки», «подбор товаров и ориентировочная стоимость»), `Home.tsx` (герой «Фото → дизайн → план ремонта», «10 дизайнов и до 30 правок — 399 ₽», «3 правки бесплатно», «Бюджет до генерации» → «Класс материалов», блок примера с бейджем «Демонстрационный пример · не оферта»), `prices.html` (пакеты 10/20/60, «1 дизайн = результат + 3 бесплатные правки», подбор товаров 1 кредит, цена модели в генераторе), `GenerationPanel.tsx` («Генерация кадра» → «Создание дизайна» и остальные «генераци…» → «дизайн»), `Cabinet.tsx`, `Room.tsx`, `TaskDock.tsx`, `delivery.html`.
+- `README.md`, `llms.txt`: числа 10/20/60 и модель биллинга «1 дизайн = результат + 3 бесплатные правки».
+- Проверка: `node --test test/copycheck.test.js` 7/7; `node scripts/check-copy.mjs` ok (81 файл); `npm test` 239/239; lint без новых ошибок; build OK.
 
 ## 2026-11-09 — подбор товаров в отдельной вкладке
 

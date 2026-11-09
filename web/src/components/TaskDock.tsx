@@ -184,8 +184,8 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
     ? `/room/${encodeURIComponent(task.room_id)}${tabQuery}`
     : '/cabinet'
   const doneLabel = isBreakdown ? 'Разбор готов' : isRoadmap ? 'Список готов' : 'Готово'
-  const activeLabel = isBreakdown ? 'Идёт разбор' : isRoadmap ? 'Идёт закупка' : 'Идёт генерация'
-  const progressLabel = isBreakdown ? 'Разбор выполняется' : isRoadmap ? 'Закупка составляется' : 'Генерация выполняется'
+  const activeLabel = isBreakdown ? 'Идёт разбор' : isRoadmap ? 'Идёт закупка' : 'Идёт создание'
+  const progressLabel = isBreakdown ? 'Разбор выполняется' : isRoadmap ? 'Закупка составляется' : 'Дизайн создаётся'
   const label = error ? 'Ошибка' : done ? doneLabel : activeLabel
   const labelClass = error ? 'text-destructive' : done ? 'text-emerald-700' : 'text-muted-foreground'
 
