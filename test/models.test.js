@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // Чистые хелперы без БД — не импортируем src/db.js.
-const { resolveModelSelection, inheritPrivate, modelCreditsOrOne, validateModelInput } = await import('../src/modelconfig.js');
+const { resolveModelSelection, inheritPrivate, modelCreditsOrOne, validateModelInput, privateAllowed } = await import('../src/modelconfig.js');
 
 const models = [
   { id: 'flux-3-image', label: 'FLUX 3 Image', model_id: 'black-forest-labs/flux-3-image', credits: 1, active: true, sort: 0 },
@@ -116,4 +116,23 @@ test('rejects credits below one or non-integer', () => {
 test('rejects non-integer sort', () => {
   assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1, sort: 1.5 }).error);
   assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1, sort: 'x' }).error);
+});
+
+// ---------- privateAllowed (приватность только после покупки, без БД) ----------
+
+test('private is allowed when not requested', () => {
+  assert.equal(privateAllowed(undefined, false), true);
+  assert.equal(privateAllowed(null, false), true);
+  assert.equal(privateAllowed(false, false), true);
+  assert.equal(privateAllowed('0', false), true);
+  assert.equal(privateAllowed('', false), true);
+});
+
+test('private is allowed only with a purchase when requested', () => {
+  assert.equal(privateAllowed(true, true), true);
+  assert.equal(privateAllowed('1', true), true);
+  assert.equal(privateAllowed('true', true), true);
+  assert.equal(privateAllowed(true, false), false);
+  assert.equal(privateAllowed('1', false), false);
+  assert.equal(privateAllowed('true', false), false);
 });

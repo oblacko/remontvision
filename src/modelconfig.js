@@ -68,6 +68,15 @@ export function inheritPrivate(parentIsPrivate) {
   return parentIsPrivate === true;
 }
 
+// Приватный режим доступен только тем, кто купил пакет. Чистая функция без БД:
+// если `requested` не выставлен — приватность не запрашивается и это разрешено;
+// иначе разрешено только при hasPurchased === true.
+export function privateAllowed(requested, hasPurchased) {
+  const wantsPrivate = requested === true || requested === '1' || requested === 'true';
+  if (!wantsPrivate) return true;
+  return hasPurchased === true;
+}
+
 // ---------- валидация строки render_models для админки (чистая, без БД) ----------
 
 // Принимает тело запроса (JSON или form-encoded) и возвращает:

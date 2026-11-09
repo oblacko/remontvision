@@ -10,8 +10,8 @@
 - Новые маршруты `GET/POST /api/admin/models` и `POST /api/admin/models/:id/toggle` (upsert по `id`, переключение `active`); валидация — чистый хелпер `validateModelInput` в `src/modelconfig.js` (id — латиница/slug, credits ≥ 1, булевы поля принимают строковые формы).
 - `src/db.js`: `createOrUpdateRenderModel`, `toggleRenderModel` (параметризованный SQL).
 - Генератор (`web/src/components/GenerationPanel.tsx`): карточки выбора модели из `GET /api/models` (цена «N кр.», выбор по умолчанию — первая); при правке карточки заблокированы с подписью «Модель — от родительского дизайна»; галочка «Приватный режим» активна только при `has_purchased` из `GET /api/credits` (иначе disabled с подписью «Только на платных пакетах»). `model` и `private` уходят в `POST /api/rooms` (только для новых дизайнов).
-- `POST /api/rooms` корректно читает `private` из multipart/form-data (строки `'1'`/`'true'`).
-- Тесты: `npm test` 230/230 (добавлены юнит-тесты `validateModelInput`).
+- `POST /api/rooms` корректно читает `private` из multipart/form-data (строки `'1'`/`'true'`) и проверяет право на приватность на сервере: если `private` запрошен, а `hasSucceededPayment` = false → `403 { error: 'Приватный режим доступен после покупки пакета' }` (чистый хелпер `privateAllowed` в `src/modelconfig.js`). Генератор шлёт `model` только если пользователь явно выбрал карточку (иначе работает серверный дефолт).
+- Тесты: `npm test` 232/232 (юнит-тесты `validateModelInput` и `privateAllowed`).
 
 ## 2026-11-09 — списание по новым правилам (per-model цена + 3 бесплатные правки)
 

@@ -26,7 +26,7 @@ import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
 import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
-import { getModelConfig, loadModelConfig, saveModelConfig, resolveModelSelection, inheritPrivate, validateModelInput } from './modelconfig.js';
+import { getModelConfig, loadModelConfig, saveModelConfig, resolveModelSelection, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
 import { validateModelOptions, modelCaps } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
@@ -1385,6 +1385,13 @@ app.post('/api/rooms', rateLimit, upload.fields([
   if (modelSelection === null) return res.status(400).json({ error: 'Модель недоступна' });
   // multipart/form-data присылает `private` строкой, поэтому принимаем true и '1'/'true'.
   const isPrivate = req.body?.private === true || req.body?.private === '1' || req.body?.private === 'true';
+  // Приватный режим — только для купивших пакет (тот же источник, что и GET /api/credits).
+  if (isPrivate) {
+    const hasPurchased = await q.hasSucceededPayment(req.user.id);
+    if (!privateAllowed(isPrivate, hasPurchased)) {
+      return res.status(403).json({ error: 'Приватный режим доступен после покупки пакета' });
+    }
+  }
   const id = crypto.randomUUID();
   const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
   const requestedStyle = String(req.body?.style || '').trim();

@@ -251,6 +251,7 @@ export function GenerationPanel({
   const [useCatalog] = useState(true)
   const [renderModels, setRenderModels] = useState<RenderModelOption[]>([])
   const [modelKey, setModelKey] = useState<string | null>(null)
+  const [modelChosen, setModelChosen] = useState(false)
   const [isPrivate, setIsPrivate] = useState(false)
   const [hasPurchased, setHasPurchased] = useState(false)
   const [concepts, setConcepts] = useState<DesignConcept[]>([])
@@ -651,7 +652,7 @@ export function GenerationPanel({
         fd.append('price_tier', priceTier)
         fd.append('keep_furniture', usingCleaned ? '0' : '1')
         fd.append('use_catalog', useCatalog ? '1' : '0')
-        if (modelKey) fd.append('model', modelKey)
+        if (modelKey && modelChosen) fd.append('model', modelKey)
         fd.append('private', isPrivate ? '1' : '0')
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
@@ -949,12 +950,13 @@ export function GenerationPanel({
                   <div className="mt-4 flex snap-x snap-mandatory gap-px overflow-x-auto border bg-border sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3">
                     {renderModels.map((m) => {
                       const selected = modelKey === m.key
+                      const highlighted = selected && !editing
                       return (
-                        <button key={m.key} type="button" disabled={editing} aria-pressed={selected} onClick={() => setModelKey(m.key)} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
-                          <span className={`block ${selected ? '' : 'opacity-60'}`}>
+                        <button key={m.key} type="button" disabled={editing} aria-pressed={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true) }} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${highlighted ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                          <span className={`block ${highlighted ? '' : 'opacity-60'}`}>
                             <span className="flex items-center justify-between gap-2 text-sm font-medium">
                               {m.label}
-                              {selected ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                              {highlighted ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
                             </span>
                             <span className="mt-1 block font-mono text-xs text-primary-text">{m.credits} кр.</span>
                             {editing && <span className="mt-1 block text-[10px] leading-4 text-muted-foreground">Модель — от родительского дизайна</span>}
