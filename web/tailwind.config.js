@@ -14,7 +14,11 @@ module.exports = {
         accent: { DEFAULT: "oklch(var(--accent) / <alpha-value>)", foreground: "oklch(var(--accent-foreground) / <alpha-value>)" },
         popover: { DEFAULT: "oklch(var(--popover) / <alpha-value>)", foreground: "oklch(var(--popover-foreground) / <alpha-value>)" },
       },
-      fontFamily: { sans: ['Onest', 'sans-serif'], display: ['Onest', 'sans-serif'], mono: ['ui-monospace', 'monospace'] },
+      fontFamily: {
+        sans: ['"Golos Text"', 'Onest', 'sans-serif'],
+        display: ['Raleway', 'Onest', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+      },
       borderRadius: { xl: 'var(--radius)', lg: 'var(--radius)', md: 'var(--radius)', sm: 'var(--radius)' },
       boxShadow: { soft: 'var(--shadow-soft)' },
       keyframes: { "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } }, "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } } },

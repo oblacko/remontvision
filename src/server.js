@@ -87,7 +87,12 @@ app.use('/images', express.static(path.join(WEB_DIST, 'images'), { maxAge: '7d' 
 app.use('/fonts', express.static(path.join(WEB_DIST, 'fonts'), { maxAge: '30d' }));
 // Хешированные имена → можно кэшировать навсегда.
 app.use('/web-assets', express.static(path.join(WEB_DIST, 'web-assets'), { maxAge: '1y', immutable: true }));
-app.get(['/app', '/app/'], (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'app.html')));
+// Приватные и служебные страницы не индексируем (дополнительно к robots.txt).
+app.use(['/admin', '/cabinet', '/room', '/s'], (_req, res, next) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  next();
+});
+app.get(['/app', '/app/'], (_req, res) => res.redirect(301, '/'));
 const webIndexPath = path.join(WEB_DIST, 'index.html');
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.all(['/cabinet', '/cabinet/', '/cabinet/paid', '/cabinet/paid/', '/cabinet/fail', '/cabinet/fail/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));

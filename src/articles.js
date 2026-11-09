@@ -180,6 +180,7 @@ export function articlePage(article) {
   const palette = Array.isArray(article.palette) ? article.palette : [];
   const title = esc(article.title);
   const description = esc(String(body.intro || '').slice(0, 160));
+  const canonical = `https://www.remontvision.ru/articles/${encodeURIComponent(article.slug || '')}`;
 
   const productCards = products.map(p => {
     const img = p.picture_url ? `<img src="${esc(p.picture_url)}" alt="${esc(p.name)}" loading="lazy">` : '';
@@ -210,33 +211,45 @@ export function articlePage(article) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title} — ремонтвижн</title>
 <meta name="description" content="${description}">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="${canonical}">
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${description}">
 ${cover ? `<meta property="og:image" content="https://www.remontvision.ru${cover}">` : ''}
 <script type="application/ld+json">${jsonLd}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500&family=IBM+Plex+Mono:wght@400&family=Raleway:wght@300;400&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f5f2ec;--fg:#1e1c19;--muted:#6b645c;--line:#d9d2c7;--accent:#8a6f4e}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font-family:Georgia,'Times New Roman',serif;line-height:1.65}
-header{max-width:1000px;margin:0 auto;padding:24px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
-header a{color:var(--fg);text-decoration:none;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:13px}
+:root{--bg:#f9f7f0;--page:#ece8de;--ink:#130f0a;--muted:#5a554c;--orange:#f3680f;--rust:#a23300;--line:#c2bdb3;--line2:#8a847a;--fh:"Raleway","Segoe UI",Arial,sans-serif;--fb:"Golos Text",system-ui,Arial,sans-serif;--fm:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;border-radius:0}
+body{margin:0;background:var(--page);color:var(--ink);font:400 16px/1.65 var(--fb);-webkit-text-size-adjust:100%}
+header{max-width:1000px;margin:0 auto;padding:20px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line2)}
+header a{color:var(--ink);text-decoration:none;font:400 12px var(--fm);letter-spacing:.08em;text-transform:uppercase}
+header a:hover{color:var(--rust)}
 main{max-width:1000px;margin:0 auto;padding:32px 20px 72px}
 .cover{width:100%;aspect-ratio:3/2;object-fit:cover;border:1px solid var(--line);margin:8px 0 28px}
-h1{font-size:clamp(28px,5vw,48px);line-height:1.1;margin:0 0 16px}
+h1{font-family:var(--fh);font-weight:300;text-transform:uppercase;font-size:clamp(30px,6vw,56px);line-height:1.05;margin:0 0 16px}
 .intro{font-size:20px;color:var(--muted);max-width:70ch}
-h2{font-size:22px;margin:40px 0 12px;border-top:1px solid var(--line);padding-top:24px}
-.swatches{display:flex;gap:8px;margin:16px 0}.swatch{width:44px;height:44px;border-radius:50%;border:1px solid rgba(0,0,0,.15);display:inline-block}
+h2{font-family:var(--fh);font-weight:300;text-transform:uppercase;font-size:clamp(20px,3vw,28px);margin:40px 0 12px;border-top:1px solid var(--line2);padding-top:24px}
+p,li{color:var(--muted)}
+.swatches{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}
+.swatch{width:44px;height:44px;border-radius:50%;border:1px solid rgba(0,0,0,.15);display:inline-block}
 ul.howto{padding-left:20px}ul.howto li{margin:8px 0}
 .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));margin-top:16px}
-.card{border:1px solid var(--line);background:#fff;padding:12px;display:flex;flex-direction:column}
+.card{border:1px solid var(--line);background:var(--bg);padding:14px;display:flex;flex-direction:column}
 .card img{width:100%;aspect-ratio:1;object-fit:contain;background:#faf8f4}
-.card h3{font-size:15px;margin:10px 0 4px;font-family:system-ui,sans-serif}
-.price{font-weight:700;margin:4px 0}
-.note{font-size:13px;color:var(--muted);font-family:system-ui,sans-serif}
-.buy{margin-top:auto;display:inline-block;padding:10px 14px;background:var(--fg);color:var(--bg);text-decoration:none;text-align:center;font-family:system-ui,sans-serif;font-size:14px}
-.erid{font-size:10px;color:var(--muted);margin-top:6px;font-family:system-ui,sans-serif}
-.cta{margin-top:48px;padding:24px;border:1px solid var(--line);background:#fff;text-align:center}
-.cta a{display:inline-block;margin-top:12px;padding:12px 20px;background:var(--accent);color:#fff;text-decoration:none;font-family:system-ui,sans-serif}
-footer{max-width:1000px;margin:0 auto;padding:24px 20px 48px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;font-family:system-ui,sans-serif}
+.card h3{font:500 15px/1.3 var(--fb);margin:10px 0 4px}
+.price{font:500 16px/1.3 var(--fb);color:var(--ink);margin:4px 0}
+.note{font-size:13px;color:var(--muted)}
+.buy{margin-top:auto;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;background:var(--orange);color:var(--ink);text-decoration:none;border:1px solid var(--ink);font:500 14px var(--fb);box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s}
+.buy:hover{transform:translate(-2px,-2px);box-shadow:5px 5px 0 var(--ink);color:var(--ink)}
+.erid{font:400 10px var(--fm);color:var(--muted);margin-top:6px}
+.cta{margin-top:48px;padding:24px;border:1px solid var(--line2);background:var(--bg);text-align:center}
+.cta a{display:inline-flex;align-items:center;justify-content:center;min-height:48px;margin-top:12px;padding:0 24px;background:var(--orange);color:var(--ink);text-decoration:none;border:1px solid var(--ink);font:500 15px var(--fb);box-shadow:4px 4px 0 var(--ink)}
+.cta a:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink);color:var(--ink)}
+footer{max-width:1000px;margin:0 auto;padding:24px 20px 48px;border-top:1px solid var(--line2);color:var(--muted);font:400 12px/1.6 var(--fm)}
+@media(max-width:560px){h1{font-size:clamp(26px,9vw,34px)}main,header,footer{padding-left:14px;padding-right:14px}}
 </style>
 </head>
 <body>
@@ -252,6 +265,17 @@ ${body.conclusion ? `<p>${esc(body.conclusion)}</p>` : ''}
 <div class="cta"><p>Хотите так же, но для своей комнаты?</p><a href="/#upload">Загрузите фото и получите дизайн</a></div>
 </main>
 <footer>© ремонтвижн · <a href="/offer">оферта</a> · <a href="/privacy">конфиденциальность</a></footer>
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+    m[i].l=1*new Date();
+    for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+    k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+    (window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=114132104', 'ym');
+    ym(114132104, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/114132104" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
 </body>
 </html>`;
 }
