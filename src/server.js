@@ -34,6 +34,7 @@ import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig
 import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { generateArticle, articlePage } from './articles.js';
+import { buildSitemapXml, STATIC_ENTRIES } from './sitemap.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { logProcurementClick } from './procurement.js';
 import { getProcurementConfig, getProcurementDefaults, saveProcurementConfig, resetProcurementConfig, loadProcurementConfig } from './procurementconfig.js';
@@ -1635,6 +1636,11 @@ app.get('/articles/:slug', h(async (req, res) => {
   const article = await q.articleBySlug(String(req.params.slug || ''));
   if (!article) return res.status(404).type('html').send(notFoundPage('Статья не найдена', 'Такой статьи нет или она снята с публикации.'));
   res.type('html').send(articlePage(article));
+}));
+app.get('/sitemap.xml', h(async (_req, res) => {
+  const articles = await q.listArticles();
+  const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles, baseUrl: APP_URL });
+  res.type('application/xml').send(xml);
 }));
 app.get('/search-lab/:file', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;

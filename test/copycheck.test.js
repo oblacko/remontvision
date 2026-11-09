@@ -24,6 +24,12 @@ test('allows «смета» negation in offer.html', () => {
   assert.equal(v.length, 0);
 });
 
+test('bans a generic «не … смета» negation in offer.html', () => {
+  const v = findCopyViolations([{ path: 'public/offer.html', content: 'Сервис не формирует смету и не считает площади' }]);
+  assert.equal(v.length, 1);
+  assert.equal(v[0].word, 'смету');
+});
+
 test('allows «смета» with a demo label', () => {
   const v = findCopyViolations([{ path: 'web/src/pages/Home.tsx', content: 'Демонстрационный пример: смета 98 900 ₽' }]);
   assert.equal(v.length, 0);

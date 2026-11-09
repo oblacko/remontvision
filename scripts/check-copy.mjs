@@ -4,7 +4,7 @@
 // Правила (источник истины — «Решения владельца» в плане):
 //   - в пользовательских текстах нет слов «генераци…» и фразы «реальные товары»;
 //   - слово «смета» запрещено, кроме:
-//       (a) public/offer.html в отрицательной формулировке («Сервис не составляет смету»);
+//       (a) public/offer.html в явной фразе «Сервис не составляет смету»;
 //       (b) строк с пометками «демо-пример» / «демонстрационный пример».
 //
 // Проверяются: web/src/**/*.{ts,tsx}, web/index.html, public/*.html.
@@ -21,8 +21,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXCLUDED = new Set([
   'web/src/pages/Admin.tsx', // админ-консоль — внутренний, не пользовательский текст
   'public/app.html',         // устаревший редактор /app: 301 на главную, только dev-fallback
-  'public/offer.html',       // Task 0.8 (оферта) — добавит явное «не составляет смету»
-  'public/privacy.html',     // Task 0.8 (политика конфиденциальности)
 ]);
 
 // Убирает //- и /* */-комментарии, не трогая текст внутри строк и шаблонов.
@@ -87,9 +85,11 @@ export function findCopyViolations(files) {
         violations.push({ path: file.path, line: lineNo, word: matchWord(line, /реальные\s+товары/i) || 'реальные товары' });
       }
       if (/смет[ауеыой]/i.test(line)) {
-        const negates = /не[^.!?\n]{0,50}смет/i.test(line);
+        // в оферте разрешена только явная фраза «Сервис не составляет смету»,
+        // а не любое «не … смета»
+        const offerNegates = /Сервис\s+не\s+составляет\s+смету/i.test(line);
         const demo = /демо[- ]пример|демонстрационный\s+пример/i.test(line);
-        if (!((isOffer && negates) || demo)) {
+        if (!((isOffer && offerNegates) || demo)) {
           violations.push({ path: file.path, line: lineNo, word: matchWord(line, /смет[а-яё]*/i) || 'смета…' });
         }
       }
