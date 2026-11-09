@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 const { FREE_EDITS, editChargeDecision, modelCreditsFor, modelForEdit } = await import('../src/billing.js');
 
 const models = [
-  { id: 1, label: 'Стандарт', model_id: 'standard/model', credits: 1, active: true, sort: 1 },
-  { id: 2, label: 'Премиум', model_id: 'premium/model', credits: 2, active: true, sort: 2 },
-  { id: 3, label: 'Старая', model_id: 'legacy/model', credits: 5, active: false, sort: 3 },
+  { id: 'seedream', label: 'Стандарт', model_id: 'bytedance/seedream', credits: 1, active: true, sort: 1 },
+  { id: 'flux-3-image', label: 'Премиум', model_id: 'black-forest-labs/flux-3-image', credits: 2, active: true, sort: 2 },
+  { id: 'legacy', label: 'Старая', model_id: 'legacy/model', credits: 5, active: false, sort: 3 },
 ];
 
 test('free edits limit is three', () => {
@@ -19,7 +19,7 @@ test('first three iterations are free', () => {
   }
 });
 
-test('fourth iteration is charged', () => {
+test('fourth iteration and later are charged', () => {
   assert.deepEqual(editChargeDecision({ iteration: true, editCount: 3 }), { free: false });
   assert.deepEqual(editChargeDecision({ iteration: true, editCount: 4 }), { free: false });
 });
@@ -30,18 +30,26 @@ test('root render is never free', () => {
   }
 });
 
-test('missing edit count counts as zero free edits', () => {
-  assert.deepEqual(editChargeDecision({ iteration: true }), { free: true });
+test('missing or invalid edit count is charged', () => {
+  for (const editCount of [undefined, NaN, Infinity, '', null, 1.5, '2']) {
+    assert.deepEqual(editChargeDecision({ iteration: true, editCount }), { free: false });
+  }
+  assert.deepEqual(editChargeDecision({ iteration: true }), { free: false });
 });
 
 test('model credits default to one without models', () => {
-  assert.equal(modelCreditsFor('standard/model', []), 1);
-  assert.equal(modelCreditsFor('standard/model', undefined), 1);
+  assert.equal(modelCreditsFor('seedream', []), 1);
+  assert.equal(modelCreditsFor('seedream', undefined), 1);
 });
 
-test('model credits come from the matching active model', () => {
-  assert.equal(modelCreditsFor('premium/model', models), 2);
-  assert.equal(modelCreditsFor('standard/model', models), 1);
+test('model credits match the short render model id', () => {
+  assert.equal(modelCreditsFor('flux-3-image', models), 2);
+  assert.equal(modelCreditsFor('seedream', models), 1);
+});
+
+test('model credits also match the full model_id', () => {
+  assert.equal(modelCreditsFor('black-forest-labs/flux-3-image', models), 2);
+  assert.equal(modelCreditsFor('bytedance/seedream', models), 1);
 });
 
 test('unknown model falls back to one credit', () => {
@@ -50,16 +58,18 @@ test('unknown model falls back to one credit', () => {
 });
 
 test('inactive model falls back to one credit', () => {
+  assert.equal(modelCreditsFor('legacy', models), 1);
   assert.equal(modelCreditsFor('legacy/model', models), 1);
 });
 
 test('invalid credit values fall back to one credit', () => {
-  const broken = [{ id: 1, model_id: 'broken/model', credits: 0, active: true, sort: 1 }];
+  const broken = [{ id: 'broken', model_id: 'broken/model', credits: 0, active: true, sort: 1 }];
+  assert.equal(modelCreditsFor('broken', broken), 1);
   assert.equal(modelCreditsFor('broken/model', broken), 1);
 });
 
 test('edits inherit the parent model', () => {
-  assert.equal(modelForEdit('standard/model', models), 'standard/model');
-  assert.equal(modelForEdit('premium/model', models), 'premium/model');
-  assert.equal(modelForEdit('legacy/model', models), 'legacy/model');
+  assert.equal(modelForEdit('seedream', models), 'seedream');
+  assert.equal(modelForEdit('flux-3-image', models), 'flux-3-image');
+  assert.equal(modelForEdit('legacy', models), 'legacy');
 });
