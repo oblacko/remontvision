@@ -26,6 +26,8 @@ function isValidRecord(value: unknown): value is UtmRecord {
   if (typeof value !== 'object' || value === null) return false
   const rec = value as { utm?: unknown; ts?: unknown }
   if (typeof rec.utm !== 'object' || rec.utm === null) return false
+  const utm = rec.utm as Record<string, unknown>
+  if (!Object.values(utm).every(v => typeof v === 'string')) return false
   return typeof rec.ts === 'number' && Number.isFinite(rec.ts)
 }
 

@@ -72,6 +72,17 @@ maybe('utm: readUtm returns null for missing/corrupt/expired', () => {
   assert.equal(readUtm({ storage: expired, now: 1000 + 31 * DAY }), null);
 });
 
+maybe('utm: readUtm rejects records with non-string utm values', () => {
+  const numberValue = makeStorage({ rv_utm: JSON.stringify({ utm: { utm_source: 123 }, ts: 1000 }) });
+  assert.equal(readUtm({ storage: numberValue, now: 1000 }), null);
+
+  const nullValue = makeStorage({ rv_utm: JSON.stringify({ utm: { utm_campaign: null }, ts: 1000 }) });
+  assert.equal(readUtm({ storage: nullValue, now: 1000 }), null);
+
+  const nestedValue = makeStorage({ rv_utm: JSON.stringify({ utm: { utm_source: { a: 1 } }, ts: 1000 }) });
+  assert.equal(readUtm({ storage: nestedValue, now: 1000 }), null);
+});
+
 maybe('utm: empty search stores nothing', () => {
   const storage = makeStorage();
   captureUtmOnce({ search: '', storage, now: 1000 });

@@ -110,7 +110,8 @@ export function collectFiles() {
       }
     }
   };
-  walk(path.join(ROOT, 'web', 'src'));
+  const srcDir = path.join(ROOT, 'web', 'src');
+  if (fs.existsSync(srcDir)) walk(srcDir);
   for (const rel of ['web/index.html']) {
     const full = path.join(ROOT, rel);
     if (fs.existsSync(full)) files.push({ path: rel, content: fs.readFileSync(full, 'utf8') });

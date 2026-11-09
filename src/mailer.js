@@ -42,7 +42,12 @@ export async function sendEmail({ to, subject, text, html = null, template = nul
       },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) throw new Error(`resend ${r.status}`);
+    if (!r.ok) {
+      // Дренируем тело ответа (освобождаем соединение), но не логируем его —
+      // в нём может быть адрес получателя или другая чувствительная информация.
+      await r.text().catch(() => {});
+      throw new Error(`resend ${r.status}`);
+    }
     return true;
   }
   if (!mailer) return false;

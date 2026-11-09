@@ -62,6 +62,14 @@ export function resolveModelSelection(requestedKey, models, defaultModelId = nul
   return { key: chosen.id, credits: modelCreditsOrOne(chosen.credits) };
 }
 
+// Ключ модели по умолчанию для UI-подсветки (GET /api/models → default_key):
+// предпочитает строку, совпадающую с runtime-моделью рендера, затем первую
+// активную по sort, иначе первую строку списка (или null при пустом списке).
+export function resolveDefaultModelKey(models, defaultModelId = null) {
+  const list = Array.isArray(models) ? models : [];
+  return resolveModelSelection(null, list, defaultModelId)?.key ?? list[0]?.key ?? null;
+}
+
 // Правка всегда наследует флаг приватности от родительского рендера;
 // клиентский `private` у правки игнорируется.
 export function inheritPrivate(parentIsPrivate) {
@@ -90,7 +98,7 @@ export function validateModelInput(body) {
   const modelId = String(body?.model_id ?? '').trim();
   const credits = Number(body?.credits);
   const sort = Number(body?.sort ?? 0);
-  const bool = (value) => !(value === false || value === 'false' || value === '0' || value === 0);
+  const bool = (value) => !(value === false || value === 'false' || value === '0' || value === 0 || value === '');
 
   if (!/^[a-z0-9_-]{2,40}$/.test(id)) {
     return { error: 'id — латиница (a-z, 0-9), дефис и подчёркивание, 2–40 символов' };
@@ -165,10 +173,12 @@ function findRenderModelRow(key) {
 }
 
 // Арт-направление включается per-model через render_models.art_direction_enabled.
-// Фолбэк — env ART_DIRECTION_ENABLED, когда ключ модели не найден (старые рендеры
-// без model_key или строка ещё не загружена).
+// env ART_DIRECTION_ENABLED=false — глобальный «потолок»: выключает арт-директора
+// для всех моделей, даже если у строки render_models флаг включён. Если env не
+// задан или включён — решает флаг строки модели (для неизвестного ключа — true).
 export function isArtDirectionEnabled(modelKey) {
+  if (/^(0|false|no|off)$/i.test(String(process.env.ART_DIRECTION_ENABLED ?? ''))) return false;
   const row = findRenderModelRow(modelKey);
   if (row) return row.art_direction_enabled !== false;
-  return !/^(0|false|no|off)$/i.test(String(process.env.ART_DIRECTION_ENABLED ?? 'true'));
+  return true;
 }

@@ -182,7 +182,7 @@ const stepLabels = ['Фото', 'Стиль', 'Результат', 'Итог'] 
 const BASE_GEN_STAGES = [
   { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик' },
   { key: 'analyzing', label: 'Анализ фото', hint: 'Разбираем комнату, свет и материалы' },
-  { key: 'rendering', label: 'Создание дизайна', hint: 'Модель рисует изображение — обычно 1–4 минуты' },
+  { key: 'rendering', label: 'Создание дизайна', hint: 'Модель рисует изображение' },
   { key: 'matching', label: 'Разбор и товары', hint: 'Архитектор смотрит кадр, даёт подсказки и ищет товары в каталоге' },
   { key: 'done', label: 'Готово', hint: 'Открываем визуализацию' },
 ] as const
@@ -255,7 +255,7 @@ export function GenerationPanel({
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [modelChosen, setModelChosen] = useState(false)
   const [isPrivate, setIsPrivate] = useState(false)
-  const [hasPurchased, setHasPurchased] = useState(false)
+  const [hasSucceededPayment, setHasSucceededPayment] = useState(false)
   const [concepts, setConcepts] = useState<DesignConcept[]>([])
   const [compatibility, setCompatibility] = useState<DesignCompatibility>({})
   const [conceptKey, setConceptKey] = useState<string | null>(null)
@@ -351,17 +351,18 @@ export function GenerationPanel({
         const list = Array.isArray(d?.models) ? (d.models as RenderModelOption[]) : []
         if (list.length) {
           setRenderModels(list.map(m => ({ key: String(m.key), label: String(m.label), credits: Number(m.credits) })))
-          setModelKey(String(list[0].key))
+          const defaultKey = typeof d?.default_key === 'string' ? d.default_key : String(list[0].key)
+          setModelKey(defaultKey)
         }
       })
       .catch(() => {})
   }, [])
 
   useEffect(() => {
-    if (!isAuthed) { setHasPurchased(false); return }
+    if (!isAuthed) { setHasSucceededPayment(false); return }
     fetch('/api/credits')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && typeof d.has_purchased === 'boolean') setHasPurchased(d.has_purchased) })
+      .then(d => { if (d && typeof d.has_succeeded_payment === 'boolean') setHasSucceededPayment(d.has_succeeded_payment) })
       .catch(() => {})
   }, [isAuthed])
 
@@ -961,14 +962,14 @@ export function GenerationPanel({
                   type="button"
                   role="checkbox"
                   aria-checked={isPrivate}
-                  disabled={!hasPurchased}
+                  disabled={!hasSucceededPayment}
                   onClick={() => setIsPrivate(value => !value)}
                   className={`mt-3 flex min-h-11 w-full items-start gap-3 border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${isPrivate ? 'border-primary' : 'border-foreground/25 hover:border-foreground'}`}
                 >
                   <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center border ${isPrivate ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/40'}`}>{isPrivate ? <Check className="size-4" /> : null}</span>
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">Приватный режим — не показывать в примерах и галерее</span>
-                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">{hasPurchased ? 'Дизайн останется приватным и не попадёт в публичную галерею.' : 'Только на платных пакетах'}</span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">{hasSucceededPayment ? 'Дизайн останется приватным и не попадёт в публичную галерею.' : 'Только на платных пакетах'}</span>
                   </span>
                 </button>
               </div>

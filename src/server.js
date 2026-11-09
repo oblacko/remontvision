@@ -28,7 +28,7 @@ import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
 import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
-import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
+import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
 import { validateModelOptions, modelCaps } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
@@ -298,7 +298,8 @@ app.get('/api/health', (_req, res) => res.json({
 }));
 app.get('/api/models', h(async (_req, res) => {
   const models = await q.listRenderModels(true);
-  res.json({ models: models.map(m => ({ key: m.id, label: m.label, credits: m.credits })) });
+  const defaultKey = resolveDefaultModelKey(models, getModelConfig().render);
+  res.json({ models: models.map(m => ({ key: m.id, label: m.label, credits: m.credits })), default_key: defaultKey });
 }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
 app.get('/api/styles', h(async (_req, res) => {
@@ -437,12 +438,18 @@ app.get('/api/my/generations', h(async (req, res) => {
 
 app.get('/api/credits', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
-  const [balance, history, hasPurchased] = await Promise.all([
+  const [balance, history, hasPurchased, hasSucceededPayment] = await Promise.all([
     q.creditBalance(req.user.id),
     q.creditHistory(req.user.id),
+    q.hasPurchased(req.user.id),
     q.hasSucceededPayment(req.user.id),
   ]);
-  res.json({ balance, history, has_purchased: hasPurchased });
+  res.json({
+    balance,
+    history,
+    has_purchased: hasPurchased,
+    has_succeeded_payment: hasSucceededPayment,
+  });
 }));
 
 // ---------- оплата ----------

@@ -12,9 +12,14 @@ export function shouldConvertHeic(file: { name?: string; type?: string } | null 
   return name.endsWith('.heic') || name.endsWith('.heif')
 }
 
-export async function convertHeicToJpeg(file: File): Promise<File> {
+export async function convertHeicToJpeg(
+  file: File,
+  { importHeic2any = () => import('heic2any') }: {
+    importHeic2any?: () => Promise<typeof import('heic2any')>
+  } = {},
+): Promise<File> {
   try {
-    const heic2any = (await import('heic2any')).default
+    const { default: heic2any } = await importHeic2any()
     const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })
     const result = Array.isArray(blob) ? blob[0] : blob
     const base = (file.name || 'photo').replace(/\.(heic|heif)$/i, '')

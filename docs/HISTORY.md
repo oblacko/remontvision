@@ -4,15 +4,24 @@
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-09 — финальная волна ревью (дефолт модели, env-потолок, семантика покупок, устойчивость)
+
+- **Подсветка модели не расходится со списываемой.** `GET /api/models` отдаёт `default_key = resolveDefaultModelKey(models, getModelConfig().render)` (предпочитает строку с `model_id` runtime-модели рендера, иначе первую по `sort`); генератор инициализирует `modelKey` из `default_key`, а `model` шлёт в `POST /api/rooms` только после явного выбора карточки (флаг `modelChosen`).
+- **env-потолок арт-директора.** `isArtDirectionEnabled` теперь: `ART_DIRECTION_ENABLED=false` → `false` для всех моделей, даже если у строки `render_models` флаг `true`; иначе решает флаг строки (неизвестный ключ → `true`).
+- **Семантика покупок разделена.** `GET /api/credits` отдаёт и `has_purchased` (`credit_txn` с `reason='purchase'`, как `/api/me`), и `has_succeeded_payment` (`payments.status='succeeded'`). Чекбокс «Приватный режим» в генераторе включает именно `has_succeeded_payment` (серверный 403-гейт не менялся).
+- **Устойчивость.** `src/mailer.js` дренирует тело Resend-ответа перед `throw` (без логирования чувствительных данных); `validateModelInput` трактует `''` как `false` для булевых полей; `isValidRecord` (`utm.ts`) требует строковые значения; `convertHeicToJpeg` получил DI для тестов; `scripts/check-copy.mjs` не падает без `web/src`.
+- **Документация.** Добавлен чек-лист после миграции: [docs/ops/DEPLOY-CHECKLIST-v2.md](ops/DEPLOY-CHECKLIST-v2.md).
+- Тесты: `test/models.test.js` (+4: `resolveDefaultModelKey`, env-потолок, `bool('')`), `test/utm.test.js` (+1: нестроковые значения), `test/heic.test.js` (+2: успешная конвертация через DI и русская ошибка). Итог `npm test` 311/311 (1 skip).
+
 ## 2026-11-09 — конфигурируемая скорость и per-model арт-директор
 
 - `src/renderconfig.js`: добавлена настройка `image_min_gap_ms` (дефолт 10000 мс, целое, clamp 0–120000) в дефолты/валидацию/сохранение; экспорт `getImageMinGapMs()` (читает кеш, без БД). Фолбэк на env `IMAGE_MIN_GAP_MS` сохранён, пока `app_settings` не задаёт поле.
 - `src/openrouter.js`: убран модульный `IMAGE_MIN_GAP_MS`; `withImageSlot` теперь берёт паузу через `getImageMinGapMs()` на каждом вызове — настройку можно менять в админке без рестарта.
-- `src/modelconfig.js`: кеш строк `render_models` (`setRenderModelsForTests`/`loadRenderModels`) и `isArtDirectionEnabled(modelKey)` — per-model флаг `render_models.art_direction_enabled`, фолбэк на env `ART_DIRECTION_ENABLED`, когда ключ неизвестен.
+- `src/modelconfig.js`: кеш строк `render_models` (`setRenderModelsForTests`/`loadRenderModels`) и `isArtDirectionEnabled(modelKey)` — per-model флаг `render_models.art_direction_enabled`; env `ART_DIRECTION_ENABLED=false` — глобальный «потолок» (выключает арт-директора для всех моделей, в т.ч. с включённым per-model флагом), при невыставленном/включённом env решает флаг строки модели.
 - `src/artdirector.js`: `buildArtDirection` принимает `modelKey` и пропускает арт-директора, если флаг модели выключен (вместо глобальной константы `ART_DIRECTION_ENABLED`).
 - `src/jobs.js`: в `buildArtDirection` передаётся `render.model_key || getModelConfig().render`.
 - `src/server.js`: `loadRenderModels()` при старте и после создания/переключения моделей в админке — смена флага действует на следующие генерации без рестарта.
-- UI: в админке «Генерация → Скорость» добавлено числовое поле «Минимальный интервал между image-вызовами, мс» (min 0, step 1000, подсказка «0 — без паузы; меньше 10 000 может участить 429»). В прогресс-этапе генерации подпись обновлена до «Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов» (объединено с прежней заметкой про письмо, без дубля).
+- UI: в админке «Генерация → Скорость» добавлено числовое поле «Минимальный интервал между image-вызовами, мс» (min 0, step 1000, подсказка «0 — без паузы; меньше 10 000 может участить 429»). Заметка об ETA вынесена в единый футер этапа генерации «Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов» (из подписи этапа «Создание дизайна» дубль убран — см. следующую запись).
 - Документация: `docs/ops/speed-2026-11.md` дополнен блоком «После изменений» (конфиг настраивается; after-baseline требует новых рендеров после деплоя; платные генерации не запускались).
 - Тесты: `test/renderconfig.test.js` (+4: дефолт/кламп/валидация/getter паузы), `test/models.test.js` (+3: per-model флаг, unknown → env, env false). Итог `npm test` 303/303 (1 skip).
 
