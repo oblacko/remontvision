@@ -1113,15 +1113,15 @@ export function GenerationPanel({
                         {objectDelta && (() => { const dir = moveDirection(objectDelta.dx, objectDelta.dy); return <p className="kit-ban text-sm">Перемещение: {dir.text} примерно на {dir.percent}% кадра.</p> })()}
                         <div className="flex flex-wrap gap-2">
                           {objectDelta && (
-                            <button type="button" className="action-primary min-h-11 px-4 text-sm" onClick={() => { const instruction = buildMoveInstruction({ label: selected.label, bbox: selected.bbox, dx: objectDelta.dx, dy: objectDelta.dy }); setObjectsOn(false); setObjectDelta(null); void startGeneration(instruction, current.styleName, { target: selected.label, parentId: current.id }) }}>Переместить</button>
+                            <button type="button" className="action-primary min-h-11 px-4 text-sm" onClick={() => { const instruction = buildMoveInstruction({ label: selected.label, bbox: selected.bbox, dx: objectDelta.dx, dy: objectDelta.dy }); setObjectsOn(false); setObjectDelta(null); void startGeneration(instruction, current.styleName, { parentId: current.id }) }}>Переместить</button>
                           )}
                           {(['replace', 'color', 'bigger', 'smaller'] as const).map(action => (
-                            <button key={action} type="button" className="action-secondary min-h-11 px-4 text-sm" onClick={() => { const instruction = buildObjectAction(selected.label, action, selected.bbox); setObjectsOn(false); void startGeneration(instruction, current.styleName, { target: selected.label, parentId: current.id }) }}>
+                            <button key={action} type="button" className="action-secondary min-h-11 px-4 text-sm" onClick={() => { const instruction = buildObjectAction(selected.label, action, selected.bbox); setObjectsOn(false); void startGeneration(instruction, current.styleName, { parentId: current.id }) }}>
                               {action === 'replace' ? 'Заменить' : action === 'color' ? 'Другой цвет' : action === 'bigger' ? 'Крупнее' : 'Мельче'}
                             </button>
                           ))}
                         </div>
-                        <form onSubmit={(event) => { event.preventDefault(); if (!objectText.trim()) return; const instruction = buildObjectText(selected.label, objectText, selected.bbox); setObjectsOn(false); setObjectText(''); void startGeneration(instruction, current.styleName, { target: selected.label, parentId: current.id }) }} className="flex flex-col gap-2 sm:flex-row">
+                        <form onSubmit={(event) => { event.preventDefault(); if (!objectText.trim()) return; const instruction = buildObjectText(selected.label, objectText, selected.bbox); setObjectsOn(false); setObjectText(''); void startGeneration(instruction, current.styleName, { parentId: current.id }) }} className="flex flex-col gap-2 sm:flex-row">
                           <input value={objectText} onChange={event => setObjectText(event.target.value)} placeholder={`Что сделать с «${ruLabel(selected.label)}»?`} className="kit-field min-w-0 flex-1 text-sm" />
                           <button type="submit" className="action-primary min-h-12 px-4 text-sm">Применить</button>
                         </form>
