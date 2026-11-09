@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, ArrowRight, Download, Expand, LoaderCircle, Scan, Share2, X, Zap } from 'lucide-react'
 import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
 import { GenerationPanel } from '@/components/GenerationPanel'
+import { buildMoveInstruction, buildMovePreview, ruLabel } from '@/lib/objects'
 import { useTasks } from '@/components/TaskDock'
 import { GuideIcon } from '@/components/GuideIcon'
 import { Logo } from '@/components/Logo'
 import { RoadmapTab } from '@/components/RoomRoadmap'
+import { KitIcon } from '@/components/KitIcon'
+import { KitLightbox } from '@/components/KitSheet'
 import type { RoadmapGroup, RoadmapItem } from '@/lib/roadmap'
 import '../App.css'
 
@@ -79,6 +81,7 @@ export default function Room() {
   const [objectsOn, setObjectsOn] = useState(false)
   const [selectedObject, setSelectedObject] = useState<number | null>(null)
   const [renderRatio, setRenderRatio] = useState(1.5)
+  const [objectBusy, setObjectBusy] = useState(false)
 
   const loadRoom = useCallback(async (renderId?: string) => {
     try {
@@ -127,6 +130,33 @@ export default function Room() {
     setBreakdownBusy(false)
     setBreakdownError('')
   }, [selectedRenderId])
+
+  const sendObjectMove = async (index: number, dx: number, dy: number) => {
+    const object = visibleObjects[index]
+    if (!object || !render?.id || !image || objectBusy) return
+    setObjectBusy(true); setError('')
+    try {
+      const instruction = buildMoveInstruction({ label: object.label, bbox: object.bbox, dx, dy })
+      const preview = await buildMovePreview(image, object.bbox, dx, dy)
+      const fd = new FormData()
+      fd.append('text', instruction)
+      fd.append('parent_id', render.id)
+      if (preview) {
+        fd.append('refs', preview)
+        fd.append('ref_meta', JSON.stringify([{ description: `Целевое положение объекта «${ruLabel(object.label)}». Переместите его туда, старое место восстановите.` }]))
+      }
+      const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Не удалось переместить объект')
+      setObjectsOn(false)
+      setSelectedObject(null)
+      await loadRoom()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось переместить объект')
+    } finally {
+      setObjectBusy(false)
+    }
+  }
 
   const runBreakdown = async () => {
     if (!render?.id || breakdownBusy) return
@@ -224,28 +254,28 @@ export default function Room() {
   }
 
   if (loading && !room) {
-    return <main className="page-shell flex min-h-[60vh] items-center justify-center"><LoaderCircle className="size-8 animate-spin text-primary-text" /></main>
+    return <main className="page-shell flex min-h-[60vh] items-center justify-center"><KitIcon name="sp" spin className="size-8 text-primary-text" /></main>
   }
 
   if (!room) {
     return (
       <main className="page-shell py-20">
         <p className="text-sm text-muted-foreground">{error || 'Комната не найдена'}</p>
-        <Link to="/cabinet" className="action-secondary mt-6 inline-flex"><ArrowLeft className="size-4" />В кабинет</Link>
+        <Link to="/cabinet" className="k-btn mt-6 inline-flex"><KitIcon name="l" />В кабинет</Link>
       </main>
     )
   }
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b bg-background">
+    <div className="min-h-dvh bg-page text-foreground">
+      <header className="sticky top-0 z-40 border-b bg-page">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Logo animated />
             <span className="eyebrow hidden sm:inline">/ комната</span>
           </div>
-          <button type="button" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/cabinet') }} className="flex size-11 shrink-0 items-center justify-center border border-foreground transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Закрыть">
-            <X className="size-5" />
+          <button type="button" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/cabinet') }} className="k-btn k-btn--icon" aria-label="Закрыть">
+            <KitIcon name="x" />
           </button>
         </div>
       </header>
@@ -257,17 +287,17 @@ export default function Room() {
         {busy ? (
           <div className="mx-auto max-w-xl py-16 text-center" role="status" aria-live="polite">
             {image && <img src={image} alt="Фото комнаты" className="mx-auto max-h-[40svh] w-auto border object-contain" />}
-            <LoaderCircle className="mx-auto mt-8 size-8 animate-spin text-primary-text motion-reduce:animate-none" />
+            <KitIcon name="sp" spin className="mx-auto mt-8 size-8 text-primary-text" />
             <h1 className="display-title mt-4 text-3xl">{stageLabel(room.status)}</h1>
             <p className="mt-2 text-sm text-muted-foreground">Дизайн создаётся. Функции комнаты откроются автоматически.</p>
-            <div className="relative mt-6 h-1 overflow-hidden bg-border"><div className="rv-progress absolute inset-y-0 left-0 w-1/3 bg-primary" /></div>
+            <div className="k-pb mt-6"><i style={{ width: '33%' }} className="rv-progress" /></div>
           </div>
         ) : room.status === 'error' ? (
           <div className="mx-auto max-w-xl py-16 text-center">
             {image && <img src={image} alt="Фото комнаты" className="mx-auto max-h-[40svh] w-auto border object-contain" />}
             <h1 className="display-title mt-6 text-3xl">Не удалось</h1>
             <p className="mt-3 text-sm text-destructive">{room.error || 'Не удалось создать дизайн'}</p>
-            <Link to="/cabinet" className="action-secondary mt-6 inline-flex"><ArrowLeft className="size-4" />В кабинет</Link>
+            <Link to="/cabinet" className="k-btn mt-6 inline-flex"><KitIcon name="l" />В кабинет</Link>
           </div>
         ) : (
           <div>
@@ -285,26 +315,26 @@ export default function Room() {
                     image={image}
                     ratio={renderRatio}
                     objects={visibleObjects}
-                    selectedIndex={selectedObject}
-                    onSelect={(index) => setSelectedObject(index)}
+                    onCreateEdit={(index) => { setSelectedObject(index); setTab('editor') }}
+                    onConfirmMove={(index, dx, dy) => { if (!objectBusy) void sendObjectMove(index, dx, dy) }}
                   />
                 ) : (
                   <img src={image} alt="Дизайн комнаты" className="max-h-[62svh] w-full object-contain" onLoad={event => setRenderRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                 )}
                 <div className="absolute right-3 top-3 flex gap-2">
                   {visibleObjects.length > 0 && (
-                    <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null) }} className={`flex size-12 items-center justify-center border backdrop-blur-sm transition-colors ${objectsOn ? 'border-primary bg-primary text-primary-foreground' : 'border-background/40 bg-foreground/60 text-background hover:bg-background hover:text-foreground'}`} aria-label="Выбрать объект на рендере"><Scan className="size-5" /></button>
+                    <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null) }} className={`k-btn k-btn--ov k-btn--icon${objectsOn ? ' bg-primary text-primary-foreground' : ''}`} aria-label="Выбрать объект на рендере"><KitIcon name="q" /></button>
                   )}
-                  <button type="button" onClick={() => setFullscreen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Во весь экран"><Expand className="size-5" /></button>
-                  <a href={image} download="remontvision-design.webp" className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Скачать"><Download className="size-5" /></a>
-                  {render?.id && <button type="button" onClick={() => setShareOpen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Поделиться"><Share2 className="size-5" /></button>}
+                  <button type="button" onClick={() => setFullscreen(true)} className="k-btn k-btn--ov k-btn--icon" aria-label="Во весь экран"><KitIcon name="fs" /></button>
+                  <a href={image} download="remontvision-design.webp" className="k-btn k-btn--ov k-btn--icon" aria-label="Скачать"><KitIcon name="dl" /></a>
+                  {render?.id && <button type="button" onClick={() => setShareOpen(true)} className="k-btn k-btn--ov k-btn--icon" aria-label="Поделиться"><KitIcon name="sh" /></button>}
                 </div>
               </div>
             )}
 
-            <nav className="mt-6 flex overflow-x-auto border-b" aria-label="Разделы комнаты">
+            <nav className="k-ut mt-6" aria-label="Разделы комнаты">
               {([['editor', 'Редактор'], ['design', 'Разбор интерьера'], ['roadmap', 'Закупка']] as const).map(([key, label]) => (
-                <button key={key} type="button" onClick={() => setTab(key)} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm ${tab === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
+                <button key={key} type="button" aria-selected={tab === key} onClick={() => setTab(key)}>{label}</button>
               ))}
             </nav>
 
@@ -358,12 +388,9 @@ export default function Room() {
         )}
       </main>
 
-      {fullscreen && image && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/95 p-4" role="dialog" aria-modal="true" aria-label="Просмотр дизайна" onClick={() => setFullscreen(false)}>
-          <button type="button" onClick={() => setFullscreen(false)} className="absolute right-4 top-4 flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Закрыть"><X className="size-5" /></button>
-          <img src={image} alt="Дизайн комнаты" className="max-h-full max-w-full object-contain" onClick={event => event.stopPropagation()} />
-        </div>
-      )}
+      <KitLightbox open={fullscreen && Boolean(image)} onClose={() => setFullscreen(false)} label="Просмотр дизайна">
+        {image && <img src={image} alt="Дизайн комнаты" className="max-h-full max-w-full object-contain" />}
+      </KitLightbox>
 
       {render?.id && <ShareDialog renderId={render.id} open={shareOpen} onClose={() => setShareOpen(false)} />}
     </div>
@@ -412,8 +439,8 @@ function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
           <h2 className="display-title mt-3 text-2xl sm:text-3xl">Что подобрать</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Соберём главные позиции, которые нужно подобрать для этого интерьера: что сохранить и что уточнить до покупки.</p>
           {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
-          <button type="button" onClick={onRun} disabled={busy} className="action-primary mt-5 w-full sm:w-auto">
-            {busy ? <><LoaderCircle className="size-4 animate-spin" /> Разбираем…</> : <>Запустить разбор <ArrowRight className="size-4" /></>}
+          <button type="button" onClick={onRun} disabled={busy} className="k-btn k-btn--primary mt-5 w-full sm:w-auto">
+            {busy ? <><KitIcon name="sp" spin /> Разбираем…</> : <>Запустить разбор <KitIcon name="r" /></>}
           </button>
         </div>
       ) : (
@@ -439,7 +466,7 @@ function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
                     {card.traits && <p className="mt-1 text-xs leading-5 text-muted-foreground">Сохранить: {card.traits}</p>}
                     {card.clarify && <p className="mt-1 text-xs leading-5 text-muted-foreground">Уточнить: {card.clarify}</p>}
                     {card.why && (
-                      <p className="mt-1.5 flex gap-1.5 text-[11px] leading-4 text-primary-text">
+                      <p className="mt-1.5 flex gap-1.5 text-xs leading-4 text-primary-text">
                         <GuideIcon name="sparkles" className="mt-0.5 size-3.5" />
                         <span>{card.why}</span>
                       </p>
@@ -459,7 +486,7 @@ function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
                   {breakdown.lighting.plan && <p className="mt-1.5 text-sm font-medium leading-5">{breakdown.lighting.plan}</p>}
                   {breakdown.lighting.temperature && <p className="mt-1 text-xs leading-5 text-muted-foreground">Температура: {breakdown.lighting.temperature}</p>}
                   {breakdown.lighting.why && (
-                    <p className="mt-1.5 flex gap-1.5 text-[11px] leading-4 text-primary-text">
+                    <p className="mt-1.5 flex gap-1.5 text-xs leading-4 text-primary-text">
                       <GuideIcon name="sparkles" className="mt-0.5 size-3.5" />
                       <span>{breakdown.lighting.why}</span>
                     </p>
@@ -488,9 +515,9 @@ function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
               <div key={`${surface.surface}-${index}`} className="bg-background p-3">
                 <span className="block h-16 w-full border border-foreground/20" style={{ background: displayColor(surface.hex) || 'transparent' }} />
                 <p className="mt-2 text-xs font-medium">{surface.label || surface.surface}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">{surface.ral?.code || surface.hex}</p>
-                {surface.ral?.name ? <p className="text-[11px] text-muted-foreground">{surface.ral.name}</p> : null}
-                {surface.description ? <p className="mt-1.5 text-[11px] leading-4 text-primary-text">Почему: {surface.description}</p> : null}
+                <p className="font-mono text-xs text-muted-foreground">{surface.ral?.code || surface.hex}</p>
+                {surface.ral?.name ? <p className="text-xs text-muted-foreground">{surface.ral.name}</p> : null}
+                {surface.description ? <p className="mt-1.5 text-xs leading-4 text-primary-text">Почему: {surface.description}</p> : null}
               </div>
             ))}
           </div>
@@ -503,9 +530,8 @@ function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
           <ul className="divide-y border-y">
             {electrical.map((item, index) => (
               <li key={index} className="flex gap-3 py-3 text-sm">
-                <Zap className="mt-0.5 size-4 shrink-0 text-primary-text" />
-                <div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div>
-              </li>
+                <KitIcon name="bolt" className="mt-0.5 size-4 shrink-0 text-primary-text" />
+                <div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div>              </li>
             ))}
           </ul>
         </section>

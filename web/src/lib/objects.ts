@@ -121,10 +121,10 @@ export function moveDirection(dx: number, dy: number): { text: string; percent: 
 
 export function buildMoveInstruction({ label, bbox, dx, dy }: { label?: string; bbox: number[]; dx: number; dy: number }): string {
   const name = ruLabel(label)
-  const region = bboxRegion(bbox)
-  const { text, percent } = moveDirection(dx, dy)
-  const amount = percent < 1 ? 'совсем немного' : `примерно на ${percent}% кадра`
-  return `Переместите ${name} из области (${region.x}%, ${region.y}%, ${region.w}% × ${region.h}%) ${text} ${amount}. Меняйте только объект, показанный в reference image; похожие объекты, свет и архитектуру не трогайте.`
+  const [x = 0, y = 0, w = 0, h = 0] = bbox
+  const source = bboxRegion(bbox)
+  const dest = bboxRegion([Math.min(1 - w, Math.max(0, x + dx)), Math.min(1 - h, Math.max(0, y + dy)), w, h])
+  return `Переместите ${name} из области (${source.x}%, ${source.y}%, ${source.w}% × ${source.h}%) в область (${dest.x}%, ${dest.y}%, ${dest.w}% × ${dest.h}%). В reference image показано целевое положение объекта: поставьте его туда, а старое место восстановите так, чтобы не осталось следа. Похожие объекты, свет и архитектуру не трогайте.`
 }
 
 export function buildObjectAction(label: string | undefined, action: 'replace' | 'color' | 'bigger' | 'smaller', bbox?: number[]): string {
@@ -143,4 +143,42 @@ export function buildObjectText(label: string | undefined, text: string, bbox?: 
   const region = bbox ? bboxRegion(bbox) : null
   const area = region ? ` (область ${region.x}%, ${region.y}%, ${region.w}% × ${region.h}%)` : ''
   return `${name}${area}: ${text.trim()}. Меняйте только объект, показанный в reference image; похожие объекты, свет и архитектуру не трогайте.`
+}
+
+
+// Превью целевого положения: объект переносится в новую область, старое место
+// размывается. Референс показывает модели, куда именно двигать объект.
+export async function buildMovePreview(imageUrl: string, bbox: number[], dx: number, dy: number): Promise<File | null> {
+  try {
+    const image = await loadImage(imageUrl)
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(image, 0, 0)
+    const [x = 0, y = 0, w = 0, h = 0] = bbox
+    const sw = Math.max(1, w * image.naturalWidth)
+    const sh = Math.max(1, h * image.naturalHeight)
+    const sx = Math.max(0, x * image.naturalWidth)
+    const sy = Math.max(0, y * image.naturalHeight)
+    const tx = Math.max(0, Math.min(image.naturalWidth - sw, (x + dx) * image.naturalWidth))
+    const ty = Math.max(0, Math.min(image.naturalHeight - sh, (y + dy) * image.naturalHeight))
+    // Старое место: размываем, чтобы в превью не было двух одинаковых объектов.
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(sx, sy, sw, sh)
+    ctx.clip()
+    ctx.filter = 'blur(18px)'
+    ctx.drawImage(image, 0, 0)
+    ctx.restore()
+    ctx.filter = 'none'
+    // Объект на новом месте.
+    ctx.drawImage(image, sx, sy, sw, sh, tx, ty, sw, sh)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    if (!blob) return null
+    return new File([blob], 'move-preview.jpg', { type: 'image/jpeg' })
+  } catch {
+    return null
+  }
 }

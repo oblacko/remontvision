@@ -27,10 +27,10 @@ maybe('moveDirection picks the dominant axis and percent', () => {
 maybe('buildMoveInstruction includes object, direction and percent', () => {
   const text = mod.buildMoveInstruction({ label: 'lamp', bbox: [0.2, 0.3, 0.1, 0.2], dx: 0.15, dy: 0 })
   assert.match(text, /светильник/)
-  assert.match(text, /вправо/)
-  assert.match(text, /15% кадра/)
-  assert.match(text, /Меняйте только объект/)
-  assert.match(text, /области/)
+  assert.match(text, /из области/)
+  assert.match(text, /в область/)
+  assert.match(text, /reference image/)
+  assert.match(text, /восстановите/)
 })
 
 maybe('buildObjectAction covers all four actions', () => {

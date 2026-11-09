@@ -1,31 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, DragEvent } from 'react'
-import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  Clipboard,
-  Download,
-  Expand,
-  Info,
-  LoaderCircle,
-  RotateCcw,
-  Scan,
-  Share2,
-  Search,
-  Upload,
-  X,
-  Zap,
-} from 'lucide-react'
+import { KitIcon } from '@/components/KitIcon'
+import { KitLightbox, KitSheet } from '@/components/KitSheet'
 import { Link } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
 import { useTasks } from '@/components/TaskDock'
 import { goal } from '@/lib/analytics'
 import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
-import { buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
+import { buildMoveInstruction, buildMovePreview, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
 import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
@@ -286,7 +269,6 @@ export function GenerationPanel({
   const [finalBusy, setFinalBusy] = useState(false)
   const [finalError, setFinalError] = useState('')
   const [objectsOn, setObjectsOn] = useState(false)
-  const [selectedObject, setSelectedObject] = useState<number | null>(null)
   const [editObjectTarget, setEditObjectTarget] = useState<{ label?: string; bbox: number[] } | null>(null)
   const [passportNotice, setPassportNotice] = useState('')
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -831,18 +813,18 @@ export function GenerationPanel({
           <ol className="hidden items-center gap-4 md:flex" aria-label="Шаги создания">
             {stepLabels.map((label, index) => (
               <li key={label} className={`gen-step ${index === activeStep ? 'gen-step-active' : ''} ${index < activeStep ? 'gen-step-done' : ''}`} aria-current={index === activeStep ? 'step' : undefined}>
-                <span className="font-mono text-[0.65rem]">0{index + 1}</span> {label}
+                <span className="font-mono text-xs">0{index + 1}</span> {label}
               </li>
             ))}
           </ol>
         </div>
-        <button ref={closeRef} type="button" onClick={onClose} className="flex size-12 items-center justify-center border border-foreground transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Закрыть генератор">
-          <X className="size-5" />
+        <button ref={closeRef} type="button" onClick={onClose} className="k-btn k-btn--icon" aria-label="Закрыть генератор">
+          <KitIcon name="x" />
         </button>
       </div>}
 
       <div className={inline ? 'min-w-0' : 'gen-body'}>
-        {inline && step === 'result' && !current && <div className="py-10 text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-primary-text" /></div>}
+        {inline && step === 'result' && !current && <div className="py-10 text-center"><KitIcon name="sp" spin className="mx-auto size-6 text-primary-text" /></div>}
         {step === 'photo' && (
           <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
             <div>
@@ -850,9 +832,9 @@ export function GenerationPanel({
               <h3 className="display-title mt-6 text-4xl sm:text-5xl">Загрузите фото своей комнаты</h3>
               <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Чёткий кадр при дневном свете — стены, пол и мебель в кадре. Подойдёт вертикальное, квадратное или горизонтальное фото, пропорции сохранятся.</p>
               <ul className="mt-8 space-y-3 border-t pt-6 text-sm">
-                <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />JPG, PNG, WebP или HEIC до 15 МБ</li>
-                <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Любое соотношение сторон</li>
-                <li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-primary-text" />Фото используется только для создания дизайна</li>
+                <li className="flex gap-3"><KitIcon name="ok" className="mt-0.5 size-4 shrink-0 text-primary-text" />JPG, PNG, WebP или HEIC до 15 МБ</li>
+                <li className="flex gap-3"><KitIcon name="ok" className="mt-0.5 size-4 shrink-0 text-primary-text" />Любое соотношение сторон</li>
+                <li className="flex gap-3"><KitIcon name="ok" className="mt-0.5 size-4 shrink-0 text-primary-text" />Фото используется только для создания дизайна</li>
               </ul>
             </div>
             <div onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
@@ -862,30 +844,27 @@ export function GenerationPanel({
                   <img src={cleaned && cleanupRequested ? cleaned.url : photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
                     <span className="truncate text-xs">{photoName}</span>
-                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setCleaned(null); setCleanupRequested(false); setCleanupError(''); if (photoInput.current) photoInput.current.value = '' }} className="flex size-11 shrink-0 items-center justify-center hover:bg-background/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Удалить фото"><X className="size-4" /></button>
+                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setCleaned(null); setCleanupRequested(false); setCleanupError(''); if (photoInput.current) photoInput.current.value = '' }} className="k-btn k-btn--ov k-btn--icon" aria-label="Удалить фото"><KitIcon name="x" /></button>
                   </div>
                 </div>
               ) : (
-                <label htmlFor="gen-photo" className="relative flex min-h-80 cursor-pointer flex-col items-center justify-center border border-dashed border-foreground/40 bg-background px-4 text-center transition-colors hover:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">
-                  <span className="pointer-events-none absolute -left-px -top-px size-5 border-l-2 border-t-2 border-foreground" aria-hidden="true" />
-                  <span className="pointer-events-none absolute -right-px -top-px size-5 border-r-2 border-t-2 border-foreground" aria-hidden="true" />
-                  <span className="pointer-events-none absolute -bottom-px -left-px size-5 border-b-2 border-l-2 border-foreground" aria-hidden="true" />
-                  <span className="pointer-events-none absolute -bottom-px -right-px size-5 border-b-2 border-r-2 border-foreground" aria-hidden="true" />
-                  <Upload className="mb-4 size-8 text-primary-text" />
+                <label htmlFor="gen-photo" className="k-dz min-h-80 cursor-pointer peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground">
+                  <b aria-hidden="true"></b><b aria-hidden="true"></b><b aria-hidden="true"></b><b aria-hidden="true"></b>
+                  <KitIcon name="plus" className="mb-2 size-8 text-primary-text" />
                   <span className="text-base font-medium">Загрузить фото комнаты</span>
-                  <span className="mt-2 text-sm leading-6 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP или HEIC · до 15 МБ</span>
+                  <span className="mt-1 text-sm leading-6 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP или HEIC · до 15 МБ</span>
                 </label>
               )}
               {photo && (
                 <div className="mt-5 border p-4">
-                  <button type="button" aria-pressed={cleanupRequested} onClick={() => setCleanupRequested(value => !value)} className={`flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cleanupRequested ? '' : 'opacity-90'}`}>
-                    <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center border ${cleanupRequested ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{cleanupRequested ? <Check className="size-3.5" /> : null}</span>
+                  <button type="button" aria-pressed={cleanupRequested} onClick={() => setCleanupRequested(value => !value)} className={`flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring ${cleanupRequested ? '' : 'opacity-90'}`}>
+                    <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center border ${cleanupRequested ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{cleanupRequested ? <KitIcon name="ok" className="size-4" /> : null}</span>
                     <span>
                       <span className="block text-sm font-medium">Очистить комнату перед созданием дизайна</span>
                       <span className="mt-1 block text-xs leading-5 text-muted-foreground">{cleanupRequested ? 'Уберём мебель, технику, декор и свет. Оставим стены, окна, двери и пропорции.' : 'По умолчанию выключено: сохраняем вашу мебель и планировку.'}</span>
                     </span>
                   </button>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     {cleanupBusy && <span>Очищаем комнату…</span>}
                     {!cleanupBusy && cleaned && cleanupRequested && <span className="text-primary-text">Очищено · можно перегенерировать</span>}
                     {!cleanupBusy && cleaned && !cleanupRequested && <span>Очищенная версия сохранена, но не выбрана</span>}
@@ -896,15 +875,15 @@ export function GenerationPanel({
               <div className="mt-5">
                 <p className="eyebrow">Тип комнаты</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{photo ? 'Чтобы в дизайне не появились предметы из другого помещения.' : 'Можно выбрать заранее — сначала загрузите фото.'}</p>
-                <div className="mt-3 grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
-                  {roomTypes.map(type => <button key={type} type="button" disabled={!photo} aria-pressed={roomType === type} onClick={() => setRoomType(type)} className={`min-h-11 bg-background px-2 text-xs leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-foreground/60 ${roomType === type ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>{type}</button>)}
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {roomTypes.map(type => <button key={type} type="button" disabled={!photo} aria-selected={roomType === type} onClick={() => setRoomType(type)} className="k-tab text-left leading-4 disabled:cursor-not-allowed disabled:opacity-50">{type}</button>)}
                 </div>
               </div>
               <div className="mt-4" onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
                 {photoError && <p className="mb-3 text-sm text-destructive" role="alert">{photoError}</p>}
                 {photo && !roomType && <p className="mb-3 text-xs text-muted-foreground">Выберите тип комнаты, чтобы продолжить.</p>}
-                <button type="button" disabled={!photo || !roomType} onClick={() => setStep('style')} className="action-primary w-full disabled:opacity-40">
-                  Продолжить <ArrowRight className="size-4" />
+                <button type="button" disabled={!photo || !roomType} onClick={() => setStep('style')} className="k-btn k-btn--primary w-full disabled:opacity-40">
+                  Продолжить <KitIcon name="r" className="size-4" />
                 </button>
               </div>
             </div>
@@ -916,18 +895,12 @@ export function GenerationPanel({
             <p className="eyebrow">Шаг 02 / Стиль</p>
             <h3 className="display-title mt-6 text-4xl">Выберите направление</h3>
             {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите одно направление — оно задаст палитру, материалы и свет.</p>}
-            <div className="mt-8 flex snap-x snap-mandatory gap-px overflow-x-auto border bg-border sm:grid sm:grid-cols-3 sm:overflow-visible lg:grid-cols-5">
+            <div className="k-tiles mt-8">
               {stylePresets.map((item) => (
-                <button key={item.key} type="button" aria-pressed={style === item.name} onClick={() => { const nextStyle = item.name; const changing = style !== nextStyle; setStyle(nextStyle); if (changing || !conceptKey) setConceptKey(pickCompatibleConcept(item.key)) }} className={`group relative w-60 shrink-0 snap-start bg-background text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:w-auto ${style === item.name ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
-                  <span className={`block ${style === item.name ? '' : 'opacity-60'}`}>
-                    <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
-                      <img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
-                    </span>
-                    <span className={`flex min-h-12 items-center justify-between gap-2 px-3 text-sm font-medium ${style === item.name ? 'text-primary-text' : ''}`}>
-                      {item.name}
-                      {style === item.name ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
-                    </span>
-                  </span>
+                <button key={item.key} type="button" role="radio" aria-checked={style === item.name} onClick={() => { const nextStyle = item.name; const changing = style !== nextStyle; setStyle(nextStyle); if (changing || !conceptKey) setConceptKey(pickCompatibleConcept(item.key)) }} className="k-tile">
+                  <span className="im relative overflow-hidden"><img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover" /></span>
+                  <span className="nm">{item.name}</span>
+                  <span className="bd"><KitIcon name="ok" /></span>
                 </button>
               ))}
             </div>
@@ -937,21 +910,21 @@ export function GenerationPanel({
                 <p className="eyebrow">Шаг 03 / Концепция</p>
                 <p className="mt-1 text-sm text-muted-foreground">{style ? 'Выберите главный ход будущего интерьера.' : 'Сначала выберите стиль — покажем совместимые концепции.'}</p>
               </div>
-              <div className="mt-4 flex snap-x snap-mandatory gap-px overflow-x-auto border bg-border sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {concepts.map((concept) => {
                   const selectedKey = stylePresets.find(item => item.name === style)?.key || null
                   const level = selectedKey ? (compatibility[concept.id]?.[selectedKey] || 'ok') : 'ok'
                   const disabled = !style || level === 'conflict'
                   const selected = conceptKey === concept.id
                   return (
-                    <button key={concept.id} data-concept-id={concept.id} type="button" disabled={disabled} aria-pressed={selected} onClick={() => setConceptKey(concept.id)} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed sm:w-auto ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
-                      <span className={`block ${selected ? '' : 'opacity-60'}`}>
+                    <button key={concept.id} data-concept-id={concept.id} type="button" disabled={disabled} aria-checked={selected} role="radio" onClick={() => setConceptKey(concept.id)} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
+                      <span className={`block ${selected ? '' : 'opacity-80'}`}>
                         <span className="flex items-center justify-between gap-2 text-sm font-medium">
                           {concept.name}
-                          {selected ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                          {selected ? <KitIcon name="ok" className="size-4 shrink-0 text-primary-text" /> : null}
                         </span>
                         <span className="mt-1 block text-xs leading-5 text-muted-foreground">{concept.main_move}</span>
-                        <span className="mt-1 block text-[10px] uppercase tracking-wide text-muted-foreground">{level === 'weaken' ? 'ослабленная форма' : level === 'conflict' ? 'несовместимо со стилем' : 'совместимо'}</span>
+                        <span className="k-caption mt-1 block">{level === 'weaken' ? 'ослабленная форма' : level === 'conflict' ? 'несовместимо со стилем' : 'совместимо'}</span>
                       </span>
                     </button>
                   )
@@ -964,19 +937,19 @@ export function GenerationPanel({
                 <div>
                   <p className="eyebrow">Модель</p>
                   <p className="mt-1 text-sm text-muted-foreground">{editing ? 'Модель — от родительского дизайна.' : 'Цена модели спишется за рендер в кредитах.'}</p>
-                  <div className="mt-4 flex snap-x snap-mandatory gap-px overflow-x-auto border bg-border sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3">
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {renderModels.map((m) => {
                       const selected = modelKey === m.key
                       const highlighted = selected && !editing
                       return (
-                        <button key={m.key} type="button" disabled={editing} aria-pressed={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true) }} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${highlighted ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
-                          <span className={`block ${highlighted ? '' : 'opacity-60'}`}>
+                        <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
+                          <span className={`block ${highlighted ? '' : 'opacity-80'}`}>
                             <span className="flex items-center justify-between gap-2 text-sm font-medium">
                               {m.label}
-                              {highlighted ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                              {highlighted ? <KitIcon name="ok" className="size-4 shrink-0 text-primary-text" /> : null}
                             </span>
                             <span className="mt-1 block font-mono text-xs text-primary-text">{m.credits} кр.</span>
-                            {editing && <span className="mt-1 block text-[10px] leading-4 text-muted-foreground">Модель — от родительского дизайна</span>}
+                            {editing && <span className="mt-1 block text-xs leading-4 text-muted-foreground">Модель — от родительского дизайна</span>}
                           </span>
                         </button>
                       )
@@ -992,9 +965,9 @@ export function GenerationPanel({
                   aria-checked={isPrivate}
                   disabled={!hasSucceededPayment}
                   onClick={() => setIsPrivate(value => !value)}
-                  className={`mt-3 flex min-h-11 w-full items-start gap-3 border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${isPrivate ? 'border-primary' : 'border-foreground/25 hover:border-foreground'}`}
+                  className={`mt-3 flex min-h-11 w-full items-start gap-3 border bg-card px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${isPrivate ? 'border-foreground' : 'border-input hover:border-foreground'}`}
                 >
-                  <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center border ${isPrivate ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/40'}`}>{isPrivate ? <Check className="size-4" /> : null}</span>
+                  <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center border ${isPrivate ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{isPrivate ? <KitIcon name="ok" className="size-4" /> : null}</span>
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">Приватный режим — не показывать в примерах и галерее</span>
                     <span className="mt-1 block text-xs leading-5 text-muted-foreground">{hasSucceededPayment ? 'Дизайн останется приватным и не попадёт в публичную галерею.' : 'Только на платных пакетах'}</span>
@@ -1006,7 +979,7 @@ export function GenerationPanel({
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={() => setStep('photo')} className="action-secondary hidden sm:inline-flex"><ArrowLeft className="size-4" />Назад</button>
+              <button type="button" onClick={() => setStep('photo')} className="k-btn hidden sm:inline-flex"><KitIcon name="l" className="size-4" />Назад</button>
               <button
                 type="button"
                 disabled={busy || !style || (concepts.length > 0 && !conceptKey)}
@@ -1015,9 +988,9 @@ export function GenerationPanel({
                   const request = style ? `Стиль: ${style}${conceptName ? ` · концепция: ${conceptName}` : ''}` : 'Стиль по референсу'
                   void startGeneration(request, style ?? 'Референс пользователя')
                 }}
-                className="action-primary min-h-14 px-8 text-base disabled:opacity-40"
+                className="k-btn k-btn--primary min-h-14 px-8 text-base disabled:opacity-40"
               >
-                {busy ? 'Запускаем…' : 'Создать дизайн'} <ArrowUpRight className="size-5" />
+                {busy ? 'Запускаем…' : 'Создать дизайн'} <KitIcon name="ur" className="size-5" />
               </button>
             </div>
           </div>
@@ -1026,24 +999,24 @@ export function GenerationPanel({
         {step === 'generating' && (
           <div className="mx-auto max-w-xl py-16" role="status" aria-live="polite">
             <div className="flex items-start gap-4">
-              <LoaderCircle className="mt-1 size-8 shrink-0 animate-spin text-primary-text motion-reduce:animate-none" />
+              <KitIcon name="sp" spin className="mt-1 size-8 shrink-0 text-primary-text" />
               <div>
                 <h3 className="display-title text-3xl">{productBinding ? 'Привязываем товар' : genMode === 'edit' ? 'Применяем редактирование' : 'Создаём ваш дизайн'}</h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{genStageInfo.hint}</p>
               </div>
             </div>
-            <div className="mt-8 h-1 w-full overflow-hidden bg-border" role="progressbar" aria-valuenow={genPercent} aria-valuemin={0} aria-valuemax={100}>
-              <div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${genPercent}%` }} />
+            <div className="k-pb mt-8" role="progressbar" aria-valuenow={genPercent} aria-valuemin={0} aria-valuemax={100}>
+              <i className="transition-[width] duration-500" style={{ width: `${genPercent}%` }} />
             </div>
-            <ol className="mt-6 space-y-2.5">
+            <ol className="k-steps">
               {genStages.map((item, index) => {
                 const done = index < genStageIndex
                 const active = index === genStageIndex
                 return (
-                  <li key={item.key} className={`flex items-center gap-3 text-sm ${done || active ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    {done ? <Check className="size-4 shrink-0 text-primary-text" /> : active ? <LoaderCircle className="size-4 shrink-0 animate-spin text-primary-text motion-reduce:animate-none" /> : <span className="size-4 shrink-0 rounded-full border" />}
+                  <li key={item.key} className={done || active ? 'text-foreground' : 'text-muted-foreground'}>
+                    <span className={`d${done ? ' ok' : active ? ' go' : ''}`}>{done ? <KitIcon name="ok" className="size-3.5" /> : active ? <KitIcon name="sp" spin className="size-3.5" /> : null}</span>
                     <span>{item.label}</span>
-                    {active && <span className="ml-auto font-mono text-[11px] text-muted-foreground">сейчас</span>}
+                    {active && <em>сейчас</em>}
                   </li>
                 )
               })}
@@ -1052,7 +1025,7 @@ export function GenerationPanel({
               Прошло {elapsedLabel}. {elapsed >= 180 ? 'Идёт дольше обычного — можно не закрывать окно, результат сохранится в кабинете.' : 'Можно переключиться на другую вкладку, процесс продолжится.'}
             </p>
             <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-              <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <KitIcon name="info" className="mt-0.5 size-4 shrink-0" />
               <span className="min-w-0">Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов.</span>
             </p>
           </div>
@@ -1060,7 +1033,7 @@ export function GenerationPanel({
 
         {step === 'searching' && (
           <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-16 text-center" role="status" aria-live="polite">
-            <Search className="size-10 animate-pulse text-primary-text motion-reduce:animate-none" />
+            <KitIcon name="q" className="size-10 animate-pulse text-primary-text" />
             <h3 className="display-title mt-8 text-4xl">Собираем подборку</h3>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">Ищем товары по фактурам и цветам из вашего дизайна, переводим оттенки в RAL и готовим разметку электрики.</p>
           </div>
@@ -1084,9 +1057,7 @@ export function GenerationPanel({
                         image={current.image}
                         ratio={current.ratio}
                         objects={visibleObjects}
-                        selectedIndex={selectedObject}
-                        onSelect={(index) => {
-                          setSelectedObject(index)
+                        onCreateEdit={(index) => {
                           const object = visibleObjects[index]
                           if (!object) return
                           setEditObjectTarget(object)
@@ -1095,6 +1066,17 @@ export function GenerationPanel({
                           if (current) setOpenHistory(current.id)
                           requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
                         }}
+                        onConfirmMove={async (index, dx, dy) => {
+                          const object = visibleObjects[index]
+                          if (!object) return
+                          const instruction = buildMoveInstruction({ label: object.label, bbox: object.bbox, dx, dy })
+                          const preview = await buildMovePreview(current.image, object.bbox, dx, dy)
+                          setObjectsOn(false)
+                          void startGeneration(instruction, current.styleName, {
+                            parentId: current.id,
+                            refs: preview ? [{ file: preview, description: `Целевое положение объекта «${ruLabel(object.label)}». Переместите его туда, старое место восстановите.` }] : undefined,
+                          })
+                        }}
                       />
                     ) : (
                       <img src={current.image} alt="Сгенерированный дизайн интерьера" className="h-full max-h-[62svh] w-full object-contain" />
@@ -1102,18 +1084,18 @@ export function GenerationPanel({
                   </div>
                   <div className="absolute right-3 top-3 flex gap-2">
                     {visibleObjects.length > 0 && (
-                      <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null) }} className={`flex size-12 items-center justify-center border backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${objectsOn ? 'border-primary bg-primary text-primary-foreground' : 'border-background/40 bg-foreground/60 text-background hover:bg-background hover:text-foreground'}`} aria-label="Выбрать объект на рендере">
-                        <Scan className="size-5" />
+                      <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value) }} className={`k-btn k-btn--ov k-btn--icon${objectsOn ? ' bg-primary text-primary-foreground' : ''}`} aria-label="Выбрать объект на рендере">
+                        <KitIcon name="q" />
                       </button>
                     )}
-                    <button type="button" onClick={() => setLightbox(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Открыть результат на весь экран">
-                      <Expand className="size-5" />
+                    <button type="button" onClick={() => setLightbox(true)} className="k-btn k-btn--ov k-btn--icon" aria-label="Открыть результат на весь экран">
+                      <KitIcon name="fs" />
                     </button>
-                    <a href={current.image} download="remontvision-design.webp" className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Скачать результат">
-                      <Download className="size-5" />
+                    <a href={current.image} download="remontvision-design.webp" className="k-btn k-btn--ov k-btn--icon" aria-label="Скачать результат">
+                      <KitIcon name="dl" />
                     </a>
-                    <button type="button" onClick={() => setShareOpen(true)} className="flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Поделиться результатом">
-                      <Share2 className="size-5" />
+                    <button type="button" onClick={() => setShareOpen(true)} className="k-btn k-btn--ov k-btn--icon" aria-label="Поделиться результатом">
+                      <KitIcon name="sh" />
                     </button>
                   </div>
                 </div>}
@@ -1122,7 +1104,7 @@ export function GenerationPanel({
                     <p id="art-direction" className="eyebrow">Авторский бриф</p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Направление, которое арт-директор написал по вашему фото и стилю.</p>
                     {(current.dimensionsEstimate || current.lens) ? (
-                      <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
                         {current.dimensionsEstimate ? `Оценка архитектора: ${current.dimensionsEstimate.width} × ${current.dimensionsEstimate.length} × ${current.dimensionsEstimate.height} м` : ''}
                         {current.dimensionsEstimate?.confidence ? ` · уверенность ${current.dimensionsEstimate.confidence === 'high' ? 'высокая' : current.dimensionsEstimate.confidence === 'medium' ? 'средняя' : 'низкая'}` : ''}
                         {current.lens?.type ? ` · объектив: ${current.lens.type === 'wide' ? 'широкий угол' : current.lens.type === 'tele' ? 'теле' : 'нормальный'}` : ''}
@@ -1132,7 +1114,7 @@ export function GenerationPanel({
                     {current.artDirection.palette?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {current.artDirection.palette.map((color, index) => (
-                          <span key={`${color.hex || color.name}-${index}`} className="inline-flex items-center gap-2 border bg-background px-2 py-1 text-[11px]">
+                          <span key={`${color.hex || color.name}-${index}`} className="inline-flex items-center gap-2 border bg-background px-2 py-1 text-xs">
                             <span className="size-4 shrink-0 border" style={{ background: color.hex || 'transparent' }} aria-hidden="true" />
                             {color.name || color.hex}
                           </span>
@@ -1161,16 +1143,16 @@ export function GenerationPanel({
                     {current.designDirection.palette?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {current.designDirection.palette.map((color) => (
-                          <span key={`${color.hex}-${color.name || ''}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                            <span className="size-4 border border-foreground/20" style={{ background: color.hex }} />
+                          <span key={`${color.hex}-${color.name || ''}`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="size-4 border border" style={{ background: color.hex }} />
                             {color.name || color.hex}
                           </span>
                         ))}
                       </div>
                     ) : null}
-                    {current.designDirection.materialsStory?.length ? <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Материалы: {current.designDirection.materialsStory.join(', ')}</p> : null}
-                    {current.designDirection.focalPoint ? <p className="mt-1 text-[11px] leading-5 text-muted-foreground">Фокус: {current.designDirection.focalPoint}</p> : null}
-                    {current.designDirection.compatibility === 'weaken' ? <p className="mt-1 text-[11px] text-muted-foreground">Ослабленная форма пары</p> : null}
+                    {current.designDirection.materialsStory?.length ? <p className="mt-2 text-xs leading-5 text-muted-foreground">Материалы: {current.designDirection.materialsStory.join(', ')}</p> : null}
+                    {current.designDirection.focalPoint ? <p className="mt-1 text-xs leading-5 text-muted-foreground">Фокус: {current.designDirection.focalPoint}</p> : null}
+                    {current.designDirection.compatibility === 'weaken' ? <p className="mt-1 text-xs text-muted-foreground">Ослабленная форма пары</p> : null}
                   </section>
                 ) : null}
                 {heroItems.length ? (
@@ -1179,12 +1161,12 @@ export function GenerationPanel({
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">Одно редактирование за товар. Если сходство или качество не пройдут проверку, версия откатится, а кредит вернётся.</p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
                       {heroItems.map(item => (
-                        <div key={item.id} className="flex min-w-0 flex-col border border-foreground/20">
+                        <div key={item.id} className="flex min-w-0 flex-col border border">
                           {item.image_url ? <img src={item.image_url} alt={item.name} className="aspect-[4/3] w-full border-b object-cover" /> : null}
                           <div className="flex flex-1 flex-col p-3">
                             <p className="line-clamp-2 text-xs font-medium leading-5">{item.name}</p>
-                            <p className="mt-1 text-[11px] text-muted-foreground">{presentationLabel(item.presentation_status)}</p>
-                            <button type="button" onClick={() => startGeneration(`Перенести товар «${item.name}» в интерьер, изменив только этот объект`, current.styleName, { target: item.target, productId: item.id, parentId: current.id })} className="mt-3 min-h-11 border border-foreground px-2 text-[11px] leading-4 transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <p className="mt-1 text-xs text-muted-foreground">{presentationLabel(item.presentation_status)}</p>
+                            <button type="button" onClick={() => startGeneration(`Перенести товар «${item.name}» в интерьер, изменив только этот объект`, current.styleName, { target: item.target, productId: item.id, parentId: current.id })} className="mt-3 min-h-11 border border-foreground px-2 text-xs leading-4 transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
                               Перенести в интерьер · 1 кредит
                             </button>
                           </div>
@@ -1208,15 +1190,15 @@ export function GenerationPanel({
                       layerLabel: change.label || change.layer,
                     })).sort((a, b) => b.impact - a.impact)
                     return (
-                      <div key={item.id} className="border border-foreground/25">
-                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id); onSelectVersion?.(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                      <div key={item.id} className="border border">
+                        <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id); onSelectVersion?.(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring">
                           <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span><span className="truncate">{item.request}</span></span>
-                          <ChevronDown className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
+                          <KitIcon name="cd" className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
                         </button>
                         {expanded && (
-                          <div className="border-t border-foreground/25 px-4 py-4">
+                          <div className="border-t border px-4 py-4">
                             <div className="flex gap-3">
-                              <img src={item.image} alt="" className="h-20 w-16 shrink-0 border border-foreground/25 object-cover" />
+                              <img src={item.image} alt="" className="h-20 w-16 shrink-0 border border object-cover" />
                               <p className="text-xs leading-5 text-muted-foreground">Эта версия показана на экране. Запустите редактирование от неё — новая версия добавится в историю.</p>
                             </div>
                             <p className="eyebrow mt-5">Быстрое редактирование</p>
@@ -1232,10 +1214,10 @@ export function GenerationPanel({
                                     {objects.map((object, objectIndex) => {
                                       const active = effectiveObjectTarget ? keyOf(effectiveObjectTarget) === keyOf(object) : false
                                       return (
-                                        <button key={`${keyOf(object)}-${objectIndex}`} type="button" aria-pressed={active} onClick={() => { setEditObjectTarget(object); setSelectedObject(null); if (!editRefs.length) addEditBlock() }} className={`min-h-11 shrink-0 border px-3 text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{ruLabel(object.label)}</button>
+                                        <button key={`${keyOf(object)}-${objectIndex}`} type="button" aria-pressed={active} onClick={() => { setEditObjectTarget(object); if (!editRefs.length) addEditBlock() }} className={`min-h-11 shrink-0 border px-3 text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-input hover:border-foreground'}`}>{ruLabel(object.label)}</button>
                                       )
                                     })}
-                                    {effectiveObjectTarget && <button type="button" onClick={() => { setEditObjectTarget(null); onClearObject?.(); setSelectedObject(null) }} className="min-h-11 shrink-0 border px-3 text-xs text-muted-foreground">Сбросить</button>}
+                                    {effectiveObjectTarget && <button type="button" onClick={() => { setEditObjectTarget(null); onClearObject?.() }} className="min-h-11 shrink-0 border px-3 text-xs text-muted-foreground">Сбросить</button>}
                                   </div>
                                   {effectiveObjectTarget && <p className="mt-2 text-xs leading-5 text-muted-foreground">Редактирование применяется к объекту «{ruLabel(effectiveObjectTarget.label)}» — в инструкцию уйдёт область кадра и кроп объекта.</p>}
                                 </div>
@@ -1253,10 +1235,10 @@ export function GenerationPanel({
                                         addEditBlockWithText(edit.action)
                                         requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
                                       }}
-                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 snap-start flex-col items-start gap-0.5 overflow-hidden border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 snap-start flex-col items-start gap-0.5 overflow-hidden border border-input px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       <span className="line-clamp-2 w-full break-words text-xs font-medium leading-4" title={edit.action}>{edit.action}</span>
-                                      <span className="w-full truncate text-[10px] text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
+                                      <span className="w-full truncate text-xs text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
                                     </button>
                                   ))}
                                 </div>
@@ -1270,10 +1252,10 @@ export function GenerationPanel({
                                         addEditBlockWithText(edit.action)
                                         requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
                                       }}
-                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 flex-col items-start gap-0.5 overflow-hidden border border-foreground/30 px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="flex min-h-12 w-44 max-w-[80vw] min-w-0 shrink-0 flex-col items-start gap-0.5 overflow-hidden border border-input px-3 py-2 text-left transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       <span className="line-clamp-2 w-full break-words text-xs font-medium leading-4" title={edit.action}>{edit.action}</span>
-                                      <span className="w-full truncate text-[10px] text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
+                                      <span className="w-full truncate text-xs text-muted-foreground">{edit.layerLabel} · {Math.round(edit.impact * 100)}%</span>
                                     </button>
                                   ))}
                                 </div>
@@ -1285,7 +1267,7 @@ export function GenerationPanel({
                                 return (
                                   <div
                                     key={ref.id}
-                                    className={`relative border p-3 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border-foreground/25'}`}
+                                    className={`relative border p-3 transition-colors ${ref.drag ? 'border-primary bg-primary/5' : 'border'}`}
                                     onDragOver={(event) => { event.preventDefault(); updateEditRef(ref.id, { drag: true }) }}
                                     onDragLeave={() => updateEditRef(ref.id, { drag: false })}
                                     onDrop={(event) => {
@@ -1298,32 +1280,32 @@ export function GenerationPanel({
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <p className="eyebrow">Прикрепить референс</p>
-                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Удалить изменение"><X className="size-4" /></button>
+                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring" aria-label="Удалить изменение"><KitIcon name="x" className="size-4" /></button>
                                     </div>
                                     {hasSource ? (
-                                      <div className="mt-2 flex items-center gap-3 border border-foreground/25 p-2">
+                                      <div className="mt-2 flex items-center gap-3 border border p-2">
                                         {ref.preview ? (
-                                          <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border border-foreground/25 object-cover" />
+                                          <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border border object-cover" />
                                         ) : (
-                                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border border-foreground/25 bg-muted text-[10px] uppercase tracking-widest text-muted-foreground">URL</a>
+                                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border border bg-secondary text-xs uppercase tracking-widest text-muted-foreground">URL</a>
                                         )}
                                         <div className="min-w-0 flex-1">
                                           <p className="truncate text-xs">{ref.url || ref.name || 'Референс'}</p>
-                                          <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
+                                          <p className="mt-1 truncate font-mono text-xs uppercase tracking-widest text-muted-foreground">{ref.file ? 'Файл' : 'Ссылка'}</p>
                                         </div>
                                       </div>
                                     ) : null}
-                                    <div className="mt-2 grid grid-cols-2 gap-px border border-foreground/25 bg-border">
-                                      <label className="inline-flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
-                                        <Upload className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">{hasSource ? 'Заменить файл' : 'Выбрать файл'}</span>
+                                    <div className="mt-2 grid grid-cols-2 gap-px border border bg-border">
+                                      <label className="inline-flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-secondary">
+                                        <KitIcon name="plus" className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">{hasSource ? 'Заменить файл' : 'Выбрать файл'}</span>
                                         <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
                                       </label>
-                                      <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-muted">
-                                        <Clipboard className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words sm:hidden">Из буфера</span><span className="hidden min-w-0 break-words sm:inline">Вставить из буфера</span>
+                                      <button type="button" onClick={() => pasteEditRef(ref.id)} className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-secondary">
+                                        <KitIcon name="plus" className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words sm:hidden">Из буфера</span><span className="hidden min-w-0 break-words sm:inline">Вставить из буфера</span>
                                       </button>
                                     </div>
                                     {hasSource && (
-                                      <button type="button" onClick={() => clearEditRefSource(ref.id)} className="mt-2 text-[11px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground">Убрать референс</button>
+                                      <button type="button" onClick={() => clearEditRefSource(ref.id)} className="mt-2 text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground">Убрать референс</button>
                                     )}
                                     <p className="eyebrow mt-4">Текст изменения</p>
                                     <textarea
@@ -1332,14 +1314,14 @@ export function GenerationPanel({
                                       rows={4}
                                       placeholder="Опишите, что изменить"
                                       aria-label="Текст изменения"
-                                      className="mt-2 min-h-20 w-full min-w-0 border border-foreground/25 bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground focus:ring-2 focus:ring-ring/20"
+                                      className="mt-2 min-h-20 w-full min-w-0 border border bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground focus:ring-2 focus:ring-ring/20"
                                     />
                                   </div>
                                 )
                               })}
                             </div>
-                            <button type="button" onClick={addEditBlock} disabled={editRefs.length >= MAX_EDIT_BLOCKS} className="mt-3 inline-flex min-h-11 items-center gap-2 border border-foreground px-3 text-xs transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                              <span className="leading-none">Добавить редактирование</span> <span className="font-mono text-[11px] leading-none text-primary-text">{editRefs.length} из {MAX_EDIT_BLOCKS}</span>
+                            <button type="button" onClick={addEditBlock} disabled={editRefs.length >= MAX_EDIT_BLOCKS} className="mt-3 inline-flex min-h-11 items-center gap-2 border border-foreground px-3 text-xs transition-colors hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                              <span className="leading-none">Добавить редактирование</span> <span className="font-mono text-xs leading-none text-primary-text">{editRefs.length} из {MAX_EDIT_BLOCKS}</span>
                             </button>
                             <div className="mt-3">
                               <button
@@ -1365,9 +1347,9 @@ export function GenerationPanel({
                                   setEditObjectTarget(null)
                                   onClearObject?.()
                                 }}
-                                className="action-primary w-full"
+                                className="k-btn k-btn--primary w-full"
                               >
-                                Применить <Check className="size-4" />
+                                Применить <KitIcon name="ok" className="size-4" />
                               </button>
                             </div>
                           </div>
@@ -1382,11 +1364,11 @@ export function GenerationPanel({
             {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
 
             {!inline && <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="action-secondary"><ArrowLeft className="size-4" />Изменить стиль</button>
+              <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="k-btn"><KitIcon name="l" className="size-4" />Изменить стиль</button>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button type="button" onClick={resetAll} className="action-secondary">Новая комната</button>
-                <Link to={`/room/${encodeURIComponent(current.roomId)}`} className="action-secondary min-h-14 px-6 text-base">Открыть комнату</Link>
-                <button type="button" onClick={runFinalReview} disabled={finalBusy} className="action-primary min-h-14 px-8 text-base">{finalBusy ? <><LoaderCircle className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <Check className="size-5" /></>}</button>
+                <button type="button" onClick={resetAll} className="k-btn">Новая комната</button>
+                <Link to={`/room/${encodeURIComponent(current.roomId)}`} className="k-btn min-h-14 px-6 text-base">Открыть комнату</Link>
+                <button type="button" onClick={runFinalReview} disabled={finalBusy} className="k-btn k-btn--primary min-h-14 px-8 text-base">{finalBusy ? <><KitIcon name="sp" spin className="size-4 animate-spin" /> Собираем итог…</> : <>Готово · итог <KitIcon name="ok" className="size-5" /></>}</button>
               </div>
             </div>}
             {finalError && <p className="mt-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">{finalError}</p>}
@@ -1402,15 +1384,15 @@ export function GenerationPanel({
                   <img src={current.image} alt="Сгенерированный дизайн интерьера" className="absolute inset-0 h-full w-full object-cover" />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  <p className="flex items-center gap-2 text-xs text-muted-foreground"><Zap className="size-4 text-primary-text" />Электрика — рекомендация, не проект</p>
-                  <button type="button" onClick={() => setLightbox(true)} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Во весь экран <Expand className="size-4" /></button>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground"><KitIcon name="bolt" className="size-4 text-primary-text" />Электрика — рекомендация, не проект</p>
+                  <button type="button" onClick={() => setLightbox(true)} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">Во весь экран <KitIcon name="fs" className="size-4" /></button>
                 </div>
               </div>
 
               <div>
-                <div className="flex gap-2 overflow-x-auto border-b pb-2" style={{ maskImage: 'linear-gradient(90deg,#000 88%,transparent)', WebkitMaskImage: 'linear-gradient(90deg,#000 88%,transparent)' }}>
+                <div className="k-tabs" role="tablist">
                   {SUMMARY_TABS.map(([id, label]) => (
-                    <button key={id} type="button" onClick={() => setOpenSummaryTab(openSummaryTab === id ? null : id)} className={`min-h-11 shrink-0 border px-3 text-xs transition-colors ${openSummaryTab === id ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>
+                    <button key={id} type="button" role="tab" aria-selected={openSummaryTab === id} onClick={() => setOpenSummaryTab(openSummaryTab === id ? null : id)} className="k-tab">{label}</button>
                   ))}
                 </div>
 
@@ -1459,9 +1441,9 @@ export function GenerationPanel({
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h4 id="gen-products" className="eyebrow">Товары</h4>
                       {current.productsEnabled === false ? (
-                        <button type="button" disabled className="action-primary min-h-11 px-4 text-sm">Подбор выключен</button>
+                        <button type="button" disabled className="k-btn k-btn--primary min-h-11 px-4 text-sm">Подбор выключен</button>
                       ) : (
-                        <a href={`/room/${encodeURIComponent(current.roomId)}/procurement`} target="_blank" rel="noopener noreferrer" className="action-primary min-h-11 px-4 text-sm">Найти товары <ArrowUpRight className="size-4" /></a>
+                        <a href={`/room/${encodeURIComponent(current.roomId)}/procurement`} target="_blank" rel="noopener noreferrer" className="k-btn k-btn--primary min-h-11 px-4 text-sm">Найти товары <KitIcon name="ur" className="size-4" /></a>
                       )}
                     </div>
                     {productMatches.length ? (
@@ -1474,15 +1456,15 @@ export function GenerationPanel({
                                 {match.offers.map(offer => {
                                   const active = Boolean(selectedOffers[offer.id])
                                   return (
-                                    <div key={offer.id} className={`w-40 shrink-0 border transition-colors ${active ? 'border-primary' : 'border-foreground/20'}`}>
+                                    <div key={offer.id} className={`w-40 shrink-0 border transition-colors ${active ? 'border-primary' : 'border'}`}>
                                       <button type="button" onClick={() => toggleOffer(offer)} className="block w-full text-left">
-                                        <div className="h-24 w-full overflow-hidden bg-muted">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">Нет фото</div>}</div>
+                                        <div className="h-24 w-full overflow-hidden bg-secondary">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет фото</div>}</div>
                                         <div className="p-2">
-                                          <p className="line-clamp-2 text-[11px] font-medium leading-4">{offer.name}</p>
+                                          <p className="line-clamp-2 text-xs font-medium leading-4">{offer.name}</p>
                                           <p className="mt-1 text-xs font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</p>
                                         </div>
                                       </button>
-                                      {offer.url ? <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" className="block border-t px-2 py-1 text-[10px] underline underline-offset-2">{offer.merchant || 'в магазин'}</a> : null}
+                                      {offer.url ? <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" className="block border-t px-2 py-1 text-xs underline underline-offset-2">{offer.merchant || 'в магазин'}</a> : null}
                                     </div>
                                   )
                                 })}
@@ -1512,16 +1494,16 @@ export function GenerationPanel({
                       <div className="grid grid-cols-2 gap-px border bg-border sm:grid-cols-3">
                         {current.analysis.surfaces.map((surface, index) => (
                           <div key={`${surface.surface}-${index}`} className="bg-background p-3">
-                            <span className="block h-10 w-full border border-foreground/20" style={{ background: surface.hex }} />
+                            <span className="block h-10 w-full border border" style={{ background: surface.hex }} />
                             <p className="mt-2 text-xs font-medium">{surface.label || surface.surface}</p>
-                            <p className="font-mono text-[11px] text-muted-foreground">{surface.ral?.code || surface.hex}</p>
-                            {surface.ral ? <p className="text-[11px] text-muted-foreground">{surface.ral.name}</p> : null}
-                            {surface.description ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{surface.description}</p> : null}
+                            <p className="font-mono text-xs text-muted-foreground">{surface.ral?.code || surface.hex}</p>
+                            {surface.ral ? <p className="text-xs text-muted-foreground">{surface.ral.name}</p> : null}
+                            {surface.description ? <p className="mt-1 text-xs leading-4 text-muted-foreground">{surface.description}</p> : null}
                           </div>
                         ))}
                       </div>
                     ) : <p className="border-y py-4 text-sm text-muted-foreground">Палитра появится после анализа рендера.</p>}
-                    <p className="mt-2 text-[11px] leading-4 text-muted-foreground">RAL подобран по оттенкам на картинке, точный код сверяйте по вееру.</p>
+                    <p className="mt-2 text-xs leading-4 text-muted-foreground">RAL подобран по оттенкам на картинке, точный код сверяйте по вееру.</p>
                   </section>
                 )}
 
@@ -1531,7 +1513,7 @@ export function GenerationPanel({
                     {current.analysis?.electrical?.length ? (
                       <ul className="divide-y border-y">
                         {current.analysis.electrical.map((item, index) => (
-                          <li key={`${item.title}-${index}`} className="flex gap-3 py-3 text-sm"><Zap className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div></li>
+                          <li key={`${item.title}-${index}`} className="flex gap-3 py-3 text-sm"><KitIcon name="bolt" className="mt-0.5 size-4 shrink-0 text-primary-text" /><div><p>{item.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p></div></li>
                         ))}
                       </ul>
                     ) : <p className="border-y py-4 text-sm text-muted-foreground">Рекомендации по электрике появятся после анализа рендера.</p>}
@@ -1553,7 +1535,7 @@ export function GenerationPanel({
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        className="action-secondary min-h-11 px-4 text-sm"
+                        className="k-btn min-h-11 px-4 text-sm"
                         onClick={() => {
                           const text = buildMasterBrief({
                             roomType,
@@ -1569,11 +1551,11 @@ export function GenerationPanel({
                           goal('master_brief_download', { room_id: current.roomId })
                         }}
                       >
-                        <Download className="size-4" /> ТЗ для мастера (.txt)
+                        <KitIcon name="dl" className="size-4" /> ТЗ для мастера (.txt)
                       </button>
                       <button
                         type="button"
-                        className="action-secondary min-h-11 px-4 text-sm"
+                        className="k-btn min-h-11 px-4 text-sm"
                         onClick={() => {
                           goal('passport_click', { room_id: current.roomId })
                           setPassportNotice('Готовим PDF-паспорт ремонта — скоро. Пока можно скачать ТЗ для мастера выше.')
@@ -1589,40 +1571,31 @@ export function GenerationPanel({
             </div>
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={() => setStep('result')} className="action-secondary"><ArrowLeft className="size-4" />Вернуться к результату</button>
+              <button type="button" onClick={() => setStep('result')} className="k-btn"><KitIcon name="l" className="size-4" />Вернуться к результату</button>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button type="button" onClick={resetAll} className="action-secondary"><RotateCcw className="size-4" />Новая комната</button>
+                <button type="button" onClick={resetAll} className="k-btn"><KitIcon name="re" className="size-4" />Новая комната</button>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {lightbox && current && (
-        <div className="gen-lightbox" role="dialog" aria-modal="true" aria-label="Результат во весь экран">
-          <button type="button" onClick={() => setLightbox(false)} className="absolute right-4 top-4 z-10 flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Закрыть полный экран">
-            <X className="size-5" />
-          </button>
+      <KitLightbox open={lightbox && Boolean(current)} onClose={() => setLightbox(false)} label="Результат во весь экран">
+        {current && (
           <div className="relative mx-auto my-auto overflow-hidden bg-foreground" style={{ aspectRatio: String(current.ratio), width: `min(100vw, calc(100svh * ${current.ratio}))` }}>
             <img src={current.image} alt="Сгенерированный дизайн интерьера в полном размере" className="absolute inset-0 h-full w-full object-cover" />
           </div>
-        </div>
-      )}
+        )}
+      </KitLightbox>
 
       <ShareDialog renderId={current?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
-      {creditOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-foreground/80 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Кредиты закончились">
-          <div className="max-h-[92svh] w-full max-w-md overflow-y-auto border-t-2 border-foreground bg-background p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[8px_8px_0_oklch(var(--foreground))] sm:border sm:pb-6">
-            <p className="eyebrow">Баланс</p>
-            <h3 className="display-title mt-3 text-3xl">Кредиты закончились</h3>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">Каждый дизайн или платное редактирование стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <a href="/cabinet#credits" target="_blank" rel="noopener" onClick={() => setCreditOpen(false)} className="action-primary">Пополнить <ArrowUpRight className="size-4" /></a>
-              <button type="button" onClick={() => setCreditOpen(false)} className="action-secondary">Позже</button>
-            </div>
-          </div>
+      <KitSheet open={creditOpen} onClose={() => setCreditOpen(false)} title="Кредиты закончились">
+        <p className="text-sm leading-6 text-muted-foreground">Каждый дизайн или платное редактирование стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
+        <div className="actions">
+          <button type="button" onClick={() => setCreditOpen(false)} className="k-btn">Позже</button>
+          <a href="/cabinet#credits" target="_blank" rel="noopener" onClick={() => setCreditOpen(false)} className="k-btn k-btn--primary">Пополнить <KitIcon name="ur" /></a>
         </div>
-      )}
+      </KitSheet>
     </div>
   )
 }
