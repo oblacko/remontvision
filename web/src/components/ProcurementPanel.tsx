@@ -22,6 +22,12 @@ export type ProductMatch = {
 
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
+const MARKETPLACES = [
+  { key: 'ozon', label: 'Ozon', url: (q: string) => `https://www.ozon.ru/search/?text=${encodeURIComponent(q)}` },
+  { key: 'wb', label: 'WB', url: (q: string) => `https://www.wildberries.ru/catalog/0/search.aspx?search=${encodeURIComponent(q)}` },
+  { key: 'ym', label: 'Я.Маркет', url: (q: string) => `https://market.yandex.ru/search?text=${encodeURIComponent(q)}` },
+] as const
+
 const SEARCH_STEPS = [
   { label: 'Разбираем кадр', hint: 'Архитектор выделяет главные позиции' },
   { label: 'Подбираем в каталоге', hint: 'Ищем похожие товары по материалам и цвету' },
@@ -141,7 +147,7 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
                           <p className="line-clamp-2 min-w-0 text-[11px] font-medium leading-4">{offer.name}</p>
                           <p className="mt-1 text-xs font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</p>
                           {offer.url ? (
-                            <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" onClick={() => goal('product_click', { source: 'procurement', url: offer.url })} className="mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] underline underline-offset-2">
+                            <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" onClick={() => goal('product_click', { source: 'procurement', url: offer.url })} className="mt-1 inline-flex min-h-11 items-center gap-1 text-[11px] underline underline-offset-2">
                               {offer.merchant || 'в магазин'} <ExternalLink className="size-3 shrink-0" />
                             </a>
                           ) : null}
@@ -150,6 +156,21 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
                     ))}
                   </div>
                 ) : <p className="mt-1 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  <span>Найти похожее:</span>
+                  {MARKETPLACES.map(market => (
+                    <a
+                      key={market.key}
+                      href={market.url(match.item.label)}
+                      target="_blank"
+                      rel="noopener nofollow sponsored"
+                      onClick={() => goal('product_click', { source: market.key, query: match.item.label })}
+                      className="inline-flex min-h-11 items-center underline underline-offset-2 hover:text-foreground"
+                    >
+                      {market.label}
+                    </a>
+                  ))}
+                </div>
               </section>
             ))}
           </div>

@@ -24,7 +24,7 @@ const defaultPacks: PublicPack[] = [
 const CONSENTS = { offer: true, privacy: true, cross_border: true }
 
 const faq = [
-  { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатных дизайна. Дальше: 10 дизайнов за 399 ₽, 20 за 599 ₽ или 60 за 1 499 ₽. Каждый дизайн включает 3 бесплатные правки; каждая следующая — 1 кредит. Подписка не нужна.' },
+  { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатных дизайна. Дальше: 10 дизайнов за 399 ₽, 20 за 599 ₽ или 60 за 1 499 ₽. Каждый дизайн включает 3 бесплатных редактирования; каждое следующее — 1 кредит. Подписка не нужна.' },
   { q: 'Какое фото подойдёт?', a: 'Чёткое фото комнаты при дневном свете: JPG, PNG, WebP или HEIC до 15 МБ. Подойдут портретные, квадратные и альбомные кадры. Чем лучше видно стены, пол и мебель, тем полезнее результат.' },
   { q: 'Что я получу, кроме картинки?', a: 'Подбор материалов и товаров с ценами и ссылками на магазины, палитру в RAL и рекомендации по розеткам и выключателям — всё для выбранного интерьера.' },
   { q: 'Можно изменить готовый дизайн?', a: 'Да, результат можно уточнять текстовыми запросами: например, изменить цвет пола, заменить текстиль или сделать интерьер светлее. Каждая версия сохраняется в истории правок.' },
@@ -321,7 +321,7 @@ export default function Home() {
                     <span>2 дизайна — 0 ₽</span><span>Без подписки</span><span>1–4 минуты</span>
                   </p>
                   <p className="mt-3 flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs uppercase tracking-wider text-background/90">
-                    <span className="text-primary">10 дизайнов и до 30 правок — 399 ₽</span><span>3 правки бесплатно в каждом дизайне</span>
+                    <span className="text-primary">10 дизайнов + 30 редактирований — 399 ₽</span><span>3 бесплатных редактирования в каждом дизайне</span>
                   </p>
                 </div>
               </div>
@@ -366,7 +366,7 @@ export default function Home() {
             <div className="border-b py-12 lg:col-span-5 lg:border-b-0 lg:border-r lg:py-16 lg:pr-12">
               <SectionMarker index="03">Генератор</SectionMarker>
               <h2 id="upload-title" className="display-title mt-8 text-4xl sm:text-5xl">Четыре шага<br />до результата</h2>
-              <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Фото комнаты, пресет стиля или ваш референс, правки текстом — а в финале товары, цвета RAL и разметка розеток.</p>
+              <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Фото комнаты, пресет стиля или ваш референс, редактирование текстом — а в финале товары, цвета RAL и разметка розеток.</p>
               <ol className="mt-8 space-y-3 border-t pt-6 text-sm">
                 {['Загрузите фото комнаты', 'Выберите пресет стиля или референс', 'Правьте результат текстом', 'Получите подборку, RAL и электрику'].map((item, index) => (
                   <li key={item} className="flex gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span>{item}</li>
@@ -435,7 +435,7 @@ export default function Home() {
               {[
                 ['Сфотографируйте комнату', 'Подойдёт чёткий кадр при дневном свете. Загрузите JPG, PNG, WebP или HEIC до 15 МБ.'],
                 ['Выберите стиль и палитру', 'Задайте направление интерьера, цветовую схему или загрузите свой референс.'],
-                ['Получите дизайн и правьте текстом', 'Каждая версия сохраняется в истории — можно вернуться к любой.'],
+                ['Получите дизайн и редактируйте текстом', 'Каждая версия сохраняется в истории — можно вернуться к любой.'],
                 ['Соберите подборку', 'Товары с ценами, цвета RAL и рекомендации по розеткам и выключателям.'],
               ].map(([title, text], index) => <div key={title} className="step-row grid gap-4 border-t border-background/20 py-6"><span className="font-mono text-xs text-primary">0{index + 1}</span><div><h3 className="text-lg font-light uppercase tracking-wide">{title}</h3><p className="mt-2 max-w-xl text-sm leading-6 text-background/60">{text}</p></div></div>)}
             </div>
@@ -447,11 +447,11 @@ export default function Home() {
             <SectionMarker index="06">Прозрачная оплата</SectionMarker>
             <div className="mt-6 grid gap-8 md:grid-cols-12 md:items-end">
               <h2 id="prices-title" className="display-title section-title md:col-span-8">Без подписки.<br />Без сюрпризов.</h2>
-              <p className="max-w-sm text-sm leading-6 text-muted-foreground md:col-span-4">Каждый дизайн включает 3 бесплатные правки. Покупайте только то, что нужно сейчас.</p>
+              <p className="max-w-sm text-sm leading-6 text-muted-foreground md:col-span-4">Одна комната целиком — от 399 ₽. Каждый дизайн включает 3 бесплатных редактирования. Покупайте только то, что нужно сейчас.</p>
             </div>
             <div className="mt-12 grid border-y md:grid-cols-3">
               {packs.map((pack, index) => {
-                const unit = pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'
+                const unit = 'дизайнов'
                 const price = new Intl.NumberFormat('ru-RU').format(pack.price_kopecks / 100) + ' ₽'
                 const isTarget = pack.id === 'flat'
                 return <div key={pack.id} className={`border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0${isTarget ? ' bg-secondary' : ''}`}><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{pack.title}</p>{isTarget && <p className="mt-2 inline-block border border-primary-text px-2 py-0.5 text-xs text-primary-text">Выгодно</p>}{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 дизайна бесплатно</p>}</div>
@@ -467,9 +467,33 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="limits" className="scroll-mt-20 border-t py-16 lg:py-24" aria-labelledby="limits-title">
+          <div className="page-shell grid gap-8 lg:grid-cols-12">
+            <div className="lg:col-span-4">
+              <SectionMarker index="07">Ограничения</SectionMarker>
+              <h2 id="limits-title" className="display-title mt-6 text-4xl sm:text-5xl">Что это<br />и чего здесь нет</h2>
+            </div>
+            <div className="lg:col-span-8">
+              <ul className="grid gap-3">
+                {[
+                  ['Это AI-визуализация, а не дизайн-проект', 'Мы не заменяем дизайнера и не выпускаем чертежи. Это черновик направления, с которым можно идти к дизайнеру или бригаде.'],
+                  ['Планировка сохраняется, детали — нет', 'Окна, двери и пропорции остаются на месте. Мебель, свет и декор могут отличаться от кадра — проверяйте размеры.'],
+                  ['Подборка и стоимость ориентировочные', 'Цены, наличие и ссылки на товары могут меняться. Итоговую стоимость по позициям сервис не считает: проверяйте всё перед покупкой.'],
+                  ['При технической ошибке кредит возвращается', 'Если дизайн не создался, списанный кредит возвращается автоматически.'],
+                ].map(([title, text]) => (
+                  <li key={title} className="border p-4">
+                    <p className="text-sm font-medium">{title}</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <section id="faq" className="scroll-mt-20 border-t bg-secondary" aria-labelledby="faq-title">
           <div className="page-shell grid gap-10 py-16 lg:grid-cols-12 lg:py-24">
-            <div className="lg:col-span-4"><SectionMarker index="07">Вопросы</SectionMarker><h2 id="faq-title" className="display-title mt-6 text-4xl sm:text-5xl">Перед<br />началом</h2><p className="mt-6 text-sm leading-6 text-muted-foreground">Остался вопрос?<br /><a className="mt-2 inline-block text-foreground underline decoration-border underline-offset-4" href="mailto:support@remontvision.ru">support@remontvision.ru</a></p></div>
+            <div className="lg:col-span-4"><SectionMarker index="08">Вопросы</SectionMarker><h2 id="faq-title" className="display-title mt-6 text-4xl sm:text-5xl">Перед<br />началом</h2><p className="mt-6 text-sm leading-6 text-muted-foreground">Остался вопрос?<br /><a className="mt-2 inline-block text-foreground underline decoration-border underline-offset-4" href="mailto:support@remontvision.ru">support@remontvision.ru</a></p></div>
             <Accordion type="single" collapsible className="lg:col-span-8" defaultValue="item-0">
               {faq.map((item, index) => <AccordionItem key={item.q} value={`item-${index}`} className="border-b border-foreground/20"><AccordionTrigger className="min-h-16 py-5 text-left text-lg font-light hover:opacity-50 hover:no-underline focus-visible:ring-2 focus-visible:ring-ring">{item.q}</AccordionTrigger><AccordionContent className="max-w-2xl pb-6 text-sm leading-6 text-muted-foreground">{item.a}</AccordionContent></AccordionItem>)}
             </Accordion>
@@ -482,7 +506,7 @@ export default function Home() {
               <div className="flex items-center justify-between gap-4 border-t border-foreground/30 pt-3 font-mono text-xs uppercase tracking-widest"><span>Ваш интерьер начинается с фото</span><ArrowUpRight className="size-5" /></div>
               <h2 id="final-cta-title" className="display-title section-title mt-8">Посмотрите,<br />что возможно</h2>
               <div className="mt-8 flex flex-col gap-6 border-t border-foreground/30 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="max-w-lg text-sm leading-6">Два дизайна бесплатно после регистрации — каждый с тремя бесплатными правками. Дизайн, материалы, цены и ссылки — в одном результате.</p>
+                <p className="max-w-lg text-sm leading-6">Два дизайна бесплатно после регистрации — каждый с тремя бесплатными редактированиями. Дизайн, материалы, цены и ссылки — в одном результате.</p>
                 <button type="button" onClick={openPanel} className="action-final button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><ArrowRight className="size-4" /></button>
               </div>
             </div>

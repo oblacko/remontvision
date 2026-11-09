@@ -2,7 +2,7 @@
 // Проверка копирайта пользовательских текстов.
 //
 // Правила (источник истины — «Решения владельца» в плане):
-//   - в пользовательских текстах нет слов «генераци…» и фразы «реальные товары»;
+//   - в пользовательских текстах нет слов «генераци…», «правк…» и фразы «реальные товары»;
 //   - слово «смета» запрещено, кроме:
 //       (a) public/offer.html в явной фразе «Сервис не составляет смету»;
 //       (b) строк с пометками «демо-пример» / «демонстрационный пример».
@@ -80,6 +80,9 @@ export function findCopyViolations(files) {
       const lineNo = i + 1;
       if (/генераци/i.test(line)) {
         violations.push({ path: file.path, line: lineNo, word: matchWord(line, /генераци[а-яё]*/i) || 'генераци…' });
+      }
+      if (/правк[а-яё]/i.test(line)) {
+        violations.push({ path: file.path, line: lineNo, word: matchWord(line, /правк[а-яё]*/i) || 'правк…' });
       }
       if (/реальные\s+товары/i.test(line)) {
         violations.push({ path: file.path, line: lineNo, word: matchWord(line, /реальные\s+товары/i) || 'реальные товары' });

@@ -12,6 +12,7 @@
     --p-ink: 17% 0.012 70;
     --p-ink-muted: 45% 0.015 80;
     --p-line: 80% 0.015 85;
+    --p-line-strong: 62% 0.012 80;
     --p-orange: 68% 0.19 45;
     --p-orange-hover: 61% 0.18 45;
     --p-orange-text: 48% 0.16 44;
@@ -64,7 +65,7 @@
     --destructive-foreground: var(--p-paper);
     --border: var(--p-line);
     --input: var(--p-line);
-    --ring: var(--p-orange-text);
+    --ring: var(--p-ink);
     --radius: 0rem;
     --shadow-soft: 0 8px 30px oklch(var(--p-ink) / 0.07);
   }
@@ -125,6 +126,27 @@
   }
   .action-final:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 oklch(var(--background)); }
   .action-final:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 oklch(var(--background)); }
+
+  /* UI-кит: поля 48px, граница #8a847a (3.4:1), фокус — чёрный контур с отступом. */
+  .kit-field {
+    @apply min-h-12 w-full bg-background px-4 text-base outline-none;
+    border: 1px solid oklch(var(--p-line-strong));
+  }
+  .kit-field:focus-visible {
+    border-color: oklch(var(--foreground));
+    box-shadow: 0 0 0 2px oklch(var(--background)), 0 0 0 4px oklch(var(--foreground));
+  }
+  .kit-field[aria-invalid='true'] { border: 2px solid oklch(var(--destructive)); }
+  /* UI-кит: заметка/ошибка — рамка, иконка и текст, не только цвет. */
+  .kit-ban { @apply flex gap-3 border p-3 text-sm leading-6; border-color: oklch(var(--p-line-strong)); }
+  .kit-ban-bad { border: 2px solid oklch(var(--destructive)); color: oklch(var(--destructive)); }
+  /* UI-кит: тост — чернила на бумаге с оранжевой офсетной тенью. */
+  .kit-toast {
+    @apply fixed bottom-4 left-4 right-4 z-[200] flex items-center gap-3 px-4 py-3 text-sm text-background;
+    background: oklch(var(--foreground));
+    box-shadow: 4px 4px 0 oklch(var(--primary));
+  }
+  @media (min-width: 640px) { .kit-toast { right: auto; max-width: 24rem; } }
 }
 
 @keyframes rv-progress-slide {

@@ -1,0 +1,105 @@
+// Работа с объектами рендера: подписи, инструкции перемещения и точечных правок.
+// bbox — нормализованные [x, y, w, h] в долях кадра (0..1), как отдаёт vision.
+
+export type VisibleObject = {
+  label?: string
+  bbox?: number[]
+  area?: number
+}
+
+const LABEL_RU: Record<string, string> = {
+  bed: 'кровать',
+  sofa: 'диван',
+  couch: 'диван',
+  armchair: 'кресло',
+  chair: 'стул',
+  dining_chair: 'стул',
+  office_chair: 'кресло',
+  table: 'стол',
+  coffee_table: 'журнальный стол',
+  dining_table: 'обеденный стол',
+  desk: 'рабочий стол',
+  wardrobe: 'шкаф',
+  cabinet: 'шкаф',
+  sideboard: 'комод',
+  shelf: 'полка',
+  shelving: 'стеллаж',
+  storage: 'хранение',
+  bench: 'скамья',
+  pouf: 'пуф',
+  rug: 'ковёр',
+  carpet: 'ковёр',
+  lamp: 'светильник',
+  light: 'светильник',
+  chandelier: 'люстра',
+  pendant: 'подвесной светильник',
+  sconce: 'бра',
+  mirror: 'зеркало',
+  curtain: 'шторы',
+  curtains: 'шторы',
+  blinds: 'жалюзи',
+  plant: 'растение',
+  plants: 'растения',
+  tv: 'телевизор',
+  television: 'телевизор',
+  painting: 'картина',
+  art: 'картина',
+  decor: 'декор',
+  radiator: 'радиатор',
+  window: 'окно',
+  door: 'дверь',
+  sink: 'раковина',
+  faucet: 'смеситель',
+  toilet: 'унитаз',
+  shower: 'душ',
+  bathtub: 'ванна',
+  countertop: 'столешница',
+  appliance: 'техника',
+  textile: 'текстиль',
+}
+
+export function ruLabel(label?: string): string {
+  const key = String(label || '').trim().toLowerCase().replace(/\s+/g, '_')
+  if (!key) return 'объект'
+  return LABEL_RU[key] || String(label).trim()
+}
+
+export function bboxCenter(bbox: number[]): { x: number; y: number } {
+  const [x = 0, y = 0, w = 0, h = 0] = bbox
+  return { x: Math.round((x + w / 2) * 100), y: Math.round((y + h / 2) * 100) }
+}
+
+export function bboxSize(bbox: number[]): { w: number; h: number } {
+  const [, , w = 0, h = 0] = bbox
+  return { w: Math.round(w * 100), h: Math.round(h * 100) }
+}
+
+export function moveDirection(dx: number, dy: number): { text: string; percent: number } {
+  const ax = Math.abs(dx)
+  const ay = Math.abs(dy)
+  if (ax >= ay) return { text: dx >= 0 ? 'вправо' : 'влево', percent: Math.round(ax * 100) }
+  return { text: dy >= 0 ? 'вниз' : 'вверх', percent: Math.round(ay * 100) }
+}
+
+export function buildMoveInstruction({ label, bbox, dx, dy }: { label?: string; bbox: number[]; dx: number; dy: number }): string {
+  const name = ruLabel(label)
+  const center = bboxCenter(bbox)
+  const { text, percent } = moveDirection(dx, dy)
+  const amount = percent < 1 ? 'совсем немного' : `примерно на ${percent}% кадра`
+  return `Переместите ${name} из точки (${center.x}%, ${center.y}%) ${text} ${amount}. Сохраните остальные объекты, свет и архитектуру без изменений.`
+}
+
+export function buildObjectAction(label: string | undefined, action: 'replace' | 'color' | 'bigger' | 'smaller', bbox?: number[]): string {
+  const name = ruLabel(label)
+  const area = bbox ? ` в области (${bboxCenter(bbox).x}%, ${bboxCenter(bbox).y}%)` : ''
+  if (action === 'replace') return `Замените ${name}${area} на похожий по стилю и размеру. Остальные объекты, свет и архитектуру не меняйте.`
+  if (action === 'color') return `Измените цвет ${name}${area}, сохранив форму и положение. Остальные объекты и свет не меняйте.`
+  if (action === 'bigger') return `Сделайте ${name}${area} немного крупнее, сохранив положение. Остальные объекты и свет не меняйте.`
+  return `Сделайте ${name}${area} немного мельче, сохранив положение. Остальные объекты и свет не меняйте.`
+}
+
+export function buildObjectText(label: string | undefined, text: string, bbox?: number[]): string {
+  const name = ruLabel(label)
+  const area = bbox ? ` (область ${bboxCenter(bbox).x}%, ${bboxCenter(bbox).y}%)` : ''
+  return `${name}${area}: ${text.trim()}. Сохраните остальные объекты, свет и архитектуру без изменений.`
+}

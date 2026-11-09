@@ -166,7 +166,7 @@ const capsFor = (id: string) => {
 const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
   procurement: 'подбор товаров', procurement_refund: 'возврат за подбор товаров',
-  render: 'генерация', iterate: 'правка', iterate_refund: 'возврат кредита', refund: 'возврат',
+  render: 'генерация', iterate: 'редактирование', iterate_refund: 'возврат кредита', refund: 'возврат',
   admin_adjust: 'корректировка', admin_test: 'корректировка', referral: 'реферальная программа',
 }
 
@@ -1021,8 +1021,8 @@ export default function Admin() {
                     <form onSubmit={adjustCredits} className="mt-4 border p-4">
                       <p className="eyebrow">Изменить кредиты</p>
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                        <input value={creditDelta} onChange={e => setCreditDelta(e.target.value)} inputMode="numeric" placeholder="+1 / -1" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
-                        <input value={creditReason} onChange={e => setCreditReason(e.target.value)} placeholder="Причина" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                        <input value={creditDelta} onChange={e => setCreditDelta(e.target.value)} inputMode="numeric" placeholder="+1 / -1" className="kit-field min-h-11 text-sm" />
+                        <input value={creditReason} onChange={e => setCreditReason(e.target.value)} placeholder="Причина" className="kit-field min-h-11 text-sm" />
                       </div>
                       <input value={creditNote} onChange={e => setCreditNote(e.target.value)} placeholder="Заметка" className="mt-2 h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
                       <button type="submit" disabled={creditBusy} className="action-primary mt-3 w-full">{creditBusy ? 'Сохраняем…' : 'Применить'}</button>
@@ -1053,10 +1053,10 @@ export default function Admin() {
               <form onSubmit={savePack} className="border p-4">
                 <div className="flex items-center justify-between gap-2"><p className="eyebrow">{editPackId ? 'Редактировать пакет' : 'Новый пакет'}</p><button type="button" onClick={startNewPack} className="text-xs underline"><Plus className="mr-1 inline size-3" />сброс</button></div>
                 <div className="mt-4 space-y-2">
-                  <input value={packForm.id} disabled={Boolean(editPackId)} onChange={e => setPackForm({ ...packForm, id: e.target.value })} placeholder="id: pack2" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary disabled:opacity-60" />
-                  <input value={packForm.title} onChange={e => setPackForm({ ...packForm, title: e.target.value })} placeholder="Название" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
-                  <div className="grid grid-cols-2 gap-2"><input value={packForm.credits} onChange={e => setPackForm({ ...packForm, credits: e.target.value })} inputMode="numeric" placeholder="Кредиты" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /><input value={packForm.price} onChange={e => setPackForm({ ...packForm, price: e.target.value })} inputMode="decimal" placeholder="Цена, ₽" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                  <div className="grid grid-cols-2 gap-2"><input value={packForm.sort} onChange={e => setPackForm({ ...packForm, sort: e.target.value })} inputMode="numeric" placeholder="Сортировка" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /><label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={packForm.active} onChange={e => setPackForm({ ...packForm, active: e.target.checked })} className="size-4 accent-primary" />активен</label></div>
+                  <input value={packForm.id} disabled={Boolean(editPackId)} onChange={e => setPackForm({ ...packForm, id: e.target.value })} placeholder="id: pack2" className="kit-field min-h-11 w-full font-mono text-sm disabled:opacity-60" />
+                  <input value={packForm.title} onChange={e => setPackForm({ ...packForm, title: e.target.value })} placeholder="Название" className="kit-field min-h-11 w-full text-sm" />
+                  <div className="grid grid-cols-2 gap-2"><input value={packForm.credits} onChange={e => setPackForm({ ...packForm, credits: e.target.value })} inputMode="numeric" placeholder="Кредиты" className="kit-field min-h-11 text-sm" /><input value={packForm.price} onChange={e => setPackForm({ ...packForm, price: e.target.value })} inputMode="decimal" placeholder="Цена, ₽" className="kit-field min-h-11 text-sm" /></div>
+                  <div className="grid grid-cols-2 gap-2"><input value={packForm.sort} onChange={e => setPackForm({ ...packForm, sort: e.target.value })} inputMode="numeric" placeholder="Сортировка" className="kit-field min-h-11 text-sm" /><label className="flex min-h-11 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={packForm.active} onChange={e => setPackForm({ ...packForm, active: e.target.checked })} className="size-5 accent-primary" />активен</label></div>
                 </div>
                 <button type="submit" className="action-primary mt-4 w-full">{editPackId ? 'Сохранить' : 'Создать пакет'}</button>
               </form>
@@ -1067,7 +1067,7 @@ export default function Admin() {
             <div className="mt-8 grid gap-6 xl:grid-cols-[22rem_1fr]">
               <section>
                 <div className="flex items-center justify-between gap-2"><p className="eyebrow">Справочник комнат</p><button type="button" onClick={startNewRoomType} className="text-xs underline"><Plus className="mr-1 inline size-3" />новый</button></div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">Тип комнаты задаёт допустимые категории товаров, слоты сметы, правила сохранения/замены, электрику и стилизацию для промта. Выключенные типы не показываются пользователям, но старые комнаты продолжают работать.</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">Тип комнаты задаёт допустимые категории товаров, слоты подборки, правила сохранения/замены, электрику и стилизацию для промта. Выключенные типы не показываются пользователям, но старые комнаты продолжают работать.</p>
                 <div className="mt-3 space-y-2">
                   {roomTypes.map(room => (
                     <button key={room.name} type="button" onClick={() => selectRoomType(room)} className={`flex w-full items-center gap-3 border p-2 text-left transition-colors hover:bg-muted ${selectedRoomType === room.name ? 'bg-muted' : ''}`}>
@@ -1086,10 +1086,10 @@ export default function Admin() {
                 {roomTypesNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{roomTypesNotice}</p>}
                 <form onSubmit={saveRoomType} className="mt-4 border p-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block"><span className="eyebrow mb-2 block">Название</span><input value={roomTypeForm.name} onChange={e => setRoomTypeForm({ ...roomTypeForm, name: e.target.value })} placeholder="Например: Гостиная (зал)" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Название</span><input value={roomTypeForm.name} onChange={e => setRoomTypeForm({ ...roomTypeForm, name: e.target.value })} placeholder="Например: Гостиная (зал)" className="kit-field min-h-11 w-full text-sm" /></label>
                     <label className="block"><span className="eyebrow mb-2 block">Prompt для модели (английский)</span><input value={roomTypeForm.prompt} onChange={e => setRoomTypeForm({ ...roomTypeForm, prompt: e.target.value })} placeholder="living room" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary" /></label>
-                    <label className="block"><span className="eyebrow mb-2 block">Сортировка</span><input value={roomTypeForm.sort} onChange={e => setRoomTypeForm({ ...roomTypeForm, sort: e.target.value })} inputMode="numeric" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></label>
-                    <label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={roomTypeForm.active} onChange={e => setRoomTypeForm({ ...roomTypeForm, active: e.target.checked })} className="size-4 accent-primary" />активен для пользователей</label>
+                    <label className="block"><span className="eyebrow mb-2 block">Сортировка</span><input value={roomTypeForm.sort} onChange={e => setRoomTypeForm({ ...roomTypeForm, sort: e.target.value })} inputMode="numeric" className="kit-field min-h-11 w-full text-sm" /></label>
+                    <label className="flex min-h-11 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={roomTypeForm.active} onChange={e => setRoomTypeForm({ ...roomTypeForm, active: e.target.checked })} className="size-5 accent-primary" />активен для пользователей</label>
                     <label className="block sm:col-span-2"><span className="eyebrow mb-2 block">Категории товаров</span><input value={roomTypeForm.categories} onChange={e => setRoomTypeForm({ ...roomTypeForm, categories: e.target.value })} placeholder="floor, paint, light, outlets" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary" /><span className="mt-2 block text-[11px] leading-5 text-muted-foreground">Через запятую. Доступны: {productCategories.join(', ')}.</span></label>
                   </div>
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -1100,7 +1100,7 @@ export default function Admin() {
                     <label className="block lg:col-span-2"><span className="eyebrow mb-2 block">Styling — Pinterest-стайлинг</span><textarea value={roomTypeForm.styling} onChange={e => setRoomTypeForm({ ...roomTypeForm, styling: e.target.value })} rows={4} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /></label>
                   </div>
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <label className="block"><span className="eyebrow mb-2 block">Слоты сметы (JSON)</span><textarea value={roomTypeForm.slots} onChange={e => setRoomTypeForm({ ...roomTypeForm, slots: e.target.value })} rows={9} className="w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" /><span className="mt-2 block text-[11px] leading-5 text-muted-foreground">Массив объектов <code>{'{ key, categories }'}</code>. Категории слота должны входить в категории комнаты.</span></label>
+                    <label className="block"><span className="eyebrow mb-2 block">Слоты подборки (JSON)</span><textarea value={roomTypeForm.slots} onChange={e => setRoomTypeForm({ ...roomTypeForm, slots: e.target.value })} rows={9} className="w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" /><span className="mt-2 block text-[11px] leading-5 text-muted-foreground">Массив объектов <code>{'{ key, categories }'}</code>. Категории слота должны входить в категории комнаты.</span></label>
                     <label className="block"><span className="eyebrow mb-2 block">Электрика (JSON)</span><textarea value={roomTypeForm.electrical} onChange={e => setRoomTypeForm({ ...roomTypeForm, electrical: e.target.value })} rows={9} className="w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" /><span className="mt-2 block text-[11px] leading-5 text-muted-foreground">Массив объектов <code>{'{ title, text }'}</code> для рекомендаций по розеткам и свету.</span></label>
                   </div>
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -1138,10 +1138,10 @@ export default function Admin() {
                   <div className="flex items-center justify-between gap-2"><p className="eyebrow">{editStyleId ? 'Редактировать стиль' : 'Новый стиль'}</p>{editStyleId && <span className="font-mono text-xs text-muted-foreground">#{editStyleId}</span>}</div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     <input value={styleForm.key} onChange={e => setStyleForm({ ...styleForm, key: e.target.value })} placeholder="key: modern" className="h-10 border bg-background px-3 font-mono text-sm outline-none focus:border-primary" />
-                    <input value={styleForm.name} onChange={e => setStyleForm({ ...styleForm, name: e.target.value })} placeholder="Название" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
-                    <select value={styleForm.accent} onChange={e => setStyleForm({ ...styleForm, accent: e.target.value })} className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary">{accents.map(a => <option key={a} value={a}>{accentNames[a]}</option>)}</select>
-                    <input value={styleForm.sort} onChange={e => setStyleForm({ ...styleForm, sort: e.target.value })} inputMode="numeric" placeholder="Сортировка" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" />
-                    <label className="flex min-h-10 items-center gap-2 border px-3 text-sm sm:col-span-2"><input type="checkbox" checked={styleForm.active} onChange={e => setStyleForm({ ...styleForm, active: e.target.checked })} className="size-4 accent-primary" />активен</label>
+                    <input value={styleForm.name} onChange={e => setStyleForm({ ...styleForm, name: e.target.value })} placeholder="Название" className="kit-field min-h-11 text-sm" />
+                    <select value={styleForm.accent} onChange={e => setStyleForm({ ...styleForm, accent: e.target.value })} className="kit-field min-h-11 text-sm">{accents.map(a => <option key={a} value={a}>{accentNames[a]}</option>)}</select>
+                    <input value={styleForm.sort} onChange={e => setStyleForm({ ...styleForm, sort: e.target.value })} inputMode="numeric" placeholder="Сортировка" className="kit-field min-h-11 text-sm" />
+                    <label className="flex min-h-10 items-center gap-2 border px-3 text-sm sm:col-span-2"><input type="checkbox" checked={styleForm.active} onChange={e => setStyleForm({ ...styleForm, active: e.target.checked })} className="size-5 accent-primary" />активен</label>
                     <textarea value={styleForm.description} onChange={e => setStyleForm({ ...styleForm, description: e.target.value })} placeholder="Короткое описание для админки" rows={2} className="border bg-background px-3 py-2 text-sm outline-none focus:border-primary sm:col-span-2" />
                     <textarea value={styleForm.prompt_description} onChange={e => setStyleForm({ ...styleForm, prompt_description: e.target.value })} placeholder="Prompt description (английский, для модели)" rows={2} className="border bg-background px-3 py-2 text-sm outline-none focus:border-primary sm:col-span-2" />
                     <label className="flex min-h-11 cursor-pointer items-center gap-2 border px-3 text-sm sm:col-span-2"><Upload className="size-4 text-primary-text" />Обложка стиля<input ref={styleImageRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" /></label>
@@ -1204,7 +1204,7 @@ export default function Admin() {
                         {!styleDetail.products.length && <p className="py-3 text-sm text-muted-foreground">Товары не выбраны — генерация возьмёт каталог по классу материалов.</p>}
                       </div>
                       <div className="mt-4">
-                        <input value={productQuery} onChange={e => setProductQuery(e.target.value)} placeholder="Найти товар по названию или бренду" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
+                        <input value={productQuery} onChange={e => setProductQuery(e.target.value)} placeholder="Найти товар по названию или бренду" className="kit-field min-h-11 w-full text-sm" />
                         <div className="mt-2 max-h-64 overflow-y-auto border">
                           {filteredProducts.slice(0, 20).map(p => <button key={p.id} type="button" onClick={() => addStyleProduct(p.id)} className="flex w-full items-center gap-3 border-b p-2 text-left text-sm last:border-b-0 hover:bg-muted"><img src={productImage(p)} alt="" className="h-9 w-9 border object-cover" /><span className="min-w-0 flex-1 truncate">{p.name}<span className="ml-2 text-xs text-muted-foreground">{p.category} · {p.price_tier || 'comfort'} · {money(p.price)}</span></span><Plus className="size-4 shrink-0 text-primary-text" /></button>)}
                           {!filteredProducts.length && <p className="p-3 text-sm text-muted-foreground">Ничего не найдено</p>}
@@ -1248,7 +1248,7 @@ export default function Admin() {
                       {([
                         ['furnitureOn', 'Мебель: оставить', 'Когда тумблер «Оставить мебель» включён.'],
                         ['furnitureOff', 'Мебель: не учитывать', 'Когда мебель можно убрать или заменить.'],
-                        ['catalogOn', 'Каталог включён', 'Как использовать товары и смету.'],
+                        ['catalogOn', 'Каталог включён', 'Как использовать товары и подборку.'],
                         ['catalogOff', 'Каталог выключен', 'Свободный дизайн без товаров.'],
                         ['extra', 'Дополнительно', 'Свободный текст в конец art direction.'],
                         ['avoid', 'Запреты', 'Негативный список в конце промта.'],
@@ -1362,13 +1362,13 @@ export default function Admin() {
                   <form onSubmit={saveRenderModel} className="border p-4">
                     <div className="flex items-center justify-between gap-2"><p className="eyebrow">{editRenderModelId ? 'Редактировать модель' : 'Новая модель'}</p><button type="button" onClick={startNewRenderModel} className="text-xs underline"><Plus className="mr-1 inline size-3" />сброс</button></div>
                     <div className="mt-4 space-y-2">
-                      <input value={renderModelForm.id} disabled={Boolean(editRenderModelId)} onChange={e => setRenderModelForm({ ...renderModelForm, id: e.target.value })} placeholder="id: flux-3-image" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary disabled:opacity-60" />
-                      <input value={renderModelForm.label} onChange={e => setRenderModelForm({ ...renderModelForm, label: e.target.value })} placeholder="Название" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
-                      <input value={renderModelForm.model_id} onChange={e => setRenderModelForm({ ...renderModelForm, model_id: e.target.value })} placeholder="model_id: black-forest-labs/flux-3-image" className="h-10 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
-                      <div className="grid grid-cols-2 gap-2"><input value={renderModelForm.credits} onChange={e => setRenderModelForm({ ...renderModelForm, credits: e.target.value })} inputMode="numeric" placeholder="Кредиты" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /><input value={renderModelForm.sort} onChange={e => setRenderModelForm({ ...renderModelForm, sort: e.target.value })} inputMode="numeric" placeholder="Порядок" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <input value={renderModelForm.id} disabled={Boolean(editRenderModelId)} onChange={e => setRenderModelForm({ ...renderModelForm, id: e.target.value })} placeholder="id: flux-3-image" className="kit-field min-h-11 w-full font-mono text-sm disabled:opacity-60" />
+                      <input value={renderModelForm.label} onChange={e => setRenderModelForm({ ...renderModelForm, label: e.target.value })} placeholder="Название" className="kit-field min-h-11 w-full text-sm" />
+                      <input value={renderModelForm.model_id} onChange={e => setRenderModelForm({ ...renderModelForm, model_id: e.target.value })} placeholder="model_id: black-forest-labs/flux-3-image" className="kit-field min-h-11 w-full font-mono text-xs" />
+                      <div className="grid grid-cols-2 gap-2"><input value={renderModelForm.credits} onChange={e => setRenderModelForm({ ...renderModelForm, credits: e.target.value })} inputMode="numeric" placeholder="Кредиты" className="kit-field min-h-11 text-sm" /><input value={renderModelForm.sort} onChange={e => setRenderModelForm({ ...renderModelForm, sort: e.target.value })} inputMode="numeric" placeholder="Порядок" className="kit-field min-h-11 text-sm" /></div>
                       <p className="text-[11px] leading-5 text-muted-foreground">1 кредит ≈ 40 ₽; если модель дороже ~15–20 ₽ за рендер — ставьте 2 кредита.</p>
-                      <label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.art_direction_enabled} onChange={e => setRenderModelForm({ ...renderModelForm, art_direction_enabled: e.target.checked })} className="size-4 accent-primary" />арт-директор включён</label>
-                      <label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.active} onChange={e => setRenderModelForm({ ...renderModelForm, active: e.target.checked })} className="size-4 accent-primary" />активна в генераторе</label>
+                      <label className="flex min-h-11 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.art_direction_enabled} onChange={e => setRenderModelForm({ ...renderModelForm, art_direction_enabled: e.target.checked })} className="size-5 accent-primary" />арт-директор включён</label>
+                      <label className="flex min-h-11 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.active} onChange={e => setRenderModelForm({ ...renderModelForm, active: e.target.checked })} className="size-5 accent-primary" />активна в генераторе</label>
                     </div>
                     <button type="submit" className="action-primary mt-4 w-full">{editRenderModelId ? 'Сохранить' : 'Создать модель'}</button>
                   </form>
@@ -1382,7 +1382,7 @@ export default function Admin() {
                 <form onSubmit={e => { e.preventDefault(); saveModels() }} className="mt-6 space-y-5 border p-4">
                   <div>
                     <label htmlFor="render-model" className="eyebrow mb-2 block">Модель генерации</label>
-                    <select id="render-model" value={renderDraft} onChange={e => { const value = e.target.value; const caps = capsFor(value); setRenderDraft(value); if (!caps.resolutions.length) setResolutionDraft(''); else if (!caps.resolutions.includes(resolutionDraft)) setResolutionDraft(caps.resolutions[0]); if (!caps.aspects.includes(aspectDraft)) setAspectDraft(caps.aspects.includes('auto') ? 'auto' : caps.aspects[0]) }} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">
+                    <select id="render-model" value={renderDraft} onChange={e => { const value = e.target.value; const caps = capsFor(value); setRenderDraft(value); if (!caps.resolutions.length) setResolutionDraft(''); else if (!caps.resolutions.includes(resolutionDraft)) setResolutionDraft(caps.resolutions[0]); if (!caps.aspects.includes(aspectDraft)) setAspectDraft(caps.aspects.includes('auto') ? 'auto' : caps.aspects[0]) }} className="kit-field w-full font-mono text-xs">
                       {modelSettings.image_models.some(m => m.id === renderDraft) ? null : <option value={renderDraft}>{renderDraft}</option>}
                       {[...modelSettings.image_models].sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}
                     </select>
@@ -1390,7 +1390,7 @@ export default function Admin() {
                   </div>
                   <div>
                     <label htmlFor="edit-model" className="eyebrow mb-2 block">Модель редактирования</label>
-                    <select id="edit-model" value={editDraft} onChange={e => setEditDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">
+                    <select id="edit-model" value={editDraft} onChange={e => setEditDraft(e.target.value)} className="kit-field w-full font-mono text-xs">
                       <option value="">Как у генерации ({renderDraft})</option>
                       {modelSettings.image_models.some(m => m.id === editDraft) || !editDraft ? null : <option value={editDraft}>{editDraft}</option>}
                       {[...modelSettings.image_models].sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}
@@ -1398,14 +1398,14 @@ export default function Admin() {
                     <p className="mt-2 text-xs text-muted-foreground">Используется для правок и точечных изменений по референсам. Должна поддерживать input_references; для нескольких референсов подходит <code className="border bg-muted px-1 text-[11px]">black-forest-labs/flux-3-image-klein</code>. Пусто — берётся модель генерации.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div><label htmlFor="resolution" className="eyebrow mb-2 block">Разрешение</label>{capsFor(renderDraft).resolutions.length ? <select id="resolution" value={resolutionDraft} onChange={e => setResolutionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(renderDraft).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select> : <div className="flex h-11 items-center border bg-muted px-3 text-sm text-muted-foreground">Задаётся моделью</div>}</div>
-                    <div><label htmlFor="aspect-ratio" className="eyebrow mb-2 block">Aspect ratio</label><select id="aspect-ratio" value={aspectDraft} onChange={e => setAspectDraft(e.target.value)} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(renderDraft).aspects.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                    <div><label htmlFor="resolution" className="eyebrow mb-2 block">Разрешение</label>{capsFor(renderDraft).resolutions.length ? <select id="resolution" value={resolutionDraft} onChange={e => setResolutionDraft(e.target.value)} className="kit-field w-full text-sm">{capsFor(renderDraft).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select> : <div className="flex h-11 items-center border bg-muted px-3 text-sm text-muted-foreground">Задаётся моделью</div>}</div>
+                    <div><label htmlFor="aspect-ratio" className="eyebrow mb-2 block">Aspect ratio</label><select id="aspect-ratio" value={aspectDraft} onChange={e => setAspectDraft(e.target.value)} className="kit-field w-full text-sm">{capsFor(renderDraft).aspects.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
                   </div>
                   <p className="-mt-1 text-xs text-muted-foreground">Seedream 5.0 Flash: 1K/2K + auto. FLUX.2 Pro: разрешение задаёт модель, параметр resolution не отправляется. Для Gemini resolution тоже не отправляется. Итоговое изображение всегда приводится к пропорции загруженного кадра.</p>
                   <div>
                     <label htmlFor="vision-model" className="eyebrow mb-2 block">Модель разбора (vision)</label>
-                    <input id="vision-model" value={visionDraft} onChange={e => setVisionDraft(e.target.value)} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
-                    <p className="mt-2 text-xs text-muted-foreground">Обычно оставляем Gemini для разбора изображения и сметы.</p>
+                    <input id="vision-model" value={visionDraft} onChange={e => setVisionDraft(e.target.value)} className="kit-field w-full font-mono text-xs" />
+                    <p className="mt-2 text-xs text-muted-foreground">Обычно оставляем Gemini для разбора изображения и подборки.</p>
                   </div>
                   {modelNotice && <p className="border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{modelNotice}</p>}
                   <button type="submit" disabled={modelSaving} className="action-primary">{modelSaving ? 'Сохраняем…' : 'Сохранить модели'}</button>
@@ -1438,13 +1438,13 @@ export default function Admin() {
                       </div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Название</label><input value={importPreview.name} onChange={e => setImportPreview({ ...importPreview, name: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                      <div><label className="eyebrow mb-1 block">Бренд</label><input value={importPreview.brand} onChange={e => setImportPreview({ ...importPreview, brand: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                      <div><label className="eyebrow mb-1 block">Цена, ₽</label><input value={importPreview.price || ''} inputMode="numeric" onChange={e => setImportPreview({ ...importPreview, price: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Название</label><input value={importPreview.name} onChange={e => setImportPreview({ ...importPreview, name: e.target.value })} className="kit-field min-h-11 w-full text-sm" /></div>
+                      <div><label className="eyebrow mb-1 block">Бренд</label><input value={importPreview.brand} onChange={e => setImportPreview({ ...importPreview, brand: e.target.value })} className="kit-field min-h-11 w-full text-sm" /></div>
+                      <div><label className="eyebrow mb-1 block">Цена, ₽</label><input value={importPreview.price || ''} inputMode="numeric" onChange={e => setImportPreview({ ...importPreview, price: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })} className="kit-field min-h-11 w-full text-sm" /></div>
                       <div><label className="eyebrow mb-1 block">Категория</label><select value={importPreview.category || ''} onChange={e => setImportPreview({ ...importPreview, category: e.target.value || null })} className="h-10 w-full border bg-background px-2 text-sm outline-none focus:border-primary"><option value="">— выберите —</option>{productCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                       <div><label className="eyebrow mb-1 block">Класс</label><select value={importPreview.price_tier} onChange={e => setImportPreview({ ...importPreview, price_tier: e.target.value })} className="h-10 w-full border bg-background px-2 text-sm outline-none focus:border-primary">{['start','comfort','premium','atelier'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                      <div><label className="eyebrow mb-1 block">Ед.</label><input value={importPreview.unit} onChange={e => setImportPreview({ ...importPreview, unit: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                      <div><label className="eyebrow mb-1 block">Кол-во</label><input value={importPreview.qty} inputMode="numeric" onChange={e => setImportPreview({ ...importPreview, qty: Number(e.target.value.replace(/[^\d]/g, '')) || 1 })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div><label className="eyebrow mb-1 block">Ед.</label><input value={importPreview.unit} onChange={e => setImportPreview({ ...importPreview, unit: e.target.value })} className="kit-field min-h-11 w-full text-sm" /></div>
+                      <div><label className="eyebrow mb-1 block">Кол-во</label><input value={importPreview.qty} inputMode="numeric" onChange={e => setImportPreview({ ...importPreview, qty: Number(e.target.value.replace(/[^\d]/g, '')) || 1 })} className="kit-field min-h-11 w-full text-sm" /></div>
                       <div className="sm:col-span-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         {[
                           ['width_cm', 'Ширина, см'],
@@ -1452,12 +1452,12 @@ export default function Admin() {
                           ['height_cm', 'Высота, см'],
                           ['diameter_cm', 'Диаметр, см'],
                         ].map(([key, label]) => (
-                          <div key={key}><label className="eyebrow mb-1 block">{label}</label><input value={(importPreview.dimensions as Record<string, number | null | undefined>)[key] ?? ''} inputMode="decimal" onChange={e => setImportPreview({ ...importPreview, dimensions: { ...importPreview.dimensions, [key]: e.target.value === '' ? null : Number(e.target.value.replace(',', '.')) || null } })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                          <div key={key}><label className="eyebrow mb-1 block">{label}</label><input value={(importPreview.dimensions as Record<string, number | null | undefined>)[key] ?? ''} inputMode="decimal" onChange={e => setImportPreview({ ...importPreview, dimensions: { ...importPreview.dimensions, [key]: e.target.value === '' ? null : Number(e.target.value.replace(',', '.')) || null } })} className="kit-field min-h-11 w-full text-sm" /></div>
                         ))}
                       </div>
-                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Габариты текстом</label><input value={importPreview.dimensions.text || ''} onChange={e => setImportPreview({ ...importPreview, dimensions: { ...importPreview.dimensions, text: e.target.value } })} placeholder="например, 220×95×90 см" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Комнаты</label><input value={importPreview.room_types} onChange={e => setImportPreview({ ...importPreview, room_types: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Стили</label><input value={importPreview.style_tags} onChange={e => setImportPreview({ ...importPreview, style_tags: e.target.value })} className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Габариты текстом</label><input value={importPreview.dimensions.text || ''} onChange={e => setImportPreview({ ...importPreview, dimensions: { ...importPreview.dimensions, text: e.target.value } })} placeholder="например, 220×95×90 см" className="kit-field min-h-11 w-full text-sm" /></div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Комнаты</label><input value={importPreview.room_types} onChange={e => setImportPreview({ ...importPreview, room_types: e.target.value })} className="kit-field min-h-11 w-full text-sm" /></div>
+                      <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Стили</label><input value={importPreview.style_tags} onChange={e => setImportPreview({ ...importPreview, style_tags: e.target.value })} className="kit-field min-h-11 w-full text-sm" /></div>
                       <div className="sm:col-span-2"><label className="eyebrow mb-1 block">Ссылка</label><a href={importPreview.url_source || importPreview.url} target="_blank" rel="noopener noreferrer" className="block truncate text-xs underline underline-offset-2">{importPreview.url_source || importPreview.url}</a></div>
                       {!importPreview.allowed_domain && <label className="flex items-center gap-2 text-xs sm:col-span-2"><input type="checkbox" checked={importAllowAny} onChange={e => setImportAllowAny(e.target.checked)} />Домен не в allowlist — разрешить импорт вручную</label>}
                       <div className="flex flex-wrap gap-2 sm:col-span-2">
@@ -1521,11 +1521,11 @@ export default function Admin() {
               {cleanupNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{cleanupNotice}</p>}
               {cleanupConfig ? (
                 <div className="mt-6 space-y-5">
-                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={cleanupConfig.enabled} onChange={e => setCleanupConfig({ ...cleanupConfig, enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Очистка включена</span><span className="mt-1 block text-xs text-muted-foreground">Если выключить, при «Оставить мебель = выкл» сразу пойдёт обычный дизайн без пустого каркаса.</span></span></label>
+                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={cleanupConfig.enabled} onChange={e => setCleanupConfig({ ...cleanupConfig, enabled: e.target.checked })} className="size-5 accent-primary" /><span><span className="font-medium">Очистка включена</span><span className="mt-1 block text-xs text-muted-foreground">Если выключить, при «Оставить мебель = выкл» сразу пойдёт обычный дизайн без пустого каркаса.</span></span></label>
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="sm:col-span-2"><label className="eyebrow mb-2 block">Модель очистки</label><select value={cleanupConfig.model} onChange={e => { const value = e.target.value; const caps = capsFor(value); const nextRes = caps.resolutions.length ? (caps.resolutions.includes(cleanupConfig.resolution) ? cleanupConfig.resolution : caps.resolutions[0]) : ''; const nextAspect = caps.aspects.includes(cleanupConfig.aspect_ratio) ? cleanupConfig.aspect_ratio : (caps.aspects.includes('auto') ? 'auto' : caps.aspects[0]); setCleanupConfig({ ...cleanupConfig, model: value, resolution: nextRes, aspect_ratio: nextAspect }) }} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary">{modelSettings?.image_models?.some(m => m.id === cleanupConfig.model) ? null : <option value={cleanupConfig.model}>{cleanupConfig.model}</option>}{modelSettings?.image_models?.map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}</select></div>
-                    <div><label className="eyebrow mb-2 block">Разрешение</label>{capsFor(cleanupConfig.model).resolutions.length ? <select value={cleanupConfig.resolution} onChange={e => setCleanupConfig({ ...cleanupConfig, resolution: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(cleanupConfig.model).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select> : <div className="flex h-11 items-center border bg-muted px-3 text-sm text-muted-foreground">Задаётся моделью</div>}</div>
-                    <div><label className="eyebrow mb-2 block">Aspect ratio</label><select value={cleanupConfig.aspect_ratio} onChange={e => setCleanupConfig({ ...cleanupConfig, aspect_ratio: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary">{capsFor(cleanupConfig.model).aspects.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+                    <div className="sm:col-span-2"><label className="eyebrow mb-2 block">Модель очистки</label><select value={cleanupConfig.model} onChange={e => { const value = e.target.value; const caps = capsFor(value); const nextRes = caps.resolutions.length ? (caps.resolutions.includes(cleanupConfig.resolution) ? cleanupConfig.resolution : caps.resolutions[0]) : ''; const nextAspect = caps.aspects.includes(cleanupConfig.aspect_ratio) ? cleanupConfig.aspect_ratio : (caps.aspects.includes('auto') ? 'auto' : caps.aspects[0]); setCleanupConfig({ ...cleanupConfig, model: value, resolution: nextRes, aspect_ratio: nextAspect }) }} className="kit-field w-full font-mono text-xs">{modelSettings?.image_models?.some(m => m.id === cleanupConfig.model) ? null : <option value={cleanupConfig.model}>{cleanupConfig.model}</option>}{modelSettings?.image_models?.map(m => <option key={m.id} value={m.id}>{m.id}{m.input_refs ? ' · refs' : ''}</option>)}</select></div>
+                    <div><label className="eyebrow mb-2 block">Разрешение</label>{capsFor(cleanupConfig.model).resolutions.length ? <select value={cleanupConfig.resolution} onChange={e => setCleanupConfig({ ...cleanupConfig, resolution: e.target.value })} className="kit-field w-full text-sm">{capsFor(cleanupConfig.model).resolutions.map(v => <option key={v} value={v}>{v}</option>)}</select> : <div className="flex h-11 items-center border bg-muted px-3 text-sm text-muted-foreground">Задаётся моделью</div>}</div>
+                    <div><label className="eyebrow mb-2 block">Aspect ratio</label><select value={cleanupConfig.aspect_ratio} onChange={e => setCleanupConfig({ ...cleanupConfig, aspect_ratio: e.target.value })} className="kit-field w-full text-sm">{capsFor(cleanupConfig.model).aspects.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
                   </div>
                   <label className="block"><span className="eyebrow mb-2 block">Промт очистки</span><textarea value={cleanupConfig.prompt} onChange={e => setCleanupConfig({ ...cleanupConfig, prompt: e.target.value })} rows={8} maxLength={8000} className="w-full border bg-background px-3 py-2 text-sm leading-6 outline-none focus:border-primary" /><span className="mt-2 block text-xs text-muted-foreground">Плейсхолдеры: <code>{'{room}'}</code> — тип комнаты, <code>{'{keep}'}</code> — что сохранить, <code>{'{remove}'}</code> — что удалить. Для кухни/санузла сохраняются встроенные элементы и технические точки.</span></label>
                   <p className="text-xs text-muted-foreground">Рекомендуем FLUX 3 Image Klein, 1K, auto. Очистка добавляет второй вызов модели и увеличивает время генерации.</p>
@@ -1538,10 +1538,10 @@ export default function Admin() {
             <div className="mt-8 max-w-4xl space-y-8">
               <div>
                 <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div><p className="eyebrow">Подбор товаров после генерации</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Архитектор разбирает готовый кадр и ищет реальные товары Hoff в catalog-service. На базовую картинку не влияет. Если выключено — блок товаров и кнопка сметы не показываются.</p></div>
+                  <div><p className="eyebrow">Подбор товаров после генерации</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Архитектор разбирает готовый кадр и ищет реальные товары Hoff в catalog-service. На базовую картинку не влияет. Если выключено — блок товаров и кнопка подбора не показываются.</p></div>
                 </div>
                 {renderConfig ? (
-                  <label className="mt-4 flex items-start gap-3 border p-3 text-sm"><input type="checkbox" checked={renderConfig.product_matching_enabled} onChange={e => setRenderConfig({ ...renderConfig, product_matching_enabled: e.target.checked })} className="mt-1 size-4 accent-primary" /><span><span className="font-medium">Подбирать реальные товары после генерации</span><span className="mt-1 block text-xs text-muted-foreground">Базовый кадр остаётся design-first: товары появляются только в разборе и смете.</span></span></label>
+                  <label className="mt-4 flex items-start gap-3 border p-3 text-sm"><input type="checkbox" checked={renderConfig.product_matching_enabled} onChange={e => setRenderConfig({ ...renderConfig, product_matching_enabled: e.target.checked })} className="mt-1 size-4 accent-primary" /><span><span className="font-medium">Подбирать реальные товары после генерации</span><span className="mt-1 block text-xs text-muted-foreground">Базовый кадр остаётся design-first: товары появляются только в разборе и подборке.</span></span></label>
                 ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем настройки…</p>}
               </div>
               <div>
@@ -1552,8 +1552,8 @@ export default function Admin() {
                 {renderNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{renderNotice}</p>}
                 {renderConfig ? (
                   <div className="mt-6 space-y-5">
-                    <label className="flex items-center gap-3 border p-3 text-sm opacity-60"><input type="checkbox" checked={false} disabled className="size-4 accent-primary" /><span><span className="font-medium">Товары в рендере отключены</span><span className="mt-1 block text-xs text-muted-foreground">Функция убрана: базовый кадр больше не добавляет товарные референсы.</span></span></label>
-                    <div><label className="eyebrow mb-2 block">Сколько товаров в кадре</label><input type="number" min={2} max={4} value={renderConfig.max_products} onChange={e => setRenderConfig({ ...renderConfig, max_products: Math.max(2, Math.min(4, Number(e.target.value) || 3)) })} className="h-11 w-40 border bg-background px-3 text-sm outline-none focus:border-primary" /><span className="ml-3 text-xs text-muted-foreground">2–4 hero-товара</span></div>
+                    <label className="flex items-center gap-3 border p-3 text-sm opacity-60"><input type="checkbox" checked={false} disabled className="size-5 accent-primary" /><span><span className="font-medium">Товары в рендере отключены</span><span className="mt-1 block text-xs text-muted-foreground">Функция убрана: базовый кадр больше не добавляет товарные референсы.</span></span></label>
+                    <div><label className="eyebrow mb-2 block">Сколько товаров в кадре</label><input type="number" min={2} max={4} value={renderConfig.max_products} onChange={e => setRenderConfig({ ...renderConfig, max_products: Math.max(2, Math.min(4, Number(e.target.value) || 3)) })} className="kit-field w-40 text-sm" /><span className="ml-3 text-xs text-muted-foreground">2–4 hero-товара</span></div>
                     <p className="text-xs text-muted-foreground">Источник — catalog-service (Hoff). Включать только после A/B-проверки, что качество не проседает.</p>
                   </div>
                 ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
@@ -1565,7 +1565,7 @@ export default function Admin() {
                 {renderConfig ? (
                   <div className="mt-4">
                     <label htmlFor="image-min-gap" className="eyebrow mb-2 block">Минимальный интервал между image-вызовами, мс</label>
-                    <input id="image-min-gap" type="number" min={0} step={1000} value={renderConfig.image_min_gap_ms} onChange={e => setRenderConfig({ ...renderConfig, image_min_gap_ms: Math.max(0, Math.min(120000, Number(e.target.value) || 0)) })} className="h-11 w-56 border bg-background px-3 text-sm outline-none focus:border-primary" />
+                    <input id="image-min-gap" type="number" min={0} step={1000} value={renderConfig.image_min_gap_ms} onChange={e => setRenderConfig({ ...renderConfig, image_min_gap_ms: Math.max(0, Math.min(120000, Number(e.target.value) || 0)) })} className="kit-field w-56 text-sm" />
                     <p className="mt-2 text-xs text-muted-foreground">0 — без паузы; меньше 10 000 может участить 429.</p>
                   </div>
                 ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем настройки…</p>}
@@ -1602,31 +1602,31 @@ export default function Admin() {
               {procurementNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{procurementNotice}</p>}
               {procurementConfig ? (
                 <div className="mt-6 space-y-5">
-                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={procurementConfig.enabled} onChange={e => setProcurementConfig({ ...procurementConfig, enabled: e.target.checked })} className="size-4 accent-primary" /><span><span className="font-medium">Поиск товаров включён</span><span className="mt-1 block text-xs text-muted-foreground">Если выключить, кнопка «Найти товары» вернёт ошибку и кредит не спишется.</span></span></label>
+                  <label className="flex items-center gap-3 border p-3 text-sm"><input type="checkbox" checked={procurementConfig.enabled} onChange={e => setProcurementConfig({ ...procurementConfig, enabled: e.target.checked })} className="size-5 accent-primary" /><span><span className="font-medium">Поиск товаров включён</span><span className="mt-1 block text-xs text-muted-foreground">Если выключить, кнопка «Найти товары» вернёт ошибку и кредит не спишется.</span></span></label>
                   <div>
                     <p className="eyebrow mb-2">Что искать</p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {Object.entries(procurementLayerLabels).map(([layer, label]) => (
                         <label key={layer} className="flex items-center gap-3 border p-3 text-sm">
-                          <input type="checkbox" checked={procurementConfig.enabled_layers.includes(layer)} onChange={e => setProcurementConfig({ ...procurementConfig, enabled_layers: e.target.checked ? [...procurementConfig.enabled_layers, layer] : procurementConfig.enabled_layers.filter(v => v !== layer) })} className="size-4 accent-primary" />
+                          <input type="checkbox" checked={procurementConfig.enabled_layers.includes(layer)} onChange={e => setProcurementConfig({ ...procurementConfig, enabled_layers: e.target.checked ? [...procurementConfig.enabled_layers, layer] : procurementConfig.enabled_layers.filter(v => v !== layer) })} className="size-5 accent-primary" />
                           <span>{label}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div><label className="eyebrow mb-2 block">Регион Яндекса</label><input value={procurementConfig.region} onChange={e => setProcurementConfig({ ...procurementConfig, region: e.target.value })} className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" placeholder="213" /></div>
-                    <div><label className="eyebrow mb-2 block">Кредитов за запуск</label><input type="number" min={0} max={10} value={procurementConfig.credit_cost} onChange={e => setProcurementConfig({ ...procurementConfig, credit_cost: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                    <div><label className="eyebrow mb-2 block">Макс. стоимость run, $</label><input type="number" min={0.01} max={5} step={0.01} value={procurementConfig.max_run_cost_usd} onChange={e => setProcurementConfig({ ...procurementConfig, max_run_cost_usd: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                    <div><label className="eyebrow mb-2 block">Регион Яндекса</label><input value={procurementConfig.region} onChange={e => setProcurementConfig({ ...procurementConfig, region: e.target.value })} className="kit-field w-full font-mono text-xs" placeholder="213" /></div>
+                    <div><label className="eyebrow mb-2 block">Кредитов за запуск</label><input type="number" min={0} max={10} value={procurementConfig.credit_cost} onChange={e => setProcurementConfig({ ...procurementConfig, credit_cost: Number(e.target.value) })} className="kit-field w-full text-sm" /></div>
+                    <div><label className="eyebrow mb-2 block">Макс. стоимость run, $</label><input type="number" min={0.01} max={5} step={0.01} value={procurementConfig.max_run_cost_usd} onChange={e => setProcurementConfig({ ...procurementConfig, max_run_cost_usd: Number(e.target.value) })} className="kit-field w-full text-sm" /></div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-4">
-                    <div><label className="eyebrow mb-2 block">Мин. score</label><input type="number" min={50} max={95} value={procurementConfig.min_score} onChange={e => setProcurementConfig({ ...procurementConfig, min_score: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                    <div><label className="eyebrow mb-2 block">Альтернатива</label><input type="number" min={40} max={90} value={procurementConfig.alt_score} onChange={e => setProcurementConfig({ ...procurementConfig, alt_score: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                    <div><label className="eyebrow mb-2 block">Кандидатов</label><input type="number" min={1} max={8} value={procurementConfig.max_candidates_per_item} onChange={e => setProcurementConfig({ ...procurementConfig, max_candidates_per_item: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
-                    <div><label className="eyebrow mb-2 block">Визуальных</label><input type="number" min={1} max={5} value={procurementConfig.max_visual_candidates} onChange={e => setProcurementConfig({ ...procurementConfig, max_visual_candidates: Number(e.target.value) })} className="h-11 w-full border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                    <div><label className="eyebrow mb-2 block">Мин. score</label><input type="number" min={50} max={95} value={procurementConfig.min_score} onChange={e => setProcurementConfig({ ...procurementConfig, min_score: Number(e.target.value) })} className="kit-field w-full text-sm" /></div>
+                    <div><label className="eyebrow mb-2 block">Альтернатива</label><input type="number" min={40} max={90} value={procurementConfig.alt_score} onChange={e => setProcurementConfig({ ...procurementConfig, alt_score: Number(e.target.value) })} className="kit-field w-full text-sm" /></div>
+                    <div><label className="eyebrow mb-2 block">Кандидатов</label><input type="number" min={1} max={8} value={procurementConfig.max_candidates_per_item} onChange={e => setProcurementConfig({ ...procurementConfig, max_candidates_per_item: Number(e.target.value) })} className="kit-field w-full text-sm" /></div>
+                    <div><label className="eyebrow mb-2 block">Визуальных</label><input type="number" min={1} max={5} value={procurementConfig.max_visual_candidates} onChange={e => setProcurementConfig({ ...procurementConfig, max_visual_candidates: Number(e.target.value) })} className="kit-field w-full text-sm" /></div>
                   </div>
                   <label className="block"><span className="eyebrow mb-2 block">Магазины (через запятую)</span><textarea value={procurementConfig.domains} onChange={e => setProcurementConfig({ ...procurementConfig, domains: e.target.value })} rows={4} className="w-full border bg-background px-3 py-2 font-mono text-xs leading-5 outline-none focus:border-primary" /></label>
-                  <p className="text-xs text-muted-foreground">Если слой выключен, его позиции не создаются и не ищутся. Комплектующие (матрас, крепёж, карниз) лучше держать выключенными до этапа сметы.</p>
+                  <p className="text-xs text-muted-foreground">Если слой выключен, его позиции не создаются и не ищутся. Комплектующие (матрас, крепёж, карниз) лучше держать выключенными до этапа подборки.</p>
                 </div>
               ) : <p className="mt-6 text-sm text-muted-foreground">Загружаем настройки…</p>}
             </div>
@@ -1641,7 +1641,7 @@ export default function Admin() {
               <form onSubmit={e => { e.preventDefault(); void saveProxy() }} className="mt-6 space-y-4 border p-4">
                 <div>
                   <label htmlFor="proxy-url" className="eyebrow mb-2 block">URL прокси</label>
-                  <input id="proxy-url" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="socks5://user:pass@host:port или http://user:pass@host:port" className="h-11 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
+                  <input id="proxy-url" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} placeholder="socks5://user:pass@host:port или http://user:pass@host:port" className="kit-field w-full font-mono text-xs" />
                   <p className="mt-2 text-xs text-muted-foreground">Env-фолбэк: {proxyEnv ? <span className="font-mono">{proxyEnv}</span> : 'не задан'}. Пароль в URL маскируется; чтобы изменить — введите новый URL целиком.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
