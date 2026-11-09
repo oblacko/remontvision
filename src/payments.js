@@ -335,10 +335,12 @@ export async function restoreCreditForRender(renderId, note = null) {
        ORDER BY id ASC LIMIT 1 FOR UPDATE`, [renderId]);
     if (!spend.rows[0]) return false;
     const userId = spend.rows[0].user_id;
+    // Возвращаем ровно списанную сумму: корневой рендер может стоить modelCredits > 1.
+    const refundDelta = Math.abs(Number(spend.rows[0].delta));
     const ins = await client.query(
       `INSERT INTO credit_txn (user_id, delta, reason, render_id, note)
-       VALUES ($1, 1, 'iterate_refund', $2, $3)
-       ON CONFLICT DO NOTHING RETURNING id`, [userId, renderId, note]);
+       VALUES ($1, $2, 'iterate_refund', $3, $4)
+       ON CONFLICT DO NOTHING RETURNING id`, [userId, refundDelta, renderId, note]);
     if (!ins.rows[0]) return false;
     log({ event: 'credit_restored', user_id: userId, render_id: renderId, note });
     return true;

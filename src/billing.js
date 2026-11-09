@@ -5,8 +5,9 @@ export const FREE_EDITS = 3;
 
 export function editChargeDecision({ iteration, editCount } = {}) {
   // Fail closed: без корректного счётчика правок считаем вызов платным.
+  // Отрицательный счётчик тоже платный — согласовано с chargeForEnqueue.
   if (!Number.isInteger(editCount)) return { free: false };
-  const free = iteration === true && editCount < FREE_EDITS;
+  const free = iteration === true && editCount >= 0 && editCount < FREE_EDITS;
   return { free };
 }
 

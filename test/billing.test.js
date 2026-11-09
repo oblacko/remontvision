@@ -31,10 +31,15 @@ test('root render is never free', () => {
 });
 
 test('missing or invalid edit count is charged', () => {
-  for (const editCount of [undefined, NaN, Infinity, '', null, 1.5, '2']) {
+  for (const editCount of [undefined, NaN, Infinity, '', null, 1.5, '2', -1]) {
     assert.deepEqual(editChargeDecision({ iteration: true, editCount }), { free: false });
   }
   assert.deepEqual(editChargeDecision({ iteration: true }), { free: false });
+});
+
+test('negative edit count is charged (aligned with chargeForEnqueue)', () => {
+  assert.deepEqual(editChargeDecision({ iteration: true, editCount: -1 }), { free: false });
+  assert.deepEqual(editChargeDecision({ iteration: true, editCount: -5 }), { free: false });
 });
 
 test('model credits default to one without models', () => {
