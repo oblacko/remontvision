@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // DB-free: чистая математика и форматирование отчёта о скорости пайплайна.
+// Скрипт импортируется только ради parseArgs; main() за main-guard не выполняется.
 const { percentile, summarizeStages, formatReport } = await import('../src/speedreport.js');
+const { parseArgs } = await import('../scripts/ops/speed-report.mjs');
 
 test('percentile returns null for empty input', () => {
   assert.equal(percentile([], 0.5), null);
@@ -96,6 +98,23 @@ test('summarizeStages on empty input yields n=0 and null total', () => {
   assert.equal(summary.total.cost_usd, null);
 });
 
+test('summarizeStages prefers meta.total_ms over summed stage ms', () => {
+  const summary = summarizeStages([
+    {
+      created_at: '2026-11-09T10:00:00Z',
+      cost_usd: 0.1,
+      meta: {
+        total_ms: 5000,
+        art_direction: { ms: 1000 },
+        cleanup: { ms: 2000 },
+      },
+    },
+  ]);
+  assert.equal(summary.total.ms.n, 1);
+  assert.equal(summary.total.ms.p50, 5000);
+  assert.equal(summary.total.ms.mean, 5000);
+});
+
 test('formatReport includes stage names and p50/p90 headers', () => {
   const summary = summarizeStages([
     {
@@ -112,4 +131,27 @@ test('formatReport includes stage names and p50/p90 headers', () => {
   assert.match(md, /cleanup/);
   assert.match(md, /design/);
   assert.match(md, /Итого|total/);
+});
+
+test('parseArgs parses limit/out/force', () => {
+  const a = parseArgs(['--limit', '25', '--out', 'x.md', '--force']);
+  assert.equal(a.limit, 25);
+  assert.equal(a.out, 'x.md');
+  assert.equal(a.force, true);
+});
+
+test('parseArgs rejects invalid --limit', () => {
+  assert.throws(() => parseArgs(['--limit', 'abc']), /--limit/);
+  assert.throws(() => parseArgs(['--limit', '0']), /--limit/);
+  assert.throws(() => parseArgs(['--limit', '-3']), /--limit/);
+  assert.throws(() => parseArgs(['--limit']), /--limit/);
+});
+
+test('parseArgs --out without a value does not swallow the next flag', () => {
+  assert.throws(() => parseArgs(['--out', '--limit', '10']), /--out/);
+  assert.throws(() => parseArgs(['--out']), /--out/);
+});
+
+test('parseArgs rejects unknown flags', () => {
+  assert.throws(() => parseArgs(['--bogus']), /Неизвестный аргумент/);
 });
