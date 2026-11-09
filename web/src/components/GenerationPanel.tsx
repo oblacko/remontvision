@@ -157,6 +157,7 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
 type StylePreset = { key: string; name: string; accent: string; image_url?: string }
+type RenderModelOption = { key: string; label: string; credits: number }
 const defaultStylePresets: StylePreset[] = [
   { key: 'minimalism', name: 'Современный минимализм', accent: 'sand', image_url: '/images/style-minimal.webp' },
   { key: 'scandinavian', name: 'Скандинавский', accent: 'dust', image_url: '/images/style-scandi.webp' },
@@ -248,6 +249,10 @@ export function GenerationPanel({
   const [style, setStyle] = useState<string | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
   const [useCatalog] = useState(true)
+  const [renderModels, setRenderModels] = useState<RenderModelOption[]>([])
+  const [modelKey, setModelKey] = useState<string | null>(null)
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [hasPurchased, setHasPurchased] = useState(false)
   const [concepts, setConcepts] = useState<DesignConcept[]>([])
   const [compatibility, setCompatibility] = useState<DesignCompatibility>({})
   const [conceptKey, setConceptKey] = useState<string | null>(null)
@@ -279,6 +284,8 @@ export function GenerationPanel({
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
   const showResultMain = !inline || heroItems.length > 0
+  // Редактируем существующий дизайн, а не создаём новый: модель и приватность наследуются от родителя.
+  const editing = Boolean(roomId)
   const productMatches = current?.analysis?.products || []
   const currentChanges = changesFromArchitect(current?.analysis?.architect)
   const selectedOffersList = Object.values(selectedOffers)
@@ -335,6 +342,27 @@ export function GenerationPanel({
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    fetch('/api/models')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const list = Array.isArray(d?.models) ? (d.models as RenderModelOption[]) : []
+        if (list.length) {
+          setRenderModels(list.map(m => ({ key: String(m.key), label: String(m.label), credits: Number(m.credits) })))
+          setModelKey(String(list[0].key))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!isAuthed) { setHasPurchased(false); return }
+    fetch('/api/credits')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && typeof d.has_purchased === 'boolean') setHasPurchased(d.has_purchased) })
+      .catch(() => {})
+  }, [isAuthed])
 
   useEffect(() => {
     if (!open) { loadedRoomRef.current = ''; setCreditOpen(false); return }
@@ -623,6 +651,8 @@ export function GenerationPanel({
         fd.append('price_tier', priceTier)
         fd.append('keep_furniture', usingCleaned ? '0' : '1')
         fd.append('use_catalog', useCatalog ? '1' : '0')
+        if (modelKey) fd.append('model', modelKey)
+        fd.append('private', isPrivate ? '1' : '0')
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { setStep('style'); onRequireLogin(); return }
@@ -908,6 +938,49 @@ export function GenerationPanel({
                     </button>
                   )
                 })}
+              </div>
+            </div>
+
+            <div className="mt-10 border-t pt-6">
+              {renderModels.length > 0 && (
+                <div>
+                  <p className="eyebrow">Модель</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{editing ? 'Модель — от родительского дизайна.' : 'Цена модели спишется за рендер в кредитах.'}</p>
+                  <div className="mt-4 flex snap-x snap-mandatory gap-px overflow-x-auto border bg-border sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-3">
+                    {renderModels.map((m) => {
+                      const selected = modelKey === m.key
+                      return (
+                        <button key={m.key} type="button" disabled={editing} aria-pressed={selected} onClick={() => setModelKey(m.key)} className={`w-60 shrink-0 snap-start bg-background p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${selected ? 'shadow-[inset_0_0_0_2px_oklch(var(--foreground))]' : 'hover:bg-muted'}`}>
+                          <span className={`block ${selected ? '' : 'opacity-60'}`}>
+                            <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                              {m.label}
+                              {selected ? <Check className="size-4 shrink-0 text-primary-text" /> : null}
+                            </span>
+                            <span className="mt-1 block font-mono text-xs text-primary-text">{m.credits} кр.</span>
+                            {editing && <span className="mt-1 block text-[10px] leading-4 text-muted-foreground">Модель — от родительского дизайна</span>}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className={renderModels.length > 0 ? 'mt-6' : ''}>
+                <p className="eyebrow">Приватность</p>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={isPrivate}
+                  disabled={!hasPurchased}
+                  onClick={() => setIsPrivate(value => !value)}
+                  className={`mt-3 flex min-h-11 w-full items-start gap-3 border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${isPrivate ? 'border-primary' : 'border-foreground/25 hover:border-foreground'}`}
+                >
+                  <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center border ${isPrivate ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/40'}`}>{isPrivate ? <Check className="size-4" /> : null}</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">Приватный режим — не показывать в примерах и галерее</span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">{hasPurchased ? 'Дизайн останется приватным и не попадёт в публичную галерею.' : 'Только на платных пакетах'}</span>
+                  </span>
+                </button>
               </div>
             </div>
 

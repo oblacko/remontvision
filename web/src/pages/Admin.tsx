@@ -31,6 +31,7 @@ type ArchitectPromptRow = { id: number; kind: string; version: number; system: s
 type ArchitectPromptsState = Record<string, { rows: ArchitectPromptRow[]; active: { id: number | null; version: number; system: string } }>
 type ArchitectKind = 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout' | 'breakdown' | 'roadmap'
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
+type RenderModel = { id: string; label: string; model_id: string; credits: number; art_direction_enabled: boolean; active: boolean; sort: number }
 type Style = {
   id: number; key: string; name: string; accent: string; description: string;
   image_url: string; active: boolean; sort: number;
@@ -210,6 +211,11 @@ export default function Admin() {
   const [packs, setPacks] = useState<Pack[]>([])
   const [editPackId, setEditPackId] = useState<string | null>(null)
   const [packForm, setPackForm] = useState({ id: '', title: '', credits: '2', price: '99', active: true, sort: '10' })
+
+  const [renderModels, setRenderModels] = useState<RenderModel[]>([])
+  const [editRenderModelId, setEditRenderModelId] = useState<string | null>(null)
+  const [renderModelForm, setRenderModelForm] = useState({ id: '', label: '', model_id: '', credits: '1', art_direction_enabled: true, active: true, sort: '10' })
+  const [renderModelNotice, setRenderModelNotice] = useState('')
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [roomTypeNames, setRoomTypeNames] = useState<string[]>(defaultRoomTypeNames)
@@ -763,7 +769,7 @@ export default function Admin() {
     } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
 
-  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') loadModels(); if (tab === 'architect') loadArchitectPrompts(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'render') loadRender(); if (tab === 'articles') { loadArticles(); if (!styles.length) loadStyles() } if (tab === 'procurement') loadProcurement() }, [authed, tab])
+  useEffect(() => { if (!authed) return; if (tab === 'users') loadUsers(); if (tab === 'packs') loadPacks(); if (tab === 'styles') { loadStyles(); loadStyleReference() } if (tab === 'prompts') loadPrompts(); if (tab === 'models') { loadModels(); loadRenderModels() } if (tab === 'architect') loadArchitectPrompts(); if (tab === 'proxy') loadProxy(); if (tab === 'catalog') loadCatalog(); if (tab === 'rules') loadPromptRules(); if (tab === 'cleanup') loadCleanup(); if (tab === 'render') loadRender(); if (tab === 'articles') { loadArticles(); if (!styles.length) loadStyles() } if (tab === 'procurement') loadProcurement() }, [authed, tab])
   useEffect(() => { if (authed) void loadRoomTypes() }, [authed])
   useEffect(() => {
     if (!authed) return
@@ -824,6 +830,40 @@ export default function Admin() {
   const deletePack = async (id: string) => {
     if (!confirm('Удалить пакет ' + id + '?')) return
     try { await api('/api/admin/packs/' + id, { method: 'DELETE' }); await loadPacks() }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const loadRenderModels = async () => {
+    try { setRenderModels(await readJson(await api('/api/admin/models'))); setRenderModelNotice('') }
+    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const startNewRenderModel = () => {
+    setEditRenderModelId(null)
+    setRenderModelForm({ id: '', label: '', model_id: '', credits: '1', art_direction_enabled: true, active: true, sort: String((renderModels.length + 1) * 10) })
+    setRenderModelNotice('')
+  }
+  const editRenderModel = (m: RenderModel) => {
+    setEditRenderModelId(m.id)
+    setRenderModelForm({ id: m.id, label: m.label, model_id: m.model_id, credits: String(m.credits), art_direction_enabled: m.art_direction_enabled, active: m.active, sort: String(m.sort) })
+    setRenderModelNotice('')
+  }
+  const saveRenderModel = async (event: FormEvent) => {
+    event.preventDefault()
+    setAdminError(''); setRenderModelNotice('')
+    try {
+      const body = {
+        id: renderModelForm.id, label: renderModelForm.label, model_id: renderModelForm.model_id,
+        credits: Number(renderModelForm.credits), art_direction_enabled: renderModelForm.art_direction_enabled,
+        active: renderModelForm.active, sort: Number(renderModelForm.sort) || 0,
+      }
+      const saved = await readJson(await api('/api/admin/models', { method: 'POST', body: JSON.stringify(body) }))
+      await loadRenderModels()
+      setRenderModelNotice(`Сохранено: ${(saved as RenderModel).label || (saved as RenderModel).id}`)
+      startNewRenderModel()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const toggleRenderModel = async (id: string) => {
+    setAdminError(''); setRenderModelNotice('')
+    try { await api('/api/admin/models/' + id + '/toggle', { method: 'POST' }); await loadRenderModels() }
     catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
   const startNewStyle = () => {
@@ -1301,9 +1341,43 @@ export default function Admin() {
           )}
 
           {tab === 'models' && (
-            <div className="mt-8 max-w-3xl">
-              <p className="eyebrow">Модели генерации</p>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Генерация и vision-разбор. Изменения применяются к новым рендерам; уже готовые не меняются. Seedream 5.0 Flash в OpenRouter: <code className="border bg-muted px-1.5 py-0.5 text-[11px]">bytedance-seed/seedream-5-0-flash</code>.</p>
+            <div className="mt-8 space-y-10">
+              <section>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="eyebrow">Модели в генераторе</p>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Список моделей, которые пользователь выбирает в генераторе. <code className="border bg-muted px-1.5 py-0.5 text-[11px]">model_id</code> — идентификатор OpenRouter, <code className="border bg-muted px-1.5 py-0.5 text-[11px]">credits</code> — сколько кредитов списывается за корневой рендер. 1 кредит ≈ 40 ₽; если модель дороже ~15–20 ₽ за рендер — ставьте 2 кредита.</p>
+                  </div>
+                  <button type="button" onClick={startNewRenderModel} className="text-xs underline"><Plus className="mr-1 inline size-3" />новая</button>
+                </div>
+                {renderModelNotice && <p className="mt-3 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{renderModelNotice}</p>}
+                <div className="mt-4 grid gap-6 xl:grid-cols-[1fr_24rem]">
+                  <section className="overflow-x-auto border">
+                    <table className="w-full text-left text-sm">
+                      <thead><tr className="border-b"><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Метка</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">model_id</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Кредиты</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Арт-директор</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">Активна</th><th className="p-3 text-xs uppercase tracking-wider text-muted-foreground">sort</th><th /></tr></thead>
+                      <tbody>{renderModels.map(m => <tr key={m.id} className="border-b last:border-b-0"><td className="p-3 font-medium">{m.label}</td><td className="p-3 font-mono text-xs">{m.model_id}</td><td className="p-3">{m.credits}</td><td className="p-3">{m.art_direction_enabled ? <Check className="size-4 text-primary-text" /> : '—'}</td><td className="p-3">{m.active ? <Check className="size-4 text-primary-text" /> : '—'}</td><td className="p-3">{m.sort}</td><td className="p-3 text-right"><button type="button" onClick={() => editRenderModel(m)} className="mr-2 text-xs underline">изм.</button><button type="button" onClick={() => toggleRenderModel(m.id)} className="text-xs underline">{m.active ? 'выкл.' : 'вкл.'}</button></td></tr>)}</tbody>
+                    </table>
+                    {!renderModels.length && <p className="p-3 text-sm text-muted-foreground">Моделей нет.</p>}
+                  </section>
+                  <form onSubmit={saveRenderModel} className="border p-4">
+                    <div className="flex items-center justify-between gap-2"><p className="eyebrow">{editRenderModelId ? 'Редактировать модель' : 'Новая модель'}</p><button type="button" onClick={startNewRenderModel} className="text-xs underline"><Plus className="mr-1 inline size-3" />сброс</button></div>
+                    <div className="mt-4 space-y-2">
+                      <input value={renderModelForm.id} disabled={Boolean(editRenderModelId)} onChange={e => setRenderModelForm({ ...renderModelForm, id: e.target.value })} placeholder="id: flux-3-image" className="h-10 w-full border bg-background px-3 font-mono text-sm outline-none focus:border-primary disabled:opacity-60" />
+                      <input value={renderModelForm.label} onChange={e => setRenderModelForm({ ...renderModelForm, label: e.target.value })} placeholder="Название" className="h-10 w-full border bg-background px-3 text-sm outline-none focus:border-primary" />
+                      <input value={renderModelForm.model_id} onChange={e => setRenderModelForm({ ...renderModelForm, model_id: e.target.value })} placeholder="model_id: black-forest-labs/flux-3-image" className="h-10 w-full border bg-background px-3 font-mono text-xs outline-none focus:border-primary" />
+                      <div className="grid grid-cols-2 gap-2"><input value={renderModelForm.credits} onChange={e => setRenderModelForm({ ...renderModelForm, credits: e.target.value })} inputMode="numeric" placeholder="Кредиты" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /><input value={renderModelForm.sort} onChange={e => setRenderModelForm({ ...renderModelForm, sort: e.target.value })} inputMode="numeric" placeholder="Порядок" className="h-10 border bg-background px-3 text-sm outline-none focus:border-primary" /></div>
+                      <p className="text-[11px] leading-5 text-muted-foreground">1 кредит ≈ 40 ₽; если модель дороже ~15–20 ₽ за рендер — ставьте 2 кредита.</p>
+                      <label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.art_direction_enabled} onChange={e => setRenderModelForm({ ...renderModelForm, art_direction_enabled: e.target.checked })} className="size-4 accent-primary" />арт-директор включён</label>
+                      <label className="flex min-h-10 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.active} onChange={e => setRenderModelForm({ ...renderModelForm, active: e.target.checked })} className="size-4 accent-primary" />активна в генераторе</label>
+                    </div>
+                    <button type="submit" className="action-primary mt-4 w-full">{editRenderModelId ? 'Сохранить' : 'Создать модель'}</button>
+                  </form>
+                </div>
+              </section>
+
+              <section className="max-w-3xl">
+                <p className="eyebrow">Модели генерации</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Генерация и vision-разбор. Изменения применяются к новым рендерам; уже готовые не меняются. Seedream 5.0 Flash в OpenRouter: <code className="border bg-muted px-1.5 py-0.5 text-[11px]">bytedance-seed/seedream-5-0-flash</code>.</p>
               {modelSettings && (
                 <form onSubmit={e => { e.preventDefault(); saveModels() }} className="mt-6 space-y-5 border p-4">
                   <div>
@@ -1338,9 +1412,9 @@ export default function Admin() {
                 </form>
               )}
               {!modelSettings && <p className="mt-4 text-sm text-muted-foreground">Загружаем список моделей…</p>}
+              </section>
             </div>
           )}
-
 
           {tab === 'catalog' && (
             <div className="mt-8 space-y-8">

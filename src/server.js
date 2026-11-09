@@ -26,7 +26,7 @@ import { SLOT_LABELS, SLOT_LABELS_RU, normalizeTier } from './pricing.js';
 import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
-import { getModelConfig, loadModelConfig, saveModelConfig, resolveModelSelection, inheritPrivate } from './modelconfig.js';
+import { getModelConfig, loadModelConfig, saveModelConfig, resolveModelSelection, inheritPrivate, validateModelInput } from './modelconfig.js';
 import { validateModelOptions, modelCaps } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
@@ -612,6 +612,27 @@ app.delete('/api/admin/packs/:id', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const ok = await q.deletePack(String(req.params.id));
   res.status(ok ? 204 : 404).end();
+}));
+
+// ---------- модели рендера (биллинг v2): только админ ----------
+app.get('/api/admin/models', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(await q.listRenderModels(false));
+}));
+
+app.post('/api/admin/models', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const parsed = validateModelInput(req.body);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  const row = await q.createOrUpdateRenderModel(parsed.value);
+  res.json(row);
+}));
+
+app.post('/api/admin/models/:id/toggle', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const row = await q.toggleRenderModel(String(req.params.id));
+  if (!row) return res.status(404).json({ error: 'Не найдено' });
+  res.json(row);
 }));
 
 // ---------- стили: только админ ----------
@@ -1362,7 +1383,8 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const models = await q.listRenderModels(true);
   const modelSelection = resolveModelSelection(req.body?.model, models, getModelConfig().render);
   if (modelSelection === null) return res.status(400).json({ error: 'Модель недоступна' });
-  const isPrivate = req.body?.private === true;
+  // multipart/form-data присылает `private` строкой, поэтому принимаем true и '1'/'true'.
+  const isPrivate = req.body?.private === true || req.body?.private === '1' || req.body?.private === 'true';
   const id = crypto.randomUUID();
   const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
   const requestedStyle = String(req.body?.style || '').trim();

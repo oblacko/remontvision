@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // Чистые хелперы без БД — не импортируем src/db.js.
-const { resolveModelSelection, inheritPrivate, modelCreditsOrOne } = await import('../src/modelconfig.js');
+const { resolveModelSelection, inheritPrivate, modelCreditsOrOne, validateModelInput } = await import('../src/modelconfig.js');
 
 const models = [
   { id: 'flux-3-image', label: 'FLUX 3 Image', model_id: 'black-forest-labs/flux-3-image', credits: 1, active: true, sort: 0 },
@@ -66,4 +66,54 @@ test('private flag inherits strictly from the parent render', () => {
   assert.equal(inheritPrivate(false), false);
   assert.equal(inheritPrivate(undefined), false);
   assert.equal(inheritPrivate(null), false);
+});
+
+// ---------- validateModelInput (админский CRUD моделей, без БД) ----------
+
+test('valid model input normalizes to a row', () => {
+  assert.deepEqual(validateModelInput({
+    id: 'Flux-3-Image', label: ' FLUX 3 Image ', model_id: ' black-forest-labs/flux-3-image ',
+    credits: 1, art_direction_enabled: true, active: true, sort: 3,
+  }), {
+    value: {
+      id: 'flux-3-image', label: 'FLUX 3 Image', model_id: 'black-forest-labs/flux-3-image',
+      credits: 1, art_direction_enabled: true, active: true, sort: 3,
+    },
+  });
+});
+
+test('missing sort defaults to zero', () => {
+  assert.equal(validateModelInput({ id: 'flux-3-image', label: 'X', model_id: 'm', credits: 1, art_direction_enabled: true, active: true }).value.sort, 0);
+});
+
+test('booleans default to true and accept string forms', () => {
+  assert.equal(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1 }).value.art_direction_enabled, true);
+  assert.equal(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1 }).value.active, true);
+  assert.equal(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1, art_direction_enabled: 'false', active: '0' }).value.art_direction_enabled, false);
+  assert.equal(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1, art_direction_enabled: 'false', active: '0' }).value.active, false);
+});
+
+test('rejects non-latin id', () => {
+  assert.ok(validateModelInput({ id: 'Модель', label: 'X', model_id: 'm', credits: 1 }).error);
+  assert.ok(validateModelInput({ id: 'a', label: 'X', model_id: 'm', credits: 1 }).error);
+  assert.ok(validateModelInput({ id: 'a'.repeat(41), label: 'X', model_id: 'm', credits: 1 }).error);
+  assert.ok(validateModelInput({ id: 'a b', label: 'X', model_id: 'm', credits: 1 }).error);
+});
+
+test('rejects empty label or model_id', () => {
+  assert.ok(validateModelInput({ id: 'm1', label: '', model_id: 'm', credits: 1 }).error);
+  assert.ok(validateModelInput({ id: 'm1', label: '  ', model_id: 'm', credits: 1 }).error);
+  assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: '', credits: 1 }).error);
+});
+
+test('rejects credits below one or non-integer', () => {
+  assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 0 }).error);
+  assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1.5 }).error);
+  assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm' }).error);
+  assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 'два' }).error);
+});
+
+test('rejects non-integer sort', () => {
+  assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1, sort: 1.5 }).error);
+  assert.ok(validateModelInput({ id: 'm1', label: 'X', model_id: 'm', credits: 1, sort: 'x' }).error);
 });

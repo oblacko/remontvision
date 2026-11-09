@@ -411,6 +411,23 @@ export const q = {
   getRenderModel: key =>
     pool.query(`SELECT * FROM render_models WHERE id = $1 OR model_id = $1 LIMIT 1`, [key])
       .then(r => r.rows[0] || null),
+  // Апсерт строки render_models по id (админка): при существующем id обновляет остальные поля.
+  createOrUpdateRenderModel: f =>
+    pool.query(`INSERT INTO render_models (id, label, model_id, credits, art_direction_enabled, active, sort)
+                VALUES ($1,$2,$3,$4,$5,$6,$7)
+                ON CONFLICT (id) DO UPDATE SET
+                  label = EXCLUDED.label,
+                  model_id = EXCLUDED.model_id,
+                  credits = EXCLUDED.credits,
+                  art_direction_enabled = EXCLUDED.art_direction_enabled,
+                  active = EXCLUDED.active,
+                  sort = EXCLUDED.sort
+                RETURNING *`,
+      [f.id, f.label, f.model_id, f.credits, f.art_direction_enabled, f.active, f.sort])
+      .then(r => r.rows[0]),
+  toggleRenderModel: id =>
+    pool.query(`UPDATE render_models SET active = NOT active WHERE id = $1 RETURNING *`, [id])
+      .then(r => r.rows[0] || null),
 
   // lookbook-статьи (контент-движок)
   createArticle: f =>

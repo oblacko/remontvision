@@ -68,6 +68,42 @@ export function inheritPrivate(parentIsPrivate) {
   return parentIsPrivate === true;
 }
 
+// ---------- валидация строки render_models для админки (чистая, без БД) ----------
+
+// Принимает тело запроса (JSON или form-encoded) и возвращает:
+//   { value: {...нормализованная строка...} } — ввод корректен;
+//   { error: 'текст на русском' } — ввод некорректен (→ HTTP 400).
+// id приводится к нижнему регистру и обязан быть латиницей (slug), credits ≥ 1 (целое),
+// булевы поля принимают true/false и строковые 'true'/'false'/'1'/'0'.
+export function validateModelInput(body) {
+  const id = String(body?.id ?? '').trim().toLowerCase();
+  const label = String(body?.label ?? '').trim();
+  const modelId = String(body?.model_id ?? '').trim();
+  const credits = Number(body?.credits);
+  const sort = Number(body?.sort ?? 0);
+  const bool = (value) => !(value === false || value === 'false' || value === '0' || value === 0);
+
+  if (!/^[a-z0-9_-]{2,40}$/.test(id)) {
+    return { error: 'id — латиница (a-z, 0-9), дефис и подчёркивание, 2–40 символов' };
+  }
+  if (!label) return { error: 'Название модели не может быть пустым' };
+  if (!modelId) return { error: 'model_id не может быть пустым' };
+  if (!Number.isInteger(credits) || credits < 1) return { error: 'Кредиты — целое число ≥ 1' };
+  if (!Number.isInteger(sort)) return { error: 'Порядок — целое число' };
+
+  return {
+    value: {
+      id,
+      label,
+      model_id: modelId,
+      credits,
+      art_direction_enabled: bool(body?.art_direction_enabled),
+      active: bool(body?.active),
+      sort,
+    },
+  };
+}
+
 export async function saveModelConfig({ render, edit, vision, resolution, aspectRatio }) {
   if (render) state.render = render;
   if (edit !== undefined) state.edit = String(edit || '');
