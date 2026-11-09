@@ -74,6 +74,44 @@ export function bboxSize(bbox: number[]): { w: number; h: number } {
   return { w: Math.round(w * 100), h: Math.round(h * 100) }
 }
 
+export function bboxRegion(bbox: number[]): { x: number; y: number; w: number; h: number } {
+  const [x = 0, y = 0, w = 0, h = 0] = bbox
+  return { x: Math.round(x * 100), y: Math.round(y * 100), w: Math.round(w * 100), h: Math.round(h * 100) }
+}
+
+// Кроп выбранного объекта: уходит в правку как reference, чтобы модель меняла
+// именно этот предмет, а не похожий соседний.
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('image load failed'))
+    image.src = src
+  })
+}
+
+export async function cropObjectFile(imageUrl: string, bbox: number[]): Promise<File | null> {
+  try {
+    const image = await loadImage(imageUrl)
+    const [x = 0, y = 0, w = 0, h = 0] = bbox
+    const sx = Math.max(0, x * image.naturalWidth)
+    const sy = Math.max(0, y * image.naturalHeight)
+    const sw = Math.max(1, w * image.naturalWidth)
+    const sh = Math.max(1, h * image.naturalHeight)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(sw))
+    canvas.height = Math.max(1, Math.round(sh))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    if (!blob) return null
+    return new File([blob], 'selected-object.jpg', { type: 'image/jpeg' })
+  } catch {
+    return null
+  }
+}
+
 export function moveDirection(dx: number, dy: number): { text: string; percent: number } {
   const ax = Math.abs(dx)
   const ay = Math.abs(dy)
@@ -83,23 +121,26 @@ export function moveDirection(dx: number, dy: number): { text: string; percent: 
 
 export function buildMoveInstruction({ label, bbox, dx, dy }: { label?: string; bbox: number[]; dx: number; dy: number }): string {
   const name = ruLabel(label)
-  const center = bboxCenter(bbox)
+  const region = bboxRegion(bbox)
   const { text, percent } = moveDirection(dx, dy)
   const amount = percent < 1 ? 'совсем немного' : `примерно на ${percent}% кадра`
-  return `Переместите ${name} из точки (${center.x}%, ${center.y}%) ${text} ${amount}. Сохраните остальные объекты, свет и архитектуру без изменений.`
+  return `Переместите ${name} из области (${region.x}%, ${region.y}%, ${region.w}% × ${region.h}%) ${text} ${amount}. Меняйте только объект, показанный в reference image; похожие объекты, свет и архитектуру не трогайте.`
 }
 
 export function buildObjectAction(label: string | undefined, action: 'replace' | 'color' | 'bigger' | 'smaller', bbox?: number[]): string {
   const name = ruLabel(label)
-  const area = bbox ? ` в области (${bboxCenter(bbox).x}%, ${bboxCenter(bbox).y}%)` : ''
-  if (action === 'replace') return `Замените ${name}${area} на похожий по стилю и размеру. Остальные объекты, свет и архитектуру не меняйте.`
-  if (action === 'color') return `Измените цвет ${name}${area}, сохранив форму и положение. Остальные объекты и свет не меняйте.`
-  if (action === 'bigger') return `Сделайте ${name}${area} немного крупнее, сохранив положение. Остальные объекты и свет не меняйте.`
-  return `Сделайте ${name}${area} немного мельче, сохранив положение. Остальные объекты и свет не меняйте.`
+  const region = bbox ? bboxRegion(bbox) : null
+  const area = region ? ` в области (${region.x}%, ${region.y}%, ${region.w}% × ${region.h}%)` : ''
+  const only = ' Меняйте только объект, показанный в reference image; похожие объекты и свет не трогайте.'
+  if (action === 'replace') return `Замените ${name}${area} на похожий по стилю и размеру.${only}`
+  if (action === 'color') return `Измените цвет ${name}${area}, сохранив форму и положение.${only}`
+  if (action === 'bigger') return `Сделайте ${name}${area} немного крупнее, сохранив положение.${only}`
+  return `Сделайте ${name}${area} немного мельче, сохранив положение.${only}`
 }
 
 export function buildObjectText(label: string | undefined, text: string, bbox?: number[]): string {
   const name = ruLabel(label)
-  const area = bbox ? ` (область ${bboxCenter(bbox).x}%, ${bboxCenter(bbox).y}%)` : ''
-  return `${name}${area}: ${text.trim()}. Сохраните остальные объекты, свет и архитектуру без изменений.`
+  const region = bbox ? bboxRegion(bbox) : null
+  const area = region ? ` (область ${region.x}%, ${region.y}%, ${region.w}% × ${region.h}%)` : ''
+  return `${name}${area}: ${text.trim()}. Меняйте только объект, показанный в reference image; похожие объекты, свет и архитектуру не трогайте.`
 }

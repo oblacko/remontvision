@@ -5,7 +5,7 @@ import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { goal } from '@/lib/analytics'
-import { buildMoveInstruction, buildObjectAction, buildObjectText, moveDirection, ruLabel } from '@/lib/objects'
+import { buildMoveInstruction, buildObjectAction, buildObjectText, cropObjectFile, moveDirection, ruLabel } from '@/lib/objects'
 import { useTasks } from '@/components/TaskDock'
 import { GuideIcon } from '@/components/GuideIcon'
 import { Logo } from '@/components/Logo'
@@ -125,13 +125,18 @@ export default function Room() {
   )
   const selectedObj = selectedObject !== null ? visibleObjects[selectedObject] : null
 
-  const sendObjectEdit = async (instruction: string) => {
+  const sendObjectEdit = async (instruction: string, label?: string, bbox?: number[]) => {
     if (!render?.id || objectBusy) return
     setObjectBusy(true); setObjectError('')
     try {
       const fd = new FormData()
       fd.append('text', instruction)
       fd.append('parent_id', render.id)
+      const ref = image && bbox ? await cropObjectFile(image, bbox) : null
+      if (ref) {
+        fd.append('refs', ref)
+        fd.append('ref_meta', JSON.stringify([{ description: `Выбранный объект: ${ruLabel(label)}. Изменяйте только его, похожие объекты не трогайте.` }]))
+      }
       const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Не удалось запустить редактирование')
@@ -343,10 +348,10 @@ export default function Room() {
                     <p className="text-sm font-medium">{ruLabel(selectedObj.label)} <span className="font-normal text-muted-foreground">· {Math.round((selectedObj.bbox[2] || 0) * 100)}% × {Math.round((selectedObj.bbox[3] || 0) * 100)}% кадра</span></p>
                     {objectDelta && (() => { const dir = moveDirection(objectDelta.dx, objectDelta.dy); return <p className="kit-ban text-sm">Перемещение: {dir.text} примерно на {dir.percent}% кадра.</p> })()}
                     <div className="flex flex-wrap gap-2">
-                      {objectDelta && <button type="button" disabled={objectBusy} className="action-primary min-h-11 px-4 text-sm" onClick={() => void sendObjectEdit(buildMoveInstruction({ label: selectedObj.label, bbox: selectedObj.bbox, dx: objectDelta.dx, dy: objectDelta.dy }))}>Переместить</button>}
-                      {(['replace', 'color', 'bigger', 'smaller'] as const).map(action => <button key={action} type="button" disabled={objectBusy} className="action-secondary min-h-11 px-4 text-sm" onClick={() => void sendObjectEdit(buildObjectAction(selectedObj.label, action, selectedObj.bbox))}>{action === 'replace' ? 'Заменить' : action === 'color' ? 'Другой цвет' : action === 'bigger' ? 'Крупнее' : 'Мельче'}</button>)}
+                      {objectDelta && <button type="button" disabled={objectBusy} className="action-primary min-h-11 px-4 text-sm" onClick={() => void sendObjectEdit(buildMoveInstruction({ label: selectedObj.label, bbox: selectedObj.bbox, dx: objectDelta.dx, dy: objectDelta.dy }), selectedObj.label, selectedObj.bbox)}>Переместить</button>}
+                      {(['replace', 'color', 'bigger', 'smaller'] as const).map(action => <button key={action} type="button" disabled={objectBusy} className="action-secondary min-h-11 px-4 text-sm" onClick={() => void sendObjectEdit(buildObjectAction(selectedObj.label, action, selectedObj.bbox), selectedObj.label, selectedObj.bbox)}>{action === 'replace' ? 'Заменить' : action === 'color' ? 'Другой цвет' : action === 'bigger' ? 'Крупнее' : 'Мельче'}</button>)}
                     </div>
-                    <form onSubmit={(event) => { event.preventDefault(); if (!objectText.trim()) return; void sendObjectEdit(buildObjectText(selectedObj.label, objectText, selectedObj.bbox)) }} className="flex flex-col gap-2 sm:flex-row">
+                    <form onSubmit={(event) => { event.preventDefault(); if (!objectText.trim()) return; void sendObjectEdit(buildObjectText(selectedObj.label, objectText, selectedObj.bbox), selectedObj.label, selectedObj.bbox) }} className="flex flex-col gap-2 sm:flex-row">
                       <input value={objectText} onChange={event => setObjectText(event.target.value)} placeholder={`Что сделать с «${ruLabel(selectedObj.label)}»?`} className="kit-field min-w-0 flex-1 text-sm" />
                       <button type="submit" disabled={objectBusy} className="action-primary min-h-12 px-4 text-sm">{objectBusy ? 'Запускаем…' : 'Применить'}</button>
                     </form>

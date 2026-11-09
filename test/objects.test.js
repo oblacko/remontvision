@@ -29,14 +29,15 @@ maybe('buildMoveInstruction includes object, direction and percent', () => {
   assert.match(text, /светильник/)
   assert.match(text, /вправо/)
   assert.match(text, /15% кадра/)
-  assert.match(text, /Сохр/)
+  assert.match(text, /Меняйте только объект/)
+  assert.match(text, /области/)
 })
 
 maybe('buildObjectAction covers all four actions', () => {
   for (const action of ['replace', 'color', 'bigger', 'smaller']) {
     const text = mod.buildObjectAction('sofa', action, [0.1, 0.2, 0.3, 0.4])
     assert.match(text, /диван/)
-    assert.match(text, /Остальные объекты/)
+    assert.match(text, /похожие объекты/)
   }
 })
 
