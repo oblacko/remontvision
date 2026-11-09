@@ -244,6 +244,7 @@ function generationDto(g) {
     price_tier: g.price_tier || 'comfort',
     status: g.status,
     error: g.error,
+    error_stage: g.error_stage || null,
     created_at: g.created_at,
     finished_at: g.finished_at,
     request_text: g.request_text,

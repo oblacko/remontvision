@@ -4,6 +4,15 @@
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-09 — UTM-персистентность + цели render_error и product_click
+
+- Новый модуль `web/src/lib/utm.ts`: first-touch UTM-персистентность. Чистые функции `captureUtmOnce({ search, storage, now })` и `readUtm({ storage, now })` хранят `{ utm, ts }` в `localStorage` под ключом `rv_utm`, TTL 30 дней, распознают `utm_source/medium/campaign/term/content` и `yclid`; `readUtm` возвращает `null` для просроченной/отсутствующей/битой записи. Браузерные обёртки `captureUtm()` и `getUtm()` защищены от отсутствия `window`/`localStorage` (SSR/тесты) и не бросают исключений.
+- `web/src/lib/analytics.ts`: `goal(name, params)` подмешивает UTM в `params.utm` для всех целей, кроме `share`; сигнатура не изменилась.
+- `web/src/main.tsx`: `captureUtm()` вызывается один раз при старте приложения.
+- Цель `render_error`: `web/src/components/TaskDock.tsx` шлёт `goal('render_error', { room_id, stage })` при переходе задачи в `status='error'` (один раз на задачу, через ref `seenError`); `stage` берётся из `error_stage` рендера (иначе `'unknown'`). Backend: `generationDto` (`src/server.js`) и `userGenerations` (`src/db.js`) теперь отдают `error_stage`.
+- Цель `product_click`: клик по ссылке товара в `web/src/components/ProcurementPanel.tsx` шлёт `goal('product_click', { source: 'procurement', url })` (без блокировки перехода).
+- Тесты: `test/utm.test.js` (6 тестов: first-touch не перезаписывается, просроченная запись заменяется, `readUtm` → null для missing/corrupt/expired, пустой поиск ничего не пишет, `yclid` фиксируется). Итог `npm test` 256/256.
+
 ## 2026-11-09 — оферта и политика по факту + динамический sitemap
 
 - `public/offer.html` приведён в соответствие с продуктом: пакеты 10/20/60 кредитов за 399/599/1 499 ₽; оплата Robokassa (основной) и ЮKassa (резервный); время создания дизайна 1–4 минуты (пункт про восстановление кредита в течение 24 часов сохранён); «1 дизайн = 1 результат + 3 бесплатные правки, каждая следующая правка — 1 кредит»; «подбор товаров — 1 кредит»; стоимость модели в кредитах — в генераторе и на `/prices`. Убрано «формирование справочной сметы», добавлено явное «Сервис не составляет смету; подборка товаров и стоимость носят ориентировочный характер». Добавлено про приватный режим (после оплаты, без примеров/галереи) и что фотографии не удаляются автоматически.

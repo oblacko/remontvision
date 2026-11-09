@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-09T16:52:22.638Z
+Generated: 2026-11-09T16:58:03.166Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2351,6 +2351,15 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-09 — UTM-персистентность + цели render_error и product_click
+
+- Новый модуль `web/src/lib/utm.ts`: first-touch UTM-персистентность. Чистые функции `captureUtmOnce({ search, storage, now })` и `readUtm({ storage, now })` хранят `{ utm, ts }` в `localStorage` под ключом `rv_utm`, TTL 30 дней, распознают `utm_source/medium/campaign/term/content` и `yclid`; `readUtm` возвращает `null` для просроченной/отсутствующей/битой записи. Браузерные обёртки `captureUtm()` и `getUtm()` защищены от отсутствия `window`/`localStorage` (SSR/тесты) и не бросают исключений.
+- `web/src/lib/analytics.ts`: `goal(name, params)` подмешивает UTM в `params.utm` для всех целей, кроме `share`; сигнатура не изменилась.
+- `web/src/main.tsx`: `captureUtm()` вызывается один раз при старте приложения.
+- Цель `render_error`: `web/src/components/TaskDock.tsx` шлёт `goal('render_error', { room_id, stage })` при переходе задачи в `status='error'` (один раз на задачу, через ref `seenError`); `stage` берётся из `error_stage` рендера (иначе `'unknown'`). Backend: `generationDto` (`src/server.js`) и `userGenerations` (`src/db.js`) теперь отдают `error_stage`.
+- Цель `product_click`: клик по ссылке товара в `web/src/components/ProcurementPanel.tsx` шлёт `goal('product_click', { source: 'procurement', url })` (без блокировки перехода).
+- Тесты: `test/utm.test.js` (6 тестов: first-touch не перезаписывается, просроченная запись заменяется, `readUtm` → null для missing/corrupt/expired, пустой поиск ничего не пишет, `yclid` фиксируется). Итог `npm test` 256/256.
 
 ## 2026-11-09 — оферта и политика по факту + динамический sitemap
 

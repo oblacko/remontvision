@@ -13,6 +13,7 @@ export type GenTask = {
   room_type?: string | null
   status: string
   error?: string | null
+  error_stage?: string | null
   created_at: string
   image_url?: string | null
   photo_url?: string | null
@@ -56,6 +57,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpenState] = useState(false)
   const primed = useRef(false)
   const seenDone = useRef<Set<string>>(new Set())
+  const seenError = useRef<Set<string>>(new Set())
 
   const refresh = useCallback(async () => {
     try {
@@ -70,15 +72,23 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       const items: GenTask[] = Array.isArray(list) ? list : []
       if (primed.current) {
         for (const task of items) {
-          if (task.status === 'done' && (task.kind || 'render') === 'render' && !seenDone.current.has(task.id)) {
+          if ((task.kind || 'render') !== 'render') continue
+          if (task.status === 'done' && !seenDone.current.has(task.id)) {
             seenDone.current.add(task.id)
             goal('render_done', { room_id: task.room_id })
           }
+          if (task.status === 'error' && !seenError.current.has(task.id)) {
+            seenError.current.add(task.id)
+            goal('render_error', { room_id: task.room_id, stage: task.error_stage || 'unknown' })
+          }
         }
       } else {
-        // Первый ответ только запоминаем: не считаем готовыми старые генерации.
+        // Первый ответ только запоминаем: не считаем готовыми/ошибочными старые генерации.
         primed.current = true
-        for (const task of items) if (task.status === 'done') seenDone.current.add(task.id)
+        for (const task of items) {
+          if (task.status === 'done') seenDone.current.add(task.id)
+          if (task.status === 'error') seenError.current.add(task.id)
+        }
       }
       setAuthed(true)
       setAll(items)

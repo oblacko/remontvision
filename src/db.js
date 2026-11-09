@@ -262,7 +262,7 @@ export const q = {
     pool.query(`SELECT id, style, budget, price_tier, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
       .then(r => r.rows),
   userGenerations: userId =>
-    pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at, r.request_text,
+    pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.error_stage, r.created_at, r.finished_at, r.request_text,
                        r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms, r.meta,
                        rm.style, rm.budget, rm.price_tier, rm.photo_path, rm.room_type,
                        GREATEST(0,

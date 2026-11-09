@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ExternalLink, LoaderCircle, Search } from 'lucide-react'
+import { goal } from '@/lib/analytics'
 
 export type ProductOffer = {
   id: string
@@ -140,7 +141,7 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
                           <p className="line-clamp-2 min-w-0 text-[11px] font-medium leading-4">{offer.name}</p>
                           <p className="mt-1 text-xs font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</p>
                           {offer.url ? (
-                            <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" className="mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] underline underline-offset-2">
+                            <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" onClick={() => goal('product_click', { source: 'procurement', url: offer.url })} className="mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] underline underline-offset-2">
                               {offer.merchant || 'в магазин'} <ExternalLink className="size-3 shrink-0" />
                             </a>
                           ) : null}
