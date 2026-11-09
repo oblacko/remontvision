@@ -42,7 +42,7 @@ export async function sendEmail({ to, subject, text, html = null, template = nul
       },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) throw new Error(`resend ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    if (!r.ok) throw new Error(`resend ${r.status}`);
     return true;
   }
   if (!mailer) return false;

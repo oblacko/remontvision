@@ -50,3 +50,24 @@ test('sendRenderDoneEmail returns false and logs email_skipped without transport
   assert.ok(skipped, 'email_skipped must be logged without transport');
   assert.equal(skipped.reason, 'no_transport');
 });
+
+test('sendRenderDoneEmail carries room/render context and never logs the email', async () => {
+  const raw = [];
+  const original = console.log;
+  console.log = (...args) => { for (const a of args) raw.push(String(a)); };
+  try {
+    const result = await sendRenderDoneEmail('private@example.com', { roomType: 'Гостиная' }, { room_id: 'room-1', render_id: 'render-9' });
+    assert.equal(result, false);
+  } finally {
+    console.log = original;
+  }
+  const logs = raw
+    .map(line => { try { return JSON.parse(line); } catch { return null; } })
+    .filter(Boolean);
+  const skipped = logs.find(l => l.event === 'email_skipped');
+  assert.ok(skipped, 'email_skipped must be logged');
+  assert.equal(skipped.room_id, 'room-1');
+  assert.equal(skipped.render_id, 'render-9');
+  // e-mail адрес не должен попадать в логи ни в каком виде.
+  assert.ok(raw.every(line => !line.includes('private@example.com')), 'email must not be logged');
+});

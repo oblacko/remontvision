@@ -694,8 +694,9 @@ async function processRender(renderId) {
     await q.setRoomStatus('done', room.id);
     log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_breakdown: costBreakdown, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
 
-    // Уведомление «Готово» по e-mail: fire-and-forget, ошибки не влияют на результат рендера.
-    if (room.user_id) notifyOwner(room, render);
+    // Уведомление «Готово» по e-mail: только для базового рендера (не правок),
+    // fire-and-forget, ошибки не влияют на результат рендера.
+    if (room.user_id && !render.parent_render_id) notifyOwner(room, render);
   } catch (e) {
     const msg = String(e.message || e).slice(0, 500);
     addCost('failed', e.cost);
@@ -715,22 +716,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Уведомление «Готово»: ищем e-mail владельца комнаты и шлём письмо со ссылкой на результат.
 // Fire-and-forget — не блокирует завершение рендера; ошибки только пишутся в лог.
+// Для приватных рендеров (is_private) публичный share-токен не создаём — письмо без ссылки.
 function notifyOwner(room, render) {
   void (async () => {
     try {
       const user = await q.getUserById(room.user_id);
       if (!user || !user.email) return;
       let shareUrl = null;
-      try {
-        const token = render.share_token || crypto.randomBytes(18).toString('base64url');
-        if (!render.share_token) await q.setRenderShareToken(render.id, token);
-        shareUrl = renderShareUrl(token);
-      } catch { /* ссылка не критична — письмо уйдёт без неё */ }
+      if (!render.is_private) {
+        try {
+          const token = render.share_token || crypto.randomBytes(18).toString('base64url');
+          if (!render.share_token) await q.setRenderShareToken(render.id, token);
+          shareUrl = renderShareUrl(token);
+        } catch { /* ссылка не критична — письмо уйдёт без неё */ }
+      }
       await sendRenderDoneEmail(user.email, {
         roomType: room.room_type || null,
         style: room.style || null,
         shareUrl,
-      });
+      }, { room_id: room.id, render_id: render.id });
     } catch (e) {
       log({ event: 'email_error', room_id: room.id, render_id: render.id, error: String(e.message || e).slice(0, 300) });
     }

@@ -30,17 +30,18 @@ export function renderDoneEmail({ roomType, style, shareUrl }) {
 
 // Отправка письма «дизайн готов». Никогда не бросает исключение:
 // без транспорта пишет email_skipped и возвращает false, при ошибке отправки — email_error и false.
-export async function sendRenderDoneEmail(toEmail, data) {
+// `context` — необязательный объект с room_id/render_id (без e-mail) для логирования.
+export async function sendRenderDoneEmail(toEmail, data, context = {}) {
   try {
     const { subject, text } = renderDoneEmail(data || {});
     const sent = await sendEmail({ to: toEmail, subject, text });
     if (!sent) {
-      log({ event: 'email_skipped', reason: 'no_transport' });
+      log({ event: 'email_skipped', reason: 'no_transport', ...context });
       return false;
     }
     return true;
   } catch (e) {
-    log({ event: 'email_error', error: String(e.message || e).slice(0, 300) });
+    log({ event: 'email_error', ...context, error: String(e.message || e).slice(0, 300) });
     return false;
   }
 }
