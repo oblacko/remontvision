@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { FREE_EDITS, editChargeDecision, modelCreditsFor, modelForEdit } = await import('../src/billing.js');
+const { FREE_EDITS, editChargeDecision, modelCreditsFor, modelForEdit, chargeForEnqueue, rootEditCountSql } = await import('../src/billing.js');
 
 const models = [
   { id: 'seedream', label: 'Стандарт', model_id: 'bytedance/seedream', credits: 1, active: true, sort: 1 },
@@ -72,4 +72,38 @@ test('edits inherit the parent model', () => {
   assert.equal(modelForEdit('seedream', models), 'seedream');
   assert.equal(modelForEdit('flux-3-image', models), 'flux-3-image');
   assert.equal(modelForEdit('legacy', models), 'legacy');
+});
+
+test('rootEditCountSql is a parameterized count of edits under a root', () => {
+  const rootId = 'root-123';
+  const { sql, params } = rootEditCountSql(rootId);
+  assert.equal(typeof sql, 'string');
+  assert.ok(sql.includes('root_render_id = $1'));
+  assert.ok(sql.includes('id <> $1'));
+  assert.ok(!sql.includes(rootId), 'SQL должен оставаться параметризованным, без подстановки id');
+  assert.deepEqual(params, [rootId]);
+});
+
+test('root render charges modelCredits against balance', () => {
+  assert.deepEqual(chargeForEnqueue({ iteration: false, editCount: 0, modelCredits: 2, balance: 1 }), { ok: false, needed: 2 });
+  assert.deepEqual(chargeForEnqueue({ iteration: false, editCount: 0, modelCredits: 2, balance: 2 }), { ok: true, delta: -2 });
+  assert.deepEqual(chargeForEnqueue({ iteration: false, editCount: 0, modelCredits: 1, balance: 5 }), { ok: true, delta: -1 });
+});
+
+test('free edits are free regardless of balance', () => {
+  for (const editCount of [0, 1, 2]) {
+    assert.deepEqual(chargeForEnqueue({ iteration: true, editCount, modelCredits: 2, balance: 0 }), { ok: true, delta: 0 });
+  }
+});
+
+test('paid edits require exactly one credit', () => {
+  assert.deepEqual(chargeForEnqueue({ iteration: true, editCount: 3, modelCredits: 2, balance: 0 }), { ok: false, needed: 1 });
+  assert.deepEqual(chargeForEnqueue({ iteration: true, editCount: 4, modelCredits: 2, balance: 1 }), { ok: true, delta: -1 });
+});
+
+test('invalid editCount is charged (fail closed)', () => {
+  for (const editCount of [undefined, null, -1, 1.5, NaN, '2', Infinity]) {
+    assert.deepEqual(chargeForEnqueue({ iteration: true, editCount, modelCredits: 2, balance: 0 }), { ok: false, needed: 1 });
+    assert.deepEqual(chargeForEnqueue({ iteration: true, editCount, modelCredits: 2, balance: 1 }), { ok: true, delta: -1 });
+  }
 });

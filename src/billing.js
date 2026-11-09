@@ -26,3 +26,28 @@ export function modelCreditsFor(modelKey, models) {
 export function modelForEdit(parentModelKey, models) {
   return parentModelKey;
 }
+
+// Параметризованный SQL подсчёта правок, принадлежащих корневому дизайну.
+// Параметр — root_render_id (id корня); сам корень (id = $1) не считается.
+export function rootEditCountSql(rootRenderId) {
+  return {
+    sql: 'SELECT COUNT(*)::int AS n FROM renders WHERE root_render_id = $1 AND id <> $1',
+    params: [rootRenderId],
+  };
+}
+
+// Чистое правило списания при постановке рендера в очередь.
+// Возвращает { ok: true, delta } либо { ok: false, needed }.
+// Корень платный по цене модели; первые FREE_EDITS правок бесплатны (delta = 0),
+// остальные правки — 1 кредит. Fail closed: некорректный счётчик правок → платно.
+export function chargeForEnqueue({ iteration = false, editCount, modelCredits = 1, balance = 0 } = {}) {
+  const credits = Number(modelCredits);
+  const cost = Number.isFinite(credits) && credits >= 1 ? credits : 1;
+  if (iteration !== true) {
+    return balance >= cost ? { ok: true, delta: -cost } : { ok: false, needed: cost };
+  }
+  if (Number.isInteger(editCount) && editCount >= 0 && editCount < FREE_EDITS) {
+    return { ok: true, delta: 0 };
+  }
+  return balance >= 1 ? { ok: true, delta: -1 } : { ok: false, needed: 1 };
+}

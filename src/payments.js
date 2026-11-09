@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { Agent } from 'undici';
 import { q, withTransaction } from './db.js';
 import { log } from './openrouter.js';
+import { chargeForEnqueue, rootEditCountSql } from './billing.js';
 import { issueReceipt } from './receipts.js';
 import {
   isConfigured as robokassaIsConfigured,
@@ -358,8 +359,12 @@ export async function enqueueRenderWithCredit({
   refPath = null,
   refProductId = null,
   editRefs = null,
+  modelKey = null,
+  modelCredits = 1,
+  isPrivate = false,
 }) {
   const iteration = Boolean(parentRenderId);
+  let finalIsPrivate = isPrivate;
   const out = await withTransaction(async client => {
     const room = await client.query(`SELECT id, user_id, status FROM rooms WHERE id = $1 FOR UPDATE`, [roomId]);
     if (!room.rows[0]) {
@@ -372,6 +377,27 @@ export async function enqueueRenderWithCredit({
       const e = new Error('Комната уже обрабатывается'); e.status = 409; throw e;
     }
 
+    // root_render_id: у корня — собственный id, у правки — корень родителя
+    // (у старых цепочек root_render_id мог быть NULL → берём id родителя).
+    // Приватность правки наследуется от родителя, а не из тела запроса.
+    let rootRenderId = id;
+    if (iteration) {
+      const parent = await client.query(
+        `SELECT id, root_render_id, is_private FROM renders WHERE id = $1`, [parentRenderId]);
+      const pr = parent.rows[0];
+      rootRenderId = pr?.root_render_id || pr?.id || id;
+      finalIsPrivate = pr?.is_private === true;
+    }
+
+    // Счётчик правок корневого дизайна (сам корень не считается).
+    let editCount = null;
+    if (iteration) {
+      const { sql, params } = rootEditCountSql(rootRenderId);
+      const cnt = await client.query(sql, params);
+      editCount = cnt.rows[0]?.n ?? null;
+    }
+
+    let delta = 0;
     if (chargedUserId) {
       const lock = await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [chargedUserId]);
       if (!lock.rows[0]) {
@@ -379,30 +405,32 @@ export async function enqueueRenderWithCredit({
       }
       const bal = await client.query(
         `SELECT COALESCE(SUM(delta), 0)::int AS balance FROM credit_txn WHERE user_id = $1`, [chargedUserId]);
-      if (bal.rows[0].balance < 1) {
+      const charge = chargeForEnqueue({ iteration, editCount, modelCredits, balance: bal.rows[0].balance });
+      if (!charge.ok) {
         const e = new Error('Нужен кредит'); e.status = 402; throw e;
       }
+      delta = charge.delta;
     }
 
     await client.query(
-      `INSERT INTO renders (id, room_id, parent_render_id, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'queued')`,
-      [id, roomId, parentRenderId, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null]);
+      `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, model_key, model_credits, is_private, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'queued')`,
+      [id, roomId, parentRenderId, rootRenderId, modelKey, modelCredits, finalIsPrivate, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null]);
 
-    if (chargedUserId) {
+    if (chargedUserId && delta !== 0) {
       await client.query(
         `INSERT INTO credit_txn (user_id, delta, reason, render_id)
-         VALUES ($1, -1, $2, $3)`,
-        [chargedUserId, iteration ? 'iterate' : 'render', id]);
+         VALUES ($1, $2, $3, $4)`,
+        [chargedUserId, delta, iteration ? 'iterate' : 'render', id]);
     }
 
     await client.query(
       `UPDATE rooms SET status = 'queued', error = NULL, updated_at = now() WHERE id = $1`, [roomId]);
 
-    return { id, charged: Boolean(chargedUserId), iteration };
+    return { id, charged: Boolean(chargedUserId && delta !== 0), iteration };
   });
 
-  log({ event: 'enqueue', room_id: roomId, render_id: id, parent_render_id: parentRenderId, charged_user_id: chargedUserId || null, iteration });
+  log({ event: 'enqueue', room_id: roomId, render_id: id, parent_render_id: parentRenderId, charged_user_id: chargedUserId || null, iteration, model_key: modelKey, model_credits: modelCredits, is_private: finalIsPrivate });
   return out;
 }
 

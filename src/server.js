@@ -1363,8 +1363,6 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const modelSelection = resolveModelSelection(req.body?.model, models, getModelConfig().render);
   if (modelSelection === null) return res.status(400).json({ error: 'Модель недоступна' });
   const isPrivate = req.body?.private === true;
-  // Task 0.3: передать modelSelection.key / modelSelection.credits / isPrivate в enqueueRender
-  // и сохранить их на созданном рендере (renders.model_key / model_credits / is_private).
   const id = crypto.randomUUID();
   const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
   const requestedStyle = String(req.body?.style || '').trim();
@@ -1416,7 +1414,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
   await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, conceptKey);
   try {
-    await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req) });
+    await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: modelSelection.credits, isPrivate });
   } catch (e) {
     if (e.status === 402) {
       await q.deleteRoom(id);
@@ -2081,7 +2079,6 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', max
   const modelKey = parent.model_key ?? null;
   const modelCredits = parent.model_credits ?? 1;
   const isPrivate = inheritPrivate(parent.is_private);
-  // Task 0.3: передать modelKey / modelCredits / isPrivate в enqueueRender.
 
   let target = String(req.body?.target || '').trim();
   if (target && !SLOT_LABELS[target]) return res.status(400).json({ error: 'Неизвестный объект правки' });
@@ -2155,6 +2152,9 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', max
       refPath,
       refProductId: refProduct ? refProduct.id : null,
       editRefs: (editRefs.length > 1 || editRefs.some(r => r.instruction)) ? editRefs : null,
+      modelKey,
+      modelCredits,
+      isPrivate,
     });
   } catch (e) {
     if (e.status === 402) {

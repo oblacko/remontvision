@@ -743,7 +743,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -757,6 +757,9 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     refPath,
     refProductId,
     editRefs,
+    modelKey,
+    modelCredits,
+    isPrivate,
   });
   return id;
 }

@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-09T15:35:02.589Z
+Generated: 2026-11-09T15:41:33.415Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2349,6 +2349,14 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-09 — списание по новым правилам (per-model цена + 3 бесплатные правки)
+
+- `enqueueRenderWithCredit` (`src/payments.js`) списывает кредиты по новым правилам: корневой рендер — `modelCredits` по модели, правка — первые `FREE_EDITS = 3` бесплатны (`delta = 0`, без записи в `credit_txn`), четвёртая и далее — 1 кредит. Fail closed: некорректный счётчик правок трактуется как платная правка.
+- `INSERT INTO renders` дополнен колонками `root_render_id, model_key, model_credits, is_private`: у корня `root_render_id` = собственный id, у правки — `root_render_id` родителя (у старых цепочек с NULL — id родителя). Приватность правки наследуется от родителя независимо от тела запроса.
+- Чистые хелперы в `src/billing.js`: `chargeForEnqueue({ iteration, editCount, modelCredits, balance })` → `{ ok, delta | needed }`; `rootEditCountSql(rootRenderId)` — параметризованный SQL счёта правок корневого дизайна.
+- `enqueueRender` (`src/jobs.js`) и вызовы в `src/server.js` (корень и правка) прокидывают `modelKey`/`modelCredits`/`isPrivate`; новая логика выбора модели в server.js не добавлялась. Причины транзакций не менялись (`'render'` / `'iterate'`), `restoreCreditForRender` работает без изменений.
+- Тесты: `npm test` 222/222.
 
 ## 2026-11-09 — API моделей и приватность рендеров
 
