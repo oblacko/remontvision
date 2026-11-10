@@ -77,6 +77,7 @@ export default function Cabinet() {
   const [fullscreen, setFullscreen] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
   const toastTimer = useRef<number | null>(null)
   const [buyConsent, setBuyConsent] = useState(false)
   const [buying, setBuying] = useState('')
@@ -192,12 +193,6 @@ export default function Cabinet() {
       return matchesQuery && matchesStatus
     })
   }, [groups, query, statusFilter])
-
-  const stats = useMemo(() => ({
-    rooms: groups.length,
-    generations: generations.length,
-    creditsSpent: generations.reduce((sum, g) => sum + Number(g.credits_spent || 0), 0),
-  }), [groups, generations])
 
   const openRoom = async (group: RoomGroup, renderId?: string | null) => {
     setFullscreen(false)
@@ -386,23 +381,34 @@ export default function Cabinet() {
           <div className="flex items-center gap-3"><Logo animated /><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
           <div className="flex items-center gap-2 text-sm">
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
-            <a href="/?panel=1" className="k-btn k-btn--primary k-btn--s hidden sm:inline-flex">Новый дизайн <KitIcon name="ur" /></a>
-            <span className="k-badge hidden md:inline-flex"><b>{me.balance}</b> кр.</span>
-            <button type="button" onClick={logout} className="inline-flex min-h-11 items-center gap-2 px-2 hover:opacity-50"><KitIcon name="out" /><span className="hidden sm:inline">Выйти</span></button>
+            <a href="/?panel=1" className="k-btn k-btn--primary k-btn--s">Новый дизайн <KitIcon name="ur" /></a>
+            <div className="relative">
+              <button type="button" onClick={() => setProfileOpen(value => !value)} aria-expanded={profileOpen} aria-haspopup="menu" className="k-badge inline-flex min-h-11 items-center gap-1"><b>{me.balance}</b> кр. <KitIcon name="cd" className="size-3.5" /></button>
+              {profileOpen && (
+                <>
+                  <button type="button" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)} className="fixed inset-0 z-20 cursor-default" />
+                  <div role="menu" className="absolute right-0 top-full z-30 mt-2 w-56 border bg-card p-1 shadow-[4px_4px_0_oklch(var(--primary))]">
+                    <p className="px-3 py-2 text-xs text-muted-foreground">Баланс: <b className="text-foreground">{me.balance} кр.</b></p>
+                    <button type="button" role="menuitem" onClick={() => { setTab('credits'); setProfileOpen(false) }} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm hover:bg-secondary"><KitIcon name="bolt" className="size-4" />История платежей</button>
+                    <button type="button" role="menuitem" onClick={() => { setTab('credits'); setProfileOpen(false); requestAnimationFrame(() => document.getElementById('referral-block')?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm hover:bg-secondary"><KitIcon name="r" className="size-4" />Пригласить друга</button>
+                    <div className="my-1 h-px bg-border" />
+                    <button type="button" role="menuitem" onClick={logout} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm hover:bg-secondary"><KitIcon name="out" className="size-4" />Выйти</button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
       <main className="page-shell py-8">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
-          <div><p className="eyebrow">Личный кабинет</p><h1 className="display-title mt-2 text-4xl sm:text-5xl">{tab === 'history' ? 'Мои дизайны' : 'Кредиты'}</h1><p className="mt-2 text-sm text-muted-foreground">{me.email}</p></div>
-          <div className="flex gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground"><span>{stats.rooms} {plural(stats.rooms, 'комната', 'комнаты', 'комнат')}</span><span>{stats.generations} {plural(stats.generations, 'дизайн', 'дизайна', 'дизайнов')}</span><span>{stats.creditsSpent} кр. использовано</span></div>
+          <div><p className="eyebrow">Личный кабинет</p><h1 className="display-title mt-2 text-4xl sm:text-5xl">{tab === 'history' ? 'Мои дизайны' : 'Профиль'}</h1><p className="mt-2 text-sm text-muted-foreground">{me.email}</p></div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <nav className="k-ut" aria-label="Разделы кабинета">
             <button type="button" aria-selected={tab === 'history'} onClick={() => setTab('history')}>История</button>
-            <button type="button" aria-selected={tab === 'credits'} onClick={() => setTab('credits')}>Кредиты</button>
+            <button type="button" aria-selected={tab === 'credits'} onClick={() => setTab('credits')}>Профиль</button>
           </nav>
-          <a href="/?panel=1" className="k-btn k-btn--primary k-btn--s sm:hidden">Новый дизайн <KitIcon name="ur" /></a>
         </div>
         {(notice || error) && <p className={`mt-4 border px-4 py-3 text-sm ${error ? 'border-destructive/40 bg-destructive/5 text-destructive' : 'border-primary/40 bg-primary/5 text-foreground'}`} role="status">{error || notice}</p>}
 
@@ -444,13 +450,13 @@ export default function Cabinet() {
           <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_24rem]">
             <section>
               <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 flex items-baseline gap-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="max-w-[20rem] text-xs text-muted-foreground">1 кредит = дизайн (в каждом 3 бесплатных редактирования) или подбор товаров</span></div>
-              <div className="k-note mt-6">
-                <KitIcon name="bolt" /><div className="min-w-0"><p className="text-sm font-medium">Пригласите друга — +2 кредита обоим</p><p className="mt-1 text-xs leading-5">Друг получит 2 кредита за регистрацию по ссылке, вы — ещё 2 за приглашение.</p></div>
+              <div id="referral-block" className="k-note mt-6">
+                <KitIcon name="bolt" /><div className="min-w-0"><p className="text-sm font-medium">Пригласите друга — +2 кредита вам</p><p className="mt-1 text-xs leading-5">+2 кредита начислим после первой покупки друга по вашей ссылке.</p></div>
               </div>
               {referral ? (
                 <div className="mt-4">
                   <div className="flex gap-2"><input readOnly value={referral.link} onFocus={e => e.currentTarget.select()} className="k-field min-w-0 flex-1 text-xs" style={{ minHeight: 44 }} aria-label="Реферальная ссылка" /><button type="button" onClick={copyReferral} className="k-btn k-btn--s shrink-0">Скопировать</button></div>
-                  <p className="mt-2 text-xs text-muted-foreground">{referral.invited > 0 ? `Приглашено по ссылке: ${referral.invited}` : 'Поделитесь ссылкой — вы оба получите по 2 кредита.'}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{referral.invited > 0 ? `Приглашено по ссылке: ${referral.invited}` : 'Поделитесь ссылкой — получите 2 кредита после первой покупки друга.'}</p>
                 </div>
               ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем ссылку…</p>}
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -459,7 +465,7 @@ export default function Cabinet() {
               <label className="k-chk mt-4 items-start"><input type="checkbox" checked={buyConsent} onChange={e => setBuyConsent(e.target.checked)} /><span>Принимаю <a className="underline" href="/offer" target="_blank" rel="noopener">оферту</a> и <a className="underline" href="/prices" target="_blank" rel="noopener">условия и цены</a></span></label>
               <div className="mt-8"><div className="flex items-center justify-between border-b pb-3"><h2 className="eyebrow">История кредитов</h2><span className="text-xs text-muted-foreground">{credits.length} {plural(credits.length, 'операция', 'операции', 'операций')}</span></div><div className="divide-y">{credits.map(c => <div key={c.id} className="flex items-start justify-between gap-4 py-3 text-sm"><div><b className={c.delta > 0 ? 'text-primary-text' : ''}>{c.delta > 0 ? '+' : ''}{c.delta} кр.</b><p className="mt-1 text-xs text-muted-foreground">{reasonNames[c.reason] || c.reason}{c.note ? ` · ${c.note}` : ''}</p></div><span className="shrink-0 text-xs text-muted-foreground">{dateTime(c.created_at)}</span></div>)}{!credits.length && <p className="py-4 text-sm text-muted-foreground">Операций пока нет.</p>}</div></div>
             </section>
-            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — дизайн (в каждом 3 бесплатных редактирования) или подбор товаров.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="lnk mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <KitIcon name="ur" /></a></aside>
+            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — дизайн (в каждом 3 бесплатных редактирования) или подбор товаров.</li><li>+2 кредита за друга после его первой покупки.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="lnk mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <KitIcon name="ur" /></a></aside>
           </div>
         )}
       </main>
