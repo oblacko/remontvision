@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariantsCount, shouldMarkRoomError, pluralVariants, retryAllowed } from '../src/variants.js';
+import { parseVariantsCount, shouldMarkRoomError, pluralVariants, retryAllowed, parseVariantItems } from '../src/variants.js';
 
 test('parseVariantsCount clamps 1..8', () => {
   assert.equal(parseVariantsCount(undefined), 1);
@@ -33,4 +33,34 @@ test('retryAllowed only for failed rooms', () => {
 test('retryAllowed blocks while sibling variants are processing', () => {
   assert.equal(retryAllowed('error', true), false);
   assert.equal(retryAllowed('error', false), true);
+});
+
+test('parseVariantItems parses pairs and drops unknown concepts', () => {
+  const { items, error } = parseVariantItems(JSON.stringify([
+    { style: 'Скандинавский', concept: 'light' },
+    { style: 'Джапанди' },
+    { style: 'Скандинавский', concept: 'unknown' },
+  ]), { allowedConcepts: new Set(['light']) });
+  assert.equal(error, null);
+  assert.deepEqual(items, [
+    { style: 'Скандинавский', concept: 'light' },
+    { style: 'Джапанди', concept: null },
+    { style: 'Скандинавский', concept: null },
+  ]);
+});
+
+test('parseVariantItems rejects more than 8 items', () => {
+  const { error } = parseVariantItems(JSON.stringify(Array.from({ length: 9 }, (_, i) => ({ style: `s${i}` }))), {});
+  assert.equal(error, 'Некорректный список дизайнов');
+});
+
+test('parseVariantItems rejects empty array and broken json', () => {
+  assert.equal(parseVariantItems('[]', {}).error, 'Некорректный список дизайнов');
+  assert.equal(parseVariantItems('{oops', {}).error, 'Некорректный список дизайнов');
+});
+
+test('parseVariantItems legacy fallback replicates style N times', () => {
+  const { items } = parseVariantItems(undefined, { legacyStyle: 'Лофт', legacyConcept: 'x', legacyVariants: 3, allowedConcepts: new Set(['x']) });
+  assert.equal(items.length, 3);
+  assert.ok(items.every(i => i.style === 'Лофт' && i.concept === 'x'));
 });

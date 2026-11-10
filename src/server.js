@@ -30,7 +30,7 @@ import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
 import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
-import { parseVariantsCount, pluralVariants, retryAllowed } from './variants.js';
+import { pluralVariants, retryAllowed, parseVariantItems } from './variants.js';
 import { sharePageHtml } from './sharepage.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
@@ -1481,7 +1481,28 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const perRenderCredits = resolution
     ? priceForResolution(modelRow?.resolution_prices, resolution, modelSelection.credits)
     : modelSelection.credits;
-  const variants = parseVariantsCount(req.body?.variants);
+  const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
+  const requestedStyle = String(req.body?.style || '').trim();
+  const requestedConceptRaw = String(req.body?.concept || '').trim();
+  const legacyConcept = DESIGN_CONCEPTS.some(item => item.id === requestedConceptRaw) ? requestedConceptRaw : null;
+  const variantParse = parseVariantItems(req.body?.items, {
+    legacyStyle: requestedStyle,
+    legacyConcept,
+    legacyVariants: req.body?.variants,
+    allowedConcepts: new Set(DESIGN_CONCEPTS.map(item => item.id)),
+  });
+  if (variantParse.error) return res.status(400).json({ error: variantParse.error });
+  const resolveStyleName = async name => {
+    const trimmed = String(name || '').trim();
+    const dbRow = trimmed ? await q.styleByName(trimmed) : null;
+    if (dbRow && dbRow.active) return dbRow.name;
+    return canonicalStyleNames.has(trimmed) ? trimmed : 'Современный минимализм';
+  };
+  const resolvedVariants = [];
+  for (const item of variantParse.items) {
+    resolvedVariants.push({ style: await resolveStyleName(item.style), concept: item.concept });
+  }
+  const variants = resolvedVariants.length;
   if (!MOCK_MODE) {
     const bal = await q.creditBalance(req.user.id);
     if (bal < perRenderCredits * variants) {
@@ -1503,19 +1524,8 @@ app.post('/api/rooms', rateLimit, upload.fields([
     }
   }
   const id = crypto.randomUUID();
-  const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
-  const requestedStyle = String(req.body?.style || '').trim();
   const requestedRoomType = String(req.body?.room_type || '').trim();
-  if (!requestedStyle) {
-    return res.status(400).json({ error: 'Выберите стиль' });
-  }
   const roomType = ROOM_TYPE_NAMES.includes(requestedRoomType) && isRoomTypeActive(requestedRoomType) ? requestedRoomType : 'Другое';
-  const dbStyle = requestedStyle ? await q.styleByName(requestedStyle) : null;
-  const style = requestedStyle
-    ? (dbStyle && dbStyle.active ? dbStyle.name : (canonicalStyleNames.has(requestedStyle) ? requestedStyle : 'Современный минимализм'))
-    : 'Современный минимализм';
-  const requestedConcept = String(req.body?.concept || '').trim();
-  const conceptKey = DESIGN_CONCEPTS.some(item => item.id === requestedConcept) ? requestedConcept : null;
   const allowedPalettes = new Set(['none', 'mono', 'analogous', 'complementary', 'split']);
   const allowedAccents = new Set(['none', 'forest', 'sand', 'terra', 'dust', 'graphite']);
   const palette = allowedPalettes.has(req.body.palette) ? req.body.palette : 'none';
@@ -1551,11 +1561,23 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const dimensionOrientation = String(req.body.dimension_orientation || '').trim().slice(0, 200) || null;
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
-  await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, conceptKey);
+  await q.createRoom(id, resolvedVariants[0].style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, resolvedVariants[0].concept);
   let enqueued = 0;
   try {
-    for (let i = 0; i < variants; i++) {
-      await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: perRenderCredits, isPrivate, resolution });
+    for (const item of resolvedVariants) {
+      const conceptName = item.concept ? DESIGN_CONCEPTS.find(concept => concept.id === item.concept)?.name : null;
+      await enqueueRender({
+        roomId: id,
+        chargedUserId: req.user.id,
+        requestIp: clientIp(req),
+        modelKey: modelSelection.key,
+        modelCredits: perRenderCredits,
+        isPrivate,
+        resolution,
+        style: item.style,
+        concept: item.concept,
+        requestText: `Стиль: ${item.style}${conceptName ? ` · концепция: ${conceptName}` : ''}`,
+      });
       enqueued += 1;
     }
   } catch (e) {
@@ -1571,7 +1593,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
     }
     throw e;
   }
-  res.status(201).json({ id, status: 'queued', concept_key: conceptKey });
+  res.status(201).json({ id, status: 'queued', concept_key: resolvedVariants[0].concept });
 }));
 
 // Повтор упавшего базового рендера. Кредит за упавший рендер уже возвращён

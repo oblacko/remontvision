@@ -29,3 +29,37 @@ export function pluralVariants(n) {
 export function retryAllowed(roomStatus, hasActiveSibling = false) {
   return roomStatus === 'error' && !hasActiveSibling;
 }
+
+export const VARIANT_ITEMS_ERROR = 'Некорректный список дизайнов';
+
+// Разбор списка вариантов «стиль + необязательный концепт» из POST /api/rooms.
+// items — JSON-строка (multipart) или массив; 1..8 пар. Без items — legacy:
+// N копий одного стиля (старые клиенты). Неизвестный концепт отбрасывается в null.
+export function parseVariantItems(raw, { legacyStyle = '', legacyConcept = null, legacyVariants = 1, allowedConcepts = new Set() } = {}) {
+  const allowed = allowedConcepts instanceof Set ? allowedConcepts : new Set();
+  const pickConcept = value => (typeof value === 'string' && allowed.has(value) ? value : null);
+
+  if (raw === undefined || raw === null || raw === '') {
+    const style = String(legacyStyle || '').trim();
+    if (!style) return { items: [], error: VARIANT_ITEMS_ERROR };
+    const count = parseVariantsCount(legacyVariants);
+    const concept = pickConcept(legacyConcept);
+    return { items: Array.from({ length: count }, () => ({ style, concept })), error: null };
+  }
+
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw); } catch { return { items: [], error: VARIANT_ITEMS_ERROR }; }
+  }
+  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > MAX_VARIANTS) {
+    return { items: [], error: VARIANT_ITEMS_ERROR };
+  }
+  const items = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== 'object') return { items: [], error: VARIANT_ITEMS_ERROR };
+    const style = String(entry.style ?? '').trim().slice(0, 80);
+    if (!style) return { items: [], error: VARIANT_ITEMS_ERROR };
+    items.push({ style, concept: pickConcept(entry.concept) });
+  }
+  return { items, error: null };
+}
