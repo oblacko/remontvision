@@ -66,6 +66,7 @@ export default function Cabinet() {
   const [tab, setTab] = useState<'history' | 'credits'>(() => location.hash.includes('credits') ? 'credits' : 'history')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'done' | 'error'>('all')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedRoom, setSelectedRoom] = useState<RoomGroup | null>(null)
   const [selectedRenderId, setSelectedRenderId] = useState<string | null>(null)
   const [roomData, setRoomData] = useState<RoomData | null>(null)
@@ -407,11 +408,25 @@ export default function Cabinet() {
 
         {tab === 'history' ? (
           <div className="mt-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="k-tabs">
-                {([['all', 'Все'], ['done', 'Готовые'], ['error', 'С ошибками']] as const).map(([key, label]) => <button key={key} type="button" aria-selected={statusFilter === key} onClick={() => setStatusFilter(key)} className="k-tab">{label}</button>)}
+            <div className="flex items-center justify-end">
+              <div className="relative">
+                <button type="button" onClick={() => setFiltersOpen(value => !value)} aria-expanded={filtersOpen} className="k-btn k-btn--s">
+                  <KitIcon name="q" className="size-4" />
+                  Фильтры
+                  {(statusFilter !== 'all' || query) && <span className="ml-1 size-2 rounded-full bg-primary" aria-hidden="true" />}
+                </button>
+                {filtersOpen && (
+                  <>
+                    <button type="button" aria-label="Закрыть фильтры" onClick={() => setFiltersOpen(false)} className="fixed inset-0 z-20 cursor-default" />
+                    <div className="absolute right-0 top-full z-30 mt-2 w-72 max-w-[90vw] border bg-card p-3 shadow-[4px_4px_0_oklch(var(--primary))]">
+                      <div className="k-tabs">
+                        {([['all', 'Все'], ['done', 'Готовые'], ['error', 'С ошибками']] as const).map(([key, label]) => <button key={key} type="button" aria-selected={statusFilter === key} onClick={() => { setStatusFilter(key); setFiltersOpen(false) }} className="k-tab">{label}</button>)}
+                      </div>
+                      <div className="relative mt-3"><KitIcon name="q" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Стиль или запрос редактирования" className="k-field pl-10 pr-3 text-sm" /></div>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="relative sm:w-72"><KitIcon name="q" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Стиль или запрос редактирования" className="k-field pl-10 pr-3 text-sm" /></div>
             </div>
             {filteredGroups.length ? (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
