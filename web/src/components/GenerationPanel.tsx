@@ -239,19 +239,19 @@ export function GenerationPanel({
   const [cleanupBusy, setCleanupBusy] = useState(false)
   const [cleanupError, setCleanupError] = useState('')
   const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
-  const [style, setStyle] = useState<string | null>(null)
+  const [stylePicks, setStylePicks] = useState<Array<{ style: string; concepts: string[] }>>([])
+  const [toast, setToast] = useState('')
+  const toastTimer = useRef<number | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
   const [useCatalog] = useState(true)
   const [renderModels, setRenderModels] = useState<RenderModelOption[]>([])
   const [resolution, setResolution] = useState<string | null>(null)
-  const [variantsCount, setVariantsCount] = useState(1)
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [modelChosen, setModelChosen] = useState(false)
   const [isPrivate, setIsPrivate] = useState(false)
   const [hasSucceededPayment, setHasSucceededPayment] = useState(false)
   const [concepts, setConcepts] = useState<DesignConcept[]>([])
   const [compatibility, setCompatibility] = useState<DesignCompatibility>({})
-  const [conceptKey, setConceptKey] = useState<string | null>(null)
   const [selectedOffers, setSelectedOffers] = useState<Record<string, ProductOffer>>({})
   const [openSummaryTab, setOpenSummaryTab] = useState<string | null>(null)
   const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
@@ -295,7 +295,48 @@ export function GenerationPanel({
   const renderCredits = selectedModel
     ? (Number(selectedModel.resolution_prices?.[effectiveResolution ?? '']) || Number(selectedModel.credits) || 1)
     : 1
-  const totalCredits = renderCredits * variantsCount
+  const styleKeyOf = (name: string) => stylePresets.find(item => item.name === name)?.key || null
+  const variantItems = stylePicks.flatMap(pick => pick.concepts.length
+    ? pick.concepts.map(concept => ({ style: pick.style, concept }))
+    : [{ style: pick.style, concept: null as string | null }])
+  const variantCount = variantItems.length
+  const totalCredits = renderCredits * variantCount
+  const countVariants = (picks: Array<{ style: string; concepts: string[] }>) =>
+    picks.reduce((sum, pick) => sum + Math.max(1, pick.concepts.length), 0)
+  const showToast = (text: string) => {
+    setToast(text)
+    if (toastTimer.current) window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(''), 2000)
+  }
+  const chargeText = (count: number) => `Спишется ${renderCredits * count} кр. за ${count} ${count === 1 ? 'дизайн' : count < 5 ? 'дизайна' : 'дизайнов'}`
+  const toggleStyle = (name: string) => {
+    const exists = stylePicks.some(pick => pick.style === name)
+    let next = stylePicks
+    if (exists) {
+      next = stylePicks.filter(pick => pick.style !== name)
+    } else {
+      if (variantCount >= 8) { showToast('Максимум 8 дизайнов'); return }
+      next = [...stylePicks, { style: name, concepts: [] }]
+    }
+    setStylePicks(next)
+    const count = countVariants(next)
+    if (count > 0) showToast(chargeText(count))
+  }
+  const toggleConcept = (styleName: string, conceptId: string | null) => {
+    const pick = stylePicks.find(item => item.style === styleName)
+    if (!pick) return
+    let next = stylePicks
+    if (conceptId === null) {
+      next = stylePicks.map(item => item.style === styleName ? { ...item, concepts: [] } : item)
+    } else if (pick.concepts.includes(conceptId)) {
+      next = stylePicks.map(item => item.style === styleName ? { ...item, concepts: item.concepts.filter(id => id !== conceptId) } : item)
+    } else {
+      if (variantCount >= 8) { showToast('Максимум 8 дизайнов'); return }
+      next = stylePicks.map(item => item.style === styleName ? { ...item, concepts: [...item.concepts, conceptId] } : item)
+    }
+    setStylePicks(next)
+    showToast(chargeText(countVariants(next)))
+  }
   const productMatches = current?.analysis?.products || []
   const visibleObjects = (current?.analysis?.visible || []).filter(
     (object): object is { label?: string; bbox: number[]; area?: number } => typeof object === 'object' && object !== null && Array.isArray(object.bbox) && object.bbox.length === 4,
@@ -346,12 +387,6 @@ export function GenerationPanel({
       })
       .catch(() => {})
   }, [])
-
-  useEffect(() => {
-    if (step !== 'style' || !conceptKey) return
-    const el = document.querySelector(`[data-concept-id="${conceptKey}"]`)
-    if (el) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
-  }, [conceptKey, step])
 
   useEffect(() => {
     fetch('/api/room-types')
@@ -419,11 +454,9 @@ export function GenerationPanel({
         if (!r.ok) throw new Error(d.error || String(r.status))
         if (cancelled) return
         setRoomId(initialRoomId)
-        setStyle(d.style || null)
         setRoomType(d.room_type || null)
         if (d.room_type) setRoomTypes(prev => prev.includes(d.room_type) ? prev : [...prev, d.room_type])
         setPriceTier(d.price_tier || 'comfort')
-        setConceptKey(d.concept_key || null)
         setPhoto(d.photo_url || null)
         setPhotoName('Фото комнаты')
         setPhotoError(''); setGenError(d.notice || '')
@@ -702,6 +735,7 @@ export function GenerationPanel({
     clearEditRefs()
     retryRef.current = null
     setCanRetry(false)
+    setStylePicks([])
     void refreshTasks()
     onEdited?.()
     await onRefreshUser()
@@ -736,7 +770,7 @@ export function GenerationPanel({
     clearEditRefs()
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
     setGeneratingTitle(edit?.generatingTitle || (edit?.parentId && effectiveObjectTarget ? `Редактирование объекта «${ruLabel(effectiveObjectTarget.label)}»` : ''))
-    if (!edit?.parentId && variantsCount > 1) setGeneratingTitle(`Создаём вариантов: ${variantsCount}`)
+    if (!edit?.parentId && variantCount > 1) setGeneratingTitle(`Создаём ${variantCount} ${variantCount < 5 ? 'дизайна' : 'дизайнов'}`)
     try {
       const isBase = !roomId
       let id = roomId
@@ -751,8 +785,7 @@ export function GenerationPanel({
         const usingCleaned = Boolean(cleanupFile)
         const fd = new FormData()
         fd.append('photo', file)
-        fd.append('style', styleName)
-        fd.append('concept', conceptKey || '')
+        fd.append('items', JSON.stringify(variantItems.map(item => ({ style: item.style, concept: item.concept }))))
         fd.append('room_type', roomType)
         if (cleanupFile) fd.append('cleanup_photo', cleanupFile)
         if (isBedRoom) fd.append('bed_length_m', '2')
@@ -760,7 +793,6 @@ export function GenerationPanel({
         fd.append('keep_furniture', usingCleaned ? '0' : '1')
         fd.append('use_catalog', useCatalog ? '1' : '0')
         if (modelKey && modelChosen) fd.append('model', modelKey)
-        fd.append('variants', String(variantsCount))
         if (effectiveResolution) fd.append('resolution', effectiveResolution)
         fd.append('private', isPrivate ? '1' : '0')
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
@@ -772,7 +804,6 @@ export function GenerationPanel({
         id = d.id
         setRoomId(id)
         void refreshTasks()
-        if (d.concept_key) setConceptKey(d.concept_key)
       } else {
         const fd = new FormData()
         fd.append('text', request)
@@ -832,20 +863,13 @@ export function GenerationPanel({
     releaseUrl(photo)
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
-    setStyle(null); setPriceTier('comfort')
+    setStylePicks([]); setPriceTier('comfort')
     setCleaned(null); setCleanupRequested(false); setCleanupError('')
     loadedRoomRef.current = ''
     clearEditRefs()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
     setGenError(''); setGenStage('queued'); setElapsed(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     if (photoInput.current) photoInput.current.value = ''
-  }
-
-  const pickCompatibleConcept = (styleKey: string | null) => {
-    if (!styleKey || !concepts.length) return null
-    const compatible = concepts.filter(concept => (compatibility[concept.id]?.[styleKey] || 'ok') !== 'conflict')
-    if (!compatible.length) return null
-    return compatible[Math.floor(Math.random() * compatible.length)].id
   }
 
   const activeStep = stepIndex(step)
@@ -949,43 +973,51 @@ export function GenerationPanel({
           <div>
             <p className="eyebrow">Шаг 02 / Стиль</p>
             <h3 className="display-title mt-6 text-4xl">Выберите направление</h3>
-            {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите одно направление — оно задаст палитру, материалы и свет.</p>}
+            {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите один или несколько стилей — каждый станет отдельным дизайном.</p>}
             <div className="k-tiles mt-8">
-              {stylePresets.map((item) => (
-                <button key={item.key} type="button" role="radio" aria-checked={style === item.name} onClick={() => { const nextStyle = item.name; const changing = style !== nextStyle; setStyle(nextStyle); if (changing || !conceptKey) setConceptKey(pickCompatibleConcept(item.key)) }} className="k-tile">
-                  <span className="im relative overflow-hidden"><img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover" /></span>
-                  <span className="nm">{item.name}</span>
-                  <span className="bd"><KitIcon name="ok" /></span>
-                </button>
-              ))}
+              {stylePresets.map((item) => {
+                const selected = stylePicks.some(pick => pick.style === item.name)
+                return (
+                  <button key={item.key} type="button" role="checkbox" aria-checked={selected} onClick={() => toggleStyle(item.name)} className="k-tile">
+                    <span className="im relative overflow-hidden"><img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover" /></span>
+                    <span className="nm">{item.name}</span>
+                    <span className="bd"><KitIcon name="ok" /></span>
+                  </button>
+                )
+              })}
             </div>
 
-            <div className="mt-10 border-t pt-6">
-              <div>
-                <p className="eyebrow">Шаг 03 / Концепция</p>
-                <p className="mt-1 text-sm text-muted-foreground">{style ? 'Выберите главный ход будущего интерьера.' : 'Сначала выберите стиль — покажем совместимые концепции.'}</p>
+            {stylePicks.length > 0 && (
+              <div className="mt-10 border-t pt-6">
+                <p className="eyebrow">Шаг 03 / Концепции</p>
+                <p className="mt-1 text-sm text-muted-foreground">У каждого стиля можно выбрать несколько концепций — каждая станет отдельным дизайном.</p>
+                <div className="mt-4 space-y-3">
+                  {stylePicks.map(pick => {
+                    const styleKey = styleKeyOf(pick.style)
+                    const count = Math.max(1, pick.concepts.length)
+                    return (
+                      <div key={pick.style} className="border bg-card p-3">
+                        <p className="text-sm font-medium">{pick.style} <span className="text-xs font-normal text-muted-foreground">· {count} {count === 1 ? 'вариант' : count < 5 ? 'варианта' : 'вариантов'}</span></p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button type="button" aria-pressed={pick.concepts.length === 0} onClick={() => toggleConcept(pick.style, null)} className={`min-h-10 border px-3 text-xs transition-colors ${pick.concepts.length === 0 ? 'border-foreground bg-foreground text-background' : 'border-input hover:border-foreground'}`}>Без концепции</button>
+                          {concepts.map(concept => {
+                            const level = styleKey ? (compatibility[concept.id]?.[styleKey] || 'ok') : 'ok'
+                            if (level === 'conflict') return null
+                            const active = pick.concepts.includes(concept.id)
+                            return (
+                              <button key={concept.id} type="button" aria-pressed={active} onClick={() => toggleConcept(pick.style, concept.id)} className={`min-h-10 border px-3 text-left text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-input hover:border-foreground'}`}>
+                                {concept.name}
+                                {level === 'weaken' ? <span className="block text-[10px] leading-4 opacity-70">ослабленная форма</span> : null}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {concepts.map((concept) => {
-                  const selectedKey = stylePresets.find(item => item.name === style)?.key || null
-                  const level = selectedKey ? (compatibility[concept.id]?.[selectedKey] || 'ok') : 'ok'
-                  const disabled = !style || level === 'conflict'
-                  const selected = conceptKey === concept.id
-                  return (
-                    <button key={concept.id} data-concept-id={concept.id} type="button" disabled={disabled} aria-checked={selected} role="radio" onClick={() => setConceptKey(concept.id)} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
-                      <span className={`block ${selected ? '' : 'opacity-80'}`}>
-                        <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                          {concept.name}
-                          {selected ? <KitIcon name="ok" className="size-4 shrink-0 text-primary-text" /> : null}
-                        </span>
-                        <span className="mt-1 block text-xs leading-5 text-muted-foreground">{concept.main_move}</span>
-                        <span className="k-caption mt-1 block">{level === 'weaken' ? 'ослабленная форма' : level === 'conflict' ? 'несовместимо со стилем' : 'совместимо'}</span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+            )}
 
             <div className="mt-10 border-t pt-6">
               {renderModels.length > 0 && (
@@ -1053,31 +1085,25 @@ export function GenerationPanel({
               </div>
             )}
 
-            {!editing && (
-              <div className="mt-8 flex flex-wrap items-center gap-3 border-t pt-6">
-                <span className="text-sm">Варианты</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setVariantsCount(n => Math.max(1, n - 1))} disabled={variantsCount <= 1} aria-label="Меньше вариантов" className="k-btn k-btn--s size-9 justify-center p-0 disabled:opacity-40">−</button>
-                  <b className="w-6 text-center font-mono">{variantsCount}</b>
-                  <button type="button" onClick={() => setVariantsCount(n => Math.min(8, n + 1))} disabled={variantsCount >= 8} aria-label="Больше вариантов" className="k-btn k-btn--s size-9 justify-center p-0 disabled:opacity-40">+</button>
-                </div>
-                <p className="text-xs text-muted-foreground">{variantsCount} × {renderCredits} = <b className="text-foreground">{totalCredits} кр.</b></p>
-              </div>
+            {!editing && variantCount > 0 && (
+              <p className="mt-8 border-t pt-6 text-xs text-muted-foreground">{variantCount} × {renderCredits} = <b className="text-foreground">{totalCredits} кр.</b></p>
             )}
 
-            <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => setStep('photo')} className="k-btn hidden sm:inline-flex"><KitIcon name="l" className="size-4" />Назад</button>
               <button
                 type="button"
-                disabled={busy || !style || (concepts.length > 0 && !conceptKey)}
+                disabled={busy || variantCount === 0}
                 onClick={() => {
-                  const conceptName = concepts.find(item => item.id === conceptKey)?.name
-                  const request = style ? `Стиль: ${style}${conceptName ? ` · концепция: ${conceptName}` : ''}` : 'Стиль по референсу'
-                  void startGeneration(request, style ?? 'Референс пользователя')
+                  const first = variantItems[0]
+                  const request = first
+                    ? `Стиль: ${first.style}${first.concept ? ` · концепция: ${concepts.find(item => item.id === first.concept)?.name || ''}` : ''}`
+                    : 'Стиль по референсу'
+                  void startGeneration(request, stylePicks[0]?.style ?? 'Референс пользователя')
                 }}
                 className="k-btn k-btn--primary min-h-14 px-8 text-base disabled:opacity-40"
               >
-                {busy ? 'Запускаем…' : 'Создать дизайн'} <KitIcon name="ur" className="size-5" />
+                {busy ? 'Запускаем…' : variantCount > 1 ? `Создать ${variantCount} дизайнов` : 'Создать дизайн'} <KitIcon name="ur" className="size-5" />
               </button>
             </div>
           </div>
@@ -1684,7 +1710,7 @@ export function GenerationPanel({
       </KitLightbox>
 
       <ShareDialog renderId={current?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
-      <KitSheet open={creditOpen} onClose={() => setCreditOpen(false)} title="Кредиты закончились">
+      {toast && <div className="kit-toast" role="status">{toast}</div>}      <KitSheet open={creditOpen} onClose={() => setCreditOpen(false)} title="Кредиты закончились">
         <p className="text-sm leading-6 text-muted-foreground">Каждый дизайн или платное редактирование стоит 1 кредит. Пополните баланс в кабинете и вернитесь к дизайну — загруженное фото и настройки сохранятся.</p>
         <div className="actions">
           <button type="button" onClick={() => setCreditOpen(false)} className="k-btn">Позже</button>
