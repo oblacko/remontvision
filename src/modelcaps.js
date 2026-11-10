@@ -56,3 +56,26 @@ export function validateModelOptions(id, resolution, aspectRatio) {
   }
   return null;
 }
+
+// Цена рендера в кредитах для выбранной резолюции: из карты цен модели,
+// иначе базовая цена рендера. Пустая/1K-резолюция без отдельной цены — базовая.
+export function priceForResolution(resolutionPrices, resolution, baseCredits) {
+  const price = resolutionPrices?.[resolution];
+  const n = Number(price);
+  return Number.isFinite(n) && n >= 1 ? n : baseCredits;
+}
+
+// Санитайзер карты цен из админки: только поддерживаемые моделью резолюции
+// и целые значения ≥ 1. Мусор и неизвестные ключи отбрасываются.
+export function sanitizeResolutionPrices(prices, allowedResolutions) {
+  const allowed = new Set(Array.isArray(allowedResolutions) ? allowedResolutions : []);
+  const out = {};
+  if (!prices || typeof prices !== 'object') return out;
+  for (const [resolution, raw] of Object.entries(prices)) {
+    if (!allowed.has(resolution)) continue;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) continue;
+    out[resolution] = n;
+  }
+  return out;
+}

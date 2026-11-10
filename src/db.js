@@ -426,17 +426,19 @@ export const q = {
       .then(r => r.rows[0] || null),
   // Апсерт строки render_models по id (админка): при существующем id обновляет остальные поля.
   createOrUpdateRenderModel: f =>
-    pool.query(`INSERT INTO render_models (id, label, model_id, credits, art_direction_enabled, active, sort)
-                VALUES ($1,$2,$3,$4,$5,$6,$7)
+    pool.query(`INSERT INTO render_models (id, label, model_id, credits, art_direction_enabled, active, sort, resolution_prices)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
                 ON CONFLICT (id) DO UPDATE SET
                   label = EXCLUDED.label,
                   model_id = EXCLUDED.model_id,
                   credits = EXCLUDED.credits,
                   art_direction_enabled = EXCLUDED.art_direction_enabled,
                   active = EXCLUDED.active,
-                  sort = EXCLUDED.sort
+                  sort = EXCLUDED.sort,
+                  resolution_prices = EXCLUDED.resolution_prices
                 RETURNING *`,
-      [f.id, f.label, f.model_id, f.credits, f.art_direction_enabled, f.active, f.sort])
+      [f.id, f.label, f.model_id, f.credits, f.art_direction_enabled, f.active, f.sort,
+       f.resolution_prices ? JSON.stringify(f.resolution_prices) : null])
       .then(r => r.rows[0]),
   toggleRenderModel: id =>
     pool.query(`UPDATE render_models SET active = NOT active WHERE id = $1 RETURNING *`, [id])

@@ -302,7 +302,16 @@ app.get('/api/health', (_req, res) => res.json({
 app.get('/api/models', h(async (_req, res) => {
   const models = await q.listRenderModels(true);
   const defaultKey = resolveDefaultModelKey(models, getModelConfig().render);
-  res.json({ models: models.map(m => ({ key: m.id, label: m.label, credits: m.credits })), default_key: defaultKey });
+  res.json({
+    models: models.map(m => ({
+      key: m.id,
+      label: m.label,
+      credits: m.credits,
+      resolutions: modelCaps(m.model_id).resolutions,
+      resolution_prices: m.resolution_prices || {},
+    })),
+    default_key: defaultKey,
+  });
 }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
 app.get('/api/styles', h(async (_req, res) => {

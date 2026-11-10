@@ -1,5 +1,7 @@
 // Текущие модели хранятся в app_settings, с фолбэком на переменные окружения.
 // Админка может переключать render-модель без рестарта; следующая генерация уже использует новую.
+import { modelCaps, sanitizeResolutionPrices } from './modelcaps.js';
+
 const DEFAULTS = {
   render: process.env.RENDER_MODEL || 'black-forest-labs/flux-3-image',
   edit: process.env.EDIT_MODEL || '',
@@ -98,6 +100,10 @@ export function validateModelInput(body) {
   const modelId = String(body?.model_id ?? '').trim();
   const credits = Number(body?.credits);
   const sort = Number(body?.sort ?? 0);
+  const rawPrices = typeof body?.resolution_prices === 'string'
+    ? (() => { try { return JSON.parse(body.resolution_prices); } catch { return null; } })()
+    : body?.resolution_prices;
+  const resolutionPrices = sanitizeResolutionPrices(rawPrices, modelCaps(modelId).resolutions);
   const bool = (value) => !(value === false || value === 'false' || value === '0' || value === 0 || value === '');
 
   if (!/^[a-z0-9_-]{2,40}$/.test(id)) {
@@ -117,6 +123,7 @@ export function validateModelInput(body) {
       art_direction_enabled: bool(body?.art_direction_enabled),
       active: bool(body?.active),
       sort,
+      ...(Object.keys(resolutionPrices).length ? { resolution_prices: resolutionPrices } : {}),
     },
   };
 }
