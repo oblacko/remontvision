@@ -469,6 +469,28 @@ const EDIT_INVARIANTS = `LOCKED INVARIANTS — HIGHEST PRIORITY:
 Keep everything else exactly as in Image 1: camera, geometry, walls, floor, furniture, decor and lighting. Do not restyle the room. Do not move objects. Do not add extra furniture or fixtures.
 Photorealistic result, no text, no watermarks, no people.`;
 
+// Промт для переноса: модель должна именно УДАЛИТЬ объект и восстановить фон.
+// Общие инварианты редактирования здесь не подходят: они запрещают трогать
+// встроенные панели и «двигать объекты», что конфликтует с задачей.
+export function buildMoveRemovalPrompt({ roomType = 'Другое', instruction = '' } = {}) {
+  const room = roomTypeByName(roomType);
+  const roomName = room?.prompt || 'room';
+  return `IMAGE ROLES:
+Image 1 — current interior render.
+
+This is a ${roomName}.
+TASK: remove the object specified below completely and reconstruct the background behind it. This is an object-level edit, not a room redesign.
+
+${instruction}
+
+RULES:
+- The target object is NOT architecture and NOT a protected built-in for this edit. Remove only that object, even if a general rule would preserve built-ins or wall panels.
+- Reconstruct the wall/floor/ceiling behind the removed object with matching texture, color, lighting, shadows and perspective. No remnants, no outline, no patch.
+- Keep everything else exactly as in Image 1: camera, geometry, proportions, framing, furniture, decor and lighting.
+- Do not move or restyle anything else. No text, no watermarks, no people.
+Photorealistic result.`;
+}
+
 export function buildEditPrompt({ roomType = 'Другое', target = null, instruction = '', hasRef = false, refLabel = '', refDimensions = '', references = null }) {
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room';

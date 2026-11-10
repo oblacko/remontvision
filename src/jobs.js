@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, assessArchitecture, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, buildMoveRemovalPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, assessArchitecture, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
@@ -441,6 +441,9 @@ async function processRender(renderId) {
       meta.refs = imageMap.map((m, i) => ({ index: i + 1, ...m }));
     }
 
+    if (iteration && render.edit_move) {
+      prompt = buildMoveRemovalPrompt({ roomType, instruction: render.request_text });
+    }
     await q.setRenderPrompt(renderId, prompt);
     await q.setRenderMeta(renderId, meta);
 
