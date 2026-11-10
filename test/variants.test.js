@@ -29,3 +29,8 @@ test('retryAllowed only for failed rooms', () => {
   assert.equal(retryAllowed('queued'), false);
   assert.equal(retryAllowed('done'), false);
 });
+
+test('retryAllowed blocks while sibling variants are processing', () => {
+  assert.equal(retryAllowed('error', true), false);
+  assert.equal(retryAllowed('error', false), true);
+});

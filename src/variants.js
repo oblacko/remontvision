@@ -24,7 +24,8 @@ export function pluralVariants(n) {
   return 'вариантов';
 }
 
-// Повтор разрешён только для комнаты в состоянии ошибки.
-export function retryAllowed(roomStatus) {
-  return roomStatus === 'error';
+// Повтор разрешён только для комнаты в состоянии ошибки и когда ни один
+// вариант ещё не в работе (иначе можно повторно списать кредит поверх очереди).
+export function retryAllowed(roomStatus, hasActiveSibling = false) {
+  return roomStatus === 'error' && !hasActiveSibling;
 }

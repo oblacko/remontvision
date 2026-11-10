@@ -246,3 +246,7 @@ test('resolutionAllowed accepts 2K for FLUX 3 Image', () => {
 test('resolutionAllowed rejects empty resolution', () => {
   assert.equal(resolutionAllowed('black-forest-labs/flux-3-image', ''), false);
 });
+
+test('priceForResolution ignores fractional prices', () => {
+  assert.equal(priceForResolution({ '2K': 2.5 }, '2K', 1), 1);
+});

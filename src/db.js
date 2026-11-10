@@ -105,8 +105,11 @@ export const q = {
   roomHasDoneRender: roomId =>
     pool.query(`SELECT EXISTS(SELECT 1 FROM renders WHERE room_id = $1 AND status = 'done') AS done`, [roomId])
       .then(r => r.rows[0]?.done === true),
-  latestRenderForRoom: roomId =>
-    pool.query(`SELECT * FROM renders WHERE room_id = $1 ORDER BY created_at DESC LIMIT 1`, [roomId])
+  roomHasActiveRender: roomId =>
+    pool.query(`SELECT EXISTS(SELECT 1 FROM renders WHERE room_id = $1 AND status IN ('queued','processing')) AS active`, [roomId])
+      .then(r => r.rows[0]?.active === true),
+  latestFailedRenderForRoom: roomId =>
+    pool.query(`SELECT * FROM renders WHERE room_id = $1 AND status = 'error' ORDER BY created_at DESC LIMIT 1`, [roomId])
       .then(r => r.rows[0] || null),
   setRenderShellPath: (id, shellPath) =>
     pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),

@@ -1573,8 +1573,8 @@ app.post('/api/rooms/:id/retry', rateLimit, h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const room = await q.getRoom(req.params.id);
   if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Комната не найдена' });
-  if (!retryAllowed(room.status)) return res.status(409).json({ error: 'Комната уже обрабатывается' });
-  const failed = await q.latestRenderForRoom(room.id);
+  if (!retryAllowed(room.status, await q.roomHasActiveRender(room.id))) return res.status(409).json({ error: 'Комната уже обрабатывается' });
+  const failed = await q.latestFailedRenderForRoom(room.id);
   if (!failed || failed.parent_render_id) return res.status(409).json({ error: 'Повтор доступен только для базового дизайна' });
   const renderId = await enqueueRender({
     roomId: room.id,

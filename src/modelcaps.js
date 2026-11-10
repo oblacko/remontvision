@@ -59,10 +59,11 @@ export function validateModelOptions(id, resolution, aspectRatio) {
 
 // Цена рендера в кредитах для выбранной резолюции: из карты цен модели,
 // иначе базовая цена рендера. Пустая/1K-резолюция без отдельной цены — базовая.
+// Только целое ≥ 1: дробная цена из БД не должна дойти до списания.
 export function priceForResolution(resolutionPrices, resolution, baseCredits) {
   const price = resolutionPrices?.[resolution];
   const n = Number(price);
-  return Number.isFinite(n) && n >= 1 ? n : baseCredits;
+  return Number.isInteger(n) && n >= 1 ? n : baseCredits;
 }
 
 // Санитайзер карты цен из админки: только поддерживаемые моделью резолюции
