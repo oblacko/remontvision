@@ -27,7 +27,7 @@ import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
-import { shouldMarkRoomError } from './variants.js';
+import { shouldMarkRoomError, isIterationRender, resolveRenderStyleConcept } from './variants.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -83,9 +83,8 @@ async function processRender(renderId) {
   if (!render || render.status !== 'processing') return;
   const room = await q.getRoom(render.room_id);
   // Мульти-стиль: у рендера может быть свой стиль/концепт; у старых рендеров — из комнаты.
-  const styleName = render.style || room.style;
-  const conceptKey = render.concept || room.concept_key;
-  const iteration = Boolean(render.request_text);
+  const { style: styleName, concept: conceptKey } = resolveRenderStyleConcept(render, room);
+  const iteration = isIterationRender(render);
   const roomType = room.room_type || 'Другое';
   const isBedRoom = /спальн|детск/i.test(roomType);
   const priceTier = normalizeTier(room.price_tier || 'comfort');
@@ -772,7 +771,7 @@ function notifyOwner(room, render) {
       }
       await sendRenderDoneEmail(user.email, {
         roomType: room.room_type || null,
-        style: styleName || null,
+        style: render.style || room.style || null,
         shareUrl,
       }, { room_id: room.id, render_id: render.id });
     } catch (e) {

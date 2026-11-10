@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariantsCount, shouldMarkRoomError, pluralVariants, retryAllowed, parseVariantItems } from '../src/variants.js';
+import { parseVariantsCount, shouldMarkRoomError, pluralVariants, retryAllowed, parseVariantItems, isIterationRender, resolveRenderStyleConcept } from '../src/variants.js';
 
 test('parseVariantsCount clamps 1..8', () => {
   assert.equal(parseVariantsCount(undefined), 1);
@@ -63,4 +63,30 @@ test('parseVariantItems legacy fallback replicates style N times', () => {
   const { items } = parseVariantItems(undefined, { legacyStyle: 'Лофт', legacyConcept: 'x', legacyVariants: 3, allowedConcepts: new Set(['x']) });
   assert.equal(items.length, 3);
   assert.ok(items.every(i => i.style === 'Лофт' && i.concept === 'x'));
+});
+
+test('isIterationRender treats base render with request_text as base', () => {
+  assert.equal(isIterationRender({ request_text: 'Стиль: X', parent_render_id: null }), false);
+  assert.equal(isIterationRender({ request_text: 'edit', parent_render_id: 'p1' }), true);
+});
+
+test('resolveRenderStyleConcept: new render with null concept does not inherit room concept', () => {
+  assert.deepEqual(
+    resolveRenderStyleConcept({ style: 'Лофт', concept: null }, { style: 'Скандинавский', concept_key: 'light' }),
+    { style: 'Лофт', concept: null },
+  );
+});
+
+test('resolveRenderStyleConcept: legacy render falls back to room', () => {
+  assert.deepEqual(
+    resolveRenderStyleConcept({ style: null, concept: null }, { style: 'Скандинавский', concept_key: 'light' }),
+    { style: 'Скандинавский', concept: 'light' },
+  );
+});
+
+test('resolveRenderStyleConcept: per-render concept wins', () => {
+  assert.deepEqual(
+    resolveRenderStyleConcept({ style: 'Лофт', concept: 'craft' }, { style: 'X', concept_key: 'light' }),
+    { style: 'Лофт', concept: 'craft' },
+  );
 });

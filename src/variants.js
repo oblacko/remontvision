@@ -32,6 +32,22 @@ export function retryAllowed(roomStatus, hasActiveSibling = false) {
 
 export const VARIANT_ITEMS_ERROR = 'Некорректный список дизайнов';
 
+// Правка — рендер с родителем. request_text не признак правки: у базовых
+// мульти-стиль рендеров он тоже заполнен подписью «Стиль: … · концепция: …».
+export function isIterationRender(render) {
+  return Boolean(render && render.parent_render_id);
+}
+
+// Стиль и концепт рендера: новые рендеры (style задан) авторитетны, включая
+// concept=null («Без концепции»); у старых (style=null) — фолбэк на комнату.
+export function resolveRenderStyleConcept(render, room) {
+  const hasRenderStyle = render?.style != null;
+  return {
+    style: render?.style || room?.style || null,
+    concept: hasRenderStyle ? (render?.concept ?? null) : (room?.concept_key ?? null),
+  };
+}
+
 // Разбор списка вариантов «стиль + необязательный концепт» из POST /api/rooms.
 // items — JSON-строка (multipart) или массив; 1..8 пар. Без items — legacy:
 // N копий одного стиля (старые клиенты). Неизвестный концепт отбрасывается в null.

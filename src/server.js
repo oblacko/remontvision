@@ -1483,6 +1483,9 @@ app.post('/api/rooms', rateLimit, upload.fields([
     : modelSelection.credits;
   const canonicalStyleNames = new Set(DESIGN_STYLES.map(item => item.name));
   const requestedStyle = String(req.body?.style || '').trim();
+  if (!req.body?.items && !requestedStyle) {
+    return res.status(400).json({ error: 'Выберите стиль' });
+  }
   const requestedConceptRaw = String(req.body?.concept || '').trim();
   const legacyConcept = DESIGN_CONCEPTS.some(item => item.id === requestedConceptRaw) ? requestedConceptRaw : null;
   const variantParse = parseVariantItems(req.body?.items, {
