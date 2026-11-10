@@ -262,6 +262,7 @@ export function GenerationPanel({
   const [lightbox, setLightbox] = useState(false)
   const [roomId, setRoomId] = useState('')
   const [genError, setGenError] = useState('')
+  const [canRetry, setCanRetry] = useState(false)
   const [busy, setBusy] = useState(false)
   const [productBinding, setProductBinding] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
@@ -275,6 +276,7 @@ export function GenerationPanel({
   const photoInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
   const loadedRoomRef = useRef('')
+  const retryRef = useRef<{ roomId: string; request: string; styleName: string } | null>(null)
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
@@ -640,12 +642,78 @@ export function GenerationPanel({
     }
   }
 
+  async function applyRoomResult(id: string, request: string, styleName: string) {
+    const room = await pollRoom(id)
+    if (!room) return
+    if (room.notice) {
+      setGenError(room.notice)
+      setStep('result')
+      await onRefreshUser()
+      return
+    }
+    const render = room.render
+    if (!render?.image) throw new Error('Модель не вернула изображение')
+    const next: Iteration = {
+      id: render.id,
+      request,
+      image: render.image,
+      styleName,
+      items: room.items,
+      total: room.total,
+      budget: room.budget,
+      priceTier: room.price_tier || priceTier,
+      keepFurniture: room.keep_furniture !== false,
+      useCatalog: room.use_catalog !== false,
+      productsEnabled: room.products_enabled !== false,
+      roomId: id,
+      ratio: photoRatio,
+      pricesAsOf: room.prices_as_of,
+      analysis: render.analysis || null,
+      artDirection: render.art_direction || null,
+      dimensionsEstimate: render.dimensions_estimate || null,
+      lens: render.lens || null,
+      repairScope: render.repair_scope || null,
+      designDirection: render.design_direction || null,
+    }
+    setIterations(prev => [...prev, next])
+    setCurrentId(next.id)
+    setOpenHistory(next.id)
+    setGenStage('done')
+    setStep('result')
+    clearEditRefs()
+    retryRef.current = null
+    setCanRetry(false)
+    void refreshTasks()
+    onEdited?.()
+    await onRefreshUser()
+  }
+
+  async function retryGeneration() {
+    const params = retryRef.current
+    if (!params || busy) return
+    setGenError('')
+    setBusy(true)
+    try {
+      const r = await fetch(`/api/rooms/${encodeURIComponent(params.roomId)}/retry`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { onRequireLogin(); return }
+      if (r.status === 402) { setCreditOpen(true); return }
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      setGenStage('queued'); setStep('generating')
+      await applyRoomResult(params.roomId, params.request, params.styleName)
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Не удалось повторить')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File; move?: { bbox: number[]; dx: number; dy: number; label?: string } }) {
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
     if (!isAuthed) { onRequireLogin(); return }
-    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError('')
+    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setCanRetry(false); retryRef.current = null
     clearEditRefs()
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
     try {
@@ -708,49 +776,11 @@ export function GenerationPanel({
         goal('edit_request', { target: edit?.target || 'custom' })
       }
 
-      const room = await pollRoom(id)
-      if (!room) return
-      if (room.notice) {
-        setGenError(room.notice)
-        setStep('result')
-        await onRefreshUser()
-        return
-      }
-      const render = room.render
-      if (!render?.image) throw new Error('Модель не вернула изображение')
-      const next: Iteration = {
-        id: render.id,
-        request,
-        image: render.image,
-        styleName,
-        items: room.items,
-        total: room.total,
-        budget: room.budget,
-        priceTier: room.price_tier || priceTier,
-        keepFurniture: room.keep_furniture !== false,
-        useCatalog: room.use_catalog !== false,
-        productsEnabled: room.products_enabled !== false,
-        roomId: id,
-        ratio: photoRatio,
-        pricesAsOf: room.prices_as_of,
-        analysis: render.analysis || null,
-        artDirection: render.art_direction || null,
-        dimensionsEstimate: render.dimensions_estimate || null,
-        lens: render.lens || null,
-        repairScope: render.repair_scope || null,
-        designDirection: render.design_direction || null,
-      }
-      setIterations(prev => [...prev, next])
-      setCurrentId(next.id)
-      setOpenHistory(next.id)
-      setGenStage('done')
-      setStep('result')
-      clearEditRefs()
-      void refreshTasks()
-      onEdited?.()
-      await onRefreshUser()
+      if (isBase) retryRef.current = { roomId: id, request, styleName }
+      await applyRoomResult(id, request, styleName)
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось создать дизайн')
+      setCanRetry(Boolean(retryRef.current))
       setStep(iterations.length ? 'result' : 'style')
       void refreshTasks()
     } finally { setBusy(false); setProductBinding(false) }
@@ -978,7 +1008,12 @@ export function GenerationPanel({
               </div>
             </div>
 
-            {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
+            {genError && (
+              <div className="mt-4 flex flex-wrap items-center gap-3" role="alert">
+                <p className="text-sm text-destructive">{genError}</p>
+                {canRetry && <button type="button" onClick={retryGeneration} disabled={busy} className="k-btn k-btn--s">Повторить</button>}
+              </div>
+            )}
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => setStep('photo')} className="k-btn hidden sm:inline-flex"><KitIcon name="l" className="size-4" />Назад</button>
@@ -1362,7 +1397,12 @@ export function GenerationPanel({
               </aside>
             </div>
 
-            {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
+            {genError && (
+              <div className="mt-4 flex flex-wrap items-center gap-3" role="alert">
+                <p className="text-sm text-destructive">{genError}</p>
+                {canRetry && <button type="button" onClick={retryGeneration} disabled={busy} className="k-btn k-btn--s">Повторить</button>}
+              </div>
+            )}
 
             {!inline && <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="k-btn"><KitIcon name="l" className="size-4" />Изменить стиль</button>

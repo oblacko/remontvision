@@ -82,6 +82,25 @@ export default function Room() {
   const [selectedObject, setSelectedObject] = useState<number | null>(null)
   const [renderRatio, setRenderRatio] = useState(1.5)
   const [objectBusy, setObjectBusy] = useState(false)
+  const [retryBusy, setRetryBusy] = useState(false)
+
+  const retryRoom = async () => {
+    if (retryBusy) return
+    setRetryBusy(true); setError('')
+    try {
+      const r = await fetch(`/api/rooms/${encodeURIComponent(id)}/retry`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { navigate('/'); return }
+      if (r.status === 402) { setError(d.error || 'Не хватает кредитов'); return }
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      await loadRoom()
+      void refreshTasks()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось повторить')
+    } finally {
+      setRetryBusy(false)
+    }
+  }
 
   const loadRoom = useCallback(async (renderId?: string) => {
     try {
@@ -293,7 +312,10 @@ export default function Room() {
             {image && <img src={image} alt="Фото комнаты" className="mx-auto max-h-[40svh] w-auto border object-contain" />}
             <h1 className="display-title mt-6 text-3xl">Не удалось</h1>
             <p className="mt-3 text-sm text-destructive">{room.error || 'Не удалось создать дизайн'}</p>
-            <Link to="/cabinet" className="k-btn mt-6 inline-flex"><KitIcon name="l" />В кабинет</Link>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={retryRoom} disabled={retryBusy} className="k-btn k-btn--primary">{retryBusy ? 'Запускаем…' : 'Повторить'} <KitIcon name="ur" /></button>
+              <Link to="/cabinet" className="k-btn"><KitIcon name="l" />В кабинет</Link>
+            </div>
           </div>
         ) : (
           <div>

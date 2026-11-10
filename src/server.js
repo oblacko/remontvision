@@ -30,7 +30,7 @@ import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
 import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
-import { parseVariantsCount, pluralVariants } from './variants.js';
+import { parseVariantsCount, pluralVariants, retryAllowed } from './variants.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
@@ -1540,6 +1540,27 @@ app.post('/api/rooms', rateLimit, upload.fields([
     throw e;
   }
   res.status(201).json({ id, status: 'queued', concept_key: conceptKey });
+}));
+
+// Повтор упавшего базового рендера. Кредит за упавший рендер уже возвращён
+// автоматически, поэтому повтор списывается как обычная генерация.
+app.post('/api/rooms/:id/retry', rateLimit, h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const room = await q.getRoom(req.params.id);
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Комната не найдена' });
+  if (!retryAllowed(room.status)) return res.status(409).json({ error: 'Комната уже обрабатывается' });
+  const failed = await q.latestRenderForRoom(room.id);
+  if (!failed || failed.parent_render_id) return res.status(409).json({ error: 'Повтор доступен только для базового дизайна' });
+  const renderId = await enqueueRender({
+    roomId: room.id,
+    chargedUserId: req.user.id,
+    requestIp: clientIp(req),
+    modelKey: failed.model_key,
+    modelCredits: failed.model_credits,
+    isPrivate: failed.is_private === true,
+    resolution: failed.resolution || null,
+  });
+  res.status(201).json({ render_id: renderId, room_id: room.id });
 }));
 
 app.get('/api/rooms/:id', h(async (req, res) => {

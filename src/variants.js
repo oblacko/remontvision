@@ -23,3 +23,8 @@ export function pluralVariants(n) {
   if (d >= 2 && d <= 4) return 'варианта';
   return 'вариантов';
 }
+
+// Повтор разрешён только для комнаты в состоянии ошибки.
+export function retryAllowed(roomStatus) {
+  return roomStatus === 'error';
+}

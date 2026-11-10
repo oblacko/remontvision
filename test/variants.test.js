@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariantsCount, shouldMarkRoomError, pluralVariants } from '../src/variants.js';
+import { parseVariantsCount, shouldMarkRoomError, pluralVariants, retryAllowed } from '../src/variants.js';
 
 test('parseVariantsCount clamps 1..8', () => {
   assert.equal(parseVariantsCount(undefined), 1);
@@ -22,4 +22,10 @@ test('pluralVariants picks Russian form', () => {
   assert.equal(pluralVariants(3), 'варианта');
   assert.equal(pluralVariants(5), 'вариантов');
   assert.equal(pluralVariants(11), 'вариантов');
+});
+
+test('retryAllowed only for failed rooms', () => {
+  assert.equal(retryAllowed('error'), true);
+  assert.equal(retryAllowed('queued'), false);
+  assert.equal(retryAllowed('done'), false);
 });
