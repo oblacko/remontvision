@@ -82,6 +82,9 @@ async function processRender(renderId) {
   const render = await q.getRender(renderId);
   if (!render || render.status !== 'processing') return;
   const room = await q.getRoom(render.room_id);
+  // Мульти-стиль: у рендера может быть свой стиль/концепт; у старых рендеров — из комнаты.
+  const styleName = render.style || room.style;
+  const conceptKey = render.concept || room.concept_key;
   const iteration = Boolean(render.request_text);
   const roomType = room.room_type || 'Другое';
   const isBedRoom = /спальн|детск/i.test(roomType);
@@ -146,7 +149,7 @@ async function processRender(renderId) {
       cleanup_enabled: useCleanup,
       precleaned_shell_path: precleanedShell,
       source_used: precleanedShell ? 'precleaned' : useCleanup ? 'cleanup' : 'original',
-      style: room.style,
+      style: styleName,
       target: render.edit_target || null,
       product_ids: [],
       refs: [],
@@ -219,7 +222,7 @@ async function processRender(renderId) {
       meta.refs = imageMap.map((m, i) => ({ index: i + 1, ...m }));
       meta.parent_render_id = render.parent_render_id || null;
     } else {
-      styleInfo = await q.styleByName(room.style);
+      styleInfo = await q.styleByName(styleName);
       const styleMode = getStyleConfig().mode;
 
       let styleUserRef = false;
@@ -243,7 +246,7 @@ async function processRender(renderId) {
           styleRefUrls.push(await getStyleSwatchDataUrl(styleInfo));
           imageMap.push({ role: 'style material board — palette, finishes and light temperature only; never copy architecture, windows, doors, layout or composition', label: `${styleInfo.name} · swatches` });
         } catch (e) {
-          log({ event: 'style_swatch_error', room_id: room.id, render_id: renderId, style: room.style, error: String(e.message || e).slice(0, 300) });
+          log({ event: 'style_swatch_error', room_id: room.id, render_id: renderId, style: styleName, error: String(e.message || e).slice(0, 300) });
         }
       }
 
@@ -257,7 +260,7 @@ async function processRender(renderId) {
             originalImageDataUrl: await bufferToDataUrl(originalBuf),
             cleanedImageDataUrl: cleanedBuf ? await bufferToDataUrl(cleanedBuf) : null,
             roomType,
-            style: room.style,
+            style: styleName,
             styleDescription: styleInfo?.prompt_description || '',
             sessionId: `render:${renderId}`,
           });
@@ -289,7 +292,7 @@ async function processRender(renderId) {
           const ad = await buildArtDirection({
             imageDataUrl: await bufferToDataUrl(adBuf),
             roomType,
-            style: room.style,
+            style: styleName,
             styleDescription: styleInfo?.prompt_description || '',
             dimensions: roomDimensions,
             keepFurniture,
@@ -318,7 +321,7 @@ async function processRender(renderId) {
             meta.lens = ad.lens || null;
           }
           let direction = null;
-          if (DESIGN_DIRECTION_ENABLED && room.concept_key && styleInfo?.key) {
+          if (DESIGN_DIRECTION_ENABLED && conceptKey && styleInfo?.key) {
             try {
               const usedDirections = room.user_id
                 ? (await q.designRegistryForUser(room.user_id))
@@ -327,7 +330,7 @@ async function processRender(renderId) {
                 : [];
               direction = await buildDesignDirection({
                 styleId: styleInfo.key,
-                conceptId: room.concept_key,
+                conceptId: conceptKey,
                 roomType,
                 dimensions: estimatedDimensions,
                 usedDirections,
@@ -343,15 +346,15 @@ async function processRender(renderId) {
             addCost('art_direction', ad.cost);
             addCost('art_direction', direction.cost);
             meta.design_direction = { ...direction, ms: Date.now() - adStart };
-            meta.concept_key = room.concept_key;
-            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: room.style, concept: room.concept_key, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart });
+            meta.concept_key = conceptKey;
+            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart });
             if (room.user_id) {
               await q.recordDesignDirection({
                 userId: room.user_id,
                 roomId: room.id,
                 roomType,
                 styleKey: styleInfo.key,
-                conceptKey: room.concept_key,
+                conceptKey,
                 focalZone: direction.focalZone,
                 mainMove: direction.mainMove?.action || direction.mainMove?.target || '',
                 accepted: true,
@@ -363,9 +366,9 @@ async function processRender(renderId) {
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
-            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
+            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
           } else {
-            log({ event: 'art_direction_empty', room_id: room.id, render_id: renderId, style: room.style, room_type: roomType });
+            log({ event: 'art_direction_empty', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType });
           }
         } catch (e) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
@@ -383,8 +386,8 @@ async function processRender(renderId) {
             imageDataUrl: await bufferToDataUrl(layoutBuf),
             roomType,
             dimensions: estimatedDimensions,
-            style: styleInfo?.key || room.style,
-            concept: room.concept_key || '',
+            style: styleInfo?.key || styleName,
+            concept: conceptKey || '',
             keepFurniture: effectiveKeepFurniture,
             sessionId: meta.render_session,
           });
@@ -413,7 +416,7 @@ async function processRender(renderId) {
       }
 
       prompt = buildPrompt({
-        style: room.style,
+        style: styleName,
         priceTier,
         budget: room.budget,
         products: [],
@@ -655,7 +658,7 @@ async function processRender(renderId) {
         const reviewed = await reviewDesign({
           imageDataUrl,
           roomType,
-          style: room.style,
+          style: styleName,
           priceTier,
           mode: 'hints',
           sessionId: meta.render_session,
@@ -704,7 +707,7 @@ async function processRender(renderId) {
       products: [],
       currentProducts: finalItems,
       priceTier,
-      style: room.style,
+      style: styleName,
     });
     if (architectReview) {
       analysis.architect = { ...architectReview, status: 'ready', render_id: renderId };
@@ -769,7 +772,7 @@ function notifyOwner(room, render) {
       }
       await sendRenderDoneEmail(user.email, {
         roomType: room.room_type || null,
-        style: room.style || null,
+        style: styleName || null,
         shareUrl,
       }, { room_id: room.id, render_id: render.id });
     } catch (e) {
@@ -812,7 +815,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, resolution = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, style = null, concept = null, resolution = null }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -831,6 +834,8 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     isPrivate,
     editSourcePath,
     editMove,
+    style,
+    concept,
     resolution,
   });
   return id;

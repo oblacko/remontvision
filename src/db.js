@@ -168,7 +168,7 @@ export const q = {
   setRenderShareToken: (id, token) =>
     pool.query(`UPDATE renders SET share_token = $2 WHERE id = $1 RETURNING share_token`, [id, token]).then(r => r.rows[0]?.share_token || null),
   renderByShareToken: token =>
-    pool.query(`SELECT r.*, rm.style, rm.room_type, rm.user_id FROM renders r
+    pool.query(`SELECT r.*, COALESCE(r.style, rm.style) AS style, rm.room_type, rm.user_id FROM renders r
                 JOIN rooms rm ON rm.id = r.room_id WHERE r.share_token = $1 AND r.status = 'done'`, [token]).then(r => r.rows[0] || null),
   countLikes: renderId => pool.query(`SELECT COUNT(*)::int AS n FROM render_likes WHERE render_id = $1`, [renderId]).then(r => r.rows[0]?.n || 0),
   hasLike: (renderId, visitor) => pool.query(`SELECT 1 FROM render_likes WHERE render_id = $1 AND visitor = $2`, [renderId, visitor]).then(r => r.rowCount > 0),
