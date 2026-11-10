@@ -339,7 +339,7 @@ export default function Room() {
                 ) : (
                   <img src={image} alt="Дизайн комнаты" className="max-h-[62svh] w-full object-contain" onLoad={event => setRenderRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                 )}
-                <div className="absolute right-3 top-3 flex gap-2">
+                <div className="mt-2 flex justify-end gap-2 sm:absolute sm:right-3 sm:top-3 sm:mt-0">
                   {visibleObjects.length > 0 && (
                     <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null) }} className={`k-btn k-btn--ov k-btn--icon${objectsOn ? ' bg-primary text-primary-foreground' : ''}`} aria-label="Выбрать объект на рендере"><KitIcon name="q" /></button>
                   )}
