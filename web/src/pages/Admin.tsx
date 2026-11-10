@@ -31,7 +31,7 @@ type ArchitectPromptRow = { id: number; kind: string; version: number; system: s
 type ArchitectPromptsState = Record<string, { rows: ArchitectPromptRow[]; active: { id: number | null; version: number; system: string } }>
 type ArchitectKind = 'designer' | 'builder' | 'reviewer' | 'criteria' | 'direction' | 'layout' | 'breakdown' | 'roadmap'
 type Pack = { id: string; title: string; credits: number; price_kopecks: number; active: boolean; sort: number }
-type RenderModel = { id: string; label: string; model_id: string; credits: number; art_direction_enabled: boolean; active: boolean; sort: number }
+type RenderModel = { id: string; label: string; model_id: string; credits: number; art_direction_enabled: boolean; active: boolean; sort: number; resolution_prices?: Record<string, number> | null }
 type Style = {
   id: number; key: string; name: string; accent: string; description: string;
   image_url: string; active: boolean; sort: number;
@@ -214,7 +214,7 @@ export default function Admin() {
 
   const [renderModels, setRenderModels] = useState<RenderModel[]>([])
   const [editRenderModelId, setEditRenderModelId] = useState<string | null>(null)
-  const [renderModelForm, setRenderModelForm] = useState({ id: '', label: '', model_id: '', credits: '1', art_direction_enabled: true, active: true, sort: '10' })
+  const [renderModelForm, setRenderModelForm] = useState<{ id: string; label: string; model_id: string; credits: string; art_direction_enabled: boolean; active: boolean; sort: string; resolution_prices: Record<string, string> }>({ id: '', label: '', model_id: '', credits: '1', art_direction_enabled: true, active: true, sort: '10', resolution_prices: {} })
   const [renderModelNotice, setRenderModelNotice] = useState('')
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
@@ -838,12 +838,21 @@ export default function Admin() {
   }
   const startNewRenderModel = () => {
     setEditRenderModelId(null)
-    setRenderModelForm({ id: '', label: '', model_id: '', credits: '1', art_direction_enabled: true, active: true, sort: String((renderModels.length + 1) * 10) })
+    setRenderModelForm({ id: '', label: '', model_id: '', credits: '1', art_direction_enabled: true, active: true, sort: String((renderModels.length + 1) * 10), resolution_prices: {} })
     setRenderModelNotice('')
   }
   const editRenderModel = (m: RenderModel) => {
     setEditRenderModelId(m.id)
-    setRenderModelForm({ id: m.id, label: m.label, model_id: m.model_id, credits: String(m.credits), art_direction_enabled: m.art_direction_enabled, active: m.active, sort: String(m.sort) })
+    setRenderModelForm({
+      id: m.id,
+      label: m.label,
+      model_id: m.model_id,
+      credits: String(m.credits),
+      art_direction_enabled: m.art_direction_enabled,
+      active: m.active,
+      sort: String(m.sort),
+      resolution_prices: Object.fromEntries(Object.entries(m.resolution_prices || {}).map(([key, value]) => [key, String(value)])),
+    })
     setRenderModelNotice('')
   }
   const saveRenderModel = async (event: FormEvent) => {
@@ -854,6 +863,11 @@ export default function Admin() {
         id: renderModelForm.id, label: renderModelForm.label, model_id: renderModelForm.model_id,
         credits: Number(renderModelForm.credits), art_direction_enabled: renderModelForm.art_direction_enabled,
         active: renderModelForm.active, sort: Number(renderModelForm.sort) || 0,
+        resolution_prices: Object.entries(renderModelForm.resolution_prices).reduce<Record<string, number>>((acc, [key, value]) => {
+          const n = Number(value)
+          if (Number.isInteger(n) && n >= 1) acc[key] = n
+          return acc
+        }, {}),
       }
       const saved = await readJson(await api('/api/admin/models', { method: 'POST', body: JSON.stringify(body) }))
       await loadRenderModels()
@@ -1367,6 +1381,24 @@ export default function Admin() {
                       <input value={renderModelForm.model_id} onChange={e => setRenderModelForm({ ...renderModelForm, model_id: e.target.value })} placeholder="model_id: black-forest-labs/flux-3-image" className="kit-field min-h-11 w-full font-mono text-xs" />
                       <div className="grid grid-cols-2 gap-2"><input value={renderModelForm.credits} onChange={e => setRenderModelForm({ ...renderModelForm, credits: e.target.value })} inputMode="numeric" placeholder="Кредиты" className="kit-field min-h-11 text-sm" /><input value={renderModelForm.sort} onChange={e => setRenderModelForm({ ...renderModelForm, sort: e.target.value })} inputMode="numeric" placeholder="Порядок" className="kit-field min-h-11 text-sm" /></div>
                       <p className="text-[11px] leading-5 text-muted-foreground">1 кредит ≈ 40 ₽; если модель дороже ~15–20 ₽ за рендер — ставьте 2 кредита.</p>
+                      {(() => {
+                        const resolutions = capsFor(renderModelForm.model_id).resolutions
+                        if (!resolutions.length) return null
+                        return (
+                          <div className="border p-3">
+                            <p className="eyebrow mb-2">Цены по резолюции, кр.</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {resolutions.map(r => (
+                                <label key={r} className="flex items-center gap-2 text-xs">
+                                  <span className="font-mono">{r}</span>
+                                  <input value={renderModelForm.resolution_prices[r] ?? ''} onChange={e => setRenderModelForm({ ...renderModelForm, resolution_prices: { ...renderModelForm.resolution_prices, [r]: e.target.value } })} inputMode="numeric" placeholder={renderModelForm.credits} className="kit-field min-h-10 w-full text-sm" />
+                                </label>
+                              ))}
+                            </div>
+                            <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Пусто — базовая цена модели. Показываются только поддерживаемые моделью резолюции.</p>
+                          </div>
+                        )
+                      })()}
                       <label className="flex min-h-11 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.art_direction_enabled} onChange={e => setRenderModelForm({ ...renderModelForm, art_direction_enabled: e.target.checked })} className="size-5 accent-primary" />арт-директор включён</label>
                       <label className="flex min-h-11 items-center gap-2 border px-3 text-sm"><input type="checkbox" checked={renderModelForm.active} onChange={e => setRenderModelForm({ ...renderModelForm, active: e.target.checked })} className="size-5 accent-primary" />активна в генераторе</label>
                     </div>

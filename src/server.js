@@ -29,7 +29,9 @@ import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
-import { validateModelOptions, modelCaps } from './modelcaps.js';
+import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
+import { parseVariantsCount, pluralVariants, retryAllowed } from './variants.js';
+import { sharePageHtml } from './sharepage.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
@@ -107,7 +109,6 @@ app.use((req, res, next) => {
 });
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.all(['/cabinet', '/cabinet/', '/cabinet/paid', '/cabinet/paid/', '/cabinet/fail', '/cabinet/fail/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
-app.get('/s/:token', (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 
 app.get(['/room/:id', '/room/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
@@ -154,6 +155,31 @@ async function saveUpload(file, dir) {
 
 // async-обработчики: единая точка 500
 const h = fn => (req, res, next) => fn(req, res, next).catch(next);
+
+// Страница шаринга: отдаём SPA с OG-мета для превью в мессенджерах.
+// Маршрут объявлен после `const h` — иначе TDZ-падение на старте (как /r/:code).
+let shareIndexCache = null;
+function shareIndexHtml() {
+  if (shareIndexCache) return shareIndexCache;
+  const file = fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html');
+  try { shareIndexCache = fs.readFileSync(file, 'utf8'); } catch { shareIndexCache = ''; }
+  return shareIndexCache;
+}
+app.get('/s/:token', h(async (req, res) => {
+  const render = await q.renderByShareToken(req.params.token);
+  if (!render || !render.image_path) return res.status(404).end();
+  const html = sharePageHtml({
+    indexHtml: shareIndexHtml(),
+    title: `Дизайн ${render.style || 'интерьера'} — RemontVision`,
+    description: `${render.room_type || 'Комната'} · дизайн интерьера, сгенерированный нейросетью`,
+    imageUrl: `${APP_URL}/s/${req.params.token}/image`,
+    canonicalUrl: `${APP_URL}/s/${req.params.token}`,
+  });
+  if (!html) {
+    return res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
+  }
+  res.type('html').send(html);
+}));
 
 // Реферальная ссылка: ставим cookie rv_ref на 30 дней и ведём на главную.
 // Невалидный код тоже ведёт на главную (отдельной страницы 404 нет).
@@ -309,7 +335,16 @@ app.get('/api/health', (_req, res) => res.json({
 app.get('/api/models', h(async (_req, res) => {
   const models = await q.listRenderModels(true);
   const defaultKey = resolveDefaultModelKey(models, getModelConfig().render);
-  res.json({ models: models.map(m => ({ key: m.id, label: m.label, credits: m.credits })), default_key: defaultKey });
+  res.json({
+    models: models.map(m => ({
+      key: m.id,
+      label: m.label,
+      credits: m.credits,
+      resolutions: modelCaps(m.model_id).resolutions,
+      resolution_prices: m.resolution_prices || {},
+    })),
+    default_key: defaultKey,
+  });
 }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
 app.get('/api/styles', h(async (_req, res) => {
@@ -1433,17 +1468,31 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const photo = req.files?.photo?.[0];
   const cleanupPhoto = req.files?.cleanup_photo?.[0];
   if (!photo) return res.status(400).json({ error: 'Нет фото' });
-  if (!MOCK_MODE) {
-    const bal = await q.creditBalance(req.user.id);
-    if (bal < 1) {
-      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: bal });
-    }
-  }
   // Выбор модели: явная должна быть активной, иначе 400; дефолт — активная модель
   // с model_id === runtime render-модели, затем первая активная по sort.
   const models = await q.listRenderModels(true);
   const modelSelection = resolveModelSelection(req.body?.model, models, getModelConfig().render);
   if (modelSelection === null) return res.status(400).json({ error: 'Модель недоступна' });
+  const modelRow = models.find(m => m.id === modelSelection.key || m.model_id === modelSelection.key) || null;
+  const resolution = String(req.body?.resolution || '').trim() || null;
+  if (resolution && !(modelRow && resolutionAllowed(modelRow.model_id, resolution))) {
+    return res.status(400).json({ error: 'Разрешение не поддерживается моделью' });
+  }
+  const perRenderCredits = resolution
+    ? priceForResolution(modelRow?.resolution_prices, resolution, modelSelection.credits)
+    : modelSelection.credits;
+  const variants = parseVariantsCount(req.body?.variants);
+  if (!MOCK_MODE) {
+    const bal = await q.creditBalance(req.user.id);
+    if (bal < perRenderCredits * variants) {
+      const afford = Math.floor(bal / perRenderCredits);
+      return res.status(402).json({
+        error: `Недостаточно кредитов — на балансе хватит на ${afford} ${pluralVariants(afford)}`,
+        balance: bal,
+        can_afford: afford,
+      });
+    }
+  }
   // multipart/form-data присылает `private` строкой, поэтому принимаем true и '1'/'true'.
   const isPrivate = req.body?.private === true || req.body?.private === '1' || req.body?.private === 'true';
   // Приватный режим — только для купивших пакет (тот же источник, что и GET /api/credits).
@@ -1503,18 +1552,47 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
   await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, conceptKey);
+  let enqueued = 0;
   try {
-    await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: modelSelection.credits, isPrivate });
+    for (let i = 0; i < variants; i++) {
+      await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: perRenderCredits, isPrivate, resolution });
+      enqueued += 1;
+    }
   } catch (e) {
     if (e.status === 402) {
-      await q.deleteRoom(id);
-      await remove(photoKey);
-      if (cleanupKey) await remove(cleanupKey);
+      // Если не удалось поставить ни одного варианта — убираем пустую комнату.
+      // Уже поставленные варианты остаются валидными оплаченными рендерами.
+      if (!enqueued) {
+        await q.deleteRoom(id);
+        await remove(photoKey);
+        if (cleanupKey) await remove(cleanupKey);
+      }
       return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: await q.creditBalance(req.user.id) });
     }
     throw e;
   }
   res.status(201).json({ id, status: 'queued', concept_key: conceptKey });
+}));
+
+// Повтор упавшего базового рендера. Кредит за упавший рендер уже возвращён
+// автоматически, поэтому повтор списывается как обычная генерация.
+app.post('/api/rooms/:id/retry', rateLimit, h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const room = await q.getRoom(req.params.id);
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Комната не найдена' });
+  if (!retryAllowed(room.status, await q.roomHasActiveRender(room.id))) return res.status(409).json({ error: 'Комната уже обрабатывается' });
+  const failed = await q.latestFailedRenderForRoom(room.id);
+  if (!failed || failed.parent_render_id) return res.status(409).json({ error: 'Повтор доступен только для базового дизайна' });
+  const renderId = await enqueueRender({
+    roomId: room.id,
+    chargedUserId: req.user.id,
+    requestIp: clientIp(req),
+    modelKey: failed.model_key,
+    modelCredits: failed.model_credits,
+    isPrivate: failed.is_private === true,
+    resolution: failed.resolution || null,
+  });
+  res.status(201).json({ render_id: renderId, room_id: room.id });
 }));
 
 app.get('/api/rooms/:id', h(async (req, res) => {

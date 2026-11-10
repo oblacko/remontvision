@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, LoaderCircle } from 'lucide-react'
+import { KitIcon } from '@/components/KitIcon'
 import { Logo } from '@/components/Logo'
 import { ProcurementPanel } from '@/components/ProcurementPanel'
 import type { ProductMatch } from '@/components/ProcurementPanel'
@@ -50,31 +50,31 @@ export default function Procurement() {
   const hasRender = Boolean(render && render.status === 'done' && render.image)
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b bg-background">
+    <div className="min-h-dvh bg-page text-foreground">
+      <header className="sticky top-0 z-40 border-b bg-page">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Logo animated />
             <span className="eyebrow hidden sm:inline">/ подбор товаров</span>
           </div>
-          <Link to={`/room/${encodeURIComponent(id)}`} className="action-secondary min-h-11 gap-2 px-3 text-sm">
-            <ArrowLeft className="size-4" /> <span className="min-w-0">Вернуться к результату</span>
+          <Link to={`/room/${encodeURIComponent(id)}`} className="k-btn k-btn--s gap-2">
+            <KitIcon name="l" /> <span className="hidden min-w-0 sm:inline">Вернуться к результату</span><span className="sm:hidden">Назад</span>
           </Link>
         </div>
       </header>
 
       <main className="page-shell py-8">
         {loading ? (
-          <div className="flex min-h-[40vh] items-center justify-center"><LoaderCircle className="size-8 animate-spin text-primary-text" /></div>
+          <div className="flex min-h-[40vh] items-center justify-center"><KitIcon name="sp" spin className="size-8 text-primary-text" /></div>
         ) : error ? (
           <div className="py-16 text-center">
-            <p className="text-sm text-destructive" role="alert">{error}</p>
-            <Link to="/cabinet" className="action-secondary mt-6 inline-flex"><ArrowLeft className="size-4" />В кабинет</Link>
+            <p className="k-ban k-ban--bad mx-auto max-w-lg" role="alert">{error}</p>
+            <Link to="/cabinet" className="k-btn mt-6 inline-flex"><KitIcon name="l" />В кабинет</Link>
           </div>
         ) : !room ? (
           <div className="py-16 text-center">
             <p className="text-sm text-muted-foreground">Комната не найдена</p>
-            <Link to="/cabinet" className="action-secondary mt-6 inline-flex"><ArrowLeft className="size-4" />В кабинет</Link>
+            <Link to="/cabinet" className="k-btn mt-6 inline-flex"><KitIcon name="l" />В кабинет</Link>
           </div>
         ) : (
           <div className="min-w-0">
@@ -87,10 +87,10 @@ export default function Procurement() {
             </div>
 
             {!hasRender ? (
-              <div className="mt-8 border border-foreground/25 p-6">
+              <div className="mt-8 border bg-card p-6">
                 <p className="eyebrow">Нет готового результата</p>
                 <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Подбор товаров запускается по готовому дизайну. Вернитесь к комнате и завершите создание дизайна.</p>
-                <Link to={`/room/${encodeURIComponent(id)}`} className="action-secondary mt-5 inline-flex"><ArrowLeft className="size-4" />Вернуться к результату</Link>
+                <Link to={`/room/${encodeURIComponent(id)}`} className="k-btn mt-5 inline-flex"><KitIcon name="l" />Вернуться к результату</Link>
               </div>
             ) : (
               <div className="mt-8">

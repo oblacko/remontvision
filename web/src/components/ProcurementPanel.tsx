@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink, LoaderCircle, Search } from 'lucide-react'
+import { KitIcon } from './KitIcon'
 import { goal } from '@/lib/analytics'
 
 export type ProductOffer = {
@@ -69,7 +69,7 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
 
   if (!productsEnabled) {
     return (
-      <div className="border border-foreground/25 p-6">
+      <div className="border bg-card p-6">
         <p className="eyebrow">Поиск товаров</p>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">Подбор товаров выключен в админке.</p>
       </div>
@@ -79,42 +79,37 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
   return (
     <div className="min-w-0">
       {image ? (
-        <div className="relative bg-foreground">
+        <div className="relative bg-secondary">
           <img src={image} alt="Дизайн комнаты" className="max-h-[46svh] w-full object-contain" />
         </div>
       ) : null}
 
       {!hasProducts && !busy && (
-        <div className="mt-5 border border-foreground/25 p-5">
+        <div className="mt-5 border bg-card p-5">
           <p className="eyebrow">Подбор по кадру</p>
           <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Подберём похожие товары по материалам и цвету из вашего дизайна. Цены — ориентир, ссылки ведут в магазины.</p>
-          {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
-          <button type="button" onClick={() => void runSearch()} disabled={busy} className="action-primary mt-5 w-full sm:w-auto">
-            <Search className="size-4" /> Запустить поиск
+          {error && <p className="k-er" role="alert"><KitIcon name="warn" className="mt-0.5" /><span>{error}</span></p>}
+          <button type="button" onClick={() => void runSearch()} disabled={busy} className="k-btn k-btn--primary mt-5 w-full sm:w-auto">
+            <KitIcon name="q" /> Запустить поиск
           </button>
         </div>
       )}
-
       {busy && !hasProducts && (
-        <div className="mt-5 border border-foreground/25 p-6" role="status" aria-live="polite">
+        <div className="mt-5 border bg-card p-6" role="status" aria-live="polite">
           <div className="flex items-start gap-4">
-            <LoaderCircle className="mt-1 size-7 shrink-0 animate-spin text-primary-text motion-reduce:animate-none" />
+            <KitIcon name="sp" spin className="mt-1 size-7 shrink-0 text-primary-text" />
             <div>
               <h2 className="text-lg font-medium">Ищем товары</h2>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">Обычно 10–60 секунд. Не закрывайте вкладку — иначе поиск прервётся.</p>
             </div>
           </div>
-          <div className="mt-6 h-1 w-full overflow-hidden bg-border">
-            <div className="rv-progress h-full w-1/3 bg-primary" />
-          </div>
-          <ol className="mt-6 space-y-2.5">
+          <div className="k-pb mt-6"><i className="rv-progress w-1/3" /></div>
+          <ol className="k-steps">
             {SEARCH_STEPS.map((step, index) => (
-              <li key={step.label} className="flex items-center gap-3 text-sm">
-                {index === 0
-                  ? <LoaderCircle className="size-4 shrink-0 animate-spin text-primary-text motion-reduce:animate-none" />
-                  : <span className="size-4 shrink-0 rounded-full border" />}
+              <li key={step.label}>
+                <span className={`d${index === 0 ? ' go' : ''}`}>{index === 0 ? <KitIcon name="sp" spin className="size-3.5" /> : null}</span>
                 <span className={index === 0 ? 'text-foreground' : 'text-muted-foreground'}>{step.label}</span>
-                {index === 0 && <span className="ml-auto font-mono text-[11px] text-muted-foreground">сейчас</span>}
+                {index === 0 && <em>сейчас</em>}
               </li>
             ))}
           </ol>
@@ -126,8 +121,8 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="eyebrow">Найдено по кадру</p>
-            <button type="button" onClick={() => void runSearch()} disabled={busy} className="action-secondary min-h-11 px-4 text-sm">
-              {busy ? <><LoaderCircle className="size-3.5 animate-spin" /> Ищем…</> : 'Обновить подбор'}
+            <button type="button" onClick={() => void runSearch()} disabled={busy} className="k-btn k-btn--s">
+              {busy ? <><KitIcon name="sp" spin /> Ищем…</> : 'Обновить подбор'}
             </button>
           </div>
           <div className="divide-y border-y">
@@ -137,18 +132,18 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
                 {match.offers.length ? (
                   <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
                     {match.offers.map(offer => (
-                      <div key={offer.id} className="w-44 shrink-0 border border-foreground/20">
-                        <div className="h-24 w-full overflow-hidden bg-muted">
+                      <div key={offer.id} className="k-card w-44 shrink-0">
+                        <div className="h-24 w-full overflow-hidden bg-secondary">
                           {offer.image_url
                             ? <img src={offer.image_url} alt={offer.name} className="h-full w-full object-cover" loading="lazy" />
-                            : <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">Нет фото</div>}
+                            : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет фото</div>}
                         </div>
                         <div className="p-2">
-                          <p className="line-clamp-2 min-w-0 text-[11px] font-medium leading-4">{offer.name}</p>
+                          <p className="line-clamp-2 min-w-0 text-xs font-medium leading-4">{offer.name}</p>
                           <p className="mt-1 text-xs font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</p>
                           {offer.url ? (
-                            <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" onClick={() => goal('product_click', { source: 'procurement', url: offer.url })} className="mt-1 inline-flex min-h-11 items-center gap-1 text-[11px] underline underline-offset-2">
-                              {offer.merchant || 'в магазин'} <ExternalLink className="size-3 shrink-0" />
+                            <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" onClick={() => goal('product_click', { source: 'procurement', url: offer.url })} className="mt-1 inline-flex min-h-11 items-center gap-1 text-xs underline underline-offset-2">
+                              {offer.merchant || 'в магазин'} <KitIcon name="ur" className="size-3.5 shrink-0" />
                             </a>
                           ) : null}
                         </div>
@@ -156,7 +151,7 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
                     ))}
                   </div>
                 ) : <p className="mt-1 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span>Найти похожее:</span>
                   {MARKETPLACES.map(market => (
                     <a

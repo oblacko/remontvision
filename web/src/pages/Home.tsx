@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import '../App.css'
-import { ArrowRight, ArrowUpRight, Menu, Sparkles, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { KitIcon } from '@/components/KitIcon'
+import { KitSheet } from '@/components/KitSheet'
 import { ExamplesCarousel } from '@/components/ExamplesCarousel'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { Logo } from '@/components/Logo'
@@ -196,10 +194,10 @@ export default function Home() {
   }
 
   return (
-    <div id="top" className="min-h-dvh overflow-x-hidden bg-background text-foreground">
+    <div id="top" className="min-h-dvh overflow-x-hidden bg-page text-foreground">
       <a href="#main" className="fixed left-4 top-4 z-50 -translate-y-24 bg-foreground px-4 py-2 text-sm text-background transition-transform focus-visible:translate-y-0">К содержанию</a>
 
-      <header className="sticky top-0 z-40 border-b bg-background">
+      <header className="sticky top-0 z-40 border-b bg-page">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
           <Logo href="#top" animated />
           <nav className="hidden items-center gap-8 text-sm lg:flex" aria-label="Основная навигация">
@@ -207,83 +205,69 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-2">
             {me ? (
-              <a href="/cabinet" className="hidden min-h-11 items-center gap-2 px-3 text-sm transition-opacity hover:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex">
-                Кабинет · {me.balance} кр. <ArrowUpRight className="size-4" />
+              <a href="/cabinet" className="hidden min-h-11 items-center gap-2 px-3 text-sm transition-opacity hover:opacity-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:flex">
+                Кабинет · {me.balance} кр. <KitIcon name="ur" className="size-4" />
               </a>
             ) : (
-              <button type="button" onClick={openLogin} className="hidden min-h-11 items-center gap-2 px-3 text-sm transition-opacity hover:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex">Войти <ArrowUpRight className="size-4" /></button>
+              <button type="button" onClick={openLogin} className="hidden min-h-11 items-center gap-2 px-3 text-sm transition-opacity hover:opacity-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:flex">Войти <KitIcon name="ur" className="size-4" /></button>
             )}
-            <Dialog open={loginOpen} onOpenChange={closeLogin}>
-              <DialogContent className="rounded-none bg-background p-6 sm:max-w-md">
-                {loginStep === 'email' ? (
-                  <>
-                    <DialogHeader className="text-center">
-                      <DialogTitle className="display-title break-words text-2xl sm:text-3xl">Войдите или зарегистрируйтесь</DialogTitle>
-                      <DialogDescription>Чтобы создавать дизайны с помощью нейросети</DialogDescription>
-                    </DialogHeader>
-                    <div className="mt-2 space-y-4">
-                      <div className="flex items-center justify-center gap-2 border border-border bg-muted/50 px-4 py-2.5 text-center text-sm">
-                        <Sparkles className="size-4 shrink-0 text-primary-text" />
-                        <span><b>2 бесплатных дизайна</b> при регистрации</span>
-                      </div>
-                      <button type="button" onClick={yandexLogin} disabled={loginBusy} className="flex h-12 w-full items-center justify-center gap-3 bg-foreground text-base font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50">
-                        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#FC3F1D] text-sm font-bold text-white">Я</span>
-                        Войти через Яндекс
-                      </button>
-                      <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или по почте<span className="h-px flex-1 bg-border" /></div>
-                      <div>
-                        <label htmlFor="login-email" className="sr-only">Почта</label>
-                        <input id="login-email" type="email" autoComplete="email" autoFocus placeholder="Почта" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="h-12 w-full rounded-none border bg-background px-4 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                      </div>
-                      {loginError && <p className="text-sm text-destructive" role="alert">{loginError}</p>}
-                      <Button type="button" disabled={loginBusy} onClick={requestLogin} className="h-12 w-full rounded-none text-base">{loginBusy ? 'Отправляем…' : 'Получить код для входа'}</Button>
-                      <p className="text-center text-xs leading-5 text-muted-foreground">
-                        Продолжая, вы соглашаетесь на <a className="underline underline-offset-2" href={`${site}/privacy`}>обработку персональных данных</a>, включая <a className="underline underline-offset-2" href={`${site}/privacy#cross-border`}>трансграничную передачу</a>, и принимаете <a className="underline underline-offset-2" href={`${site}/offer`}>Условия использования</a> и <a className="underline underline-offset-2" href={`${site}/privacy`}>Политику конфиденциальности</a>.
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle className="display-title text-3xl">Код из письма</DialogTitle>
-                      <DialogDescription>Отправили на {loginEmail}</DialogDescription>
-                    </DialogHeader>
-                    <div className="mt-2 space-y-4">
-                      <div>
-                        <label htmlFor="login-code" className="mb-2 block text-sm font-medium">Код</label>
-                        <input id="login-code" type="text" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus value={loginCode} onChange={(event) => setLoginCode(event.target.value.replace(/\D/g, '').slice(0, 6))} className="h-12 w-full rounded-none border bg-background px-4 text-center font-mono text-xl tracking-[0.35em] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                      </div>
-                      {loginError && <p className="text-sm text-destructive" role="alert">{loginError}</p>}
-                      <Button type="button" disabled={loginBusy} onClick={verifyLogin} className="h-12 w-full rounded-none text-base">{loginBusy ? 'Проверяем…' : 'Войти'}</Button>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <button type="button" className="underline underline-offset-4" onClick={() => { setLoginStep('email'); setLoginError('') }}>Изменить e-mail</button>
-                        <button type="button" className="underline underline-offset-4" onClick={requestLogin} disabled={loginBusy}>Отправить ещё раз</button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </DialogContent>
-            </Dialog>
-            <button type="button" onClick={openPanel} className="action-primary hidden sm:inline-flex">Попробовать <ArrowUpRight className="size-4" /></button>
-            <button type="button" className="flex size-12 items-center justify-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden" aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
-              {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--s hidden sm:inline-flex">Попробовать <KitIcon name="ur" /></button>
+            <button type="button" className="k-btn k-btn--s lg:hidden" aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
+              {menuOpen ? <KitIcon name="x" /> : 'Меню'}
             </button>
           </div>
         </div>
         {menuOpen && (
           <nav className="page-shell grid border-t py-3 lg:hidden" aria-label="Мобильная навигация">
             {navItems.map(([label, href]) => (
-              <a key={label} href={href} onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between border-b text-sm last:border-0 hover:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{label}<ArrowUpRight className="size-4" /></a>
+              <a key={label} href={href} onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center justify-between border-b text-sm last:border-0 hover:opacity-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">{label}<KitIcon name="ur" className="size-4" /></a>
             ))}
             {me ? (
-              <a href="/cabinet" className="flex min-h-12 items-center justify-between border-b text-sm hover:opacity-50">Кабинет · {me.balance} кр.<ArrowUpRight className="size-4" /></a>
+              <a href="/cabinet" className="flex min-h-12 items-center justify-between border-b text-sm hover:opacity-50">Кабинет · {me.balance} кр.<KitIcon name="ur" className="size-4" /></a>
             ) : (
-              <button type="button" onClick={() => { setMenuOpen(false); openLogin() }} className="flex min-h-12 items-center justify-between border-b text-left text-sm hover:opacity-50">Войти<ArrowUpRight className="size-4" /></button>
+              <button type="button" onClick={() => { setMenuOpen(false); openLogin() }} className="flex min-h-12 items-center justify-between border-b text-left text-sm hover:opacity-50">Войти<KitIcon name="ur" className="size-4" /></button>
             )}
-            <button type="button" onClick={openPanel} className="action-primary mt-3">Попробовать бесплатно</button>
+            <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--block mt-3">Попробовать бесплатно</button>
           </nav>
         )}
       </header>
+
+      <KitSheet open={loginOpen} onClose={() => closeLogin(false)} title={loginStep === 'email' ? 'Войдите или зарегистрируйтесь' : 'Код из письма'}>
+        {loginStep === 'email' ? (
+          <>
+            <p className="k-hint" style={{ margin: 0 }}>Пришлём код на почту. Без паролей.</p>
+            <div className="k-note"><KitIcon name="bolt" /><span><b>2 бесплатных дизайна</b> при регистрации</span></div>
+            <button type="button" onClick={yandexLogin} disabled={loginBusy} className="k-btn k-btn--block k-btn--l">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#FC3F1D] text-sm font-bold text-white">Я</span>
+              Войти через Яндекс
+            </button>
+            <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или по почте<span className="h-px flex-1 bg-border" /></div>
+            <div>
+              <label htmlFor="login-email" className="k-label">E-mail</label>
+              <input id="login-email" type="email" autoComplete="email" autoFocus placeholder="you@example.ru" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="k-field" />
+            </div>
+            {loginError && <p className="k-er" role="alert"><KitIcon name="warn" className="mt-0.5" /><span>{loginError}</span></p>}
+            <button type="button" disabled={loginBusy} onClick={requestLogin} className="k-btn k-btn--primary k-btn--l k-btn--block">{loginBusy ? 'Отправляем…' : 'Получить код для входа'}</button>
+            <p className="text-center text-xs leading-5 text-muted-foreground">
+              Продолжая, вы соглашаетесь на <a className="underline underline-offset-2" href={`${site}/privacy`}>обработку персональных данных</a>, включая <a className="underline underline-offset-2" href={`${site}/privacy#cross-border`}>трансграничную передачу</a>, и принимаете <a className="underline underline-offset-2" href={`${site}/offer`}>Условия использования</a> и <a className="underline underline-offset-2" href={`${site}/privacy`}>Политику конфиденциальности</a>.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="k-hint" style={{ margin: 0 }}>Отправили на {loginEmail}</p>
+            <div>
+              <label htmlFor="login-code" className="k-label">Код</label>
+              <input id="login-code" type="text" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus value={loginCode} onChange={(event) => setLoginCode(event.target.value.replace(/\D/g, '').slice(0, 6))} className="k-field text-center font-mono text-xl tracking-[0.35em]" />
+            </div>
+            {loginError && <p className="k-er" role="alert"><KitIcon name="warn" className="mt-0.5" /><span>{loginError}</span></p>}
+            <button type="button" disabled={loginBusy} onClick={verifyLogin} className="k-btn k-btn--primary k-btn--l k-btn--block">{loginBusy ? 'Проверяем…' : 'Войти'}</button>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <button type="button" className="underline underline-offset-4" onClick={() => { setLoginStep('email'); setLoginError('') }}>Изменить e-mail</button>
+              <button type="button" className="underline underline-offset-4" onClick={requestLogin} disabled={loginBusy}>Отправить ещё раз</button>
+            </div>
+          </>
+        )}
+      </KitSheet>
 
       <main id="main">
         <section className="hero-scene" aria-labelledby="hero-title">
@@ -310,11 +294,11 @@ export default function Home() {
                 </p>
                 <div className="lg:col-span-7 lg:pl-8">
                   <div className="flex flex-col gap-4 sm:flex-row">
-                    <button type="button" onClick={openPanel} className="action-primary hero-action-primary button-shift min-h-14 flex-1 px-8 text-base">
-                      <span className="sr-only">Создать мой дизайн</span><ShiftLabel>Создать мой дизайн</ShiftLabel><ArrowUpRight className="size-5" />
+                    <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l k-btn--on-dark button-shift flex-1">
+                      <span className="sr-only">Создать мой дизайн</span><ShiftLabel>Создать мой дизайн</ShiftLabel><KitIcon name="ur" className="size-5" />
                     </button>
-                    <a href="#how" className="action-hero-secondary button-shift min-h-14 flex-1 px-8 text-base">
-                      <span className="sr-only">Как это работает</span><ShiftLabel>Как это работает</ShiftLabel><ArrowRight className="size-5" />
+                    <a href="#how" className="k-btn k-btn--l k-btn--on-dark button-shift flex-1">
+                      <span className="sr-only">Как это работает</span><ShiftLabel>Как это работает</ShiftLabel><KitIcon name="r" className="size-5" />
                     </a>
                   </div>
                   <p className="mt-5 flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs uppercase tracking-wider text-background/80">
@@ -329,7 +313,7 @@ export default function Home() {
 
             <div className="hero-enter hero-delay-4 mt-8 flex items-end justify-between gap-4 border-t border-background/35 pt-3 font-mono text-xs uppercase tracking-widest text-background/70">
               <span>Гостиная / тёплый минимализм</span>
-              <span className="hidden items-center gap-2 sm:flex">Ваш интерьер начинается здесь <ArrowRight className="hero-caption-arrow size-4" /></span>
+              <span className="hidden items-center gap-2 sm:flex">Ваш интерьер начинается здесь <KitIcon name="r" className="hero-caption-arrow size-4" /></span>
             </div>
           </div>
         </section>
@@ -361,7 +345,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="upload" className="scroll-mt-20 border-y bg-secondary" aria-labelledby="upload-title">
+        <section id="upload" className="scroll-mt-20 border-y bg-card" aria-labelledby="upload-title">
           <div className="page-shell grid lg:grid-cols-12">
             <div className="border-b py-12 lg:col-span-5 lg:border-b-0 lg:border-r lg:py-16 lg:pr-12">
               <SectionMarker index="03">Генератор</SectionMarker>
@@ -372,16 +356,16 @@ export default function Home() {
                   <li key={item} className="flex gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span>{item}</li>
                 ))}
               </ol>
-              <button type="button" onClick={openPanel} className="action-primary button-shift mt-8 min-h-14 px-8 text-base">
-                <span className="sr-only">Открыть генератор</span><ShiftLabel>Открыть генератор</ShiftLabel><ArrowUpRight className="size-5" />
+              <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l button-shift mt-8">
+                <span className="sr-only">Открыть генератор</span><ShiftLabel>Открыть генератор</ShiftLabel><KitIcon name="ur" className="size-5" />
               </button>
               <p className="mt-4 text-xs text-muted-foreground">2 кредита бесплатно после регистрации · без подписки</p>
             </div>
             <div className="relative min-h-80 overflow-hidden bg-foreground lg:col-span-7 lg:min-h-full">
               <img src="/images/living-after.webp" alt="Готовая гостиная в современной классике — результат редизайна" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
               <div className="absolute inset-0 bg-foreground/35" aria-hidden="true" />
-              <button type="button" onClick={openPanel} className="action-primary absolute inset-x-6 bottom-6 min-h-14 text-base sm:inset-x-auto sm:bottom-10 sm:left-1/2 sm:w-80 sm:-translate-x-1/2">
-                Собрать мой дизайн <ArrowUpRight className="size-5" />
+              <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l k-btn--on-dark absolute inset-x-6 bottom-6 sm:inset-x-auto sm:bottom-10 sm:left-1/2 sm:w-80 sm:-translate-x-1/2">
+                Собрать мой дизайн <KitIcon name="ur" className="size-5" />
               </button>
             </div>
           </div>
@@ -449,20 +433,20 @@ export default function Home() {
               <h2 id="prices-title" className="display-title section-title md:col-span-8">Без подписки.<br />Без сюрпризов.</h2>
               <p className="max-w-sm text-sm leading-6 text-muted-foreground md:col-span-4">Одна комната целиком — от 399 ₽. Каждый дизайн включает 3 бесплатных редактирования. Покупайте только то, что нужно сейчас.</p>
             </div>
-            <div className="mt-12 grid border-y md:grid-cols-3">
+            <div className="mt-12 grid gap-4 md:grid-cols-3">
               {packs.map((pack, index) => {
                 const unit = 'дизайнов'
                 const price = new Intl.NumberFormat('ru-RU').format(pack.price_kopecks / 100) + ' ₽'
                 const isTarget = pack.id === 'flat'
-                return <div key={pack.id} className={`border-b py-8 last:border-b-0 md:border-b-0 md:border-r md:px-8 md:first:pl-0 md:last:border-r-0 md:last:pr-0${isTarget ? ' bg-secondary' : ''}`}><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{unit}</span></div><p className="mt-8 text-2xl font-light">{price}</p><p className="mt-2 text-sm text-muted-foreground">{pack.title}</p>{isTarget && <p className="mt-2 inline-block border border-primary-text px-2 py-0.5 text-xs text-primary-text">Выгодно</p>}{index === 0 && <p className="mt-4 text-xs text-primary-text">До этого — 2 дизайна бесплатно</p>}</div>
+                return <div key={pack.id} className={`k-pl${isTarget ? ' on' : ''}`}><div className="flex items-start justify-between gap-4"><span className="display-title text-6xl">{String(pack.credits).padStart(2, '0')}</span><span className="k-caption">{unit}</span></div><p className="mt-6 text-2xl font-light">{price}</p><p className="mt-1 text-sm text-muted-foreground">{pack.title}</p>{isTarget && <p className="k-badge k-badge--hot mt-1 self-start">Выгодно</p>}{index === 0 && <p className="mt-2 text-xs text-primary-text">До этого — 2 дизайна бесплатно</p>}</div>
               })}
             </div>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button type="button" onClick={openPanel} className="action-primary">Начать бесплатно <ArrowUpRight className="size-4" /></button>
-                <a href="/cabinet#credits" className="action-secondary">Купить кредиты <ArrowUpRight className="size-4" /></a>
+                <button type="button" onClick={openPanel} className="k-btn k-btn--primary">Начать бесплатно <KitIcon name="ur" /></button>
+                <a href="/cabinet#credits" className="k-btn">Купить кредиты <KitIcon name="ur" /></a>
               </div>
-              <a href={`${site}/prices`} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Все условия и цены <ArrowUpRight className="size-4" /></a>
+              <a href={`${site}/prices`} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">Все условия и цены <KitIcon name="ur" /></a>
             </div>
           </div>
         </section>
@@ -481,7 +465,7 @@ export default function Home() {
                   ['Подборка и стоимость ориентировочные', 'Цены, наличие и ссылки на товары могут меняться. Итоговую стоимость по позициям сервис не считает: проверяйте всё перед покупкой.'],
                   ['При технической ошибке кредит возвращается', 'Если дизайн не создался, списанный кредит возвращается автоматически.'],
                 ].map(([title, text]) => (
-                  <li key={title} className="border p-4">
+                  <li key={title} className="border bg-card p-4">
                     <p className="text-sm font-medium">{title}</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
                   </li>
@@ -491,23 +475,30 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="faq" className="scroll-mt-20 border-t bg-secondary" aria-labelledby="faq-title">
+        <section id="faq" className="scroll-mt-20 border-t bg-card" aria-labelledby="faq-title">
           <div className="page-shell grid gap-10 py-16 lg:grid-cols-12 lg:py-24">
             <div className="lg:col-span-4"><SectionMarker index="08">Вопросы</SectionMarker><h2 id="faq-title" className="display-title mt-6 text-4xl sm:text-5xl">Перед<br />началом</h2><p className="mt-6 text-sm leading-6 text-muted-foreground">Остался вопрос?<br /><a className="mt-2 inline-block text-foreground underline decoration-border underline-offset-4" href="mailto:support@remontvision.ru">support@remontvision.ru</a></p></div>
-            <Accordion type="single" collapsible className="lg:col-span-8" defaultValue="item-0">
-              {faq.map((item, index) => <AccordionItem key={item.q} value={`item-${index}`} className="border-b border-foreground/20"><AccordionTrigger className="min-h-16 py-5 text-left text-lg font-light hover:opacity-50 hover:no-underline focus-visible:ring-2 focus-visible:ring-ring">{item.q}</AccordionTrigger><AccordionContent className="max-w-2xl pb-6 text-sm leading-6 text-muted-foreground">{item.a}</AccordionContent></AccordionItem>)}
-            </Accordion>
+            <div className="border-t border-foreground/20 lg:col-span-8">
+              {faq.map((item, index) => (
+                <details key={item.q} className="group border-b border-foreground/20" open={index === 0}>
+                  <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 py-5 text-lg font-light [&::-webkit-details-marker]:hidden">
+                    {item.q}<KitIcon name="cd" className="size-5 shrink-0 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <p className="max-w-2xl pb-6 text-sm leading-6 text-muted-foreground">{item.a}</p>
+                </details>
+              ))}
+            </div>
           </div>
         </section>
 
         <section className="bg-primary text-primary-foreground" aria-labelledby="final-cta-title">
           <div className="mx-auto grid max-w-screen-2xl lg:grid-cols-12">
             <div className="px-4 py-12 sm:px-6 lg:col-span-8 lg:px-8 lg:py-16">
-              <div className="flex items-center justify-between gap-4 border-t border-foreground/30 pt-3 font-mono text-xs uppercase tracking-widest"><span>Ваш интерьер начинается с фото</span><ArrowUpRight className="size-5" /></div>
+              <div className="flex items-center justify-between gap-4 border-t border-foreground/30 pt-3 font-mono text-xs uppercase tracking-widest"><span>Ваш интерьер начинается с фото</span><KitIcon name="ur" /></div>
               <h2 id="final-cta-title" className="display-title section-title mt-8">Посмотрите,<br />что возможно</h2>
               <div className="mt-8 flex flex-col gap-6 border-t border-foreground/30 pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <p className="max-w-lg text-sm leading-6">Два дизайна бесплатно после регистрации — каждый с тремя бесплатными редактированиями. Дизайн, материалы, цены и ссылки — в одном результате.</p>
-                <button type="button" onClick={openPanel} className="action-final button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><ArrowRight className="size-4" /></button>
+                <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l k-btn--on-orange button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><KitIcon name="r" /></button>
               </div>
             </div>
             <div className="relative min-h-80 overflow-hidden lg:col-span-4 lg:min-h-full">

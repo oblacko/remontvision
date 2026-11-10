@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
 import { GenerationPanel } from '@/components/GenerationPanel'
-import { buildMoveCleanupInstruction, buildMovePreview } from '@/lib/objects'
+import { buildMoveCleanupInstruction } from '@/lib/objects'
 import { useTasks } from '@/components/TaskDock'
 import { GuideIcon } from '@/components/GuideIcon'
 import { Logo } from '@/components/Logo'
@@ -82,6 +82,25 @@ export default function Room() {
   const [selectedObject, setSelectedObject] = useState<number | null>(null)
   const [renderRatio, setRenderRatio] = useState(1.5)
   const [objectBusy, setObjectBusy] = useState(false)
+  const [retryBusy, setRetryBusy] = useState(false)
+
+  const retryRoom = async () => {
+    if (retryBusy) return
+    setRetryBusy(true); setError('')
+    try {
+      const r = await fetch(`/api/rooms/${encodeURIComponent(id)}/retry`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { navigate('/'); return }
+      if (r.status === 402) { setError(d.error || 'Не хватает кредитов'); return }
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      await loadRoom()
+      void refreshTasks()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось повторить')
+    } finally {
+      setRetryBusy(false)
+    }
+  }
 
   const loadRoom = useCallback(async (renderId?: string) => {
     try {
@@ -136,12 +155,11 @@ export default function Room() {
     if (!object || !render?.id || !image || objectBusy) return
     setObjectBusy(true); setError('')
     try {
-      const instruction = buildMoveCleanupInstruction(object.label)
-      const preview = await buildMovePreview(image, object.bbox, dx, dy)
+      const instruction = buildMoveCleanupInstruction(object.label, object.bbox)
       const fd = new FormData()
       fd.append('text', instruction)
       fd.append('parent_id', render.id)
-      if (preview) fd.append('source', preview)
+      fd.append('move', JSON.stringify({ bbox: object.bbox, dx, dy, label: object.label }))
       const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Не удалось переместить объект')
@@ -294,7 +312,10 @@ export default function Room() {
             {image && <img src={image} alt="Фото комнаты" className="mx-auto max-h-[40svh] w-auto border object-contain" />}
             <h1 className="display-title mt-6 text-3xl">Не удалось</h1>
             <p className="mt-3 text-sm text-destructive">{room.error || 'Не удалось создать дизайн'}</p>
-            <Link to="/cabinet" className="k-btn mt-6 inline-flex"><KitIcon name="l" />В кабинет</Link>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={retryRoom} disabled={retryBusy} className="k-btn k-btn--primary">{retryBusy ? 'Запускаем…' : 'Повторить'} <KitIcon name="ur" /></button>
+              <Link to="/cabinet" className="k-btn"><KitIcon name="l" />В кабинет</Link>
+            </div>
           </div>
         ) : (
           <div>
@@ -312,13 +333,13 @@ export default function Room() {
                     image={image}
                     ratio={renderRatio}
                     objects={visibleObjects}
-                    onCreateEdit={(index) => { setSelectedObject(index); setTab('editor') }}
+                    onCreateEdit={(index) => { setSelectedObject(index); setTab('editor'); requestAnimationFrame(() => document.getElementById('room-editor')?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }}
                     onConfirmMove={(index, dx, dy) => { if (!objectBusy) void sendObjectMove(index, dx, dy) }}
                   />
                 ) : (
                   <img src={image} alt="Дизайн комнаты" className="max-h-[62svh] w-full object-contain" onLoad={event => setRenderRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                 )}
-                <div className="absolute right-3 top-3 flex gap-2">
+                <div className="mt-2 flex justify-end gap-2 sm:absolute sm:right-3 sm:top-3 sm:mt-0">
                   {visibleObjects.length > 0 && (
                     <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value); setSelectedObject(null) }} className={`k-btn k-btn--ov k-btn--icon${objectsOn ? ' bg-primary text-primary-foreground' : ''}`} aria-label="Выбрать объект на рендере"><KitIcon name="q" /></button>
                   )}
@@ -335,7 +356,7 @@ export default function Room() {
               ))}
             </nav>
 
-            <div className={tab === 'editor' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
+            <div id="room-editor" className={tab === 'editor' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
               <GenerationPanel
                 key={id}
                 open

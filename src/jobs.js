@@ -26,6 +26,8 @@ import { fitLayoutPlan } from './layoutfit.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
+import { friendlyRenderError } from './rendererrors.js';
+import { shouldMarkRoomError } from './variants.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -524,6 +526,7 @@ async function processRender(renderId) {
         sourceImageB64: srcB64,
         referenceImagesB64,
         aspectRatio,
+        resolution: render.resolution || null,
         ...(iteration ? { aspect: aspectRatio, model: editModel } : {}),
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
@@ -730,16 +733,18 @@ async function processRender(renderId) {
     // fire-and-forget, ошибки не влияют на результат рендера.
     if (room.user_id && !render.parent_render_id) notifyOwner(room, render);
   } catch (e) {
-    const msg = String(e.message || e).slice(0, 500);
+    const rawMsg = String(e.message || e).slice(0, 500);
+    const msg = friendlyRenderError(rawMsg);
     addCost('failed', e.cost);
     const errorCost = sumCostBreakdown();
     await q.setRenderError(msg, renderId, stage, errorCost);
-    await q.setRoomError(msg, room.id);
+    const hasDoneSibling = await q.roomHasDoneRender(room.id);
+    if (shouldMarkRoomError(room.status, hasDoneSibling)) await q.setRoomError(msg, room.id);
     try {
       const restored = await restoreCreditForRender(renderId, `render_error:${stage}`);
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restored: restored, ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restored: restored, ms: Date.now() - t0 });
     } catch (restoreError) {
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
     }
   }
 }
@@ -807,7 +812,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, resolution = null }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -826,6 +831,7 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     isPrivate,
     editSourcePath,
     editMove,
+    resolution,
   });
   return id;
 }

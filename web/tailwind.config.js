@@ -7,6 +7,7 @@ module.exports = {
       colors: {
         border: "oklch(var(--border) / <alpha-value>)", input: "oklch(var(--input) / <alpha-value>)", ring: "oklch(var(--ring) / <alpha-value>)",
         background: "oklch(var(--background) / <alpha-value>)", foreground: "oklch(var(--foreground) / <alpha-value>)",
+        page: "oklch(var(--page) / <alpha-value>)",
         primary: { DEFAULT: "oklch(var(--primary) / <alpha-value>)", hover: "oklch(var(--primary-hover) / <alpha-value>)", text: "oklch(var(--primary-text) / <alpha-value>)", foreground: "oklch(var(--primary-foreground) / <alpha-value>)" },
         secondary: { DEFAULT: "oklch(var(--secondary) / <alpha-value>)", foreground: "oklch(var(--secondary-foreground) / <alpha-value>)" },
         destructive: { DEFAULT: "oklch(var(--destructive) / <alpha-value>)", foreground: "oklch(var(--destructive-foreground) / <alpha-value>)" },

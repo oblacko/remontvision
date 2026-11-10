@@ -388,6 +388,7 @@ export async function enqueueRenderWithCredit({
   isPrivate = false,
   editSourcePath = null,
   editMove = null,
+  resolution = null,
 }) {
   const iteration = Boolean(parentRenderId);
   let finalIsPrivate = isPrivate;
@@ -439,9 +440,9 @@ export async function enqueueRenderWithCredit({
     }
 
     await client.query(
-      `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, model_key, model_credits, is_private, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, edit_source_path, edit_move, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'queued')`,
-      [id, roomId, parentRenderId, rootRenderId, modelKey, modelCredits, finalIsPrivate, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null, editSourcePath, editMove ? JSON.stringify(editMove) : null]);
+      `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, model_key, model_credits, is_private, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, edit_source_path, edit_move, resolution, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'queued')`,
+      [id, roomId, parentRenderId, rootRenderId, modelKey, modelCredits, finalIsPrivate, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null, editSourcePath, editMove ? JSON.stringify(editMove) : null, resolution]);
 
     if (chargedUserId && delta !== 0) {
       await client.query(

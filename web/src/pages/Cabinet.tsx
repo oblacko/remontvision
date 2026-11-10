@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Copy, Download, Expand, Gift, LoaderCircle, LogOut, Search, Share2, Sparkles, Trash2, X } from 'lucide-react'
+import { KitIcon } from '@/components/KitIcon'
+import { KitLightbox, KitSheet } from '@/components/KitSheet'
 import { Link } from 'react-router'
 import { Logo } from '@/components/Logo'
 import { ShareDialog } from '@/components/ShareDialog'
@@ -46,7 +47,13 @@ const plural = (n: number, one: string, few: string, many: string) => {
   if (d >= 2 && d <= 4) return few
   return many
 }
-const statusLabel = (status: string) => status === 'done' ? 'готово' : status === 'error' ? 'ошибка' : status === 'queued' ? 'в очереди' : status
+const statusView = (status: string): { label: string; className: string } => {
+  if (status === 'done') return { label: 'готово', className: 'text-emerald-600' }
+  if (status === 'error') return { label: 'ошибка', className: 'text-destructive underline decoration-destructive decoration-2 underline-offset-4' }
+  if (status === 'processing') return { label: 'в процессе', className: 'text-sky-600' }
+  if (status === 'queued') return { label: 'в очереди', className: 'text-sky-600' }
+  return { label: status, className: 'text-muted-foreground' }
+}
 const editName = (text: string | null | undefined, fallback: string) => text ? text.replace(/(^|\n)\d+\)\s*/g, '$1').trim() || fallback : fallback
 
 export default function Cabinet() {
@@ -59,6 +66,7 @@ export default function Cabinet() {
   const [tab, setTab] = useState<'history' | 'credits'>(() => location.hash.includes('credits') ? 'credits' : 'history')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'done' | 'error'>('all')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedRoom, setSelectedRoom] = useState<RoomGroup | null>(null)
   const [selectedRenderId, setSelectedRenderId] = useState<string | null>(null)
   const [roomData, setRoomData] = useState<RoomData | null>(null)
@@ -69,8 +77,8 @@ export default function Cabinet() {
   const [fullscreen, setFullscreen] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
   const toastTimer = useRef<number | null>(null)
-  const [buyConsent, setBuyConsent] = useState(false)
   const [buying, setBuying] = useState('')
   const [loginStep, setLoginStep] = useState<'email' | 'code'>('email')
   const [loginEmail, setLoginEmail] = useState(() => localStorage.getItem('rv_last_email') || '')
@@ -184,12 +192,6 @@ export default function Cabinet() {
       return matchesQuery && matchesStatus
     })
   }, [groups, query, statusFilter])
-
-  const stats = useMemo(() => ({
-    rooms: groups.length,
-    generations: generations.length,
-    creditsSpent: generations.reduce((sum, g) => sum + Number(g.credits_spent || 0), 0),
-  }), [groups, generations])
 
   const openRoom = async (group: RoomGroup, renderId?: string | null) => {
     setFullscreen(false)
@@ -309,7 +311,6 @@ export default function Cabinet() {
     showToast('Ссылка скопирована')
   }
   const buyPack = async (pack: Pack) => {
-    if (!buyConsent) return setError('Отметьте акцепт оферты перед оплатой')
     setBuying(pack.id); setError('')
     try {
       const r = await fetch('/api/payments/create', {
@@ -325,28 +326,12 @@ export default function Cabinet() {
     finally { setBuying('') }
   }
 
-  useEffect(() => {
-    if (!selectedRoom) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape' && !fullscreen) setSelectedRoom(null) }
-    window.addEventListener('keydown', close)
-    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', close) }
-  }, [selectedRoom, fullscreen])
-
-  useEffect(() => {
-    if (!fullscreen) return
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setFullscreen(false) }
-    window.addEventListener('keydown', close)
-    return () => window.removeEventListener('keydown', close)
-  }, [fullscreen])
-
-  if (loading) return <div className="flex min-h-dvh items-center justify-center bg-background"><LoaderCircle className="size-8 animate-spin text-primary-text" /></div>
+  if (loading) return <div className="flex min-h-dvh items-center justify-center bg-page"><KitIcon name="sp" spin className="size-8 text-primary-text" /></div>
 
   if (!me) {
     return (
-      <div className="min-h-dvh bg-background text-foreground">
-        <header className="border-b"><div className="page-shell flex min-h-16 items-center justify-between"><Logo animated /><a href="/" className="text-sm underline decoration-border underline-offset-4">На сайт</a></div></header>
+      <div className="min-h-dvh bg-page text-foreground">
+        <header className="border-b bg-page"><div className="page-shell flex min-h-16 items-center justify-between"><Logo animated /><a href="/" className="text-sm underline decoration-border underline-offset-4">На сайт</a></div></header>
         <main className="mx-auto flex min-h-[75svh] max-w-md flex-col justify-center px-4 py-12">
           <p className="eyebrow">Личный кабинет</p>
           <h1 className="display-title mt-4 break-words text-3xl sm:text-4xl">Войдите или зарегистрируйтесь</h1>
@@ -354,19 +339,18 @@ export default function Cabinet() {
           <div className="mt-6 space-y-4">
             {loginStep === 'email' ? (
               <>
-                <div className="flex items-center justify-center gap-2 border border-border bg-muted/50 px-4 py-2.5 text-center text-sm">
-                  <Sparkles className="size-4 shrink-0 text-primary-text" />
-                  <span><b>2 бесплатных дизайна</b> при регистрации</span>
-                </div>
-                <button type="button" onClick={yandexLogin} disabled={loginBusy} className="flex h-12 w-full items-center justify-center gap-3 bg-foreground text-base font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50">
+                <div className="k-note"><KitIcon name="bolt" /><span><b>2 бесплатных дизайна</b> при регистрации</span></div>
+                <button type="button" onClick={yandexLogin} disabled={loginBusy} className="k-btn k-btn--block k-btn--l">
                   <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#FC3F1D] text-sm font-bold text-white">Я</span>
                   Войти через Яндекс
                 </button>
                 <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или по почте<span className="h-px flex-1 bg-border" /></div>
-                <label htmlFor="login-email" className="sr-only">Почта</label>
-                <input id="login-email" type="email" autoComplete="email" autoFocus value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Почта" className="h-12 w-full border bg-background px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-ring/20" />
-                {loginError && <p className="text-sm text-destructive" role="alert">{loginError}</p>}
-                <button type="button" disabled={loginBusy} onClick={sendLogin} className="action-primary w-full">{loginBusy ? 'Отправляем…' : 'Получить код для входа'}</button>
+                <div>
+                  <label htmlFor="login-email" className="k-label">E-mail</label>
+                  <input id="login-email" type="email" autoComplete="email" autoFocus value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="you@example.ru" className="k-field" />
+                </div>
+                {loginError && <p className="k-er" role="alert"><KitIcon name="warn" className="mt-0.5" /><span>{loginError}</span></p>}
+                <button type="button" disabled={loginBusy} onClick={sendLogin} className="k-btn k-btn--primary k-btn--l k-btn--block">{loginBusy ? 'Отправляем…' : 'Получить код для входа'}</button>
                 <p className="text-center text-xs leading-5 text-muted-foreground">
                   Продолжая, вы соглашаетесь на <a className="underline underline-offset-2" href="/privacy">обработку персональных данных</a>, включая <a className="underline underline-offset-2" href="/privacy#cross-border">трансграничную передачу</a>, и принимаете <a className="underline underline-offset-2" href="/offer">Условия использования</a> и <a className="underline underline-offset-2" href="/privacy">Политику конфиденциальности</a>.
                 </p>
@@ -374,9 +358,9 @@ export default function Cabinet() {
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">Код отправлен на {loginEmail}</p>
-                <input type="text" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus value={loginCode} onChange={e => setLoginCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456" className="h-14 w-full border bg-background px-4 text-center font-mono text-2xl tracking-[0.35em] outline-none focus:border-primary" />
-                {loginError && <p className="text-sm text-destructive" role="alert">{loginError}</p>}
-                <button type="button" disabled={loginBusy} onClick={verifyLogin} className="action-primary w-full">{loginBusy ? 'Проверяем…' : 'Войти'}</button>
+                <input type="text" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus value={loginCode} onChange={e => setLoginCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456" className="k-field text-center font-mono text-xl tracking-[0.35em]" />
+                {loginError && <p className="k-er" role="alert"><KitIcon name="warn" className="mt-0.5" /><span>{loginError}</span></p>}
+                <button type="button" disabled={loginBusy} onClick={verifyLogin} className="k-btn k-btn--primary k-btn--l k-btn--block">{loginBusy ? 'Проверяем…' : 'Войти'}</button>
                 <div className="flex justify-between text-sm"><button type="button" className="underline underline-offset-4" onClick={() => { setLoginStep('email'); setLoginError('') }}>Изменить e-mail</button><button type="button" className="underline underline-offset-4" onClick={sendLogin} disabled={loginBusy}>Отправить ещё раз</button></div>
               </>
             )}
@@ -389,110 +373,137 @@ export default function Cabinet() {
   const realProducts = roomData?.render?.analysis?.products || []
   const realOfferCount = realProducts.reduce((sum, match) => sum + match.offers.length, 0)
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b bg-background">
+    <div className="min-h-dvh bg-page text-foreground">
+      <header className="sticky top-0 z-40 border-b bg-page">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-3"><Logo animated /><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
           <div className="flex items-center gap-2 text-sm">
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
-            <a href="/?panel=1" className="action-primary hidden min-h-11 items-center px-4 sm:inline-flex">Новый дизайн <ArrowUpRight className="size-4" /></a>
-            <span className="hidden items-center gap-1 border px-3 py-2 md:inline-flex"><b>{me.balance}</b> кр.</span>
-            <button type="button" onClick={logout} className="inline-flex min-h-11 items-center gap-2 px-2 hover:opacity-50"><LogOut className="size-4" /><span className="hidden sm:inline">Выйти</span></button>
+            <a href="/?panel=1" className="k-btn k-btn--primary k-btn--s">Новый дизайн <KitIcon name="ur" /></a>
+            <div className="relative">
+              <button type="button" onClick={() => setProfileOpen(value => !value)} aria-expanded={profileOpen} aria-haspopup="menu" className="k-badge inline-flex min-h-11 items-center gap-1"><b>{me.balance}</b> кр. <KitIcon name="cd" className="size-3.5" /></button>
+              {profileOpen && (
+                <>
+                  <button type="button" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)} className="fixed inset-0 z-20 cursor-default" />
+                  <div role="menu" className="absolute right-0 top-full z-30 mt-2 w-56 border bg-card p-1 shadow-[4px_4px_0_oklch(var(--primary))]">
+                    <p className="px-3 py-2 text-xs text-muted-foreground">Баланс: <b className="text-foreground">{me.balance} кр.</b></p>
+                    <button type="button" role="menuitem" onClick={() => { setTab('credits'); setProfileOpen(false) }} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm hover:bg-secondary"><KitIcon name="bolt" className="size-4" />История платежей</button>
+                    <button type="button" role="menuitem" onClick={() => { setTab('credits'); setProfileOpen(false); requestAnimationFrame(() => document.getElementById('referral-block')?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm hover:bg-secondary"><KitIcon name="r" className="size-4" />Пригласить друга</button>
+                    <div className="my-1 h-px bg-border" />
+                    <button type="button" role="menuitem" onClick={logout} className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm hover:bg-secondary"><KitIcon name="out" className="size-4" />Выйти</button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
       <main className="page-shell py-8">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-6">
-          <div><p className="eyebrow">Личный кабинет</p><h1 className="display-title mt-2 text-4xl sm:text-5xl">{tab === 'history' ? 'Мои дизайны' : 'Кредиты'}</h1><p className="mt-2 text-sm text-muted-foreground">{me.email}</p></div>
-          <div className="flex gap-4 font-mono text-xs uppercase tracking-wider text-muted-foreground"><span>{stats.rooms} {plural(stats.rooms, 'комната', 'комнаты', 'комнат')}</span><span>{stats.generations} {plural(stats.generations, 'дизайн', 'дизайна', 'дизайнов')}</span><span>{stats.creditsSpent} кр. использовано</span></div>
+          <div><p className="eyebrow">Личный кабинет</p><h1 className="display-title mt-2 text-4xl sm:text-5xl">{tab === 'history' ? 'Мои дизайны' : 'Профиль'}</h1><p className="mt-2 text-sm text-muted-foreground">{me.email}</p></div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <nav className="flex border-b" aria-label="Разделы кабинета">
-            <button type="button" onClick={() => setTab('history')} className={`min-h-12 border-b-2 px-4 text-sm ${tab === 'history' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>История</button>
-            <button type="button" onClick={() => setTab('credits')} className={`min-h-12 border-b-2 px-4 text-sm ${tab === 'credits' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Кредиты</button>
+          <nav className="k-ut" aria-label="Разделы кабинета">
+            <button type="button" aria-selected={tab === 'history'} onClick={() => setTab('history')}>История</button>
+            <button type="button" aria-selected={tab === 'credits'} onClick={() => setTab('credits')}>Профиль</button>
           </nav>
-          <a href="/?panel=1" className="action-primary sm:hidden">Новый дизайн <ArrowUpRight className="size-4" /></a>
         </div>
         {(notice || error) && <p className={`mt-4 border px-4 py-3 text-sm ${error ? 'border-destructive/40 bg-destructive/5 text-destructive' : 'border-primary/40 bg-primary/5 text-foreground'}`} role="status">{error || notice}</p>}
 
         {tab === 'history' ? (
           <div className="mt-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-2">
-                {([['all', 'Все'], ['done', 'Готовые'], ['error', 'С ошибками']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setStatusFilter(key)} className={`min-h-11 border px-3 text-xs ${statusFilter === key ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>{label}</button>)}
+            <div className="flex items-center justify-end">
+              <div className="relative">
+                <button type="button" onClick={() => setFiltersOpen(value => !value)} aria-expanded={filtersOpen} className="k-btn k-btn--s">
+                  <KitIcon name="q" className="size-4" />
+                  Фильтры
+                  {(statusFilter !== 'all' || query) && <span className="ml-1 size-2 rounded-full bg-primary" aria-hidden="true" />}
+                </button>
+                {filtersOpen && (
+                  <>
+                    <button type="button" aria-label="Закрыть фильтры" onClick={() => setFiltersOpen(false)} className="fixed inset-0 z-20 cursor-default" />
+                    <div className="absolute right-0 top-full z-30 mt-2 w-72 max-w-[90vw] border bg-card p-3 shadow-[4px_4px_0_oklch(var(--primary))]">
+                      <div className="k-tabs">
+                        {([['all', 'Все'], ['done', 'Готовые'], ['error', 'С ошибками']] as const).map(([key, label]) => <button key={key} type="button" aria-selected={statusFilter === key} onClick={() => { setStatusFilter(key); setFiltersOpen(false) }} className="k-tab">{label}</button>)}
+                      </div>
+                      <div className="relative mt-3"><KitIcon name="q" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Стиль или запрос редактирования" className="k-field pl-10 pr-3 text-sm" /></div>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="relative sm:w-72"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Стиль или запрос редактирования" className="kit-field h-12 pl-10 pr-3 text-sm" /></div>
             </div>
             {filteredGroups.length ? (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredGroups.map(group => <div key={group.roomId} className="group relative min-w-0 border bg-background transition-colors hover:border-foreground">
-                  <Link to={`/room/${encodeURIComponent(group.roomId)}`} className="block text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="absolute left-2 top-2 bg-background/90 px-2 py-1 font-mono text-[10px] uppercase tracking-wider">{group.versions.length} {plural(group.versions.length, 'версия', 'версии', 'версий')}</span></div>
-                  <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{editName(group.latest.request_text, 'Базовый дизайн')}</p></div><span className="shrink-0 text-[11px] text-muted-foreground">{statusLabel(group.latest.status)}</span></div><div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span className="flex items-center gap-2"><span>{group.credits} кр.</span></span></div></div>
+                {filteredGroups.map(group => <div key={group.roomId} className="k-card group relative min-w-0">
+                  <Link to={`/room/${encodeURIComponent(group.roomId)}`} className="block text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="k-badge absolute left-2 top-2">{group.versions.length} {plural(group.versions.length, 'версия', 'версии', 'версий')}</span></div>
+                  <div className="bo"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{editName(group.latest.request_text, 'Базовый дизайн')}</p></div><span className={`k-caption shrink-0 ${statusView(group.latest.status).className}`}>{statusView(group.latest.status).label}</span></div><div className="rw mt-4 border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span>{group.credits} кр.</span></div></div>
                   </Link>
-                  <button type="button" onClick={() => { setShareRenderId(group.latest.id); setShareOpen(true) }} className="absolute right-2 top-2 flex size-9 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground" aria-label="Поделиться дизайном"><Share2 className="size-4" /></button>
+                  <button type="button" onClick={() => { setShareRenderId(group.latest.id); setShareOpen(true) }} className="k-btn k-btn--ov k-btn--icon absolute right-2 top-2" aria-label="Поделиться дизайном"><KitIcon name="sh" /></button>
                 </div>)}
               </div>
-            ) : <div className="mt-8 border border-dashed p-10 text-center"><p className="display-title text-3xl">Пока пусто</p><p className="mt-3 text-sm text-muted-foreground">Создайте первый дизайн — он появится здесь вместе с версиями и подборкой.</p><a href="/?panel=1" className="action-primary mt-6">Создать дизайн <ArrowUpRight className="size-4" /></a></div>}
+            ) : <div className="k-empty mt-8"><p className="display-title text-3xl">Пока пусто</p><p className="text-sm text-muted-foreground">Создайте первый дизайн — он появится здесь вместе с версиями и подборкой.</p><a href="/?panel=1" className="k-btn k-btn--primary">Создать дизайн <KitIcon name="ur" /></a></div>}
           </div>
         ) : (
           <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_24rem]">
             <section>
-              <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="text-xs text-muted-foreground">1 кредит = дизайн (в каждом 3 бесплатных редактирования) или подбор товаров</span></div>
-              <div className="mt-6 border p-4">
-                <div className="flex items-start gap-3"><Gift className="size-5 shrink-0 text-primary-text" /><div className="min-w-0"><p className="text-sm font-medium">Пригласите друга — +2 кредита обоим</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Друг получит 2 кредита за регистрацию по ссылке, вы — ещё 2 за приглашение.</p></div></div>
-                {referral ? (
-                  <div className="mt-4">
-                    <div className="flex gap-2"><input readOnly value={referral.link} onFocus={e => e.currentTarget.select()} className="kit-field min-h-11 min-w-0 flex-1 px-3 text-xs" aria-label="Реферальная ссылка" /><button type="button" onClick={copyReferral} className="action-secondary min-h-11 shrink-0 px-3 text-sm"><Copy className="size-4" /><span className="hidden sm:inline">Скопировать</span></button></div>
-                    <p className="mt-2 text-xs text-muted-foreground">{referral.invited > 0 ? `Приглашено по ссылке: ${referral.invited}` : 'Поделитесь ссылкой — вы оба получите по 2 кредита.'}</p>
-                  </div>
-                ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем ссылку…</p>}
+              <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 flex items-baseline gap-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="max-w-[20rem] text-xs text-muted-foreground">1 кредит = дизайн (в каждом 3 бесплатных редактирования) или подбор товаров</span></div>
+              <div id="referral-block" className="k-note mt-6">
+                <KitIcon name="bolt" /><div className="min-w-0"><p className="text-sm font-medium">Пригласите друга — +2 кредита вам</p><p className="mt-1 text-xs leading-5">+2 кредита начислим после первой покупки друга по вашей ссылке.</p></div>
               </div>
+              {referral ? (
+                <div className="mt-4">
+                  <div className="flex gap-2"><input readOnly value={referral.link} onFocus={e => e.currentTarget.select()} className="k-field min-w-0 flex-1 text-xs" style={{ minHeight: 44 }} aria-label="Реферальная ссылка" /><button type="button" onClick={copyReferral} className="k-btn k-btn--s shrink-0">Скопировать</button></div>
+                  <p className="mt-2 text-xs text-muted-foreground">{referral.invited > 0 ? `Приглашено по ссылке: ${referral.invited}` : 'Поделитесь ссылкой — получите 2 кредита после первой покупки друга.'}</p>
+                </div>
+              ) : <p className="mt-4 text-sm text-muted-foreground">Загружаем ссылку…</p>}
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                {packs.map(pack => <div key={pack.id} className={`border p-4${pack.id === 'flat' ? ' bg-secondary' : ''}`}><div className="flex items-end justify-between gap-2"><span className="display-title text-4xl">{String(pack.credits).padStart(2, '0')}</span><span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'}</span></div><p className="mt-4 text-xl font-light">{rub(pack.price_kopecks / 100)}</p><p className="mt-1 text-xs text-muted-foreground">{pack.title}</p>{pack.id === 'flat' && <p className="mt-1 inline-block border border-primary-text px-2 py-0.5 text-xs text-primary-text">Выгодно</p>}<button type="button" onClick={() => buyPack(pack)} disabled={buying === pack.id} className="action-primary mt-4 w-full">{buying === pack.id ? 'Переходим…' : 'Купить'} <ArrowUpRight className="size-4" /></button></div>)}
+                {packs.map(pack => <div key={pack.id} className={`k-pl${pack.id === 'flat' ? ' on' : ''}`}><div className="flex items-end justify-between gap-2"><span className="display-title text-4xl">{String(pack.credits).padStart(2, '0')}</span><span className="k-caption">{pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'}</span></div><p className="mt-3 text-xl font-light">{rub(pack.price_kopecks / 100)}</p><p className="text-xs text-muted-foreground">{pack.title}</p>{pack.id === 'flat' && <p className="k-badge k-badge--hot self-start">Выгодно</p>}<button type="button" onClick={() => buyPack(pack)} disabled={buying === pack.id} className="k-btn k-btn--primary k-btn--block mt-2">{buying === pack.id ? 'Переходим…' : 'Купить'} <KitIcon name="ur" /></button></div>)}
               </div>
-              <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-5"><input type="checkbox" checked={buyConsent} onChange={e => setBuyConsent(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-primary" /><span>Принимаю <a className="underline" href="/offer" target="_blank" rel="noopener">оферту</a> и <a className="underline" href="/prices" target="_blank" rel="noopener">условия и цены</a></span></label>
+              <p className="mt-4 text-xs leading-5 text-muted-foreground">Нажимая «Купить», вы принимаете <a className="underline underline-offset-2" href="/offer" target="_blank" rel="noopener">оферту</a> и <a className="underline underline-offset-2" href="/prices" target="_blank" rel="noopener">условия и цены</a>.</p>
               <div className="mt-8"><div className="flex items-center justify-between border-b pb-3"><h2 className="eyebrow">История кредитов</h2><span className="text-xs text-muted-foreground">{credits.length} {plural(credits.length, 'операция', 'операции', 'операций')}</span></div><div className="divide-y">{credits.map(c => <div key={c.id} className="flex items-start justify-between gap-4 py-3 text-sm"><div><b className={c.delta > 0 ? 'text-primary-text' : ''}>{c.delta > 0 ? '+' : ''}{c.delta} кр.</b><p className="mt-1 text-xs text-muted-foreground">{reasonNames[c.reason] || c.reason}{c.note ? ` · ${c.note}` : ''}</p></div><span className="shrink-0 text-xs text-muted-foreground">{dateTime(c.created_at)}</span></div>)}{!credits.length && <p className="py-4 text-sm text-muted-foreground">Операций пока нет.</p>}</div></div>
             </section>
-            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — дизайн (в каждом 3 бесплатных редактирования) или подбор товаров.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <ArrowUpRight className="ml-1 size-4" /></a></aside>
+            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — дизайн (в каждом 3 бесплатных редактирования) или подбор товаров.</li><li>+2 кредита за друга после его первой покупки.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="lnk mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <KitIcon name="ur" /></a></aside>
           </div>
         )}
       </main>
 
-      {selectedRoom && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-foreground/50" role="dialog" aria-modal="true" aria-label="История комнаты" onClick={e => { if (e.target === e.currentTarget) setSelectedRoom(null) }}>
-          <div className="h-full w-full max-w-3xl overflow-y-auto bg-background p-5 sm:p-8">
-            <div className="flex items-start justify-between gap-4 border-b pb-4"><div><p className="eyebrow">Комната</p><h2 className="display-title mt-2 text-3xl">{selectedRoom.style}</h2>{selectedRoom.latest.room_type && <p className="mt-1 text-xs text-muted-foreground">{selectedRoom.latest.room_type}</p>}<p className="mt-1 text-xs text-muted-foreground">{selectedRoom.versions.length} {plural(selectedRoom.versions.length, 'версия', 'версии', 'версий')} · {dateTime(selectedRoom.latest.created_at)}</p></div><button type="button" onClick={() => setSelectedRoom(null)} className="flex size-11 items-center justify-center border hover:bg-muted" aria-label="Закрыть"><X className="size-5" /></button></div>
-            {detailLoading ? <div className="flex min-h-64 items-center justify-center"><LoaderCircle className="size-7 animate-spin text-primary-text" /></div> : roomData ? (
+      <KitSheet open={Boolean(selectedRoom)} onClose={() => setSelectedRoom(null)} title={selectedRoom?.style} wide>
+        {selectedRoom && (
+          <>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="eyebrow">Комната</span>
+              {selectedRoom.latest.room_type && <span>· {selectedRoom.latest.room_type}</span>}
+              <span>· {selectedRoom.versions.length} {plural(selectedRoom.versions.length, 'версия', 'версии', 'версий')}</span>
+              <span>· {dateTime(selectedRoom.latest.created_at)}</span>
+            </div>
+            {detailLoading ? <div className="flex min-h-64 items-center justify-center"><KitIcon name="sp" spin className="size-7 text-primary-text" /></div> : roomData ? (
               <>
-                <div className="relative mt-5 bg-foreground">
+                <div className="relative bg-secondary">
                   {roomData.render?.image ? <img src={roomData.render.image} alt="Дизайн комнаты" className="max-h-[52svh] w-full object-contain" /> : <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">{roomData.error || 'Изображение недоступно'}</div>}
-                  {roomData.render?.image && <button type="button" onClick={() => setFullscreen(true)} className="absolute right-3 top-3 flex size-11 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Открыть на весь экран"><Expand className="size-5" /></button>}
+                  {roomData.render?.image && <button type="button" onClick={() => setFullscreen(true)} className="k-btn k-btn--ov k-btn--icon absolute right-3 top-3" aria-label="Открыть на весь экран"><KitIcon name="fs" /></button>}
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {roomData.render?.image && <button type="button" onClick={() => setFullscreen(true)} className="action-secondary"><Expand className="size-4" />На весь экран</button>}
-                  {roomData.render?.image && <a href={roomData.render.image} download="remontvision-design.jpg" className="action-secondary"><Download className="size-4" />Скачать</a>}
-                  {roomData.render?.image && <button type="button" onClick={() => { setShareRenderId(roomData.render?.id || ''); setShareOpen(true) }} className="action-secondary"><Share2 className="size-4" />Поделиться</button>}
-                  <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="action-secondary"><ArrowUpRight className="size-4" />Редактировать</a>
-                  <button type="button" onClick={deleteRoom} className="inline-flex min-h-12 items-center gap-2 border border-destructive/50 px-4 text-sm text-destructive hover:bg-destructive/5"><Trash2 className="size-4" />Удалить комнату</button>
+                <div className="flex flex-wrap gap-2">
+                  {roomData.render?.image && <button type="button" onClick={() => setFullscreen(true)} className="k-btn k-btn--s"><KitIcon name="fs" />На весь экран</button>}
+                  {roomData.render?.image && <a href={roomData.render.image} download="remontvision-design.jpg" className="k-btn k-btn--s"><KitIcon name="dl" />Скачать</a>}
+                  {roomData.render?.image && <button type="button" onClick={() => { setShareRenderId(roomData.render?.id || ''); setShareOpen(true) }} className="k-btn k-btn--s"><KitIcon name="sh" />Поделиться</button>}
+                  <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="k-btn k-btn--s"><KitIcon name="ur" />Редактировать</a>
+                  <button type="button" onClick={deleteRoom} className="k-btn k-btn--s k-btn--danger"><KitIcon name="tr" />Удалить комнату</button>
                 </div>
-                <div className="mt-6 grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-[11px] text-muted-foreground">Подбор по уровню, а не по сумме</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p><p className="mt-1 text-[11px] text-muted-foreground">Стоимость ориентировочная</p>{roomData.prices_as_of && <p className="mt-1 text-[11px] text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
-                <div className="mt-6"><p className="eyebrow">Версии</p><div className="mt-3 flex flex-wrap gap-2">{selectedRoom.versions.map((v, index) => <button key={v.id} type="button" onClick={() => selectVersion(v.id)} className={`min-h-11 border px-3 text-xs ${selectedRenderId === v.id ? 'border-foreground bg-foreground text-background' : 'border-foreground/30 hover:border-foreground'}`}>Версия {selectedRoom.versions.length - index} · {v.request_text ? 'редактирование' : 'базовая'} · {statusLabel(v.status)}</button>)}</div></div>
-                {realProducts.length > 0 && <div className="mt-6"><p className="eyebrow">Подобранные товары · {realOfferCount}</p><div className="mt-3 space-y-5">{realProducts.map((match, index) => <div key={`${match.item.category}-${index}`}><div className="flex items-baseline justify-between gap-3 border-b pb-2"><p className="text-sm font-medium">{match.item.label}</p><span className="text-xs text-muted-foreground">{match.offers.length ? `${match.offers.length} в каталоге` : 'нет в каталоге'}</span></div>{match.offers.length ? <div className="mt-3 grid gap-3 sm:grid-cols-2">{match.offers.map(offer => <a key={offer.id} href={offer.url || '#'} target="_blank" rel={offer.url ? 'noopener nofollow sponsored' : 'noopener nofollow'} className="flex min-w-0 gap-3 border p-2 transition-colors hover:border-foreground">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="size-16 shrink-0 object-cover" loading="lazy" /> : <div className="flex size-16 shrink-0 items-center justify-center bg-muted text-[10px] text-muted-foreground">нет фото</div>}<div className="min-w-0"><p className="line-clamp-2 text-xs font-medium leading-5">{offer.name}</p><p className="mt-1 text-xs">{offer.price === null ? 'цена не указана' : rub(offer.price)}{offer.merchant ? ` · ${offer.merchant}` : ''}</p>{offer.erid ? <p className="text-[10px] text-muted-foreground">реклама · erid {offer.erid}</p> : null}</div></a>)}</div> : <p className="mt-2 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}</div>)}</div></div>}
-                {roomData.use_catalog === false && <p className="mt-6 border-y py-4 text-sm text-muted-foreground">Товары были отключены для этого дизайна — подборка не формировалась.</p>}
-                {roomData.items.length > 0 && <div className="mt-6"><p className="eyebrow">Товары и стоимость</p><div className="mt-3 divide-y border-y">{roomData.items.map((item, i) => <div key={`${item.name}-${i}`} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 py-3 text-sm"><span>{item.name}</span><span className="font-medium">{rub(item.price * item.qty)}</span><span className="col-span-2 text-xs text-muted-foreground">{rub(item.price)} × {item.qty} {item.unit}{` · ${item.presentation_status === 'verified' ? 'Проверен на рендере' : item.presentation_status === 'matched' ? 'Похожий по рендеру' : 'Подобран к дизайну'}`}{item.source ? ` · ${item.source}` : ''}{item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}</span></div>)}</div></div>}
-                {roomData.error && <p className="mt-4 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{roomData.error}</p>}
+                <div className="grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-xs text-muted-foreground">Подбор по уровню, а не по сумме</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p><p className="mt-1 text-xs text-muted-foreground">Стоимость ориентировочная</p>{roomData.prices_as_of && <p className="mt-1 text-xs text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
+                <div><p className="eyebrow">Версии</p><div className="mt-3 flex flex-wrap gap-2">{selectedRoom.versions.map((v, index) => <button key={v.id} type="button" aria-selected={selectedRenderId === v.id} onClick={() => selectVersion(v.id)} className="k-tab">Версия {selectedRoom.versions.length - index} · {v.request_text ? 'редактирование' : 'базовая'} · <span className={statusView(v.status).className}>{statusView(v.status).label}</span></button>)}</div></div>
+                {realProducts.length > 0 && <div><p className="eyebrow">Подобранные товары · {realOfferCount}</p><div className="mt-3 space-y-5">{realProducts.map((match, index) => <div key={`${match.item.category}-${index}`}><div className="flex items-baseline justify-between gap-3 border-b pb-2"><p className="text-sm font-medium">{match.item.label}</p><span className="text-xs text-muted-foreground">{match.offers.length ? `${match.offers.length} в каталоге` : 'нет в каталоге'}</span></div>{match.offers.length ? <div className="mt-3 grid gap-3 sm:grid-cols-2">{match.offers.map(offer => <a key={offer.id} href={offer.url || '#'} target="_blank" rel={offer.url ? 'noopener nofollow sponsored' : 'noopener nofollow'} className="k-card flex min-w-0 gap-3 p-2">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="size-16 shrink-0 object-cover" loading="lazy" /> : <div className="flex size-16 shrink-0 items-center justify-center bg-secondary text-xs text-muted-foreground">нет фото</div>}<div className="min-w-0"><p className="line-clamp-2 text-xs font-medium leading-5">{offer.name}</p><p className="mt-1 text-xs">{offer.price === null ? 'цена не указана' : rub(offer.price)}{offer.merchant ? ` · ${offer.merchant}` : ''}</p>{offer.erid ? <p className="text-xs text-muted-foreground">реклама · erid {offer.erid}</p> : null}</div></a>)}</div> : <p className="mt-2 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}</div>)}</div></div>}
+                {roomData.use_catalog === false && <p className="border-y py-4 text-sm text-muted-foreground">Товары были отключены для этого дизайна — подборка не формировалась.</p>}
+                {roomData.items.length > 0 && <div><p className="eyebrow">Товары и стоимость</p><div className="mt-3 divide-y border-y">{roomData.items.map((item, i) => <div key={`${item.name}-${i}`} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 py-3 text-sm"><span>{item.name}</span><span className="font-medium">{rub(item.price * item.qty)}</span><span className="col-span-2 text-xs text-muted-foreground">{rub(item.price)} × {item.qty} {item.unit}{` · ${item.presentation_status === 'verified' ? 'Проверен на рендере' : item.presentation_status === 'matched' ? 'Похожий по рендеру' : 'Подобран к дизайну'}`}{item.source ? ` · ${item.source}` : ''}{item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}</span></div>)}</div></div>}
+                {roomData.error && <p className="k-ban k-ban--bad">{roomData.error}</p>}
               </>
-            ) : <p className="mt-6 text-sm text-muted-foreground">Не удалось загрузить комнату.</p>}
-          </div>
-        </div>
-      )}
-      {fullscreen && roomData?.render?.image && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/95 p-4" role="dialog" aria-modal="true" aria-label="Просмотр дизайна на весь экран" onClick={() => setFullscreen(false)}>
-          <button type="button" onClick={() => setFullscreen(false)} className="absolute right-4 top-4 z-10 flex size-12 items-center justify-center border border-background/40 bg-foreground/60 text-background backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Закрыть полноэкранный просмотр"><X className="size-5" /></button>
-          <img src={roomData.render.image} alt="Дизайн комнаты на весь экран" className="max-h-full max-w-full object-contain" onClick={event => event.stopPropagation()} />
-        </div>
-      )}
+            ) : <p className="text-sm text-muted-foreground">Не удалось загрузить комнату.</p>}
+          </>
+        )}
+      </KitSheet>
+      <KitLightbox open={fullscreen && Boolean(roomData?.render?.image)} onClose={() => setFullscreen(false)} label="Просмотр дизайна на весь экран">
+        {roomData?.render?.image && <img src={roomData.render.image} alt="Дизайн комнаты на весь экран" className="max-h-full max-w-full object-contain" />}
+      </KitLightbox>
       <ShareDialog renderId={shareRenderId || roomData?.render?.id || ''} open={shareOpen} onClose={() => setShareOpen(false)} />
       {toast && <div className="kit-toast" role="status">{toast}</div>}
     </div>

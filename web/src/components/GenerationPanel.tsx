@@ -8,7 +8,7 @@ import { ObjectLayer } from '@/components/ObjectLayer'
 import { useTasks } from '@/components/TaskDock'
 import { goal } from '@/lib/analytics'
 import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
-import { buildMoveCleanupInstruction, buildMovePreview, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
+import { buildMoveCleanupInstruction, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
 import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
@@ -146,7 +146,7 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
 type StylePreset = { key: string; name: string; accent: string; image_url?: string }
-type RenderModelOption = { key: string; label: string; credits: number }
+type RenderModelOption = { key: string; label: string; credits: number; resolutions: string[]; resolution_prices: Record<string, number> }
 const defaultStylePresets: StylePreset[] = [
   { key: 'minimalism', name: 'Современный минимализм', accent: 'sand', image_url: '/images/style-minimal.webp' },
   { key: 'scandinavian', name: 'Скандинавский', accent: 'dust', image_url: '/images/style-scandi.webp' },
@@ -243,6 +243,8 @@ export function GenerationPanel({
   const [priceTier, setPriceTier] = useState('comfort')
   const [useCatalog] = useState(true)
   const [renderModels, setRenderModels] = useState<RenderModelOption[]>([])
+  const [resolution, setResolution] = useState<string | null>(null)
+  const [variantsCount, setVariantsCount] = useState(1)
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [modelChosen, setModelChosen] = useState(false)
   const [isPrivate, setIsPrivate] = useState(false)
@@ -258,10 +260,12 @@ export function GenerationPanel({
   const [openHistory, setOpenHistory] = useState<string | null>(null)
   const [genStage, setGenStage] = useState('queued')
   const [genMode, setGenMode] = useState<'base' | 'edit'>('base')
+  const [generatingTitle, setGeneratingTitle] = useState('')
   const [elapsed, setElapsed] = useState(0)
   const [lightbox, setLightbox] = useState(false)
   const [roomId, setRoomId] = useState('')
   const [genError, setGenError] = useState('')
+  const [canRetry, setCanRetry] = useState(false)
   const [busy, setBusy] = useState(false)
   const [productBinding, setProductBinding] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
@@ -275,12 +279,23 @@ export function GenerationPanel({
   const photoInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
   const loadedRoomRef = useRef('')
+  const retryRef = useRef<{ roomId: string; request: string; styleName: string } | null>(null)
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
   const showResultMain = !inline || heroItems.length > 0
   // Редактируем существующий дизайн, а не создаём новый: модель и приватность наследуются от родителя.
   const editing = Boolean(roomId)
+  const selectedModel = renderModels.find(m => m.key === modelKey) || null
+  const effectiveResolution = selectedModel && selectedModel.resolutions.length
+    ? (resolution && selectedModel.resolutions.includes(resolution)
+        ? resolution
+        : (selectedModel.resolutions.includes('1K') ? '1K' : selectedModel.resolutions[0]))
+    : null
+  const renderCredits = selectedModel
+    ? (Number(selectedModel.resolution_prices?.[effectiveResolution ?? '']) || Number(selectedModel.credits) || 1)
+    : 1
+  const totalCredits = renderCredits * variantsCount
   const productMatches = current?.analysis?.products || []
   const visibleObjects = (current?.analysis?.visible || []).filter(
     (object): object is { label?: string; bbox: number[]; area?: number } => typeof object === 'object' && object !== null && Array.isArray(object.bbox) && object.bbox.length === 4,
@@ -356,7 +371,13 @@ export function GenerationPanel({
       .then(d => {
         const list = Array.isArray(d?.models) ? (d.models as RenderModelOption[]) : []
         if (list.length) {
-          setRenderModels(list.map(m => ({ key: String(m.key), label: String(m.label), credits: Number(m.credits) })))
+          setRenderModels(list.map(m => ({
+            key: String(m.key),
+            label: String(m.label),
+            credits: Number(m.credits),
+            resolutions: Array.isArray(m.resolutions) ? m.resolutions.map(String) : [],
+            resolution_prices: m.resolution_prices && typeof m.resolution_prices === 'object' ? m.resolution_prices : {},
+          })))
           const defaultKey = typeof d?.default_key === 'string' ? d.default_key : String(list[0].key)
           setModelKey(defaultKey)
         }
@@ -640,14 +661,82 @@ export function GenerationPanel({
     }
   }
 
-  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File }) {
+  async function applyRoomResult(id: string, request: string, styleName: string) {
+    const room = await pollRoom(id)
+    if (!room) return
+    if (room.notice) {
+      setGenError(room.notice)
+      setStep('result')
+      await onRefreshUser()
+      return
+    }
+    const render = room.render
+    if (!render?.image) throw new Error('Модель не вернула изображение')
+    const next: Iteration = {
+      id: render.id,
+      request,
+      image: render.image,
+      styleName,
+      items: room.items,
+      total: room.total,
+      budget: room.budget,
+      priceTier: room.price_tier || priceTier,
+      keepFurniture: room.keep_furniture !== false,
+      useCatalog: room.use_catalog !== false,
+      productsEnabled: room.products_enabled !== false,
+      roomId: id,
+      ratio: photoRatio,
+      pricesAsOf: room.prices_as_of,
+      analysis: render.analysis || null,
+      artDirection: render.art_direction || null,
+      dimensionsEstimate: render.dimensions_estimate || null,
+      lens: render.lens || null,
+      repairScope: render.repair_scope || null,
+      designDirection: render.design_direction || null,
+    }
+    setIterations(prev => [...prev, next])
+    setCurrentId(next.id)
+    setOpenHistory(next.id)
+    setGenStage('done')
+    setStep('result')
+    clearEditRefs()
+    retryRef.current = null
+    setCanRetry(false)
+    void refreshTasks()
+    onEdited?.()
+    await onRefreshUser()
+  }
+
+  async function retryGeneration() {
+    const params = retryRef.current
+    if (!params || busy) return
+    setGenError('')
+    setBusy(true)
+    try {
+      const r = await fetch(`/api/rooms/${encodeURIComponent(params.roomId)}/retry`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 401) { onRequireLogin(); return }
+      if (r.status === 402) { setCreditOpen(true); return }
+      if (!r.ok) throw new Error(d.error || String(r.status))
+      setGenStage('queued'); setStep('generating')
+      await applyRoomResult(params.roomId, params.request, params.styleName)
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Не удалось повторить')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File; move?: { bbox: number[]; dx: number; dy: number; label?: string }; generatingTitle?: string }) {
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
     if (!isAuthed) { onRequireLogin(); return }
-    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError('')
+    setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setCanRetry(false); retryRef.current = null
     clearEditRefs()
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
+    setGeneratingTitle(edit?.generatingTitle || (edit?.parentId && effectiveObjectTarget ? `Редактирование объекта «${ruLabel(effectiveObjectTarget.label)}»` : ''))
+    if (!edit?.parentId && variantsCount > 1) setGeneratingTitle(`Создаём вариантов: ${variantsCount}`)
     try {
       const isBase = !roomId
       let id = roomId
@@ -671,11 +760,13 @@ export function GenerationPanel({
         fd.append('keep_furniture', usingCleaned ? '0' : '1')
         fd.append('use_catalog', useCatalog ? '1' : '0')
         if (modelKey && modelChosen) fd.append('model', modelKey)
+        fd.append('variants', String(variantsCount))
+        if (effectiveResolution) fd.append('resolution', effectiveResolution)
         fd.append('private', isPrivate ? '1' : '0')
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { setStep('style'); onRequireLogin(); return }
-        if (r.status === 402) { setGenError(''); setStep('style'); setCreditOpen(true); return }
+        if (r.status === 402) { setGenError(d.error || 'Не хватает кредитов'); setStep('style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
         goal('render_start', { style: styleName, room_type: roomType })
         id = d.id
@@ -696,6 +787,7 @@ export function GenerationPanel({
           }))))
           refs.forEach(ref => { if (ref.file) fd.append('refs', ref.file) })
         }
+        if (edit?.move) fd.append('move', JSON.stringify(edit.move))
         if (edit?.sourceFile) fd.append('source', edit.sourceFile)
         if (edit?.refFile) fd.append('ref', edit.refFile)
         if (!edit?.refFile && edit?.refUrl) fd.append('ref_url', edit.refUrl)
@@ -707,49 +799,11 @@ export function GenerationPanel({
         goal('edit_request', { target: edit?.target || 'custom' })
       }
 
-      const room = await pollRoom(id)
-      if (!room) return
-      if (room.notice) {
-        setGenError(room.notice)
-        setStep('result')
-        await onRefreshUser()
-        return
-      }
-      const render = room.render
-      if (!render?.image) throw new Error('Модель не вернула изображение')
-      const next: Iteration = {
-        id: render.id,
-        request,
-        image: render.image,
-        styleName,
-        items: room.items,
-        total: room.total,
-        budget: room.budget,
-        priceTier: room.price_tier || priceTier,
-        keepFurniture: room.keep_furniture !== false,
-        useCatalog: room.use_catalog !== false,
-        productsEnabled: room.products_enabled !== false,
-        roomId: id,
-        ratio: photoRatio,
-        pricesAsOf: room.prices_as_of,
-        analysis: render.analysis || null,
-        artDirection: render.art_direction || null,
-        dimensionsEstimate: render.dimensions_estimate || null,
-        lens: render.lens || null,
-        repairScope: render.repair_scope || null,
-        designDirection: render.design_direction || null,
-      }
-      setIterations(prev => [...prev, next])
-      setCurrentId(next.id)
-      setOpenHistory(next.id)
-      setGenStage('done')
-      setStep('result')
-      clearEditRefs()
-      void refreshTasks()
-      onEdited?.()
-      await onRefreshUser()
+      if (isBase) retryRef.current = { roomId: id, request, styleName }
+      await applyRoomResult(id, request, styleName)
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось создать дизайн')
+      setCanRetry(Boolean(retryRef.current))
       setStep(iterations.length ? 'result' : 'style')
       void refreshTasks()
     } finally { setBusy(false); setProductBinding(false) }
@@ -943,7 +997,7 @@ export function GenerationPanel({
                       const selected = modelKey === m.key
                       const highlighted = selected && !editing
                       return (
-                        <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
+                        <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true); if (resolution && !m.resolutions.includes(resolution)) setResolution(null) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
                           <span className={`block ${highlighted ? '' : 'opacity-80'}`}>
                             <span className="flex items-center justify-between gap-2 text-sm font-medium">
                               {m.label}
@@ -956,6 +1010,21 @@ export function GenerationPanel({
                       )
                     })}
                   </div>
+                  {!editing && selectedModel && selectedModel.resolutions.length > 1 && (
+                    <div className="mt-4">
+                      <p className="eyebrow">Качество</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {selectedModel.resolutions.map(r => {
+                          const active = effectiveResolution === r
+                          return (
+                            <button key={r} type="button" aria-pressed={active} onClick={() => setResolution(r)} className={`min-h-10 border px-3 font-mono text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-input hover:border-foreground'}`}>
+                              {r}<span className="ml-2 opacity-70">{Number(selectedModel.resolution_prices?.[r] ?? selectedModel.credits)} кр.</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className={renderModels.length > 0 ? 'mt-6' : ''}>
@@ -977,7 +1046,24 @@ export function GenerationPanel({
               </div>
             </div>
 
-            {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
+            {genError && (
+              <div className="mt-4 flex flex-wrap items-center gap-3" role="alert">
+                <p className="text-sm text-destructive">{genError}</p>
+                {canRetry && <button type="button" onClick={retryGeneration} disabled={busy} className="k-btn k-btn--s">Повторить</button>}
+              </div>
+            )}
+
+            {!editing && (
+              <div className="mt-8 flex flex-wrap items-center gap-3 border-t pt-6">
+                <span className="text-sm">Варианты</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setVariantsCount(n => Math.max(1, n - 1))} disabled={variantsCount <= 1} aria-label="Меньше вариантов" className="k-btn k-btn--s size-9 justify-center p-0 disabled:opacity-40">−</button>
+                  <b className="w-6 text-center font-mono">{variantsCount}</b>
+                  <button type="button" onClick={() => setVariantsCount(n => Math.min(8, n + 1))} disabled={variantsCount >= 8} aria-label="Больше вариантов" className="k-btn k-btn--s size-9 justify-center p-0 disabled:opacity-40">+</button>
+                </div>
+                <p className="text-xs text-muted-foreground">{variantsCount} × {renderCredits} = <b className="text-foreground">{totalCredits} кр.</b></p>
+              </div>
+            )}
 
             <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => setStep('photo')} className="k-btn hidden sm:inline-flex"><KitIcon name="l" className="size-4" />Назад</button>
@@ -1002,7 +1088,7 @@ export function GenerationPanel({
             <div className="flex items-start gap-4">
               <KitIcon name="sp" spin className="mt-1 size-8 shrink-0 text-primary-text" />
               <div>
-                <h3 className="display-title text-3xl">{productBinding ? 'Привязываем товар' : genMode === 'edit' ? 'Применяем редактирование' : 'Создаём ваш дизайн'}</h3>
+                <h3 className="display-title text-3xl">{generatingTitle || (productBinding ? 'Привязываем товар' : genMode === 'edit' ? 'Применяем редактирование' : 'Создаём ваш дизайн')}</h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{genStageInfo.hint}</p>
               </div>
             </div>
@@ -1070,12 +1156,12 @@ export function GenerationPanel({
                         onConfirmMove={async (index, dx, dy) => {
                           const object = visibleObjects[index]
                           if (!object) return
-                          const instruction = buildMoveCleanupInstruction(object.label)
-                          const preview = await buildMovePreview(current.image, object.bbox, dx, dy)
+                          const instruction = buildMoveCleanupInstruction(object.label, object.bbox)
                           setObjectsOn(false)
                           void startGeneration(instruction, current.styleName, {
                             parentId: current.id,
-                            sourceFile: preview || undefined,
+                            move: { bbox: object.bbox, dx, dy, label: object.label },
+                            generatingTitle: `Перемещаем «${ruLabel(object.label)}»`,
                           })
                         }}
                       />
@@ -1083,7 +1169,7 @@ export function GenerationPanel({
                       <img src={current.image} alt="Сгенерированный дизайн интерьера" className="h-full max-h-[62svh] w-full object-contain" />
                     )}
                   </div>
-                  <div className="absolute right-3 top-3 flex gap-2">
+                  <div className="mt-2 flex justify-end gap-2 sm:absolute sm:right-3 sm:top-3 sm:mt-0">
                     {visibleObjects.length > 0 && (
                       <button type="button" aria-pressed={objectsOn} onClick={() => { setObjectsOn(value => !value) }} className={`k-btn k-btn--ov k-btn--icon${objectsOn ? ' bg-primary text-primary-foreground' : ''}`} aria-label="Выбрать объект на рендере">
                         <KitIcon name="q" />
@@ -1181,7 +1267,7 @@ export function GenerationPanel({
               <aside className={showResultMain ? 'min-w-0 border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0' : 'min-w-0'}>
                 <p className="eyebrow">История правок</p>
                 <div className="mt-4 space-y-2">
-                  {iterations.map((item, index) => {
+                  {[...iterations].reverse().map((item, index) => {
                     const expanded = openHistory === item.id
                     const quickEdits = changesFromArchitect(item.analysis?.architect).map(change => ({
                       target: change.target || change.layer,
@@ -1193,7 +1279,7 @@ export function GenerationPanel({
                     return (
                       <div key={item.id} className="border border">
                         <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id); onSelectVersion?.(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring">
-                          <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span><span className="truncate">{item.request}</span></span>
+                          <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{iterations.length - index}</span><span className="truncate">{item.request}</span></span>
                           <KitIcon name="cd" className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
                         </button>
                         {expanded && (
@@ -1262,6 +1348,9 @@ export function GenerationPanel({
                                 </div>
                               </div>
                             ) : <p className="mt-2 text-xs leading-5 text-muted-foreground">Архитектор не оставил подсказок — опишите редактирование ниже.</p>}
+                            {effectiveObjectTarget && (
+                              <p className="mt-5 border-l-2 border-primary pl-3 text-sm font-medium">Редактирование объекта «{ruLabel(effectiveObjectTarget.label)}»</p>
+                            )}
                             <div id="edit-blocks" className="mt-5 space-y-3">
                               {editRefs.map((ref) => {
                                 const hasSource = Boolean(ref.file || ref.url)
@@ -1362,7 +1451,12 @@ export function GenerationPanel({
               </aside>
             </div>
 
-            {genError && <p className="mt-4 text-sm text-destructive" role="alert">{genError}</p>}
+            {genError && (
+              <div className="mt-4 flex flex-wrap items-center gap-3" role="alert">
+                <p className="text-sm text-destructive">{genError}</p>
+                {canRetry && <button type="button" onClick={retryGeneration} disabled={busy} className="k-btn k-btn--s">Повторить</button>}
+              </div>
+            )}
 
             {!inline && <div className="mt-10 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" onClick={() => { setStep('style'); setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null); }} className="k-btn"><KitIcon name="l" className="size-4" />Изменить стиль</button>

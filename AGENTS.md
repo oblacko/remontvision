@@ -81,6 +81,7 @@ node --check src/openrouter.js
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
 | API, auth, admin, share | `src/server.js` |
 | SQL/данные | `src/db.js`, `migrations/` |
+| Бэкапы, мониторинг, runbook | `scripts/ops/`, `docs/ops/` |
 | Каталог | `catalog/seed.json`, `public/catalog/`, `src/catalogseed.js` |
 | Импорт товаров | `src/productimport.js`, `src/remoteimage.js` |
 | Стилевые референсы | `scripts/generate-style-references.mjs`, `style-refs/`, `src/stylerefseed.js` |
@@ -142,7 +143,7 @@ node --check src/openrouter.js
 - Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
 - Нет inpainting для люстр/розеток; позиции могут плавать.
 - Нет автоматического обновления цен/наличия и фидов.
-- Нет автоматических бэкапов, метрик и алертов.
+- Бэкап/restore скрипты есть и проверены (`scripts/ops/`, `docs/ops/`); автоматическое расписание, копия вне VPS и алерты пока не включены.
 - Старый редактор `/app` не переделан в новый стиль.
 - Возвраты выключены (`REFUNDS_ENABLED=false`), чеки — вручную.
 

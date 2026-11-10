@@ -97,6 +97,7 @@ ResultURL — только серверное уведомление Robokassa (
 4. Smoke: `/api/health`, `/`, `/app`.
 
 Откат: `git revert`/предыдущий коммит + пуш; миграции append-only, не удалять.
+Процедура и smoke: [ops/ROLLBACK.md](ops/ROLLBACK.md).
 
 ## Миграции
 
@@ -122,28 +123,42 @@ ResultURL — только серверное уведомление Robokassa (
 
 ## Бэкапы
 
-Сейчас автоматических бэкапов нет. Минимум:
+Полная процедура: [ops/BACKUP-RESTORE.md](ops/BACKUP-RESTORE.md). Скрипт: `scripts/ops/backup.sh`.
+
+Автоматического расписания пока нет. Скрипт и restore-учения проверены 2026-11-09:
+дамп БД 1.3 MB, архив файлов 254 MB, restore в чистую БД — PASS (42 таблицы, счётчики
+совпали). Копия вне VPS ещё не настроена — нужен таргет хранения и ключи.
 
 ```bash
-# на VPS
-docker compose exec -T db pg_dump -U remont -d remontvision | gzip > backup-$(date +%F).sql.gz
-# файлы
-tar czf appdata-$(date +%F).tar.gz /path/to/appdata
+cd /root/remontvision
+./scripts/ops/backup.sh                 # БД + файлы
+./scripts/ops/backup.sh --db-only       # быстро, перед миграцией
+./scripts/ops/restore-verify.sh --latest # restore в чистую БД
 ```
 
-Хранить вне VPS. Восстановление — в отдельную БД, проверить `_migrations` и ключевые таблицы.
+Cron, retention, rclone, полное восстановление на новом сервере — в
+[ops/BACKUP-RESTORE.md](ops/BACKUP-RESTORE.md).
 
 ## Мониторинг
 
-Сейчас: Docker logs + `/api/health`. Нет Prometheus/алертов.
+Полная процедура: [ops/MONITORING.md](ops/MONITORING.md). Инциденты:
+[ops/RUNBOOK.md](ops/RUNBOOK.md).
 
-Проверять:
+Сейчас: Docker logs + `/api/health` + `scripts/ops/daily-check.sh` (вручную).
+Внешнего uptime-монитора и алертов пока нет — G8 не закрыт.
 
-- `docker compose ps`
-- `docker compose logs app --tail=200`
-- `/api/health`
-- `render_error`/`config_warning` в логах
-- стоимость рендеров (`renders.cost_usd`)
+```bash
+cd /root/remontvision
+./scripts/ops/daily-check.sh            # health, диск, контейнеры, бэкапы, render_error, 429
+./scripts/ops/smoke.sh                  # после деплоя/отката
+```
+
+Проверять ежедневно:
+
+- `docker compose ps`, `/api/health`, `daily-check.sh`;
+- `render_error`/`render_timeout` и их `stage`;
+- `webhook_error`/`payment_created`, 429;
+- свежесть бэкапа и свободное место (диск 86% на 2026-11-09).
 
 ## Типовые проблемы
 
@@ -174,6 +189,7 @@ tar czf appdata-$(date +%F).tar.gz /path/to/appdata
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [API.md](API.md)
 - [ROADMAP.md](ROADMAP.md)
+- [ops/README.md](ops/README.md) — бэкапы, мониторинг, откат, runbook, G4/G8
 
 ## Подбор товаров
 

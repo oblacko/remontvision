@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { KitIcon } from './KitIcon'
 import { ImageComparison } from './ImageComparison'
 
 const examples = [
@@ -46,11 +46,11 @@ export function ExamplesCarousel() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={previous} className="carousel-button" aria-label="Предыдущий пример">
-            <ArrowLeft className="size-5" />
+          <button type="button" onClick={previous} className="k-btn k-btn--icon" aria-label="Предыдущий пример">
+            <KitIcon name="l" />
           </button>
-          <button type="button" onClick={next} className="carousel-button" aria-label="Следующий пример">
-            <ArrowRight className="size-5" />
+          <button type="button" onClick={next} className="k-btn k-btn--icon" aria-label="Следующий пример">
+            <KitIcon name="r" />
           </button>
         </div>
       </div>

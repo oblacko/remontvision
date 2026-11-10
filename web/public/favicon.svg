@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ремонтвижн">
+  <rect width="64" height="64" fill="#f9f7f0"/>
+  <g fill="none" stroke="#130f0a" stroke-width="4.4" stroke-linejoin="miter" stroke-linecap="butt">
+    <path d="M8 24V8h16M40 8h16v16M56 40v16H40M24 56H8V40"/>
+  </g>
+  <circle cx="32" cy="32" r="8" fill="#f3680f"/>
+</svg>

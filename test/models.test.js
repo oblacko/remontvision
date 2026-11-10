@@ -218,3 +218,35 @@ test('env false disables art direction for unknown keys too', () => {
     assert.equal(isArtDirectionEnabled(null), false);
   });
 });
+
+const { priceForResolution, sanitizeResolutionPrices } = await import('../src/modelcaps.js');
+
+test('priceForResolution falls back to base credits', () => {
+  assert.equal(priceForResolution(null, '2K', 1), 1);
+  assert.equal(priceForResolution({ '2K': 2, '4K': 4 }, '2K', 1), 2);
+  assert.equal(priceForResolution({ '2K': 2 }, '1K', 1), 1);
+});
+
+test('sanitizeResolutionPrices keeps only allowed resolutions', () => {
+  assert.deepEqual(sanitizeResolutionPrices({ '2K': 2, '8K': 9, bad: 'x' }, ['1K', '2K', '4K']), { '2K': 2 });
+  assert.deepEqual(sanitizeResolutionPrices({ '1K': 1 }, ['1K', '2K']), { '1K': 1 });
+  assert.deepEqual(sanitizeResolutionPrices(null, ['1K']), {});
+});
+
+const { resolutionAllowed } = await import('../src/modelcaps.js');
+
+test('resolutionAllowed rejects 4K for FLUX 2 Pro', () => {
+  assert.equal(resolutionAllowed('black-forest-labs/flux-2-pro', '4K'), false);
+});
+
+test('resolutionAllowed accepts 2K for FLUX 3 Image', () => {
+  assert.equal(resolutionAllowed('black-forest-labs/flux-3-image', '2K'), true);
+});
+
+test('resolutionAllowed rejects empty resolution', () => {
+  assert.equal(resolutionAllowed('black-forest-labs/flux-3-image', ''), false);
+});
+
+test('priceForResolution ignores fractional prices', () => {
+  assert.equal(priceForResolution({ '2K': 2.5 }, '2K', 1), 1);
+});

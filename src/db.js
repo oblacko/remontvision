@@ -102,6 +102,15 @@ export const q = {
     pool.query(`INSERT INTO renders (id, room_id, parent_render_id, request_text, prompt) VALUES ($1,$2,$3,$4,$5)`,
       [id, roomId, parentRenderId, requestText, prompt]),
   getRender: id => pool.query(`SELECT * FROM renders WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  roomHasDoneRender: roomId =>
+    pool.query(`SELECT EXISTS(SELECT 1 FROM renders WHERE room_id = $1 AND status = 'done') AS done`, [roomId])
+      .then(r => r.rows[0]?.done === true),
+  roomHasActiveRender: roomId =>
+    pool.query(`SELECT EXISTS(SELECT 1 FROM renders WHERE room_id = $1 AND status IN ('queued','processing')) AS active`, [roomId])
+      .then(r => r.rows[0]?.active === true),
+  latestFailedRenderForRoom: roomId =>
+    pool.query(`SELECT * FROM renders WHERE room_id = $1 AND status = 'error' ORDER BY created_at DESC LIMIT 1`, [roomId])
+      .then(r => r.rows[0] || null),
   setRenderShellPath: (id, shellPath) =>
     pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),
   setRenderDone: (imagePath, costUsd, model, id) =>
@@ -426,17 +435,19 @@ export const q = {
       .then(r => r.rows[0] || null),
   // Апсерт строки render_models по id (админка): при существующем id обновляет остальные поля.
   createOrUpdateRenderModel: f =>
-    pool.query(`INSERT INTO render_models (id, label, model_id, credits, art_direction_enabled, active, sort)
-                VALUES ($1,$2,$3,$4,$5,$6,$7)
+    pool.query(`INSERT INTO render_models (id, label, model_id, credits, art_direction_enabled, active, sort, resolution_prices)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
                 ON CONFLICT (id) DO UPDATE SET
                   label = EXCLUDED.label,
                   model_id = EXCLUDED.model_id,
                   credits = EXCLUDED.credits,
                   art_direction_enabled = EXCLUDED.art_direction_enabled,
                   active = EXCLUDED.active,
-                  sort = EXCLUDED.sort
+                  sort = EXCLUDED.sort,
+                  resolution_prices = EXCLUDED.resolution_prices
                 RETURNING *`,
-      [f.id, f.label, f.model_id, f.credits, f.art_direction_enabled, f.active, f.sort])
+      [f.id, f.label, f.model_id, f.credits, f.art_direction_enabled, f.active, f.sort,
+       f.resolution_prices ? JSON.stringify(f.resolution_prices) : null])
       .then(r => r.rows[0]),
   toggleRenderModel: id =>
     pool.query(`UPDATE render_models SET active = NOT active WHERE id = $1 RETURNING *`, [id])

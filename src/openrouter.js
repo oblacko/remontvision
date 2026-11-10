@@ -557,8 +557,8 @@ export function snapAspect(width, height, allowed = null) {
   return best;
 }
 
-export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio, model = null, aspect = null }) {
-  return generateWithModel(model || getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, aspectOverride: aspect });
+export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio, model = null, aspect = null, resolution = null }) {
+  return generateWithModel(model || getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, aspectOverride: aspect, resolutionOverride: resolution });
 }
 
 // Пустой каркас: отдельная модель/промт/разрешение из админки, только исходник, без style/product refs.
