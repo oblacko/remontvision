@@ -1216,7 +1216,7 @@ export function GenerationPanel({
               <aside className={showResultMain ? 'min-w-0 border-t pt-8 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0' : 'min-w-0'}>
                 <p className="eyebrow">История правок</p>
                 <div className="mt-4 space-y-2">
-                  {iterations.map((item, index) => {
+                  {[...iterations].reverse().map((item, index) => {
                     const expanded = openHistory === item.id
                     const quickEdits = changesFromArchitect(item.analysis?.architect).map(change => ({
                       target: change.target || change.layer,
@@ -1228,7 +1228,7 @@ export function GenerationPanel({
                     return (
                       <div key={item.id} className="border border">
                         <button type="button" aria-expanded={expanded} onClick={() => { if (!expanded) { setEditRefs([]) } setOpenHistory(expanded ? null : item.id); setCurrentId(item.id); onSelectVersion?.(item.id) }} className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left text-sm focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring">
-                          <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span><span className="truncate">{item.request}</span></span>
+                          <span className="flex min-w-0 items-center gap-3"><span className="font-mono text-xs text-primary-text">0{iterations.length - index}</span><span className="truncate">{item.request}</span></span>
                           <KitIcon name="cd" className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`} />
                         </button>
                         {expanded && (
