@@ -14,6 +14,7 @@ import { reviewDesign } from './architect.js';
 import { buildDesignDirection, DESIGN_DIRECTION_ENABLED } from './designeragent.js';
 import { buildLayoutPlan } from './layoutagent.js';
 import { buildAnalysis } from './analysis.js';
+import { composeMove } from './moveobject.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
 import { modelCaps } from './modelcaps.js';
@@ -25,6 +26,7 @@ import { fitLayoutPlan } from './layoutfit.js';
 import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
+import { friendlyRenderError } from './rendererrors.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -514,6 +516,17 @@ async function processRender(renderId) {
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
       addCost('design', out.cost);
+      if (render.edit_move) {
+        try {
+          const composed = await composeMove(originalBuf, Buffer.from(out.b64, 'base64'), render.edit_move);
+          imageB64 = composed.toString('base64');
+          meta.move = { ...render.edit_move, composed: true };
+          log({ event: 'move_composed', room_id: room.id, render_id: renderId, label: render.edit_move.label || null });
+        } catch (e) {
+          meta.move = { ...render.edit_move, composed: false };
+          log({ event: 'move_compose_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+        }
+      }
       log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
     }
 
@@ -704,16 +717,17 @@ async function processRender(renderId) {
     // fire-and-forget, ошибки не влияют на результат рендера.
     if (room.user_id && !render.parent_render_id) notifyOwner(room, render);
   } catch (e) {
-    const msg = String(e.message || e).slice(0, 500);
+    const rawMsg = String(e.message || e).slice(0, 500);
+    const msg = friendlyRenderError(rawMsg);
     addCost('failed', e.cost);
     const errorCost = sumCostBreakdown();
     await q.setRenderError(msg, renderId, stage, errorCost);
     await q.setRoomError(msg, room.id);
     try {
       const restored = await restoreCreditForRender(renderId, `render_error:${stage}`);
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restored: restored, ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restored: restored, ms: Date.now() - t0 });
     } catch (restoreError) {
-      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
+      log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
     }
   }
 }
@@ -781,7 +795,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -799,6 +813,7 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     modelCredits,
     isPrivate,
     editSourcePath,
+    editMove,
   });
   return id;
 }
