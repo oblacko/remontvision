@@ -27,6 +27,7 @@ import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
+import { shouldMarkRoomError } from './variants.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -723,7 +724,8 @@ async function processRender(renderId) {
     addCost('failed', e.cost);
     const errorCost = sumCostBreakdown();
     await q.setRenderError(msg, renderId, stage, errorCost);
-    await q.setRoomError(msg, room.id);
+    const hasDoneSibling = await q.roomHasDoneRender(room.id);
+    if (shouldMarkRoomError(room.status, hasDoneSibling)) await q.setRoomError(msg, room.id);
     try {
       const restored = await restoreCreditForRender(renderId, `render_error:${stage}`);
       log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restored: restored, ms: Date.now() - t0 });

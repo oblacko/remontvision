@@ -102,6 +102,9 @@ export const q = {
     pool.query(`INSERT INTO renders (id, room_id, parent_render_id, request_text, prompt) VALUES ($1,$2,$3,$4,$5)`,
       [id, roomId, parentRenderId, requestText, prompt]),
   getRender: id => pool.query(`SELECT * FROM renders WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  roomHasDoneRender: roomId =>
+    pool.query(`SELECT EXISTS(SELECT 1 FROM renders WHERE room_id = $1 AND status = 'done') AS done`, [roomId])
+      .then(r => r.rows[0]?.done === true),
   setRenderShellPath: (id, shellPath) =>
     pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),
   setRenderDone: (imagePath, costUsd, model, id) =>

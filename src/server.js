@@ -30,6 +30,7 @@ import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
 import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
+import { parseVariantsCount, pluralVariants } from './variants.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
@@ -1448,10 +1449,16 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const perRenderCredits = resolution
     ? priceForResolution(modelRow?.resolution_prices, resolution, modelSelection.credits)
     : modelSelection.credits;
+  const variants = parseVariantsCount(req.body?.variants);
   if (!MOCK_MODE) {
     const bal = await q.creditBalance(req.user.id);
-    if (bal < perRenderCredits) {
-      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: bal });
+    if (bal < perRenderCredits * variants) {
+      const afford = Math.floor(bal / perRenderCredits);
+      return res.status(402).json({
+        error: `Недостаточно кредитов — на балансе хватит на ${afford} ${pluralVariants(afford)}`,
+        balance: bal,
+        can_afford: afford,
+      });
     }
   }
   // multipart/form-data присылает `private` строкой, поэтому принимаем true и '1'/'true'.
@@ -1513,13 +1520,21 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
   await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, conceptKey);
+  let enqueued = 0;
   try {
-    await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: perRenderCredits, isPrivate, resolution });
+    for (let i = 0; i < variants; i++) {
+      await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: perRenderCredits, isPrivate, resolution });
+      enqueued += 1;
+    }
   } catch (e) {
     if (e.status === 402) {
-      await q.deleteRoom(id);
-      await remove(photoKey);
-      if (cleanupKey) await remove(cleanupKey);
+      // Если не удалось поставить ни одного варианта — убираем пустую комнату.
+      // Уже поставленные варианты остаются валидными оплаченными рендерами.
+      if (!enqueued) {
+        await q.deleteRoom(id);
+        await remove(photoKey);
+        if (cleanupKey) await remove(cleanupKey);
+      }
       return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: await q.creditBalance(req.user.id) });
     }
     throw e;
