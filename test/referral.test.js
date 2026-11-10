@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // Соединение не открывается: тестируем только чистые функции без БД.
 process.env.RV_DATABASE_URL = process.env.RV_DATABASE_URL || 'postgres://test:test@127.0.0.1:5432/test';
 
-const { generateCode, normalizeCode, rewardDecision } = await import('../src/referral.js');
+const { generateCode, normalizeCode, rewardDecision, purchaseRewardDecision } = await import('../src/referral.js');
 
 const CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
 
@@ -45,4 +45,20 @@ test('rewardDecision: already rewarded is rejected', () => {
 
 test('rewardDecision: new pair is allowed', () => {
   assert.deepEqual(rewardDecision({ ownerId: 'u1', inviteeId: 'u2', alreadyRewarded: false }), { reward: true, reason: 'ok' });
+});
+
+test('purchaseRewardDecision: owner gets reward on first purchase', () => {
+  assert.deepEqual(purchaseRewardDecision({ ownerId: 'u1', inviteeId: 'u2', rewarded: false }), { reward: true, reason: 'ok' });
+});
+
+test('purchaseRewardDecision: self-referral is rejected', () => {
+  assert.deepEqual(purchaseRewardDecision({ ownerId: 'u1', inviteeId: 'u1', rewarded: false }), { reward: false, reason: 'self' });
+});
+
+test('purchaseRewardDecision: already rewarded is rejected', () => {
+  assert.deepEqual(purchaseRewardDecision({ ownerId: 'u1', inviteeId: 'u2', rewarded: true }), { reward: false, reason: 'already' });
+});
+
+test('purchaseRewardDecision: missing pair is rejected', () => {
+  assert.deepEqual(purchaseRewardDecision({ ownerId: null, inviteeId: 'u2', rewarded: false }), { reward: false, reason: 'missing' });
 });
