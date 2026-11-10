@@ -200,7 +200,7 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
   const labelClass = error ? 'text-destructive' : done ? 'text-primary-text' : 'text-muted-foreground'
 
   return (
-    <li className="relative border-t border-foreground/15 first:border-t-0">
+    <li className="relative border-t border-foreground/15 bg-page first:border-t-0">
       <Link to={to} onClick={onDismiss} className="group flex gap-3 px-3 py-3 pr-8 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring">
         <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden border border-foreground/20 bg-secondary">
           {thumb
