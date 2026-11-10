@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-09T18:26:38.354Z
+Generated: 2026-11-09T21:58:46.563Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -270,6 +270,7 @@ node --check src/openrouter.js
 | Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
 | API, auth, admin, share | `src/server.js` |
 | SQL/данные | `src/db.js`, `migrations/` |
+| Бэкапы, мониторинг, runbook | `scripts/ops/`, `docs/ops/` |
 | Каталог | `catalog/seed.json`, `public/catalog/`, `src/catalogseed.js` |
 | Импорт товаров | `src/productimport.js`, `src/remoteimage.js` |
 | Стилевые референсы | `scripts/generate-style-references.mjs`, `style-refs/`, `src/stylerefseed.js` |
@@ -331,7 +332,7 @@ node --check src/openrouter.js
 - Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
 - Нет inpainting для люстр/розеток; позиции могут плавать.
 - Нет автоматического обновления цен/наличия и фидов.
-- Нет автоматических бэкапов, метрик и алертов.
+- Бэкап/restore скрипты есть и проверены (`scripts/ops/`, `docs/ops/`); автоматическое расписание, копия вне VPS и алерты пока не включены.
 - Старый редактор `/app` не переделан в новый стиль.
 - Возвраты выключены (`REFUNDS_ENABLED=false`), чеки — вручную.
 
@@ -373,6 +374,7 @@ Last updated: 2026-11-03
 - [docs/PROMPT-RULES.md](https://github.com/oblacko/remontvision/blob/main/docs/PROMPT-RULES.md) — editable prompt rules.
 - [docs/API.md](https://github.com/oblacko/remontvision/blob/main/docs/API.md) — API reference.
 - [docs/OPERATIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/OPERATIONS.md) — prod, deploy, TLS, proxy, backups.
+- [docs/ops/README.md](https://github.com/oblacko/remontvision/blob/main/docs/ops/README.md) — backups/restore, monitoring, rollback, incident runbook, G4/G8.
 - [docs/ROADMAP.md](https://github.com/oblacko/remontvision/blob/main/docs/ROADMAP.md) — launch plan.
 - [docs/DECISIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/DECISIONS.md) — key decisions.
 - [docs/HISTORY.md](https://github.com/oblacko/remontvision/blob/main/docs/HISTORY.md) — chronological changelog.
@@ -454,7 +456,8 @@ docker compose up -d db  # local Postgres 127.0.0.1:5434
 - Seedream/FLUX are image-only: do not use chat fallback.
 - Demo catalog has no real URLs; do not claim real checkout works.
 - Design-first product binding exists; no automatic 2–4 design variants or inpainting yet.
-- No automated backups/metrics yet.
+- Backup/restore scripts exist and are verified (`scripts/ops/`, `docs/ops/`); schedule, off-site copy and alerts are not enabled yet.
+- No automated metrics/alerting yet.
 - `db.js` exits without `RV_DATABASE_URL`; avoid importing it in unit tests.
 
 ## Next priorities
@@ -580,7 +583,7 @@ flowchart LR
 - Один основной провайдер (OpenRouter).
 - Нет автоматического выбора из 2–4 дизайн-вариантов и inpainting.
 - Каталог демонстрационный, 0 URL.
-- Нет автоматических бэкапов/метрик.
+- Бэкап/restore скрипты проверены, но расписание, off-site и алерты не включены.
 - Старый `/app` не в новом стиле.
 
 ## Связанные документы
@@ -1476,6 +1479,7 @@ ResultURL — только серверное уведомление Robokassa (
 4. Smoke: `/api/health`, `/`, `/app`.
 
 Откат: `git revert`/предыдущий коммит + пуш; миграции append-only, не удалять.
+Процедура и smoke: [ops/ROLLBACK.md](ops/ROLLBACK.md).
 
 ## Миграции
 
@@ -1501,28 +1505,42 @@ ResultURL — только серверное уведомление Robokassa (
 
 ## Бэкапы
 
-Сейчас автоматических бэкапов нет. Минимум:
+Полная процедура: [ops/BACKUP-RESTORE.md](ops/BACKUP-RESTORE.md). Скрипт: `scripts/ops/backup.sh`.
+
+Автоматического расписания пока нет. Скрипт и restore-учения проверены 2026-11-09:
+дамп БД 1.3 MB, архив файлов 254 MB, restore в чистую БД — PASS (42 таблицы, счётчики
+совпали). Копия вне VPS ещё не настроена — нужен таргет хранения и ключи.
 
 ```bash
-# на VPS
-docker compose exec -T db pg_dump -U remont -d remontvision | gzip > backup-$(date +%F).sql.gz
-# файлы
-tar czf appdata-$(date +%F).tar.gz /path/to/appdata
+cd /root/remontvision
+./scripts/ops/backup.sh                 # БД + файлы
+./scripts/ops/backup.sh --db-only       # быстро, перед миграцией
+./scripts/ops/restore-verify.sh --latest # restore в чистую БД
 ```
 
-Хранить вне VPS. Восстановление — в отдельную БД, проверить `_migrations` и ключевые таблицы.
+Cron, retention, rclone, полное восстановление на новом сервере — в
+[ops/BACKUP-RESTORE.md](ops/BACKUP-RESTORE.md).
 
 ## Мониторинг
 
-Сейчас: Docker logs + `/api/health`. Нет Prometheus/алертов.
+Полная процедура: [ops/MONITORING.md](ops/MONITORING.md). Инциденты:
+[ops/RUNBOOK.md](ops/RUNBOOK.md).
 
-Проверять:
+Сейчас: Docker logs + `/api/health` + `scripts/ops/daily-check.sh` (вручную).
+Внешнего uptime-монитора и алертов пока нет — G8 не закрыт.
 
-- `docker compose ps`
-- `docker compose logs app --tail=200`
-- `/api/health`
-- `render_error`/`config_warning` в логах
-- стоимость рендеров (`renders.cost_usd`)
+```bash
+cd /root/remontvision
+./scripts/ops/daily-check.sh            # health, диск, контейнеры, бэкапы, render_error, 429
+./scripts/ops/smoke.sh                  # после деплоя/отката
+```
+
+Проверять ежедневно:
+
+- `docker compose ps`, `/api/health`, `daily-check.sh`;
+- `render_error`/`render_timeout` и их `stage`;
+- `webhook_error`/`payment_created`, 429;
+- свежесть бэкапа и свободное место (диск 86% на 2026-11-09).
 
 ## Типовые проблемы
 
@@ -1553,6 +1571,7 @@ tar czf appdata-$(date +%F).tar.gz /path/to/appdata
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [API.md](API.md)
 - [ROADMAP.md](ROADMAP.md)
+- [ops/README.md](ops/README.md) — бэкапы, мониторинг, откат, runbook, G4/G8
 
 ## Подбор товаров
 
@@ -1579,6 +1598,821 @@ PROCUREMENT_VISION_MODEL=google/gemini-3.1-pro-preview
 - Кнопка «Очистить комнату» после загрузки фото вызывает `/api/cleanup` и показывает shell. Если пользователь оставляет «Очищенная», shell загружается в `/api/rooms` как `cleanup_photo`; генерация использует его без повторной очистки. Очистка в админке (`cleanup.config.v1`) на ручную кнопку не влияет.
 - Источник стиля переключается в админке → «Стили»: текст, референс или свотчи. По умолчанию текст; фото-референс в этом режиме не отправляется. Активны только «Скандинавский» и «Джапанди».
 - В админке → «Поиск» настраиваются включение, слои (по умолчанию только мебель/свет/декор и текстиль), регион, домены, пороги score и лимиты. Выключенные слои не создают позиции и не тратят запросы. Настройки хранятся в `app_settings` (`procurement.settings.v1`).
+
+
+---
+
+<!-- source: docs/ops/README.md -->
+
+# docs/ops — эксплуатация
+
+Операционные документы и скрипты для прода `https://www.remontvision.ru`.
+Задача REM-14, gates **G4** (восстановление данных) и **G8** (мониторинг).
+
+## Состав
+
+| Файл | Назначение |
+|---|---|
+| [BACKUP-RESTORE.md](BACKUP-RESTORE.md) | бэкапы БД/файлов, хранение вне VPS, протокол restore |
+| [MONITORING.md](MONITORING.md) | внешний uptime, алерты, ежедневная проверка, `render_error` |
+| [ROLLBACK.md](ROLLBACK.md) | откат релиза и БД, smoke после отката |
+| [RUNBOOK.md](RUNBOOK.md) | действия при инцидентах |
+| [CHECKLIST-G4-G8.md](CHECKLIST-G4-G8.md) | чек-лист готовности и текущий статус |
+
+Скрипты: `scripts/ops/backup.sh`, `restore-verify.sh`, `daily-check.sh`, `smoke.sh`.
+
+## Быстрые команды (на VPS)
+
+```bash
+cd /root/remontvision
+
+# бэкап БД + файлов (после настройки remote уходит вне VPS)
+./scripts/ops/backup.sh
+
+# только БД (быстро, перед миграцией/деплоем)
+./scripts/ops/backup.sh --db-only
+
+# проверка восстановления последнего бэкапа в чистую БД
+./scripts/ops/restore-verify.sh --latest --report /root/rv-backups/restore-$(date +%F).md
+
+# ежедневная проверка: health, диск, контейнеры, бэкапы, ошибки
+./scripts/ops/daily-check.sh
+
+# smoke после деплоя/отката
+./scripts/ops/smoke.sh
+```
+
+## Статус на 2026-11-09
+
+| Проверка | Статус | Доказательство |
+|---|---|---|
+| Дамп БД снимается | ✅ | `/root/rv-backups/20261109-165346/db-remontvision-*.dump`, 1.3 MB |
+| Restore БД в чистую БД | ✅ PASS | 42 таблицы, users=6, rooms=119, renders=156, payments=15, products=110, migrations=44 |
+| Архив файлов снимается | ✅ | `20261109-165400`, 254 MB, 952 записи |
+| Архив файлов читается | ✅ PASS | gzip + sha256 + путей вне каталога нет |
+| Копия **вне VPS** | ❌ нет | не выбран таргет/нет доступов |
+| Расписание cron | ❌ нет | нужно разрешение на изменение прода |
+| Внешний uptime-алерт | ❌ нет | нужен аккаунт/канал алертов |
+| Ежедневный `render_error` | ⚠️ скрипт готов | запускается вручную; cron не включён |
+| Runbook | ✅ | [RUNBOOK.md](RUNBOOK.md) |
+
+**Вывод:** процедура бэкапа и восстановления проверена, но G4 не закрыт без копии вне VPS.
+G8 не закрыт без внешнего монитора и тестового алерта.
+
+## Ограничения
+
+- Диск VPS на 2026-11-09 занят на **86%** (свободно ~1.4 GB). Полный архив файлов — 254 MB. До расширения диска локально держим не больше одной полной копии; глубокое хранение — только на remote.
+- `.env` и секреты в ежедневный бэкап **не входят**: их резервная копия должна храниться отдельно у владельца (менеджер паролей / зашифрованный архив).
+- Каталог `catalog-db` (≈900 MB, 36k офферов + эмбеддинги) — восстанавливаемый, но дорогой: дампится в weekly-бэкап, не в daily.
+- Автоматического мониторинга 429/платежей и APM/Sentry нет; ежедневная проверка — минимальный уровень.
+
+
+---
+
+<!-- source: docs/ops/BACKUP-RESTORE.md -->
+
+# Бэкапы и восстановление (G4)
+
+Цель: иметь ежедневную копию БД и файлов **вне VPS** и уметь доказать, что из неё
+восстанавливается рабочий сайт. Бэкап без проверенного restore не считается бэкапом.
+
+## Что бэкапим
+
+| Объект | Где | Размер (2026-11-09) | Частота |
+|---|---|---|---|
+| БД `remontvision` | том `remontvision_pgdata` | 16 MB (дамп 1.3 MB) | daily |
+| Файлы `appdata` | том `remontvision_appdata` | 258 MB (архив 254 MB) | daily |
+| БД `catalog` | том `remontvision_catalogdata` | 898 MB | weekly |
+| `.env`, TLS-ключи | `/root/remontvision/.env`, `/etc/letsencrypt` | — | отдельно, у владельца |
+
+`.env` в ежедневный архив **не кладём**: иначе секреты уезжают в объектное хранилище.
+Владелец хранит `.env` в менеджере паролей/зашифрованном архиве. TLS восстанавливается
+через `certbot`; разовая копия `/etc/letsencrypt` уже лежит в `/root/rv-backups/`.
+
+## Как устроено
+
+`scripts/ops/backup.sh`:
+
+1. `pg_dump -Fc` основной БД + проверка `pg_restore --list` (дамп читается).
+2. `tar.gz` каталога `/app/data` (uploads, renders, products, style-images, …).
+3. `manifest.txt`: дата, коммит, размеры, sha256, счётчики таблиц, версия `pg_dump`.
+4. Копирование каталога в rclone-remote (вне VPS) и проверка `rclone check`.
+5. Локальная ротация: храним последние `RV_BACKUP_LOCAL_KEEP` каталогов.
+
+`--weekly` дополнительно дампит `catalog-db`. `--pre-deploy` делает только БД (быстро,
+перед миграцией). `--dry-run` показывает план без записи.
+
+Скрипт не читает и не печатает секреты: `pg_dump` идёт через локальный сокет контейнера.
+
+## Куда складывать вне VPS
+
+Нужен один из вариантов (выбрать и согласовать с владельцем):
+
+1. **Yandex Object Storage** — рекомендуется: проект уже использует Yandex Cloud.
+   Приватный bucket `remontvision-backups`, versioning, lifecycle 30 дней, SSE.
+2. **Другой сервер** (например, второй VPS) через `rclone sftp:` или `rsync`.
+3. **S3-совместимое хранилище** (Selectel, VK Cloud, MinIO) через `rclone s3:`.
+
+Пример настройки rclone (**ключи не коммитить**):
+
+```bash
+apt-get install -y rclone
+rclone config create rv-s3 s3 \
+  provider=Other env_auth=false \
+  access_key_id='<key-id>' secret_access_key='<secret>' \
+  endpoint='https://storage.yandexcloud.net' region='ru-central1' acl=private
+rclone lsd rv-s3:remontvision-backups
+```
+
+Проверка, что remote пишется и читается:
+
+```bash
+RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1 \
+  /root/remontvision/scripts/ops/backup.sh --db-only
+rclone lsf rv-s3:remontvision-backups/daily
+```
+
+## Расписание (после разрешения владельца)
+
+Cron root на VPS (`crontab -e`). Часовой пояс VPS — MSK.
+
+```cron
+# ежедневно: БД + файлы, обязательно с копией вне VPS
+30 3 * * * cd /root/remontvision && RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1 RV_BACKUP_LOCAL_KEEP=1 ./scripts/ops/backup.sh >> /var/log/remontvision-backup.log 2>&1
+
+# еженедельно: + каталог catalog-db
+0 3 * * 0 cd /root/remontvision && RV_BACKUP_REMOTE=rv-s3:remontvision-backups/weekly RV_BACKUP_REQUIRE_REMOTE=1 RV_BACKUP_LOCAL_KEEP=1 ./scripts/ops/backup.sh --weekly >> /var/log/remontvision-backup.log 2>&1
+
+# ежедневная проверка эксплуатации
+15 9 * * * cd /root/remontvision && ./scripts/ops/daily-check.sh --strict >> /var/log/remontvision-daily.log 2>&1
+```
+
+`flock` внутри скрипта не даёт двум бэкапам пересечься. Логи ротировать:
+
+```bash
+# /etc/logrotate.d/remontvision
+/var/log/remontvision-*.log {
+  weekly
+  rotate 8
+  compress
+  missingok
+  notifempty
+}
+```
+
+Хранение на remote: 14 daily + 8 weekly (bucket lifecycle). Локально — 1 каталог:
+на VPS свободно ~1.4 GB, полный архив 254 MB.
+
+## Проверка восстановления (обязательно раз в месяц и после смены схемы)
+
+```bash
+cd /root/remontvision
+./scripts/ops/restore-verify.sh --latest \
+  --report /root/rv-backups/restore-$(date +%F).md
+```
+
+Скрипт поднимает **отдельный** `postgres:16-alpine` с `--network none`, восстанавливает
+дамп в чистую БД, сверяет счётчики с manifest, проверяет архив файлов и удаляет контейнер.
+Прод-БД не затрагивается.
+
+Критерий PASS:
+
+- `pg_restore` без ошибок;
+- таблиц в `public` больше 20;
+- `users/rooms/renders/payments/products/migrations` совпадают с manifest;
+- `_migrations` не пуста, последняя миграция совпадает;
+- sha256 дампа и архива совпадают.
+
+### Протокол от 2026-11-09
+
+| Проверка | Результат |
+|---|---|
+| Дамп | `db-remontvision-20261109-165346.dump`, 1.3 MB |
+| Временная БД | `postgres:16-alpine`, `--network none`, удалена |
+| `pg_restore` | OK |
+| Таблиц в `public` | 42 |
+| `users` | 6 |
+| `rooms` | 119 |
+| `renders` | 156 |
+| `payments` | 15 |
+| `products` | 110 |
+| `_migrations` | 44, последняя `042_oauth_states.sql` |
+| Архив файлов | 254 MB, 952 записи, gzip/sha256 OK, путей вне каталога нет |
+| **Итог** | **PASS** |
+
+Отчёты на VPS: `/root/rv-backups/restore-drill-20261109.md`,
+`/root/rv-backups/restore-drill-files-20261109.md`. Копии — в
+[docs/ops/drills/2026-11-09.md](drills/2026-11-09.md).
+
+## Полное восстановление на новом сервере
+
+1. Установить Docker + Compose, клонировать репозиторий в `/root/remontvision`.
+2. Положить `.env` из хранилища владельца (права `600`).
+3. Поднять только БД: `docker compose up -d db`.
+4. Восстановить БД (дамп с remote):
+   ```bash
+   rclone copy rv-s3:remontvision-backups/daily/<stamp> /root/rv-backups/<stamp>
+   docker compose exec -T db pg_restore -U remont -d remontvision \
+     --clean --if-exists --no-owner --no-privileges \
+     < /root/rv-backups/<stamp>/db-remontvision-<stamp>.dump
+   ```
+5. Восстановить файлы в том `appdata`:
+   ```bash
+   docker compose run --rm --no-deps -T app \
+     tar -xzf - -C /app/data < /root/rv-backups/<stamp>/files-<stamp>.tar.gz
+   ```
+6. Поднять стек: `docker compose up -d --build`; миграции догонятся сами.
+7. Smoke: `./scripts/ops/smoke.sh`; проверить `_migrations`, счётчики, открытие рендера.
+8. Каталог: восстановить weekly-дамп `catalog` или переимпортировать фид.
+
+Перед восстановлением **поверх текущей** БД: остановить `app`, снять свежий дамп,
+только потом `pg_restore`. Миграции append-only — откат схемы только через restore.
+
+## Риски и ограничения
+
+- Диск 86%: до расширения держим локально 1 полную копию; следить за `daily-check`.
+- Нет шифрования client-side: защита — приватный bucket + SSE + TLS. Для PII можно
+  добавить `gpg --symmetric` перед upload (ключ хранить отдельно у владельца).
+- Нет проверки «бэкап за вчера есть на remote» отдельным алертом: `daily-check` проверяет
+  свежесть локального manifest и наличие `remote=`; внешний монитор сюда не смотрит.
+- Нет автоматического бэкапа перед каждым деплоем: делать `--pre-deploy` вручную перед
+  рискованными миграциями (или добавить шаг в `deploy.yml` после согласования).
+
+
+---
+
+<!-- source: docs/ops/MONITORING.md -->
+
+# Мониторинг и алерты (G8)
+
+Цель G8: падение `/api/health` даёт алерт **≤ 5 минут**, а `render_error` и платежи
+кто-то смотрит каждый день. Сейчас есть только Docker logs и ручной health-check.
+
+## Уровни
+
+| Уровень | Что | Реакция |
+|---|---|---|
+| P1 | сайт/health недоступен, БД лежит, диск 100% | поднять немедленно, [RUNBOOK.md](RUNBOOK.md) |
+| P2 | доля `render_error` > 25%, платежи не начисляются, бэкапа нет > 26 ч | в течение дня |
+| P3 | диск > 80%, TLS < 14 дней, 429, единичные ошибки | плановая задача |
+
+## 1. Внешний uptime-чек (обязательно)
+
+Монитор должен быть **вне VPS**: если сервер/сеть/nginx упали, локальный cron ничего
+не отправит.
+
+Рекомендуемый вариант — **Better Stack** (интервал 3 мин, бесплатный тариф) или
+**UptimeRobot** (интервал 5 мин). Настроить:
+
+- URL: `https://www.remontvision.ru/api/health`
+- метод: GET, ожидать HTTP 200;
+- keyword: `"ok":true` (ловит «200, но приложение нездорово»);
+- интервал: 3–5 мин, alert после **1** неудачной проверки (иначе SLO > 5 мин);
+- контакты: e-mail владельца + Telegram (см. ниже);
+- второй монитор (опционально): `https://www.remontvision.ru/` с keyword `id="root"` —
+  ловит падение фронта/nginx при живом API.
+
+После создания монитора нажать **Test notification** и сохранить скрин/запись.
+
+### Канал алертов
+
+Нужен один рабочий канал (выбрать с владельцем):
+
+1. **Telegram-бот** — лучший по скорости: создать бота у `@BotFather`, получить token,
+   узнать `chat_id`, добавить в Better Stack/UptimeRobot интеграцию Telegram.
+2. **E-mail** — на `support@remontvision.ru` или личный адрес владельца. На VPS уже есть
+   `RESEND_API_KEY` и `MAIL_FROM`, но для внешнего монитора проще встроенная почта сервиса.
+3. **SMS** — платно, не требуется на старте.
+
+Секреты бота/сервиса хранить у владельца, не в репозитории.
+
+### План Б без внешнего аккаунта
+
+GitHub Actions по расписанию (`*/5 * * * *`) дергает health и при ошибке открывает issue
+в репозитории. Это внешняя проверка, но GitHub может задерживать cron на 5–15 минут,
+поэтому SLO ≤ 5 мин не гарантируется. Использовать только как временный fallback.
+Workflow должен попасть в `main`, а пуш в `main` запускает деплой — нужно разрешение.
+
+## 2. Внутренняя ежедневная проверка
+
+`scripts/ops/daily-check.sh` (только чтение) проверяет:
+
+- `/api/health` локально и публично, `ok:true`;
+- контейнеры `app`, `db`, `catalog`, `catalog-db`, unhealthy/restarting;
+- диск и inodes (`warn 80%`, `crit 90%`);
+- свежесть бэкапа (`> 26 ч` — CRIT), наличие `db_dump`, `files_archive`, `remote=`;
+- TLS-сертификат (`< 14 дн` — WARN, `< 7` — CRIT);
+- логи за 24 ч: `render_done`, `render_error`, `render_timeout`, `credit_restored`,
+  `payment_created`, `webhook_error`, строки с `429`;
+- доля `render_error` от `done+error`: WARN ≥ 10%, CRIT ≥ 25%;
+- топ `stage` ошибок и последние 5 ошибок (обрезаны до 300 символов).
+
+Запуск вручную:
+
+```bash
+cd /root/remontvision
+./scripts/ops/daily-check.sh
+```
+
+Cron (после разрешения): `15 9 * * *` с `--strict` и логом в
+`/var/log/remontvision-daily.log`. `--strict` возвращает код 1 и на WARN, чтобы сбой
+был заметен в cron-почте/логе.
+
+Порог доли ошибок меняется переменными `RV_RENDER_ERROR_WARN` / `RV_RENDER_ERROR_CRIT`.
+
+## 3. Ежедневный просмотр `render_error`
+
+Раз в день (утром) открыть отчёт `daily-check` и разобрать:
+
+```bash
+docker compose logs --since 24h app | grep '"event":"render_error"' | tail -20
+docker compose logs --since 24h app | grep -o '"stage":"[^"]*"' | sort | uniq -c
+```
+
+Что смотреть:
+
+- `stage` — на каком этапе падает (cleanup / image / vision / product QA);
+- `error` — 429, content moderation, таймаут, 400 модели;
+- `credit_restored` — кредит вернулся пользователю;
+- `cost_usd` — не тратим ли деньги на повторяющиеся ошибки.
+
+Действия: при 429 — проверить прокси/`IMAGE_MIN_GAP_MS`; при moderation — сменить модель
+или предупредить пользователя; при 400 — сверить `modelcaps`; при росте доли — P2,
+см. [RUNBOOK.md](RUNBOOK.md).
+
+Ограничение: Docker logs хранят 10 MB × 3 на контейнер. При интенсивном трафике сутки
+могут не помещаться — тогда нужен внешний сбор логов (не настроен).
+
+## 4. Платежи
+
+Смотреть ежедневно:
+
+```bash
+docker compose logs --since 24h app | grep -E '"event":"(payment_created|webhook_error|refund_error)"'
+```
+
+- `webhook_error` > 0 — проверить подпись/URL Robokassa и повторно синхронизировать платёж;
+- `payment_created` без начисления — сверить `payments` и `credit_txn` в БД;
+- возвраты выключены (`REFUNDS_ENABLED=false`) — делать вручную.
+
+Автоматического алерта на «платёж не начислился» нет: это ручная сверка.
+
+## 5. Проверка алерта (приёмочный тест G8)
+
+Делать только в согласованное окно, не на живом трафике:
+
+1. Убедиться, что монитор зелёный, канал алертов подключён.
+2. `cd /root/remontvision && docker compose stop app`
+3. Ждать ≤ 5 минут (интервал монитора + 1 проверка).
+4. Зафиксировать время и текст алерта (скрин/пересланное сообщение).
+5. `docker compose start app`
+6. `./scripts/ops/smoke.sh` — PASS.
+7. Записать результат в [CHECKLIST-G4-G8.md](CHECKLIST-G4-G8.md).
+
+Остановка `app` не трогает БД и файлы; после `start` контейнер поднимается за ~20 с.
+Тест занимает 5–10 минут и требует разрешения владельца.
+
+## 6. Чего пока нет
+
+- APM/Sentry, метрики Prometheus, дашборды.
+- Алертов на 429/платежи/бэкап в реальном времени.
+- Dead-man's switch для бэкапов (Healthchecks.io) — полезно добавить после выбора
+  внешнего хранилища.
+- Ротации и централизованного хранения логов.
+
+
+---
+
+<!-- source: docs/ops/ROLLBACK.md -->
+
+# Откат релиза и smoke
+
+Прод обновляется пушем в `main`: GitHub Actions → SSH на VPS → `git pull` →
+`docker compose up -d --build` → smoke (`/api/health`, `/`, `/app`).
+Отдельных тегов/релизов нет, поэтому «предыдущая версия» — это коммит в `main`.
+
+## Перед рискованным деплоем
+
+1. Зафиксировать текущий коммит: `git -C /root/remontvision rev-parse --short HEAD`.
+2. Снять бэкап БД: `./scripts/ops/backup.sh --pre-deploy`.
+3. Убедиться, что `https://www.remontvision.ru/api/health` зелёный.
+4. После деплоя: `./scripts/ops/smoke.sh` + `daily-check.sh`.
+
+## Откат релиза (штатный, предпочтительный)
+
+Откат — это **новый коммит**, а не переписывание истории. Так `main` остаётся правдой,
+а деплой проходит обычным путём.
+
+```bash
+cd /path/to/app
+git log --oneline -10                 # найти плохой коммит
+git revert <bad-sha>                  # или несколько: git revert --no-commit <old>..<new>
+git push origin main                  # запускает deploy.yml
+```
+
+Дождаться зелёного GitHub Actions. Затем на VPS:
+
+```bash
+cd /root/remontvision
+git log -1 --oneline
+./scripts/ops/smoke.sh
+./scripts/ops/daily-check.sh
+```
+
+## Аварийный откат на VPS (GitHub/Actions недоступны)
+
+```bash
+cd /root/remontvision
+git fetch origin
+git checkout <good-sha>               # известный рабочий коммит
+docker compose up -d --build
+docker compose ps
+./scripts/ops/smoke.sh
+```
+
+Важно:
+
+- это detached HEAD; после инцидента вернуться: `git checkout main && git pull origin main`;
+- `docker compose up -d --build` пересоздаст только изменившиеся сервисы; если сборка
+  упала, старый контейнер может остаться — смотреть `docker compose ps` и
+  `docker compose logs app --tail=100`;
+- миграции уже применены и не откатываются вместе с кодом (append-only).
+
+## Откат БД
+
+Миграции только добавляются, применённые файлы не редактируются. Варианты по возрастанию
+риска:
+
+1. **Forward fix** — новая миграция исправляет схему. Предпочтительно.
+2. **Restore из дампа** — только если данные повреждены. Потеряются записи после дампа.
+3. **Новая БД + переключение** — создать чистую БД, восстановить дамп, поменять
+   `RV_DATABASE_URL` в `.env` (нужно разрешение владельца, это изменение прода).
+
+Перед любым restore:
+
+```bash
+cd /root/remontvision
+docker compose stop app
+./scripts/ops/backup.sh --db-only        # сохранить текущее состояние
+```
+
+Восстановление поверх текущей БД (разрушительно):
+
+```bash
+docker compose exec -T db pg_restore -U remont -d remontvision \
+  --clean --if-exists --no-owner --no-privileges \
+  < /root/rv-backups/<stamp>/db-remontvision-<stamp>.dump
+docker compose start app
+./scripts/ops/smoke.sh
+```
+
+Проверить: `_migrations`, счётчики `users/rooms/renders/payments`, вход в кабинет,
+открытие существующего рендера.
+
+## Smoke после отката
+
+`scripts/ops/smoke.sh` проверяет:
+
+- `/api/health` → 200, `ok:true`, `payments_enabled:true`, `refunds_enabled:false`;
+- `/` содержит `id="root"`;
+- `/app` и `/offer` отвечают 200.
+
+Дополнительно вручную:
+
+- `docker compose logs app --tail=100` — нет `render_error`/`config_warning` пачкой;
+- админка открывается, модели/настройки на месте;
+- при откате БД — тестовый вход и старая комната.
+
+Живой платный рендер после отката не запускать без разрешения: он тратит кредит и деньги.
+
+## Если откат не помог
+
+Перейти в [RUNBOOK.md](RUNBOOK.md): «Сайт недоступен», «БД», «Диск», «Платежи».
+Зафиксировать таймлайн, коммиты, дампы и решения в задаче/инциденте.
+
+
+---
+
+<!-- source: docs/ops/RUNBOOK.md -->
+
+# Runbook инцидентов
+
+Правила: сначала остановить ущерб, потом чинить. Не удалять тома/данные, не менять
+`.env`, не делать `docker compose down -v`, не запускать платные генерации без
+разрешения владельца. Секреты не копировать в тикеты и чаты.
+
+## Контакты
+
+| Кто | Когда | Контакт |
+|---|---|---|
+| Владелец продукта | любой P1/P2, доступы, деньги | заполнить |
+| Хостинг/VPS | сеть, диск, панель, снапшоты | заполнить |
+| Регистратор/DNS | домен, NS, apex/www | заполнить |
+| Robokassa | платежи, подпись, возвраты | кабинет провайдера |
+| Yandex Cloud | Object Storage, Search API | консоль Yandex Cloud |
+
+## Первые 5 минут P1
+
+1. Проверить внешний health: `curl -fsS https://www.remontvision.ru/api/health`.
+2. Зайти на VPS: `ssh root@<vps>`; `cd /root/remontvision`.
+3. `docker compose ps` — кто не running/unhealthy.
+4. `docker compose logs app --tail=200` — ошибка старта/БД/диска.
+5. `df -h /` — не кончилось ли место.
+6. Зафиксировать время начала и симптом; дальше — по разделу ниже.
+
+## 1. Сайт недоступен / health не отвечает
+
+Симптом: монитор/alerts, `curl` не получает 200 или `ok != true`.
+
+```bash
+docker compose ps
+docker compose logs nginx 2>/dev/null || true          # nginx на хосте, не в compose
+systemctl status nginx
+curl -sS -m 5 http://127.0.0.1:3000/api/health
+curl -sS -m 5 https://www.remontvision.ru/api/health
+```
+
+- Контейнер `app` не running → `docker compose up -d app`, смотреть логи.
+- `app` healthy, но снаружи 502 → nginx/TLS: `nginx -t`, `systemctl reload nginx`,
+  проверить `certbot certificates`.
+- DNS/домен → `dig +short www.remontvision.ru`, срок домена, NS.
+- БД недоступна → раздел 3.
+- Диск 100% → раздел 4.
+
+Проверка после: `./scripts/ops/smoke.sh`.
+
+## 2. Приложение падает/5xx
+
+```bash
+docker compose logs app --tail=300
+docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' $(docker compose ps -q app)
+docker compose restart app
+```
+
+- Ошибка миграции при старте → `docker compose logs app | grep -i migration`;
+  не редактировать применённые миграции; откат релиза ([ROLLBACK.md](ROLLBACK.md)).
+- OOM (нет в логах, контейнер убит) → `dmesg | tail`, `free -m`; уменьшить нагрузку,
+  поднять память у VPS.
+- Цикл рестартов после деплоя → аварийный откат на предыдущий коммит.
+- Ошибка конфигурации (`config_warning`) → проверить `app_settings`/`.env` по именам,
+  не печатая значения.
+
+## 3. БД недоступна или повреждена
+
+```bash
+docker compose ps db
+docker compose exec -T db pg_isready -U remont -d remontvision
+docker compose exec -T db psql -U remont -d remontvision -c 'select 1'
+df -h /var/lib/docker
+```
+
+- `db` не запускается → `docker compose logs db --tail=200`; место/права на томе.
+- «database system is in recovery» → ждать, не убивать процесс.
+- Повреждение (`invalid page`, `could not read block`) → остановить `app`, снять дамп
+  (`backup.sh --db-only`), восстановить последний бэкап ([BACKUP-RESTORE.md](BACKUP-RESTORE.md)).
+- Перед restore обязательно сохранить текущее состояние (дамп может частично читаться).
+- После restore: `daily-check.sh`, вход, открытие старого рендера.
+
+## 4. Диск заполнен
+
+На 2026-11-09 занято 86% (свободно ~1.4 GB). Полный бэкап — 254 MB.
+
+```bash
+df -h /
+df -i /
+docker system df
+du -sh /var/lib/docker/volumes/* | sort -h | tail
+du -sh /var/log/* | sort -h | tail
+```
+
+Безопасно (после подтверждения): `docker image prune -f`, ротация логов
+(`logrotate -f /etc/logrotate.d/remontvision`), удаление старых каталогов
+`/root/rv-backups/*` сверх одной копии.
+
+Нельзя без разрешения: `docker volume rm`, `docker compose down -v`, `rm -rf` томов,
+удаление `remontvision_pgdata`/`remontvision_appdata`.
+
+Если места нет совсем: остановить `catalog` (не критичен для генерации),
+временно `docker compose stop app`, освободить место, поднять обратно.
+
+## 5. Всплеск `render_error`, 429, moderation
+
+```bash
+cd /root/remontvision
+./scripts/ops/daily-check.sh
+docker compose logs --since 1h app | grep '"event":"render_error"' | tail -20
+docker compose logs --since 1h app | grep -o '"stage":"[^"]*"' | sort | uniq -c
+```
+
+- `429` → OpenRouter rate limit: проверить `HTTPS_PROXY`/IP, `IMAGE_MIN_GAP_MS`
+  (по умолчанию 10000 мс), повторы 10/20/40 с; при устойчивом 429 — сменить модель/прокси.
+- `content moderation` → FLUX/BFL блокирует фото (часто спальни/кровати); предложить
+  другую модель или попросить другое фото.
+- `400` от `/images` → сверить `modelcaps`; FLUX.2 Pro не принимает `resolution`.
+- Таймауты → `OPENROUTER_TIMEOUT_MS`, размер изображения, нагрузка.
+- Проверить, что кредиты вернулись: `credit_restored` в логах; при сбое возврата —
+  `credit_restore_error` и ручная корректировка через админку.
+- Если доля ошибок > 25% — P2, остановить рекламу/наплыв, разобрать причину.
+
+## 6. Платежи
+
+Симптом: пользователь заплатил, кредиты не пришли; `webhook_error`; Robokassa шлёт ошибку.
+
+```bash
+cd /root/remontvision
+docker compose logs --since 24h app | grep -E '"event":"(payment_created|webhook_error)"'
+docker compose exec -T db psql -U remont -d remontvision -c \
+  "select id,user_id,provider_payment_id,status,amount_kopecks,created_at from payments order by id desc limit 10"
+```
+
+- Проверить в кабинете Robokassa: ResultURL = `${APP_URL}/api/payments/robokassa/result`,
+  подпись (`ROBOKASSA_HASH_ALGO`), тестовый/боевой режим.
+- Начисление идемпотентно по `provider_payment_id`; повторный ResultURL безопасен.
+- Синхронизировать платёж: `POST /api/payments/sync` из сессии пользователя или
+  админский список `/api/admin/payments`; сверить `credit_txn`.
+- Если кредит не начислен и синхронизация не помогает — не менять БД вручную без
+  разрешения; зафиксировать payment id и сумму, эскалировать владельцу.
+- Возвраты выключены (`REFUNDS_ENABLED=false`) — только ручная процедура.
+
+## 7. Деплой упал / плохой релиз
+
+- GitHub Actions красный → смотреть шаг; если сборка/SSH — прод мог остаться на старой
+  версии, проверить `git log -1` и `docker compose ps`.
+- Сайт сломан после деплоя → откат: [ROLLBACK.md](ROLLBACK.md).
+- Не перезапускать деплой «на всякий случай»: сначала понять, какая версия на проде.
+- Миграции не удалять и не править; только новая миграция или restore.
+
+## 8. Бэкап не создался / нет свежего
+
+```bash
+cd /root/remontvision
+tail -100 /var/log/remontvision-backup.log
+ls -la /root/rv-backups | tail
+./scripts/ops/backup.sh
+```
+
+- `flock` занят → предыдущий запуск завис: `ps aux | grep backup.sh`, убить только
+  зависший процесс, повторить.
+- Нет места → раздел 4.
+- Remote недоступен → проверить `rclone lsd <remote>`, ключи/сеть; локальная копия
+  остаётся, но G4 не закрыт без off-site.
+- Регулярно (раз в месяц) — restore-учения: `restore-verify.sh --latest`.
+
+## 9. Утечка секрета
+
+1. Не публиковать значение и не пересылать его в чат.
+2. Отозвать/перевыпустить ключ у провайдера (OpenRouter, Resend, Robokassa, Yandex,
+   SSH, БД).
+3. Обновить `.env` на VPS, перезапустить `app`; при утечке SSH — удалить ключ из
+   `authorized_keys`, проверить входы.
+4. Проверить логи на несанкционированные вызовы/платежи.
+5. Зафиксировать инцидент и ротацию в задаче; сменить пароли, которые могли утечь.
+
+## 10. TLS/домен
+
+```bash
+certbot certificates
+certbot renew --dry-run
+nginx -t && systemctl reload nginx
+dig +short www.remontvision.ru
+```
+
+- Сертификат истёк → `certbot renew --force-renewal`, reload nginx.
+- Apex/www → проверить 301 и DNS; HSTS не отключать.
+- После — `smoke.sh` и `daily-check.sh`.
+
+## 11. Каталог/поиск товаров
+
+- `catalog`/`catalog-db` unhealthy → `docker compose logs catalog --tail=200`.
+- Поиск не работает, генерация работает → это деградация, не P1; сообщить в UI/задаче.
+- Не удалять `remontvision_catalogdata`: восстановление 36k офферов дорогое (weekly dump).
+
+## После инцидента
+
+Заполнить в задаче/инциденте:
+
+- время начала/обнаружения/восстановления;
+- симптом и влияние на пользователей;
+- что сделали (команды/коммиты);
+- корневая причина;
+- что предотвратит повтор (задача, алерт, тест);
+- ссылки на дампы/логи/протокол restore.
+
+Обновить [CHECKLIST-G4-G8.md](CHECKLIST-G4-G8.md) и, если менялась процедура, этот runbook.
+
+
+---
+
+<!-- source: docs/ops/CHECKLIST-G4-G8.md -->
+
+# Чек-лист эксплуатационной готовности G4/G8
+
+Дата проверки: 2026-11-09. Прод: `https://www.remontvision.ru`, коммит `0d0f89c`.
+Отметка ставится только по факту с доказательством (команда/лог/протокол).
+
+## G4 — восстановление данных
+
+| # | Условие | Статус | Доказательство / блокер |
+|---|---|---|---|
+| 1 | Бэкап БД снимается и читается | ✅ | дамп 1.3 MB, `pg_restore --list` OK |
+| 2 | Бэкап файлов снимается и читается | ✅ | 254 MB, 952 записи, gzip/sha256 OK |
+| 3 | Restore в чистую БД | ✅ PASS | 42 таблицы; users=6, rooms=119, renders=156, payments=15, products=110, migrations=44 |
+| 4 | Протокол restore зафиксирован | ✅ | [drills/2026-11-09.md](drills/2026-11-09.md) |
+| 5 | Копия **вне VPS** | ❌ | не выбран таргет, нет ключей rclone |
+| 6 | Ежедневное расписание | ❌ | cron не установлен (нужно разрешение) |
+| 7 | Ротация и контроль места | ⚠️ | скрипт умеет; диск 86%, локально держать 1 копию |
+| 8 | Алерт «бэкапа нет > 26 ч» | ⚠️ | `daily-check.sh` умеет; cron/канал не включены |
+| 9 | `.env`/секреты в escrow | ❌ | хранит владелец, в бэкап не входят |
+| 10 | Полное восстановление на чистом хосте | ❌ | процедура описана, второй хост не проверялся |
+
+**G4: не пройден.** Осталось: внешнее хранилище + cron + (желательно) escrow `.env`.
+Процедура и restore-учения выполнены.
+
+## G8 — мониторинг
+
+| # | Условие | Статус | Доказательство / блокер |
+|---|---|---|---|
+| 1 | Внешний uptime-чек `/api/health` | ❌ | нужен аккаунт Better Stack/UptimeRobot |
+| 2 | Алерт ≤ 5 мин | ❌ | зависит от п.1 и канала |
+| 3 | Тестовая остановка health дала алерт | ❌ | после п.1–2, в согласованное окно |
+| 4 | Ежедневный просмотр `render_error` | ⚠️ | скрипт готов, запускается вручную |
+| 5 | Cron ежедневной проверки | ❌ | нужно разрешение |
+| 6 | Мониторинг 429/платежей | ⚠️ | только дневной отчёт, алертов в реальном времени нет |
+| 7 | Runbook инцидентов | ✅ | [RUNBOOK.md](RUNBOOK.md) |
+| 8 | Smoke после деплоя/отката | ✅ | `scripts/ops/smoke.sh`, проверен на проде |
+
+**G8: не пройден.** Осталось: внешний монитор + канал алертов + приёмочный тест.
+
+## Что нужно от владельца
+
+1. **Внешнее хранилище** для бэкапов: Yandex Object Storage (рекомендуется), другой
+   сервер или S3. Нужны bucket/endpoint + ключ с правами только на bucket.
+2. **Канал алертов**: Telegram-бот (token + chat_id) или e-mail получателя. Для
+   внешнего монитора — аккаунт Better Stack/UptimeRobot (или согласие на GitHub-fallback).
+3. **Разрешение на изменения прода**: установить `rclone`, скопировать скрипты в
+   `/root/remontvision/scripts/ops/`, добавить 3 строки в root-crontab, включить logrotate.
+   Это не деплой и не меняет БД/`.env`.
+4. **Окно 10 минут** для теста G8: остановить `app`, получить алерт, поднять обратно.
+5. **Диск**: 86% занято. Расширить диск/том или согласовать очистку (старые образы,
+   логи, лишние копии). Иначе ежедневные полные бэкапы рискованны.
+6. **`.env`**: положить актуальную копию в менеджер паролей/зашифрованный архив.
+
+После выполнения п.1–6: включить cron, провести тест, заполнить таблицы, приложить
+скрин алерта и `restore-verify` отчёт — тогда G4/G8 можно подписывать.
+
+## Подпись
+
+| Роль | Имя | Дата | Решение |
+|---|---|---|---|
+| DevOps | — | 2026-11-09 | работа выполнена, G4/G8 заблокированы доступами |
+| QA/владелец | — | — | — |
+
+
+---
+
+<!-- source: docs/ops/drills/2026-11-09.md -->
+
+# Протокол restore-учений 2026-11-09
+
+Хост: `oblacko-vps-10` (прод). Прод-БД не изменялась. Для проверки поднимался
+отдельный контейнер `postgres:16-alpine` с `--network none`; после проверки удалён.
+
+## 1. БД
+
+- Источник: `pg_dump -Fc` БД `remontvision`, 2026-11-09 16:53 MSK.
+- Дамп: `/root/rv-backups/20261109-165346/db-remontvision-20261109-165346.dump`
+  (1.3 MB, sha256 сверен с manifest).
+- Восстановление: `pg_restore --no-owner --no-privileges --exit-on-error` — OK.
+
+| Проверка | Ожидание (manifest) | Получено |
+|---|---|---|
+| Таблиц в `public` | > 20 | 42 |
+| `users` | 6 | 6 |
+| `rooms` | 119 | 119 |
+| `renders` | 156 | 156 |
+| `payments` | 15 | 15 |
+| `products` | 110 | 110 |
+| `_migrations` | 44 | 44 |
+| Последняя миграция | `042_oauth_states.sql` | `042_oauth_states.sql` |
+
+**Результат: PASS.** Отчёт на VPS: `/root/rv-backups/restore-drill-20261109.md`.
+
+## 2. Файлы
+
+- Архив: `/root/rv-backups/20261109-165400/files-20261109-165400.tar.gz`
+  (254 MB, 952 записи).
+- gzip-целостность: OK.
+- sha256: совпадает с manifest.
+- Абсолютных путей и `..` в архиве нет.
+- Архив создан из `/app/data` (uploads, renders, products, style-images, procurement, search-lab).
+
+**Результат: PASS.** Отчёт на VPS: `/root/rv-backups/restore-drill-files-20261109.md`.
+
+## Что не проверено
+
+- Копия **вне VPS**: таргет хранения ещё не выбран, rclone не настроен.
+- Полное восстановление на чистом сервере «с нуля» (нет второго хоста).
+- `.env` и TLS: восстанавливаются из отдельного хранилища владельца/certbot.
 
 
 ---
@@ -2350,17 +3184,37 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-09. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+Дата обновления: 2026-11-10. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-10 — UI-кит v2 применён ко всем страницам, кроме админки
+
+- **Токены.** `web/src/index.css`: точные цвета кита (`#ece8de` страница, `#f9f7f0` бумага, `#130f0a` чернила, `#f3680f` оранж, `#a23300` rust, `#ede9df` beige, `#c2bdb3`/`#8a847a` линии, `#be241f` ошибка, `#fbe6d6` tint). Добавлен отдельный токен `--page` (фон страницы), `--background` остался бумагой — админка не меняется.
+- **Шрифты self-hosted.** Raleway 300/400, Golos Text 400/500, IBM Plex Mono 400 (cyrillic + latin) в `web/public/fonts/kit` и `public/fonts/kit`; убраны ссылки на Google Fonts из `web/index.html` и статичных страниц.
+- **Компоненты кита** в `index.css`: `k-btn` (44/48/56, primary/danger/icon/overlay, тени 4→6→0, disabled), `k-field`, `k-chk`/`k-radio`/`k-switch`, `k-tabs`/`k-tab`, `k-ut`, `k-tiles`/`k-tile`, `k-card`, `k-empty`, `k-ban`, `k-note`, `k-pb`/`k-steps`, `k-badge`, `k-dz`, `k-sheet` (шторка снизу на телефоне, центр на десктопе), `k-lb`, `k-table`, `k-pl`.
+- **Иконки.** Новый `KitIcon` — строго 21 иконка кита (штрих 1.5, острые углы, 20 px). Все lucide-иконки на пользовательских страницах заменены; где аналога нет — иконка убрана, осталась текстовая метка. Админка сохранила lucide.
+- **Логотип v2** (`Logo.tsx`, `Logo.css`, `favicon.svg`): симметричная рамка-видоискатель, точка-«глаз», «ремонт**вижн**» строчными; мигание точки при генерации.
+- **Страницы.** Home, Cabinet, Room, Procurement, Share и общие компоненты (GenerationPanel, ProcurementPanel, TaskDock, ShareDialog, ExamplesCarousel, ImageComparison, ObjectLayer, RoomRoadmap, GuideIcon) переведены на kit-разметку: шторки, табы, плитки стиля, шаги процесса, поля, пустые состояния, панель действий, липкая панель, тосты. Модалки входа и шаринга — нативные `<dialog>` без затронутой shadcn-обвязки админки.
+- **Статичные страницы.** `legal.css`, `offer/privacy/prices/contacts/delivery.html`: локальные шрифты, inline-логотип v2, фокус 3 px, кнопка с kit-тенью.
+- **Проверка.** `cd web && npx tsc -b && npm run build` — зелёные. Браузерный прогон 390×844 и 1366×900 по Home, Cabinet (история/кредиты), Room (редактор/разбор/закупка), Procurement, Share, генератор (фото/результат): нет горизонтального скролла, битых картинок и ошибок консоли; шрифты Golos Text / Raleway. Админка визуально не менялась.
+
+## 2026-11-09 — финальная волна ревью (дефолт модели, env-потолок, семантика покупок, устойчивость)
+
+- **Подсветка модели не расходится со списываемой.** `GET /api/models` отдаёт `default_key = resolveDefaultModelKey(models, getModelConfig().render)` (предпочитает строку с `model_id` runtime-модели рендера, иначе первую по `sort`); генератор инициализирует `modelKey` из `default_key`, а `model` шлёт в `POST /api/rooms` только после явного выбора карточки (флаг `modelChosen`).
+- **env-потолок арт-директора.** `isArtDirectionEnabled` теперь: `ART_DIRECTION_ENABLED=false` → `false` для всех моделей, даже если у строки `render_models` флаг `true`; иначе решает флаг строки (неизвестный ключ → `true`).
+- **Семантика покупок разделена.** `GET /api/credits` отдаёт и `has_purchased` (`credit_txn` с `reason='purchase'`, как `/api/me`), и `has_succeeded_payment` (`payments.status='succeeded'`). Чекбокс «Приватный режим» в генераторе включает именно `has_succeeded_payment` (серверный 403-гейт не менялся).
+- **Устойчивость.** `src/mailer.js` дренирует тело Resend-ответа перед `throw` (без логирования чувствительных данных); `validateModelInput` трактует `''` как `false` для булевых полей; `isValidRecord` (`utm.ts`) требует строковые значения; `convertHeicToJpeg` получил DI для тестов; `scripts/check-copy.mjs` не падает без `web/src`.
+- **Документация.** Добавлен чек-лист после миграции: [docs/ops/DEPLOY-CHECKLIST-v2.md](ops/DEPLOY-CHECKLIST-v2.md).
+- Тесты: `test/models.test.js` (+4: `resolveDefaultModelKey`, env-потолок, `bool('')`), `test/utm.test.js` (+1: нестроковые значения), `test/heic.test.js` (+2: успешная конвертация через DI и русская ошибка). Итог `npm test` 311/311 (1 skip).
 
 ## 2026-11-09 — конфигурируемая скорость и per-model арт-директор
 
 - `src/renderconfig.js`: добавлена настройка `image_min_gap_ms` (дефолт 10000 мс, целое, clamp 0–120000) в дефолты/валидацию/сохранение; экспорт `getImageMinGapMs()` (читает кеш, без БД). Фолбэк на env `IMAGE_MIN_GAP_MS` сохранён, пока `app_settings` не задаёт поле.
 - `src/openrouter.js`: убран модульный `IMAGE_MIN_GAP_MS`; `withImageSlot` теперь берёт паузу через `getImageMinGapMs()` на каждом вызове — настройку можно менять в админке без рестарта.
-- `src/modelconfig.js`: кеш строк `render_models` (`setRenderModelsForTests`/`loadRenderModels`) и `isArtDirectionEnabled(modelKey)` — per-model флаг `render_models.art_direction_enabled`, фолбэк на env `ART_DIRECTION_ENABLED`, когда ключ неизвестен.
+- `src/modelconfig.js`: кеш строк `render_models` (`setRenderModelsForTests`/`loadRenderModels`) и `isArtDirectionEnabled(modelKey)` — per-model флаг `render_models.art_direction_enabled`; env `ART_DIRECTION_ENABLED=false` — глобальный «потолок» (выключает арт-директора для всех моделей, в т.ч. с включённым per-model флагом), при невыставленном/включённом env решает флаг строки модели.
 - `src/artdirector.js`: `buildArtDirection` принимает `modelKey` и пропускает арт-директора, если флаг модели выключен (вместо глобальной константы `ART_DIRECTION_ENABLED`).
 - `src/jobs.js`: в `buildArtDirection` передаётся `render.model_key || getModelConfig().render`.
 - `src/server.js`: `loadRenderModels()` при старте и после создания/переключения моделей в админке — смена флага действует на следующие генерации без рестарта.
-- UI: в админке «Генерация → Скорость» добавлено числовое поле «Минимальный интервал между image-вызовами, мс» (min 0, step 1000, подсказка «0 — без паузы; меньше 10 000 может участить 429»). В прогресс-этапе генерации подпись обновлена до «Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов» (объединено с прежней заметкой про письмо, без дубля).
+- UI: в админке «Генерация → Скорость» добавлено числовое поле «Минимальный интервал между image-вызовами, мс» (min 0, step 1000, подсказка «0 — без паузы; меньше 10 000 может участить 429»). Заметка об ETA вынесена в единый футер этапа генерации «Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов» (из подписи этапа «Создание дизайна» дубль убран — см. следующую запись).
 - Документация: `docs/ops/speed-2026-11.md` дополнен блоком «После изменений» (конфиг настраивается; after-baseline требует новых рендеров после деплоя; платные генерации не запускались).
 - Тесты: `test/renderconfig.test.js` (+4: дефолт/кламп/валидация/getter паузы), `test/models.test.js` (+3: per-model флаг, unknown → env, env false). Итог `npm test` 303/303 (1 skip).
 
@@ -2471,6 +3325,23 @@ export const MAX_REFERENCES; // 4
 - `GET /api/credits` добавляет `has_purchased` (успешный платёж в `payments` со статусом `succeeded`).
 - Чистые хелперы в `src/modelconfig.js`: `resolveModelSelection`, `inheritPrivate`, `modelCreditsOrOne`; `src/db.js`: `listRenderModels`, `getRenderModel`, `hasSucceededPayment`.
 - Тесты: `npm test` 217/217.
+
+## 2026-11-09 — эксплуатационная готовность: бэкапы, restore, мониторинг, runbook
+
+- Добавлены `scripts/ops/`: `backup.sh` (pg_dump + tar.gz + manifest + rclone + retention), `restore-verify.sh` (restore в чистую временную БД), `daily-check.sh` (health, диск, контейнеры, бэкапы, `render_error`, платежи, 429, TLS), `smoke.sh`.
+- Добавлены `docs/ops/`: бэкап/restore, мониторинг, откат релиза, runbook инцидентов, чек-лист G4/G8.
+- На проде снят дамп БД (1.3 MB) и архив файлов (254 MB, 952 записи); restore в чистую БД `postgres:16-alpine` — **PASS**: 42 таблицы, users=6, rooms=119, renders=156, payments=15, products=110, migrations=44. Протокол: `docs/ops/drills/2026-11-09.md`.
+- Прод только читался: приложение, БД и `.env` не менялись, деплой не запускался. Обнаружено: cron/бэкапов нет, диск занят на 86%, внешнего монитора и алертов нет.
+- G4 не закрыт: нужна копия вне VPS (таргет + ключи). G8 не закрыт: нужен внешний uptime-монитор и канал алертов. Включение cron/rclone и тестовая остановка health требуют разрешения владельца (см. `docs/ops/CHECKLIST-G4-G8.md`).
+- Проверки: `bash -n` всех скриптов, локальный цикл backup → restore PASS, боевой restore PASS, `smoke.sh` на проде PASS. `npm test` не запускался: код приложения не менялся.
+
+## 2026-11-09 — growth-аудит и план первого коммерческого теста
+
+- Добавлен `docs/launch/GROWTH-TEST.md`: сегмент, конкуренты и альтернативы, 3 оффера, план тёплого и поискового теста, требования к лендингу, воронка и экономика, доступы и бюджет.
+- Вывод: обещание «реальные товары и смета» нельзя использовать до P0-2/A-16; первый оффер — «дизайн + план ремонта» (RAL, розетки, что менять). Платный поиск для пакета 399 ₽ требует конверсии клик → покупка ≥13% при CPC 30 ₽, поэтому первый тест — тёплый, без медиабюджета.
+- В `docs/launch/BACKLOG.md` добавлены GTM-1…GTM-6 (лендинг, оферта, аналитика, тёплый тест, поисковый тест, кейсы).
+- Проверено: прод-оферта всё ещё содержит 99/229 ₽, «ЮKassa», «30–60 секунд»; лендинг обещает реальные товары; sitemap без статей. Код не менялся, реклама/платежи/генерации не запускались.
+- Тесты не запускались: изменение только в документации.
 
 ## 2026-11-08 — новый логотип
 

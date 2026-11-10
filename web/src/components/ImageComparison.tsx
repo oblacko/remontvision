@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties, PointerEvent } from 'react'
-import { ChevronsLeftRight } from 'lucide-react'
+import { KitIcon } from './KitIcon'
 
 type ImageComparisonProps = {
   before: string
@@ -48,8 +48,8 @@ export function ImageComparison({ before, after, beforeAlt, afterAlt, ratio, lab
         <span className="comparison-tag left-4 top-4">До</span>
         <span className="comparison-tag right-4 top-4">После</span>
         <div className="pointer-events-none absolute inset-y-0 w-px bg-background" style={{ left: `${position}%` }}>
-          <span className="absolute left-1/2 top-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <ChevronsLeftRight className="size-5" aria-hidden="true" />
+          <span className="absolute left-1/2 top-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-1 bg-primary text-primary-foreground">
+            <KitIcon name="l" className="size-4" /><KitIcon name="r" className="size-4" />
           </span>
         </div>
         <input

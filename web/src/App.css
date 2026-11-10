@@ -234,7 +234,7 @@
   border-bottom: 1px solid transparent;
   color: oklch(var(--muted-foreground));
   font-family: ui-monospace, monospace;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
@@ -292,7 +292,7 @@
   background: oklch(var(--foreground) / 0.82);
   color: oklch(var(--background));
   font-family: ui-monospace, monospace;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   line-height: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
