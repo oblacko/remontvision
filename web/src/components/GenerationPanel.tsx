@@ -717,7 +717,7 @@ export function GenerationPanel({
     setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setCanRetry(false); retryRef.current = null
     clearEditRefs()
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
-    setGeneratingTitle(edit?.generatingTitle || (edit?.parentId && effectiveObjectTarget ? `Правка объекта «${ruLabel(effectiveObjectTarget.label)}»` : ''))
+    setGeneratingTitle(edit?.generatingTitle || (edit?.parentId && effectiveObjectTarget ? `Редактирование объекта «${ruLabel(effectiveObjectTarget.label)}»` : ''))
     try {
       const isBase = !roomId
       let id = roomId
@@ -1301,7 +1301,7 @@ export function GenerationPanel({
                               </div>
                             ) : <p className="mt-2 text-xs leading-5 text-muted-foreground">Архитектор не оставил подсказок — опишите редактирование ниже.</p>}
                             {effectiveObjectTarget && (
-                              <p className="mt-5 border-l-2 border-primary pl-3 text-sm font-medium">Правка объекта «{ruLabel(effectiveObjectTarget.label)}»</p>
+                              <p className="mt-5 border-l-2 border-primary pl-3 text-sm font-medium">Редактирование объекта «{ruLabel(effectiveObjectTarget.label)}»</p>
                             )}
                             <div id="edit-blocks" className="mt-5 space-y-3">
                               {editRefs.map((ref) => {
