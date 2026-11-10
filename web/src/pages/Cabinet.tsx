@@ -79,7 +79,6 @@ export default function Cabinet() {
   const [toast, setToast] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
   const toastTimer = useRef<number | null>(null)
-  const [buyConsent, setBuyConsent] = useState(false)
   const [buying, setBuying] = useState('')
   const [loginStep, setLoginStep] = useState<'email' | 'code'>('email')
   const [loginEmail, setLoginEmail] = useState(() => localStorage.getItem('rv_last_email') || '')
@@ -312,7 +311,6 @@ export default function Cabinet() {
     showToast('Ссылка скопирована')
   }
   const buyPack = async (pack: Pack) => {
-    if (!buyConsent) return setError('Отметьте акцепт оферты перед оплатой')
     setBuying(pack.id); setError('')
     try {
       const r = await fetch('/api/payments/create', {
@@ -462,7 +460,7 @@ export default function Cabinet() {
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {packs.map(pack => <div key={pack.id} className={`k-pl${pack.id === 'flat' ? ' on' : ''}`}><div className="flex items-end justify-between gap-2"><span className="display-title text-4xl">{String(pack.credits).padStart(2, '0')}</span><span className="k-caption">{pack.credits === 1 ? 'кредит' : pack.credits < 5 ? 'кредита' : 'кредитов'}</span></div><p className="mt-3 text-xl font-light">{rub(pack.price_kopecks / 100)}</p><p className="text-xs text-muted-foreground">{pack.title}</p>{pack.id === 'flat' && <p className="k-badge k-badge--hot self-start">Выгодно</p>}<button type="button" onClick={() => buyPack(pack)} disabled={buying === pack.id} className="k-btn k-btn--primary k-btn--block mt-2">{buying === pack.id ? 'Переходим…' : 'Купить'} <KitIcon name="ur" /></button></div>)}
               </div>
-              <label className="k-chk mt-4 items-start"><input type="checkbox" checked={buyConsent} onChange={e => setBuyConsent(e.target.checked)} /><span>Принимаю <a className="underline" href="/offer" target="_blank" rel="noopener">оферту</a> и <a className="underline" href="/prices" target="_blank" rel="noopener">условия и цены</a></span></label>
+              <p className="mt-4 text-xs leading-5 text-muted-foreground">Нажимая «Купить», вы принимаете <a className="underline underline-offset-2" href="/offer" target="_blank" rel="noopener">оферту</a> и <a className="underline underline-offset-2" href="/prices" target="_blank" rel="noopener">условия и цены</a>.</p>
               <div className="mt-8"><div className="flex items-center justify-between border-b pb-3"><h2 className="eyebrow">История кредитов</h2><span className="text-xs text-muted-foreground">{credits.length} {plural(credits.length, 'операция', 'операции', 'операций')}</span></div><div className="divide-y">{credits.map(c => <div key={c.id} className="flex items-start justify-between gap-4 py-3 text-sm"><div><b className={c.delta > 0 ? 'text-primary-text' : ''}>{c.delta > 0 ? '+' : ''}{c.delta} кр.</b><p className="mt-1 text-xs text-muted-foreground">{reasonNames[c.reason] || c.reason}{c.note ? ` · ${c.note}` : ''}</p></div><span className="shrink-0 text-xs text-muted-foreground">{dateTime(c.created_at)}</span></div>)}{!credits.length && <p className="py-4 text-sm text-muted-foreground">Операций пока нет.</p>}</div></div>
             </section>
             <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — дизайн (в каждом 3 бесплатных редактирования) или подбор товаров.</li><li>+2 кредита за друга после его первой покупки.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="lnk mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <KitIcon name="ur" /></a></aside>
