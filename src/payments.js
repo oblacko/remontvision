@@ -183,6 +183,13 @@ async function syncYukassaPayment(providerPaymentId) {
       await client.query(`INSERT INTO credit_txn (user_id, delta, reason, payment_id) VALUES ($1,$2,'purchase',$3)`,
         [userId, credits, local.id]);
     }
+    try {
+      // Динамический импорт: referral.js уже импортирует grantCredits из этого модуля.
+      const { rewardReferrerForPurchase } = await import('./referral.js');
+      await rewardReferrerForPurchase(userId, client);
+    } catch (e) {
+      log({ event: 'referral_error', invitee_id: userId, error: String(e.message || e).slice(0, 300) });
+    }
     log({ event: 'payment_succeeded', user_id: userId, credits, provider: 'yukassa', provider_payment_id: providerPaymentId });
     return { granted: true, credits, user_id: userId, local_payment_id: local.id };
   });
@@ -244,6 +251,13 @@ async function syncRobokassaPayment(local, { amountKopecks = null } = {}) {
     if (credits > 0) {
       await client.query(`INSERT INTO credit_txn (user_id, delta, reason, payment_id) VALUES ($1,$2,'purchase',$3)`,
         [payment.user_id, credits, payment.id]);
+    }
+    try {
+      // Динамический импорт: referral.js уже импортирует grantCredits из этого модуля.
+      const { rewardReferrerForPurchase } = await import('./referral.js');
+      await rewardReferrerForPurchase(payment.user_id, client);
+    } catch (e) {
+      log({ event: 'referral_error', invitee_id: payment.user_id, error: String(e.message || e).slice(0, 300) });
     }
     log({ event: 'payment_succeeded', user_id: payment.user_id, credits, provider: 'robokassa', provider_payment_id: payment.provider_payment_id });
     return { granted: true, credits, user_id: payment.user_id, local_payment_id: payment.id };
@@ -373,6 +387,7 @@ export async function enqueueRenderWithCredit({
   modelCredits = 1,
   isPrivate = false,
   editSourcePath = null,
+  editMove = null,
 }) {
   const iteration = Boolean(parentRenderId);
   let finalIsPrivate = isPrivate;
@@ -424,9 +439,9 @@ export async function enqueueRenderWithCredit({
     }
 
     await client.query(
-      `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, model_key, model_credits, is_private, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, edit_source_path, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'queued')`,
-      [id, roomId, parentRenderId, rootRenderId, modelKey, modelCredits, finalIsPrivate, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null, editSourcePath]);
+      `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, model_key, model_credits, is_private, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, edit_source_path, edit_move, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'queued')`,
+      [id, roomId, parentRenderId, rootRenderId, modelKey, modelCredits, finalIsPrivate, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null, editSourcePath, editMove ? JSON.stringify(editMove) : null]);
 
     if (chargedUserId && delta !== 0) {
       await client.query(

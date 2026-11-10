@@ -8,7 +8,7 @@ import { ObjectLayer } from '@/components/ObjectLayer'
 import { useTasks } from '@/components/TaskDock'
 import { goal } from '@/lib/analytics'
 import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
-import { buildMoveCleanupInstruction, buildMovePreview, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
+import { buildMoveCleanupInstruction, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
 import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
@@ -640,7 +640,7 @@ export function GenerationPanel({
     }
   }
 
-  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File }) {
+  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File; move?: { bbox: number[]; dx: number; dy: number; label?: string } }) {
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
@@ -696,6 +696,7 @@ export function GenerationPanel({
           }))))
           refs.forEach(ref => { if (ref.file) fd.append('refs', ref.file) })
         }
+        if (edit?.move) fd.append('move', JSON.stringify(edit.move))
         if (edit?.sourceFile) fd.append('source', edit.sourceFile)
         if (edit?.refFile) fd.append('ref', edit.refFile)
         if (!edit?.refFile && edit?.refUrl) fd.append('ref_url', edit.refUrl)
@@ -1070,12 +1071,11 @@ export function GenerationPanel({
                         onConfirmMove={async (index, dx, dy) => {
                           const object = visibleObjects[index]
                           if (!object) return
-                          const instruction = buildMoveCleanupInstruction(object.label)
-                          const preview = await buildMovePreview(current.image, object.bbox, dx, dy)
+                          const instruction = buildMoveCleanupInstruction(object.label, object.bbox)
                           setObjectsOn(false)
                           void startGeneration(instruction, current.styleName, {
                             parentId: current.id,
-                            sourceFile: preview || undefined,
+                            move: { bbox: object.bbox, dx, dy, label: object.label },
                           })
                         }}
                       />

@@ -209,6 +209,8 @@ export async function cropObjectDataUrl(imageUrl: string, bbox: number[]): Promi
   }
 }
 
-export function buildMoveCleanupInstruction(label?: string): string {
-  return `На изображении ${ruLabel(label) || 'объект'} уже перенесён в новое положение. Уберите след старого места, впишите объект в свет и перспективу, сделайте края естественными. Не двигайте объект снова и не меняйте остальную комнату.`
+export function buildMoveCleanupInstruction(label?: string, bbox?: number[]): string {
+  const region = bbox ? bboxRegion(bbox) : null
+  const area = region ? ` (область ${region.x}%, ${region.y}%, ${region.w}% × ${region.h}%)` : ''
+  return `Удалите ${ruLabel(label) || 'объект'}${area} и восстановите фон, свет и перспективу так, чтобы не осталось следа. Остальную комнату не меняйте.`
 }

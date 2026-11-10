@@ -10,7 +10,7 @@ import { analyzeRoomBrief } from './artdirector.js';
 import { rateLimit } from './ratelimit.js';
 import { requestCode, verifyCode, sessionUser, setSessionCookie, clearSessionCookie, logout } from './auth.js';
 import { startYandex, completeYandexLogin, appBaseUrl, yandexConfigured } from './oauth.js';
-import { getOrCreateCode, resolveCode, rewardPair, referralCookieValue, setReferralCookie, clearReferralCookie } from './referral.js';
+import { getOrCreateCode, resolveCode, recordReferral, referralCookieValue, setReferralCookie, clearReferralCookie } from './referral.js';
 import { createPayment, syncPayment, createRefund, refundQuote, adjustCredits, yukassaConfigured, robokassaConfigured, paymentProvider } from './payments.js';
 import { verifyResult as verifyRobokassaResult } from './robokassa.js';
 import { putBuffer, getBuffer, remove, redirectUrl, resolveDisk } from './storage.js';
@@ -36,6 +36,7 @@ import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig
 import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { generateArticle, articlePage } from './articles.js';
+import { normalizeMove } from './moveobject.js';
 import { buildSitemapXml, STATIC_ENTRIES } from './sitemap.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { logProcurementClick } from './procurement.js';
@@ -169,14 +170,14 @@ function requireAdmin(req, res) {
   return true;
 }
 
-// Реферальная программа: после создания нового пользователя начисляем +2 обоим,
-// если в куке был валидный rv_ref. Ошибка начисления не ломает регистрацию.
+// Реферальная программа: при регистрации только запоминаем, кто пригласил.
+// +2 кредита пригласившему начисляются позже — при первой успешной оплате приглашённого.
 async function applyReferral(userId, req, res) {
   const rawCode = referralCookieValue(req);
   if (!rawCode) return;
   try {
     const ownerId = await resolveCode(rawCode);
-    if (ownerId) await rewardPair(ownerId, userId);
+    if (ownerId) await recordReferral(ownerId, userId);
   } catch (e) {
     log({ event: 'referral_error', user_id: userId, error: String(e.message || e).slice(0, 300) });
   } finally {
@@ -2230,6 +2231,16 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', max
   }
   if (!instruction) instruction = 'Применить правки по референсам';
   const refPath = editRefs[0]?.path || null;
+  let editMove = null;
+  const moveRaw = String(req.body?.move || '').trim();
+  if (moveRaw) {
+    try {
+      editMove = normalizeMove(JSON.parse(moveRaw));
+    } catch {
+      editMove = null;
+    }
+    if (!editMove) return res.status(400).json({ error: 'Некорректные данные переноса' });
+  }
   let editSourcePath = null;
   const sourceFile = req.files?.source?.[0] || null;
   if (sourceFile) {
@@ -2252,6 +2263,7 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', max
       refProductId: refProduct ? refProduct.id : null,
       editRefs: (editRefs.length > 1 || editRefs.some(r => r.instruction)) ? editRefs : null,
       editSourcePath,
+      editMove,
       modelKey,
       modelCredits,
       isPrivate,

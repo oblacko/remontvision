@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
 import { GenerationPanel } from '@/components/GenerationPanel'
-import { buildMoveCleanupInstruction, buildMovePreview } from '@/lib/objects'
+import { buildMoveCleanupInstruction } from '@/lib/objects'
 import { useTasks } from '@/components/TaskDock'
 import { GuideIcon } from '@/components/GuideIcon'
 import { Logo } from '@/components/Logo'
@@ -136,12 +136,11 @@ export default function Room() {
     if (!object || !render?.id || !image || objectBusy) return
     setObjectBusy(true); setError('')
     try {
-      const instruction = buildMoveCleanupInstruction(object.label)
-      const preview = await buildMovePreview(image, object.bbox, dx, dy)
+      const instruction = buildMoveCleanupInstruction(object.label, object.bbox)
       const fd = new FormData()
       fd.append('text', instruction)
       fd.append('parent_id', render.id)
-      if (preview) fd.append('source', preview)
+      fd.append('move', JSON.stringify({ bbox: object.bbox, dx, dy, label: object.label }))
       const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Не удалось переместить объект')
