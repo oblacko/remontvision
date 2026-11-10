@@ -512,6 +512,7 @@ async function processRender(renderId) {
         sourceImageB64: srcB64,
         referenceImagesB64,
         aspectRatio,
+        resolution: render.resolution || null,
         ...(iteration ? { aspect: aspectRatio, model: editModel } : {}),
       });
       imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
@@ -795,7 +796,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, resolution = null }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -814,6 +815,7 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     isPrivate,
     editSourcePath,
     editMove,
+    resolution,
   });
   return id;
 }

@@ -79,3 +79,8 @@ export function sanitizeResolutionPrices(prices, allowedResolutions) {
   }
   return out;
 }
+
+// Разрешена ли резолюция для модели: пустая карта возможностей = не поддерживает.
+export function resolutionAllowed(id, resolution) {
+  return modelCaps(id).resolutions.includes(String(resolution || ''));
+}

@@ -29,7 +29,7 @@ import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
-import { validateModelOptions, modelCaps } from './modelcaps.js';
+import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
@@ -1435,17 +1435,25 @@ app.post('/api/rooms', rateLimit, upload.fields([
   const photo = req.files?.photo?.[0];
   const cleanupPhoto = req.files?.cleanup_photo?.[0];
   if (!photo) return res.status(400).json({ error: 'Нет фото' });
-  if (!MOCK_MODE) {
-    const bal = await q.creditBalance(req.user.id);
-    if (bal < 1) {
-      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: bal });
-    }
-  }
   // Выбор модели: явная должна быть активной, иначе 400; дефолт — активная модель
   // с model_id === runtime render-модели, затем первая активная по sort.
   const models = await q.listRenderModels(true);
   const modelSelection = resolveModelSelection(req.body?.model, models, getModelConfig().render);
   if (modelSelection === null) return res.status(400).json({ error: 'Модель недоступна' });
+  const modelRow = models.find(m => m.id === modelSelection.key || m.model_id === modelSelection.key) || null;
+  const resolution = String(req.body?.resolution || '').trim() || null;
+  if (resolution && !(modelRow && resolutionAllowed(modelRow.model_id, resolution))) {
+    return res.status(400).json({ error: 'Разрешение не поддерживается моделью' });
+  }
+  const perRenderCredits = resolution
+    ? priceForResolution(modelRow?.resolution_prices, resolution, modelSelection.credits)
+    : modelSelection.credits;
+  if (!MOCK_MODE) {
+    const bal = await q.creditBalance(req.user.id);
+    if (bal < perRenderCredits) {
+      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/app?buy=1', balance: bal });
+    }
+  }
   // multipart/form-data присылает `private` строкой, поэтому принимаем true и '1'/'true'.
   const isPrivate = req.body?.private === true || req.body?.private === '1' || req.body?.private === 'true';
   // Приватный режим — только для купивших пакет (тот же источник, что и GET /api/credits).
@@ -1506,7 +1514,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
   await q.createRoom(id, style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, conceptKey);
   try {
-    await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: modelSelection.credits, isPrivate });
+    await enqueueRender({ roomId: id, chargedUserId: req.user.id, requestIp: clientIp(req), modelKey: modelSelection.key, modelCredits: perRenderCredits, isPrivate, resolution });
   } catch (e) {
     if (e.status === 402) {
       await q.deleteRoom(id);

@@ -232,3 +232,17 @@ test('sanitizeResolutionPrices keeps only allowed resolutions', () => {
   assert.deepEqual(sanitizeResolutionPrices({ '1K': 1 }, ['1K', '2K']), { '1K': 1 });
   assert.deepEqual(sanitizeResolutionPrices(null, ['1K']), {});
 });
+
+const { resolutionAllowed } = await import('../src/modelcaps.js');
+
+test('resolutionAllowed rejects 4K for FLUX 2 Pro', () => {
+  assert.equal(resolutionAllowed('black-forest-labs/flux-2-pro', '4K'), false);
+});
+
+test('resolutionAllowed accepts 2K for FLUX 3 Image', () => {
+  assert.equal(resolutionAllowed('black-forest-labs/flux-3-image', '2K'), true);
+});
+
+test('resolutionAllowed rejects empty resolution', () => {
+  assert.equal(resolutionAllowed('black-forest-labs/flux-3-image', ''), false);
+});
