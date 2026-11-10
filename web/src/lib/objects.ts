@@ -164,21 +164,51 @@ export async function buildMovePreview(imageUrl: string, bbox: number[], dx: num
     const sy = Math.max(0, y * image.naturalHeight)
     const tx = Math.max(0, Math.min(image.naturalWidth - sw, (x + dx) * image.naturalWidth))
     const ty = Math.max(0, Math.min(image.naturalHeight - sh, (y + dy) * image.naturalHeight))
-    // Старое место: размываем, чтобы в превью не было двух одинаковых объектов.
+    // Старое место: клонируем соседний фон, затем смягчаем края.
     ctx.save()
     ctx.beginPath()
     ctx.rect(sx, sy, sw, sh)
     ctx.clip()
-    ctx.filter = 'blur(18px)'
-    ctx.drawImage(image, 0, 0)
+    const left = sx - sw
+    const right = sx + sw
+    const above = sy - sh
+    const below = sy + sh
+    if (left >= 0) ctx.drawImage(image, left, sy, sw, sh, sx, sy, sw, sh)
+    else if (right + sw <= image.naturalWidth) ctx.drawImage(image, right, sy, sw, sh, sx, sy, sw, sh)
+    else if (above >= 0) ctx.drawImage(image, sx, above, sw, sh, sx, sy, sw, sh)
+    else if (below + sh <= image.naturalHeight) ctx.drawImage(image, sx, below, sw, sh, sx, sy, sw, sh)
+    else { ctx.filter = 'blur(18px)'; ctx.drawImage(image, 0, 0) }
     ctx.restore()
     ctx.filter = 'none'
-    // Объект на новом месте.
-    ctx.drawImage(image, sx, sy, sw, sh, tx, ty, sw, sh)
+    // Объект на новом месте с небольшим инсетом, чтобы края вписалось моделью.
+    const iw = sw * 0.02
+    const ih = sh * 0.02
+    ctx.drawImage(image, sx + iw, sy + ih, sw - iw * 2, sh - ih * 2, tx + iw, ty + ih, sw - iw * 2, sh - ih * 2)
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
     if (!blob) return null
     return new File([blob], 'move-preview.jpg', { type: 'image/jpeg' })
   } catch {
     return null
   }
+}
+
+
+export async function cropObjectDataUrl(imageUrl: string, bbox: number[]): Promise<string | null> {
+  try {
+    const image = await loadImage(imageUrl)
+    const [x = 0, y = 0, w = 0, h = 0] = bbox
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(w * image.naturalWidth))
+    canvas.height = Math.max(1, Math.round(h * image.naturalHeight))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(image, x * image.naturalWidth, y * image.naturalHeight, w * image.naturalWidth, h * image.naturalHeight, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.9)
+  } catch {
+    return null
+  }
+}
+
+export function buildMoveCleanupInstruction(label?: string): string {
+  return `На изображении ${ruLabel(label) || 'объект'} уже перенесён в новое положение. Уберите след старого места, впишите объект в свет и перспективу, сделайте края естественными. Не двигайте объект снова и не меняйте остальную комнату.`
 }

@@ -2132,7 +2132,7 @@ app.get('/s/:token/image', h(async (req, res) => {
 }));
 
 const MAX_EDIT_REFS = 4;
-app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', maxCount: MAX_EDIT_REFS }, { name: 'ref', maxCount: 1 }]), h(async (req, res) => {
+app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', maxCount: MAX_EDIT_REFS }, { name: 'ref', maxCount: 1 }, { name: 'source', maxCount: 1 }]), h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const room = await q.getRoom(req.params.id);
   if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
@@ -2230,6 +2230,15 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', max
   }
   if (!instruction) instruction = 'Применить правки по референсам';
   const refPath = editRefs[0]?.path || null;
+  let editSourcePath = null;
+  const sourceFile = req.files?.source?.[0] || null;
+  if (sourceFile) {
+    try {
+      editSourcePath = await saveUpload(sourceFile, 'uploads');
+    } catch {
+      return res.status(400).json({ error: 'Не удалось прочитать подготовленный исходник правки' });
+    }
+  }
 
   try {
     await enqueueRender({
@@ -2242,6 +2251,7 @@ app.post('/api/rooms/:id/iterate', rateLimit, upload.fields([{ name: 'refs', max
       refPath,
       refProductId: refProduct ? refProduct.id : null,
       editRefs: (editRefs.length > 1 || editRefs.some(r => r.instruction)) ? editRefs : null,
+      editSourcePath,
       modelKey,
       modelCredits,
       isPrivate,

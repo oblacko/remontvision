@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
-import { moveDirection, ruLabel } from '@/lib/objects'
+import { cropObjectDataUrl, moveDirection, ruLabel } from '@/lib/objects'
 import type { VisibleObject } from '@/lib/objects'
 
 type Props = {
@@ -21,6 +21,8 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [offset, setOffset] = useState<{ index: number; dx: number; dy: number } | null>(null)
   const [popup, setPopup] = useState<Popup | null>(null)
+  const [dragImage, setDragImage] = useState<string | null>(null)
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
 
   const safeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1.5
 
@@ -31,6 +33,10 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     setActiveIndex(index)
     setOffset({ index, dx: 0, dy: 0 })
     setPopup(null)
+    const box = objects[index]?.bbox
+    if (box) void cropObjectDataUrl(image, box).then(url => setDragImage(url))
+    const rect = wrapRef.current?.getBoundingClientRect()
+    if (rect) setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
   }
 
   const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
@@ -40,12 +46,16 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     const dy = event.clientY - drag.startY
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true
     setOffset({ index: drag.index, dx, dy })
+    const rect = wrapRef.current?.getBoundingClientRect()
+    if (rect) setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
   }
 
   const onPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current
     dragRef.current = null
     setOffset(null)
+    setDragImage(null)
+    setPointer(null)
     if (!drag) return
     const rect = wrapRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return
@@ -69,7 +79,7 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
       className="relative mx-auto w-full"
       style={{ aspectRatio: String(safeRatio), width: `min(100%, calc(62svh * ${safeRatio}))` }}
     >
-      <div className="absolute inset-0 overflow-hidden bg-foreground">
+      <div className="absolute inset-0 overflow-hidden bg-secondary">
         <img src={image} alt="Сгенерированный дизайн интерьера" className="h-full w-full select-none object-cover" draggable={false} />
       </div>
       {objects.map((object, index) => {
@@ -88,7 +98,7 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={() => { dragRef.current = null; setOffset(null) }}
-            className={`absolute cursor-move touch-none border-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected ? 'border-primary bg-primary/15' : 'border-primary/70 bg-transparent hover:bg-primary/10'}`}
+            className={`absolute cursor-move touch-none border-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary ${selected ? 'border-primary bg-primary/15' : 'border-primary/70 bg-transparent hover:bg-primary/10'}`}
             style={{
               left: `${x * 100}%`,
               top: `${y * 100}%`,
@@ -97,12 +107,25 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
               transform: drag ? `translate(${drag.dx}px, ${drag.dy}px)` : undefined,
             }}
           >
-            <span className={`pointer-events-none absolute left-0 top-0 max-w-full truncate px-1.5 py-0.5 font-mono text-[10px] uppercase leading-4 tracking-wide ${selected ? 'bg-primary text-primary-foreground' : 'bg-foreground/85 text-background'}`}>
+            <span className={`pointer-events-none absolute left-0 top-0 max-w-full truncate px-1.5 py-0.5 font-mono text-xs uppercase leading-4 tracking-wide ${selected ? 'bg-primary text-primary-foreground' : 'bg-foreground/85 text-background'}`}>
               {ruLabel(object.label)}
             </span>
           </button>
         )
       })}
+      {offset && dragImage && pointer && (() => {
+        const object = objects[offset.index]
+        const box = object?.bbox
+        const rect = wrapRef.current?.getBoundingClientRect()
+        if (!box || !rect) return null
+        const [x = 0, y = 0, w = 0, h = 0] = box
+        return (
+          <>
+            <div className="pointer-events-none absolute z-10 border-2 border-dashed border-primary" style={{ left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`, transform: `translate(${offset.dx}px, ${offset.dy}px)` }} />
+            <img src={dragImage} alt="" className="pointer-events-none absolute z-10 border-2 border-primary object-cover opacity-90 shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ left: pointer.x - (w * rect.width) / 2, top: pointer.y - (h * rect.height) / 2, width: w * rect.width, height: h * rect.height }} />
+          </>
+        )
+      })()}
       {popup && popupObject && popupBox && (
         <div
           className="absolute z-20 w-56 border-2 border-foreground bg-background p-3 shadow-[4px_4px_0_oklch(var(--primary))]"

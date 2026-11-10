@@ -8,7 +8,7 @@ import { ObjectLayer } from '@/components/ObjectLayer'
 import { useTasks } from '@/components/TaskDock'
 import { goal } from '@/lib/analytics'
 import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
-import { buildMoveInstruction, buildMovePreview, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
+import { buildMoveCleanupInstruction, buildMovePreview, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
 import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
@@ -640,7 +640,7 @@ export function GenerationPanel({
     }
   }
 
-  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }> }) {
+  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File }) {
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
@@ -696,6 +696,7 @@ export function GenerationPanel({
           }))))
           refs.forEach(ref => { if (ref.file) fd.append('refs', ref.file) })
         }
+        if (edit?.sourceFile) fd.append('source', edit.sourceFile)
         if (edit?.refFile) fd.append('ref', edit.refFile)
         if (!edit?.refFile && edit?.refUrl) fd.append('ref_url', edit.refUrl)
         const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
@@ -840,7 +841,7 @@ export function GenerationPanel({
             <div onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); acceptPhoto(event.dataTransfer.files?.[0]) }}>
               <input ref={photoInput} id="gen-photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="peer sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptPhoto(event.target.files?.[0])} />
               {photo ? (
-                <div className="gen-photo-preview relative mx-auto border border-foreground bg-foreground" style={{ '--photo-ratio': photoRatio } as PanelStyle}>
+                <div className="gen-photo-preview relative mx-auto border border-foreground bg-secondary" style={{ '--photo-ratio': photoRatio } as PanelStyle}>
                   <img src={cleaned && cleanupRequested ? cleaned.url : photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
                     <span className="truncate text-xs">{photoName}</span>
@@ -1050,7 +1051,7 @@ export function GenerationPanel({
                   </div>
                   <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Версия {iterations.length}</span>
                 </div>}
-                {!inline && <div className="relative mt-6 bg-foreground">
+                {!inline && <div className="relative mt-6 bg-secondary">
                   <div className="max-h-[62svh] overflow-hidden">
                     {objectsOn && visibleObjects.length ? (
                       <ObjectLayer
@@ -1069,12 +1070,12 @@ export function GenerationPanel({
                         onConfirmMove={async (index, dx, dy) => {
                           const object = visibleObjects[index]
                           if (!object) return
-                          const instruction = buildMoveInstruction({ label: object.label, bbox: object.bbox, dx, dy })
+                          const instruction = buildMoveCleanupInstruction(object.label)
                           const preview = await buildMovePreview(current.image, object.bbox, dx, dy)
                           setObjectsOn(false)
                           void startGeneration(instruction, current.styleName, {
                             parentId: current.id,
-                            refs: preview ? [{ file: preview, description: `Целевое положение объекта «${ruLabel(object.label)}». Переместите его туда, старое место восстановите.` }] : undefined,
+                            sourceFile: preview || undefined,
                           })
                         }}
                       />
@@ -1198,7 +1199,7 @@ export function GenerationPanel({
                         {expanded && (
                           <div className="border-t border px-4 py-4">
                             <div className="flex gap-3">
-                              <img src={item.image} alt="" className="h-20 w-16 shrink-0 border border object-cover" />
+                              <img src={item.image} alt="" className="h-20 w-16 shrink-0 border object-cover" />
                               <p className="text-xs leading-5 text-muted-foreground">Эта версия показана на экране. Запустите редактирование от неё — новая версия добавится в историю.</p>
                             </div>
                             <p className="eyebrow mt-5">Быстрое редактирование</p>
@@ -1280,14 +1281,14 @@ export function GenerationPanel({
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <p className="eyebrow">Прикрепить референс</p>
-                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring" aria-label="Удалить изменение"><KitIcon name="x" className="size-4" /></button>
+                                      <button type="button" onClick={() => removeEditRef(ref.id)} className="k-btn k-btn--icon size-11 min-h-0" aria-label="Удалить изменение"><KitIcon name="x" /></button>
                                     </div>
                                     {hasSource ? (
-                                      <div className="mt-2 flex items-center gap-3 border border p-2">
+                                      <div className="mt-2 flex items-center gap-3 border p-2">
                                         {ref.preview ? (
-                                          <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border border object-cover" />
+                                          <img src={ref.preview} alt="" className="h-12 w-12 shrink-0 border object-cover" />
                                         ) : (
-                                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border border bg-secondary text-xs uppercase tracking-widest text-muted-foreground">URL</a>
+                                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="flex h-12 w-12 shrink-0 items-center justify-center border bg-secondary text-xs uppercase tracking-widest text-muted-foreground">URL</a>
                                         )}
                                         <div className="min-w-0 flex-1">
                                           <p className="truncate text-xs">{ref.url || ref.name || 'Референс'}</p>
@@ -1295,7 +1296,7 @@ export function GenerationPanel({
                                         </div>
                                       </div>
                                     ) : null}
-                                    <div className="mt-2 grid grid-cols-2 gap-px border border bg-border">
+                                    <div className="mt-2 grid grid-cols-2 gap-px border bg-border">
                                       <label className="inline-flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-2 bg-background px-2 text-xs transition-colors hover:bg-secondary">
                                         <KitIcon name="plus" className="size-4 shrink-0 text-primary-text" /> <span className="min-w-0 break-words">{hasSource ? 'Заменить файл' : 'Выбрать файл'}</span>
                                         <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => setEditRefFile(ref.id, event.target.files?.[0])} />
@@ -1314,7 +1315,7 @@ export function GenerationPanel({
                                       rows={4}
                                       placeholder="Опишите, что изменить"
                                       aria-label="Текст изменения"
-                                      className="mt-2 min-h-20 w-full min-w-0 border border bg-background px-3 py-2 text-sm leading-5 outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground focus:ring-2 focus:ring-ring/20"
+                                      className="k-field mt-2 text-sm"
                                     />
                                   </div>
                                 )
@@ -1380,7 +1381,7 @@ export function GenerationPanel({
             <p className="eyebrow">Шаг 04 / Товары и электрика</p>
             <div className="mt-6 grid gap-10 xl:grid-cols-2">
               <div>
-                <div className="relative mx-auto w-full bg-foreground" style={{ aspectRatio: String(current.ratio), width: `min(100%, calc(58svh * ${current.ratio}))` }}>
+                <div className="relative mx-auto w-full bg-secondary" style={{ aspectRatio: String(current.ratio), width: `min(100%, calc(58svh * ${current.ratio}))` }}>
                   <img src={current.image} alt="Сгенерированный дизайн интерьера" className="absolute inset-0 h-full w-full object-cover" />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">

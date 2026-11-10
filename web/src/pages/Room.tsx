@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
 import { GenerationPanel } from '@/components/GenerationPanel'
-import { buildMoveInstruction, buildMovePreview, ruLabel } from '@/lib/objects'
+import { buildMoveCleanupInstruction, buildMovePreview } from '@/lib/objects'
 import { useTasks } from '@/components/TaskDock'
 import { GuideIcon } from '@/components/GuideIcon'
 import { Logo } from '@/components/Logo'
@@ -136,15 +136,12 @@ export default function Room() {
     if (!object || !render?.id || !image || objectBusy) return
     setObjectBusy(true); setError('')
     try {
-      const instruction = buildMoveInstruction({ label: object.label, bbox: object.bbox, dx, dy })
+      const instruction = buildMoveCleanupInstruction(object.label)
       const preview = await buildMovePreview(image, object.bbox, dx, dy)
       const fd = new FormData()
       fd.append('text', instruction)
       fd.append('parent_id', render.id)
-      if (preview) {
-        fd.append('refs', preview)
-        fd.append('ref_meta', JSON.stringify([{ description: `Целевое положение объекта «${ruLabel(object.label)}». Переместите его туда, старое место восстановите.` }]))
-      }
+      if (preview) fd.append('source', preview)
       const r = await fetch(`/api/rooms/${id}/iterate`, { method: 'POST', body: fd })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Не удалось переместить объект')
@@ -309,7 +306,7 @@ export default function Room() {
             </div>
 
             {image && (
-              <div className="relative mt-6 bg-foreground">
+              <div className="relative mt-6 bg-secondary">
                 {objectsOn && visibleObjects.length ? (
                   <ObjectLayer
                     image={image}

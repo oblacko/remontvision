@@ -157,7 +157,12 @@ async function processRender(renderId) {
     if (iteration) {
       const parent = render.parent_render_id ? await q.getRender(render.parent_render_id) : null;
       if (parent?.image_path) sourceStored = parent.image_path;
-      meta.source_used = 'parent';
+      if (render.edit_source_path) {
+        sourceStored = render.edit_source_path;
+        meta.source_used = 'move_composite';
+      } else {
+        meta.source_used = 'parent';
+      }
       if (parent) parentItems = await q.itemsForRender(parent.id);
       const manualRefs = Array.isArray(render.edit_refs) ? render.edit_refs.filter(r => r && r.path) : [];
       const editRefs = [];
@@ -776,7 +781,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -793,6 +798,7 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     modelKey,
     modelCredits,
     isPrivate,
+    editSourcePath,
   });
   return id;
 }
