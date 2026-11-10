@@ -333,7 +333,7 @@ export default function Room() {
                     image={image}
                     ratio={renderRatio}
                     objects={visibleObjects}
-                    onCreateEdit={(index) => { setSelectedObject(index); setTab('editor') }}
+                    onCreateEdit={(index) => { setSelectedObject(index); setTab('editor'); requestAnimationFrame(() => document.getElementById('room-editor')?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }}
                     onConfirmMove={(index, dx, dy) => { if (!objectBusy) void sendObjectMove(index, dx, dy) }}
                   />
                 ) : (
@@ -356,7 +356,7 @@ export default function Room() {
               ))}
             </nav>
 
-            <div className={tab === 'editor' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
+            <div id="room-editor" className={tab === 'editor' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
               <GenerationPanel
                 key={id}
                 open

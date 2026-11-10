@@ -258,6 +258,7 @@ export function GenerationPanel({
   const [openHistory, setOpenHistory] = useState<string | null>(null)
   const [genStage, setGenStage] = useState('queued')
   const [genMode, setGenMode] = useState<'base' | 'edit'>('base')
+  const [generatingTitle, setGeneratingTitle] = useState('')
   const [elapsed, setElapsed] = useState(0)
   const [lightbox, setLightbox] = useState(false)
   const [roomId, setRoomId] = useState('')
@@ -708,7 +709,7 @@ export function GenerationPanel({
     }
   }
 
-  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File; move?: { bbox: number[]; dx: number; dy: number; label?: string } }) {
+  async function startGeneration(request: string, styleName: string, edit?: { target?: string; productId?: number; refFile?: File; refUrl?: string; parentId?: string; refs?: Array<{ file?: File; url?: string; description?: string }>; sourceFile?: File; move?: { bbox: number[]; dx: number; dy: number; label?: string }; generatingTitle?: string }) {
     if (!file && !roomId) { setPhotoError('Сначала загрузите фото комнаты'); setStep('photo'); return }
     if (!roomType) { setPhotoError('Выберите тип комнаты'); setStep('photo'); return }
     if (busy) return
@@ -716,6 +717,7 @@ export function GenerationPanel({
     setBusy(true); setProductBinding(Boolean(edit?.productId)); setGenError(''); setCanRetry(false); retryRef.current = null
     clearEditRefs()
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
+    setGeneratingTitle(edit?.generatingTitle || (edit?.parentId && effectiveObjectTarget ? `Правка объекта «${ruLabel(effectiveObjectTarget.label)}»` : ''))
     try {
       const isBase = !roomId
       let id = roomId
@@ -1038,7 +1040,7 @@ export function GenerationPanel({
             <div className="flex items-start gap-4">
               <KitIcon name="sp" spin className="mt-1 size-8 shrink-0 text-primary-text" />
               <div>
-                <h3 className="display-title text-3xl">{productBinding ? 'Привязываем товар' : genMode === 'edit' ? 'Применяем редактирование' : 'Создаём ваш дизайн'}</h3>
+                <h3 className="display-title text-3xl">{generatingTitle || (productBinding ? 'Привязываем товар' : genMode === 'edit' ? 'Применяем редактирование' : 'Создаём ваш дизайн')}</h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{genStageInfo.hint}</p>
               </div>
             </div>
@@ -1111,6 +1113,7 @@ export function GenerationPanel({
                           void startGeneration(instruction, current.styleName, {
                             parentId: current.id,
                             move: { bbox: object.bbox, dx, dy, label: object.label },
+                            generatingTitle: `Перемещаем «${ruLabel(object.label)}»`,
                           })
                         }}
                       />
@@ -1297,6 +1300,9 @@ export function GenerationPanel({
                                 </div>
                               </div>
                             ) : <p className="mt-2 text-xs leading-5 text-muted-foreground">Архитектор не оставил подсказок — опишите редактирование ниже.</p>}
+                            {effectiveObjectTarget && (
+                              <p className="mt-5 border-l-2 border-primary pl-3 text-sm font-medium">Правка объекта «{ruLabel(effectiveObjectTarget.label)}»</p>
+                            )}
                             <div id="edit-blocks" className="mt-5 space-y-3">
                               {editRefs.map((ref) => {
                                 const hasSource = Boolean(ref.file || ref.url)
