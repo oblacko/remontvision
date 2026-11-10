@@ -372,6 +372,7 @@ export async function enqueueRenderWithCredit({
   modelKey = null,
   modelCredits = 1,
   isPrivate = false,
+  editSourcePath = null,
 }) {
   const iteration = Boolean(parentRenderId);
   let finalIsPrivate = isPrivate;
