@@ -1,6 +1,6 @@
-// Реферальная программа: «+2 кредита обоим».
-// Пользователь получает уникальный код; при регистрации нового пользователя по ссылке
-// оба получают по 2 кредита (однократно на приглашённого).
+// Реферальная программа: +2 кредита пригласившему после первой успешной оплаты
+// приглашённого. При регистрации только запоминаем пару (referral_rewards),
+// начисление — в момент оплаты, однократно на приглашённого (флаг rewarded).
 import crypto from 'node:crypto';
 import { q, withTransaction } from './db.js';
 import { log } from './openrouter.js';
@@ -31,6 +31,14 @@ export function rewardDecision({ ownerId, inviteeId, alreadyRewarded }) {
   return { reward: true, reason: 'ok' };
 }
 
+// Чистое решение о награде за покупку: нужна запись пары, не self и не rewarded.
+export function purchaseRewardDecision({ ownerId, inviteeId, rewarded }) {
+  if (!ownerId || !inviteeId) return { reward: false, reason: 'missing' };
+  if (String(ownerId) === String(inviteeId)) return { reward: false, reason: 'self' };
+  if (rewarded) return { reward: false, reason: 'already' };
+  return { reward: true, reason: 'ok' };
+}
+
 // Существующий код пользователя или новый (с повтором при коллизии кода).
 export async function getOrCreateCode(userId) {
   const existing = await q.referralCodeByUser(userId);
@@ -56,22 +64,38 @@ export async function resolveCode(codeRaw) {
   return row?.user_id || null;
 }
 
-// Однократное начисление +2 обоим. Атомарно: referral_rewards уникален по invitee_id,
-// поэтому повторная попытка (второй вход того же приглашённого) ничего не начисляет.
-export async function rewardPair(ownerId, inviteeId) {
-  if (ownerId === inviteeId) return { rewarded: false };
+// Запоминаем пару «пригласивший — приглашённый» при регистрации, без начислений.
+// Уникальность по invitee_id: повторная регистрация/вход ничего не дублирует.
+export async function recordReferral(ownerId, inviteeId) {
+  if (String(ownerId) === String(inviteeId)) return { recorded: false, reason: 'self' };
   return withTransaction(async client => {
     const inserted = await client.query(
       `INSERT INTO referral_rewards (invitee_id, owner_id) VALUES ($1, $2)
        ON CONFLICT (invitee_id) DO NOTHING RETURNING invitee_id`,
       [inviteeId, ownerId]);
-    if (!inserted.rows[0]) return { rewarded: false };
-    // grantCredits с клиентом транзакции: начисления коммитятся вместе с reward-строкой.
-    await grantCredits(ownerId, REFERRAL_REWARD, 'referral', null, client);
-    await grantCredits(inviteeId, REFERRAL_REWARD, 'referral', null, client);
-    log({ event: 'referral_rewarded', owner_id: ownerId, invitee_id: inviteeId });
-    return { rewarded: true };
+    return { recorded: Boolean(inserted.rows[0]) };
   });
+}
+
+// Награда пригласившему при первой успешной оплате приглашённого.
+// Идемпотентно: флаг rewarded переставляется в той же транзакции, что и начисление.
+// client — транзакция платёжного webhook, чтобы начисление коммитилось вместе с оплатой.
+export async function rewardReferrerForPurchase(inviteeId, client = null) {
+  const run = async dbClient => {
+    const { rows } = await dbClient.query(
+      `UPDATE referral_rewards SET rewarded = true
+       WHERE invitee_id = $1 AND rewarded = false RETURNING owner_id`,
+      [inviteeId]);
+    const row = rows[0];
+    if (!row) return { rewarded: false, reason: 'missing' };
+    const decision = purchaseRewardDecision({ ownerId: row.owner_id, inviteeId, rewarded: false });
+    if (!decision.reward) return { rewarded: false, reason: decision.reason };
+    // grantCredits с клиентом транзакции: начисление коммитится вместе с флагом rewarded.
+    await grantCredits(row.owner_id, REFERRAL_REWARD, 'referral', null, dbClient);
+    log({ event: 'referral_rewarded_on_purchase', owner_id: row.owner_id, invitee_id: inviteeId });
+    return { rewarded: true };
+  };
+  return client ? run(client) : withTransaction(run);
 }
 
 // Куки rv_ref: ставится на /r/:code, читается при регистрации, стирается после начисления.
