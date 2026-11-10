@@ -146,7 +146,7 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
 type StylePreset = { key: string; name: string; accent: string; image_url?: string }
-type RenderModelOption = { key: string; label: string; credits: number }
+type RenderModelOption = { key: string; label: string; credits: number; resolutions: string[]; resolution_prices: Record<string, number> }
 const defaultStylePresets: StylePreset[] = [
   { key: 'minimalism', name: 'Современный минимализм', accent: 'sand', image_url: '/images/style-minimal.webp' },
   { key: 'scandinavian', name: 'Скандинавский', accent: 'dust', image_url: '/images/style-scandi.webp' },
@@ -243,6 +243,8 @@ export function GenerationPanel({
   const [priceTier, setPriceTier] = useState('comfort')
   const [useCatalog] = useState(true)
   const [renderModels, setRenderModels] = useState<RenderModelOption[]>([])
+  const [resolution, setResolution] = useState<string | null>(null)
+  const [variantsCount, setVariantsCount] = useState(1)
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [modelChosen, setModelChosen] = useState(false)
   const [isPrivate, setIsPrivate] = useState(false)
@@ -284,6 +286,16 @@ export function GenerationPanel({
   const showResultMain = !inline || heroItems.length > 0
   // Редактируем существующий дизайн, а не создаём новый: модель и приватность наследуются от родителя.
   const editing = Boolean(roomId)
+  const selectedModel = renderModels.find(m => m.key === modelKey) || null
+  const effectiveResolution = selectedModel && selectedModel.resolutions.length
+    ? (resolution && selectedModel.resolutions.includes(resolution)
+        ? resolution
+        : (selectedModel.resolutions.includes('1K') ? '1K' : selectedModel.resolutions[0]))
+    : null
+  const renderCredits = selectedModel
+    ? (Number(selectedModel.resolution_prices?.[effectiveResolution ?? '']) || Number(selectedModel.credits) || 1)
+    : 1
+  const totalCredits = renderCredits * variantsCount
   const productMatches = current?.analysis?.products || []
   const visibleObjects = (current?.analysis?.visible || []).filter(
     (object): object is { label?: string; bbox: number[]; area?: number } => typeof object === 'object' && object !== null && Array.isArray(object.bbox) && object.bbox.length === 4,
@@ -359,7 +371,13 @@ export function GenerationPanel({
       .then(d => {
         const list = Array.isArray(d?.models) ? (d.models as RenderModelOption[]) : []
         if (list.length) {
-          setRenderModels(list.map(m => ({ key: String(m.key), label: String(m.label), credits: Number(m.credits) })))
+          setRenderModels(list.map(m => ({
+            key: String(m.key),
+            label: String(m.label),
+            credits: Number(m.credits),
+            resolutions: Array.isArray(m.resolutions) ? m.resolutions.map(String) : [],
+            resolution_prices: m.resolution_prices && typeof m.resolution_prices === 'object' ? m.resolution_prices : {},
+          })))
           const defaultKey = typeof d?.default_key === 'string' ? d.default_key : String(list[0].key)
           setModelKey(defaultKey)
         }
@@ -718,6 +736,7 @@ export function GenerationPanel({
     clearEditRefs()
     setGenMode(edit?.parentId ? 'edit' : 'base'); setGenStage('queued'); setElapsed(0); setStep('generating')
     setGeneratingTitle(edit?.generatingTitle || (edit?.parentId && effectiveObjectTarget ? `Редактирование объекта «${ruLabel(effectiveObjectTarget.label)}»` : ''))
+    if (!edit?.parentId && variantsCount > 1) setGeneratingTitle(`Создаём вариантов: ${variantsCount}`)
     try {
       const isBase = !roomId
       let id = roomId
@@ -741,11 +760,13 @@ export function GenerationPanel({
         fd.append('keep_furniture', usingCleaned ? '0' : '1')
         fd.append('use_catalog', useCatalog ? '1' : '0')
         if (modelKey && modelChosen) fd.append('model', modelKey)
+        fd.append('variants', String(variantsCount))
+        if (effectiveResolution) fd.append('resolution', effectiveResolution)
         fd.append('private', isPrivate ? '1' : '0')
         const r = await fetch('/api/rooms', { method: 'POST', body: fd })
         const d = await r.json().catch(() => ({}))
         if (r.status === 401) { setStep('style'); onRequireLogin(); return }
-        if (r.status === 402) { setGenError(''); setStep('style'); setCreditOpen(true); return }
+        if (r.status === 402) { setGenError(d.error || 'Не хватает кредитов'); setStep('style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
         goal('render_start', { style: styleName, room_type: roomType })
         id = d.id
@@ -976,7 +997,7 @@ export function GenerationPanel({
                       const selected = modelKey === m.key
                       const highlighted = selected && !editing
                       return (
-                        <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
+                        <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true); if (resolution && !m.resolutions.includes(resolution)) setResolution(null) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
                           <span className={`block ${highlighted ? '' : 'opacity-80'}`}>
                             <span className="flex items-center justify-between gap-2 text-sm font-medium">
                               {m.label}
@@ -989,6 +1010,21 @@ export function GenerationPanel({
                       )
                     })}
                   </div>
+                  {!editing && selectedModel && selectedModel.resolutions.length > 1 && (
+                    <div className="mt-4">
+                      <p className="eyebrow">Качество</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {selectedModel.resolutions.map(r => {
+                          const active = effectiveResolution === r
+                          return (
+                            <button key={r} type="button" aria-pressed={active} onClick={() => setResolution(r)} className={`min-h-10 border px-3 font-mono text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-input hover:border-foreground'}`}>
+                              {r}<span className="ml-2 opacity-70">{Number(selectedModel.resolution_prices?.[r] ?? selectedModel.credits)} кр.</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className={renderModels.length > 0 ? 'mt-6' : ''}>
@@ -1014,6 +1050,18 @@ export function GenerationPanel({
               <div className="mt-4 flex flex-wrap items-center gap-3" role="alert">
                 <p className="text-sm text-destructive">{genError}</p>
                 {canRetry && <button type="button" onClick={retryGeneration} disabled={busy} className="k-btn k-btn--s">Повторить</button>}
+              </div>
+            )}
+
+            {!editing && (
+              <div className="mt-8 flex flex-wrap items-center gap-3 border-t pt-6">
+                <span className="text-sm">Варианты</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setVariantsCount(n => Math.max(1, n - 1))} disabled={variantsCount <= 1} aria-label="Меньше вариантов" className="k-btn k-btn--s size-9 justify-center p-0 disabled:opacity-40">−</button>
+                  <b className="w-6 text-center font-mono">{variantsCount}</b>
+                  <button type="button" onClick={() => setVariantsCount(n => Math.min(8, n + 1))} disabled={variantsCount >= 8} aria-label="Больше вариантов" className="k-btn k-btn--s size-9 justify-center p-0 disabled:opacity-40">+</button>
+                </div>
+                <p className="text-xs text-muted-foreground">{variantsCount} × {renderCredits} = <b className="text-foreground">{totalCredits} кр.</b></p>
               </div>
             )}
 
