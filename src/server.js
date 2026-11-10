@@ -31,6 +31,7 @@ import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
 import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
 import { parseVariantsCount, pluralVariants, retryAllowed } from './variants.js';
+import { sharePageHtml } from './sharepage.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
@@ -101,7 +102,6 @@ app.get(['/app', '/app/'], (_req, res) => res.redirect(301, '/'));
 const webIndexPath = path.join(WEB_DIST, 'index.html');
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.all(['/cabinet', '/cabinet/', '/cabinet/paid', '/cabinet/paid/', '/cabinet/fail', '/cabinet/fail/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
-app.get('/s/:token', (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 
 app.get(['/room/:id', '/room/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
@@ -148,6 +148,31 @@ async function saveUpload(file, dir) {
 
 // async-обработчики: единая точка 500
 const h = fn => (req, res, next) => fn(req, res, next).catch(next);
+
+// Страница шаринга: отдаём SPA с OG-мета для превью в мессенджерах.
+// Маршрут объявлен после `const h` — иначе TDZ-падение на старте (как /r/:code).
+let shareIndexCache = null;
+function shareIndexHtml() {
+  if (shareIndexCache) return shareIndexCache;
+  const file = fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html');
+  try { shareIndexCache = fs.readFileSync(file, 'utf8'); } catch { shareIndexCache = ''; }
+  return shareIndexCache;
+}
+app.get('/s/:token', h(async (req, res) => {
+  const render = await q.renderByShareToken(req.params.token);
+  if (!render || !render.image_path) return res.status(404).end();
+  const html = sharePageHtml({
+    indexHtml: shareIndexHtml(),
+    title: `Дизайн ${render.style || 'интерьера'} — RemontVision`,
+    description: `${render.room_type || 'Комната'} · дизайн интерьера, сгенерированный нейросетью`,
+    imageUrl: `${APP_URL}/s/${req.params.token}/image`,
+    canonicalUrl: `${APP_URL}/s/${req.params.token}`,
+  });
+  if (!html) {
+    return res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
+  }
+  res.type('html').send(html);
+}));
 
 // Реферальная ссылка: ставим cookie rv_ref на 30 дней и ведём на главную.
 // Невалидный код тоже ведёт на главную (отдельной страницы 404 нет).
