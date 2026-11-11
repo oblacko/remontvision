@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import sharp from 'sharp'
-import { normalizeMove, composeMove } from '../src/moveobject.js'
+import { normalizeMove, composeMove, moveDestinationRegion, cropObjectPng } from '../src/moveobject.js'
 
 test('normalizeMove clamps bbox and deltas', () => {
   const move = normalizeMove({ bbox: [0.1, 0.2, 0.3, 0.4], dx: 2, dy: -2, label: 'Шкаф' })
@@ -30,4 +30,18 @@ test('composeMove pastes the object at the destination and clears the source', a
   assert.ok(dest.b > dest.r, `destination should be blue, got ${JSON.stringify(dest)}`)
   const old = px(20, 20)
   assert.ok(old.r > old.b, `old place should be red, got ${JSON.stringify(old)}`)
+})
+
+
+test('moveDestinationRegion clamps the destination to the frame', () => {
+  assert.deepEqual(moveDestinationRegion([0.1, 0.1, 0.2, 0.2], 0.3, 0.05), { x: 40, y: 15, w: 20, h: 20 })
+  assert.deepEqual(moveDestinationRegion([0.8, 0.8, 0.2, 0.2], 0.5, 0.5), { x: 80, y: 80, w: 20, h: 20 })
+})
+
+test('cropObjectPng extracts the bbox at full resolution', async () => {
+  const parent = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#ff0000' } }).png().toBuffer()
+  const crop = await cropObjectPng(parent, [0.1, 0.1, 0.2, 0.2])
+  const meta = await sharp(crop).metadata()
+  assert.equal(meta.width, 20)
+  assert.equal(meta.height, 20)
 })

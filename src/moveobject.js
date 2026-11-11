@@ -63,3 +63,29 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
     .png()
     .toBuffer();
 }
+
+export function moveDestinationRegion(bbox, dx, dy) {
+  const [x = 0, y = 0, w = 0, h = 0] = bbox || [];
+  const nx = Math.min(1 - w, Math.max(0, x + dx));
+  const ny = Math.min(1 - h, Math.max(0, y + dy));
+  return {
+    x: Math.round(nx * 100),
+    y: Math.round(ny * 100),
+    w: Math.round(w * 100),
+    h: Math.round(h * 100),
+  };
+}
+
+export async function cropObjectPng(parentBuf, bbox) {
+  const move = normalizeMove({ bbox, dx: 0, dy: 0 });
+  if (!move) throw new Error('Некорректный bbox объекта');
+  const meta = await sharp(parentBuf).metadata();
+  const width = Number(meta.width);
+  const height = Number(meta.height);
+  const [x, y, w, h] = move.bbox;
+  const sx = Math.max(0, Math.min(width - 1, Math.round(x * width)));
+  const sy = Math.max(0, Math.min(height - 1, Math.round(y * height)));
+  const sw = Math.max(1, Math.min(width - sx, Math.round(w * width)));
+  const sh = Math.max(1, Math.min(height - sy, Math.round(h * height)));
+  return sharp(parentBuf).extract({ left: sx, top: sy, width: sw, height: sh }).png().toBuffer();
+}

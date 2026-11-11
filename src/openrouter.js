@@ -472,6 +472,27 @@ Photorealistic result, no text, no watermarks, no people.`;
 // Промт для переноса: модель должна именно УДАЛИТЬ объект и восстановить фон.
 // Общие инварианты редактирования здесь не подходят: они запрещают трогать
 // встроенные панели и «двигать объекты», что конфликтует с задачей.
+// Промт для ВСТАВКИ: модель рисует объект заново в целевой области по референсу,
+// а не вставляет вырезанный прямоугольник.
+export function buildMoveInsertPrompt({ roomType = 'Другое', instruction = '', label = '' } = {}) {
+  const room = roomTypeByName(roomType);
+  const roomName = room?.prompt || 'room';
+  const name = label || 'object';
+  return `IMAGE ROLES:
+Image 1 — current interior render with the target object already removed. This is the background to edit.
+Image 2 — reference of the ${name} to place: its shape, color, material and finish. Ignore Image 2's background, framing, studio lighting and any other objects.
+
+This is a ${roomName}.
+TASK: draw the ${name} from Image 2 into Image 1 at the specified region, as a real object physically present in the room. Match the wall/furniture perspective, scale, lighting, shadows and edges. Do not paste a rectangular cut-out.
+${instruction}
+
+RULES:
+- Change only the target region. Keep everything else in Image 1 exactly as it is: camera, geometry, walls, floor, furniture, decor and lighting.
+- The result must look like a real ${name} in this room, not a sticker.
+- No text, no watermarks, no people.
+Photorealistic result.`;
+}
+
 export function buildMoveRemovalPrompt({ roomType = 'Другое', instruction = '' } = {}) {
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room';

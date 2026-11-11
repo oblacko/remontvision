@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { q } from './db.js';
-import { MOCK_MODE, buildPrompt, buildEditPrompt, buildMoveRemovalPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, assessArchitecture, snapAspect, log } from './openrouter.js';
+import { MOCK_MODE, buildPrompt, buildEditPrompt, buildMoveRemovalPrompt, buildMoveInsertPrompt, generateRender, generateCleanupRender, assessProductEdit, parseRender, assessArchitecture, snapAspect, log } from './openrouter.js';
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
@@ -14,7 +14,7 @@ import { reviewDesign } from './architect.js';
 import { buildDesignDirection, DESIGN_DIRECTION_ENABLED } from './designeragent.js';
 import { buildLayoutPlan } from './layoutagent.js';
 import { buildAnalysis } from './analysis.js';
-import { composeMove } from './moveobject.js';
+import { composeMove, cropObjectPng, moveDestinationRegion } from './moveobject.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
 import { modelCaps } from './modelcaps.js';
@@ -535,13 +535,29 @@ async function processRender(renderId) {
       addCost('design', out.cost);
       if (render.edit_move) {
         try {
-          const composed = await composeMove(originalBuf, Buffer.from(out.b64, 'base64'), render.edit_move);
-          imageB64 = composed.toString('base64');
-          meta.move = { ...render.edit_move, composed: true };
-          log({ event: 'move_composed', room_id: room.id, render_id: renderId, label: render.edit_move.label || null });
+          const move = render.edit_move;
+          const region = moveDestinationRegion(move.bbox, move.dx, move.dy);
+          const insertPrompt = buildMoveInsertPrompt({
+            roomType,
+            label: move.label,
+            instruction: `Place the object at region (${region.x}%, ${region.y}%, ${region.w}% × ${region.h}%) of Image 1. Preserve its identity from Image 2.`,
+          });
+          const crop = await cropObjectPng(originalBuf, move.bbox);
+          const insert = await generateRender({
+            prompt: insertPrompt,
+            sourceImageB64: await bufferToDataUrl(Buffer.from(out.b64, 'base64')),
+            referenceImagesB64: [await bufferToDataUrl(crop)],
+            aspectRatio,
+            model: editModel,
+          });
+          imageB64 = insert.b64;
+          cost += insert.cost || 0;
+          addCost('move_insert', insert.cost);
+          meta.move = { ...move, inserted: true };
+          log({ event: 'move_inserted', room_id: room.id, render_id: renderId, label: move.label || null, cost_usd: insert.cost ?? null });
         } catch (e) {
-          meta.move = { ...render.edit_move, composed: false };
-          log({ event: 'move_compose_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+          meta.move = { ...render.edit_move, inserted: false };
+          log({ event: 'move_insert_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
       }
       }
