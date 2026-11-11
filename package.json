@@ -8,6 +8,7 @@
     "start": "node --env-file=.env src/server.js",
     "dev": "node --watch --env-file=.env src/server.js",
     "test": "node --test test/*.test.js",
+    "test:integration": "node --env-file=.env --test test/integration/*.test.js",
     "check:copy": "node scripts/check-copy.mjs",
     "catalog:images": "node --env-file=.env scripts/generate-catalog-images.mjs",
     "docs:llms": "node scripts/build-llms-full.mjs"
