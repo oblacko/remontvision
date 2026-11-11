@@ -428,6 +428,7 @@ export default function Room() {
 
             <div className={tab === 'roadmap' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
               <RoadmapTab
+                roomId={id}
                 items={items}
                 hasPurchased={Boolean(room.has_purchased)}
                 busy={roadmapBusy}
@@ -542,7 +543,7 @@ function PassportTab({ render, passport, busy, error, hasBreakdown, onRun, onGoB
 
           {!!passport.objects?.length && (
             <section className="border border-foreground/25 p-4">
-              <p className="eyebrow">Что в интерьере</p>
+              <p className="eyebrow">Видно на изображении</p>
               <ul className="mt-3 space-y-2">
                 {passport.objects.map((object, index) => (
                   <li key={index} className="text-sm leading-5">
@@ -569,13 +570,13 @@ function PassportTab({ render, passport, busy, error, hasBreakdown, onRun, onGoB
           <div className="grid gap-4 sm:grid-cols-2">
             {!!passport.keep?.length && (
               <section className="border border-foreground/25 p-4">
-                <p className="eyebrow">Что важно сохранить</p>
+                <p className="eyebrow">Рекомендуем сохранить</p>
                 <ul className="mt-3 space-y-1 text-sm leading-5">{passport.keep.map((item, index) => <li key={index}>• {item}</li>)}</ul>
               </section>
             )}
             {!!passport.measure?.length && (
               <section className="border border-foreground/25 p-4">
-                <p className="eyebrow">Что замерить на объекте</p>
+                <p className="eyebrow">Требует замера</p>
                 <ul className="mt-3 space-y-1 text-sm leading-5">{passport.measure.map((item, index) => <li key={index}>• {item}</li>)}</ul>
               </section>
             )}

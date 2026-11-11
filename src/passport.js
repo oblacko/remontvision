@@ -124,7 +124,7 @@ function fontBoldPath() {
 
 // PDF на A4: заголовок, блоки, перенос строк. Кириллица — через DejaVuSans,
 // который ставится в образ (см. Dockerfile).
-export function renderPassportPdf(passport) {
+export function renderPassportPdf(passport, { imageBuffer = null } = {}) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 48, bottom: 48, left: 48, right: 48 } });
     const chunks = [];
@@ -155,6 +155,12 @@ export function renderPassportPdf(passport) {
       doc.fontSize(10).fillColor('#222222').text(`• ${text}`, { lineGap: 2 });
     };
 
+    if (imageBuffer) {
+      try {
+        doc.image(imageBuffer, { fit: [495, 260], align: 'center' });
+        doc.moveDown(0.5);
+      } catch { /* битое изображение не должно ломать паспорт */ }
+    }
     setBold();
     doc.fontSize(20).fillColor('#111111').text(passport.title);
     setBody();
@@ -182,7 +188,7 @@ export function renderPassportPdf(passport) {
     }
 
     if (passport.objects.length) {
-      heading('Что в интерьере');
+      heading('Видно на изображении');
       for (const object of passport.objects) {
         bullet([object.label, object.description].filter(Boolean).join(' — '));
         if (object.note) paragraph(`   Уточнить: ${object.note}`);
@@ -199,13 +205,13 @@ export function renderPassportPdf(passport) {
     }
 
     if (passport.keep.length) {
-      heading('Что важно сохранить');
+      heading('Рекомендуем сохранить');
       for (const item of passport.keep) bullet(item);
       doc.moveDown(0.4);
     }
 
     if (passport.measure.length) {
-      heading('Что замерить и проверить на объекте');
+      heading('Требует замера на объекте');
       for (const item of passport.measure) bullet(item);
       doc.moveDown(0.4);
     }

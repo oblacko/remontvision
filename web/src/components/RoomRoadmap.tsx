@@ -88,12 +88,13 @@ function EmptyRoadmap({ busy, error, onGenerate }: { busy: boolean; error: strin
   )
 }
 
-export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
+export function RoadmapTab({ items, hasPurchased, busy, error, actions, roomId }: {
   items: RoadmapItem[]
   hasPurchased: boolean
   busy: boolean
   error: string
   actions: RoadmapActions
+  roomId?: string
 }) {
   const [commentId, setCommentId] = useState<string | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
@@ -131,6 +132,9 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
           <button type="button" onClick={actions.onRegenerate} disabled={busy} className="k-btn k-btn--s">
             {busy ? <KitIcon name="sp" spin /> : <KitIcon name="re" />} Перегенерировать
           </button>
+          {roomId && items.length > 0 && (
+            <a href={`/api/rooms/${roomId}/roadmap.pdf`} className="k-btn k-btn--s"><KitIcon name="dl" />Скачать PDF</a>
+          )}
           <button type="button" onClick={actions.onShare} className="k-btn k-btn--s">
             <KitIcon name="sh" /> Поделиться
           </button>

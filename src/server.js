@@ -44,6 +44,7 @@ import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig
 import { generateArticle, articlePage } from './articles.js';
 import { normalizeMove } from './moveobject.js';
 import { buildPassport, renderPassportPdf } from './passport.js';
+import { renderRoadmapPdf } from './roadmappdf.js';
 import { buildSitemapXml, STATIC_ENTRIES } from './sitemap.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { logProcurementClick } from './procurement.js';
@@ -2056,7 +2057,9 @@ app.get('/api/renders/:id/passport.pdf', h(async (req, res) => {
   const passport = (render.meta?.passport && render.meta.passport.render_id === render.id)
     ? render.meta.passport
     : buildPassport({ render, room });
-  const pdf = await renderPassportPdf(passport);
+  let imageBuffer = null;
+  try { imageBuffer = await getBuffer(render.image_path); } catch { /* без картинки тоже валидно */ }
+  const pdf = await renderPassportPdf(passport, { imageBuffer });
   res.set('Content-Type', 'application/pdf');
   res.set('Content-Disposition', `attachment; filename="remontvision-passport-${render.id}.pdf"`);
   res.send(pdf);
@@ -2140,6 +2143,19 @@ app.post('/api/renders/:id/roadmap', h(async (req, res) => {
 }));
 
 // Правки роадмапа: галочка, деактивация, комментарий, своя строка, удаление своей.
+// PDF плана закупки: те же данные, что на публичной странице.
+app.get('/api/rooms/:id/roadmap.pdf', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const room = await q.getRoom(String(req.params.id));
+  if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Комната не найдена' });
+  const items = await q.roadmapItemsForRoom(room.id);
+  if (!items.length) return res.status(409).json({ error: 'Сначала составьте план закупки' });
+  const pdf = await renderRoadmapPdf({ room, items });
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="remontvision-plan-${room.id}.pdf"`);
+  res.send(pdf);
+}));
+
 app.post('/api/rooms/:id/roadmap/items', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const room = await q.getRoom(req.params.id);
