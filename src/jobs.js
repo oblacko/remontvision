@@ -32,7 +32,7 @@ import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolve
 import { workerConcurrency } from './workerknobs.js';
 import { pickArtDirection } from './artdirectionpick.js';
 import { buildRoomVariability, variabilityPrompt } from './variability.js';
-import { roomAnalysisKey } from './roomanalysis.js';
+import { roomAnalysisKey, shouldCacheRoomAnalysis } from './roomanalysis.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -258,7 +258,7 @@ export async function processRender(renderId, claimedBy = null) {
           row.meta?.variability?.accentHex || null,
         ].filter(Boolean),
       })).filter(item => item.focalZone || item.mainMove || item.palette.length);
-      const variability = buildRoomVariability({ seed: renderId, styleName, styleKey: styleInfo?.key, used: usedDirections });
+      const variability = buildRoomVariability({ seed: renderId, styleName, styleKey: styleInfo?.key, used: usedDirections, keepFurniture });
 
       let styleUserRef = false;
       const styleRefUrls = [];
@@ -288,6 +288,7 @@ export async function processRender(renderId, claimedBy = null) {
       // Проход A: строитель определяет объём ремонта по исходному фото и cleaned shell.
       // Параллельно с арт-директором: оба читают одно фото и не зависят друг от друга.
       let repairScope = cachedAnalysis?.repair_scope || null;
+      let analysisFailed = false;
       const repairPromise = cachedAnalysis ? Promise.resolve(repairScope) : (async () => {
         if (MOCK_MODE) return null;
         try {
@@ -312,6 +313,7 @@ export async function processRender(renderId, claimedBy = null) {
           return null;
         } catch (e) {
           log({ event: 'repair_scope_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+          analysisFailed = true;
           return null;
         }
       })();
@@ -419,6 +421,7 @@ export async function processRender(renderId, claimedBy = null) {
           }
         } catch (e) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+          analysisFailed = true;
         }
       }
 
@@ -483,11 +486,13 @@ export async function processRender(renderId, claimedBy = null) {
           }
         } catch (e) {
           log({ event: 'layout_plan_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+          analysisFailed = true;
         }
       }
 
       // Сохраняем результат трёх vision-этапов до image-вызова: он не зависит от рендера.
-      if (!MOCK_MODE && !cachedAnalysis) {
+      // Неполный анализ (ошибка любого агента) не кэшируем: повторный рендер должен попробовать снова.
+      if (!MOCK_MODE && shouldCacheRoomAnalysis({ cached: Boolean(cachedAnalysis), failed: analysisFailed })) {
         const snapshotKeys = [
           'art_direction', 'design_direction', 'concept_key', 'repair_scope', 'repair_prompt_version',
           'room_dimensions_estimate', 'lens', 'layout_fit', 'layout_plan', 'layout_validation',
@@ -804,6 +809,9 @@ export async function processRender(renderId, claimedBy = null) {
         parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
         visionCost = parsed.cost;
         addCost('render_analysis_auto', visionCost);
+        // Ранний done уже записал стоимость без разбора — досчитываем её в renders.
+        await q.setRenderCost(renderId, sumCostBreakdown())
+          .catch(e => log({ event: 'render_cost_update_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 200) }));
         log({ event: 'render_analysis_auto', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length, cost_usd: visionCost ?? null });
       } catch (e) {
         log({ event: 'render_analysis_auto_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });

@@ -93,6 +93,18 @@ test('geometry lock keeps opening counts from the photo when provided', () => {
   assert.match(prompt, /do not invent extra openings/);
 });
 
+test('geometry lock does not turn unknown opening counts into zero', () => {
+  const prompt = buildPrompt({
+    style: 'Лофт',
+    roomType: 'Гостиная (зал)',
+    useCatalog: false,
+    dimensions: { width: 5, length: 4, height: 2.7 },
+    architectureFacts: { windows: null, doors: null },
+  });
+  assert.doesNotMatch(prompt, /0 windows and 0 doors/);
+  assert.match(prompt, /Count every visible window and door/);
+});
+
 test('geometry lock still forbids changes when metres are unknown', () => {
   const prompt = buildPrompt({ style: 'Джапанди', roomType: 'Кухня', useCatalog: false });
   assert.match(prompt, /GEOMETRY LOCK/);

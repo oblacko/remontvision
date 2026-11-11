@@ -280,6 +280,8 @@ export function GenerationPanel({
   const [editObjectTarget, setEditObjectTarget] = useState<{ label?: string; bbox: number[] } | null>(null)
   const [draftBanner, setDraftBanner] = useState<{ savedAt: string; otherTab?: boolean } | null>(null)
   const draftCreatedAtRef = useRef('')
+  const draftBaselineRef = useRef('')
+  const draftPhotoToken = useRef(0)
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
@@ -576,6 +578,7 @@ export function GenerationPanel({
       const photoBlob = await loadDraftPhoto()
       if (cancelled) return
       if (!photoBlob && !params.roomType && !params.stylePicks.length) return
+      draftBaselineRef.current = params.saved_at
       setDraftBanner({ savedAt: params.saved_at })
     })()
     return () => { cancelled = true }
@@ -588,7 +591,10 @@ export function GenerationPanel({
       if (event.key !== DRAFT_PARAMS_KEY || !event.newValue) return
       try {
         const data = JSON.parse(event.newValue) as DraftParams
-        if (data?.saved_at) setDraftBanner({ savedAt: data.saved_at, otherTab: true })
+        if (data?.saved_at) {
+          draftBaselineRef.current = data.saved_at
+          setDraftBanner({ savedAt: data.saved_at, otherTab: true })
+        }
       } catch { /* чужой формат — не мешаем работе */ }
     }
     window.addEventListener('storage', onStorage)
@@ -601,11 +607,18 @@ export function GenerationPanel({
     if (step === 'generating' || step === 'result' || step === 'estimates') return
     if (!photo && !roomType && !stylePicks.length) return
     if (!draftCreatedAtRef.current) draftCreatedAtRef.current = new Date().toISOString()
-    saveDraftParams({
+    const saved = saveDraftParams({
       roomType, stylePicks, priceTier, modelKey, resolution, isPrivate,
       created_at: draftCreatedAtRef.current,
-    })
-    setDraftBanner(null)
+    }, { ifNewerThan: draftBaselineRef.current })
+    if (saved) {
+      draftBaselineRef.current = saved.saved_at
+      setDraftBanner(null)
+    } else {
+      // Более свежий черновик из другой вкладки: не перетираем, показываем время.
+      const latest = loadDraftParams()
+      if (latest) setDraftBanner({ savedAt: latest.saved_at, otherTab: true })
+    }
   }, [open, initialRoomId, inline, step, photo, roomType, stylePicks, priceTier, modelKey, resolution, isPrivate])
 
   useEffect(() => {
@@ -649,7 +662,10 @@ export function GenerationPanel({
     // Габариты и объектив оценивает архитектор по фото — пользователь их не вводит.
     if (!initialRoomId) {
       if (!draftCreatedAtRef.current) draftCreatedAtRef.current = new Date().toISOString()
-      void compressDraftPhoto(photoFile).then(blob => saveDraftPhoto(blob)).catch(() => {})
+      const token = ++draftPhotoToken.current
+      void compressDraftPhoto(photoFile)
+        .then(blob => { if (draftPhotoToken.current === token) return saveDraftPhoto(blob) })
+        .catch(() => {})
     }
   }
 
@@ -674,13 +690,16 @@ export function GenerationPanel({
     setResolution(params.resolution)
     setIsPrivate(params.isPrivate)
     draftCreatedAtRef.current = params.created_at
+    draftBaselineRef.current = params.saved_at
     setDraftBanner(null)
     setStep(blob && params.roomType ? 'style' : 'photo')
   }
 
   async function discardDraft() {
+    draftPhotoToken.current += 1
     await clearDraft()
     draftCreatedAtRef.current = ''
+    draftBaselineRef.current = ''
     setDraftBanner(null)
   }
 
@@ -894,6 +913,8 @@ export function GenerationPanel({
         void clearDraft()
         setDraftBanner(null)
         draftCreatedAtRef.current = ''
+        draftBaselineRef.current = ''
+        draftPhotoToken.current += 1
         void refreshTasks()
       } else {
         const fd = new FormData()
@@ -961,6 +982,8 @@ export function GenerationPanel({
     setGenError(''); setGenStage('queued'); setElapsed(0); setRoomId(''); setBusy(false); setCreditOpen(false)
     void clearDraft()
     draftCreatedAtRef.current = ''
+    draftBaselineRef.current = ''
+    draftPhotoToken.current += 1
     setDraftBanner(null)
     if (photoInput.current) photoInput.current.value = ''
   }
@@ -1027,7 +1050,7 @@ export function GenerationPanel({
                   <img src={photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
                     <span className="truncate text-xs">{photoName}</span>
-                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setDraftBanner(null); void discardDraft(); if (photoInput.current) photoInput.current.value = '' }} className="k-btn k-btn--ov k-btn--icon" aria-label="Удалить фото"><KitIcon name="x" /></button>
+                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setDraftBanner(null); draftPhotoToken.current += 1; draftBaselineRef.current = ''; void discardDraft(); if (photoInput.current) photoInput.current.value = '' }} className="k-btn k-btn--ov k-btn--icon" aria-label="Удалить фото"><KitIcon name="x" /></button>
                   </div>
                 </div>
               ) : (

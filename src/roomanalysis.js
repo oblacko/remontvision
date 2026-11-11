@@ -35,3 +35,9 @@ export function roomAnalysisKey({
   });
   return crypto.createHash('sha256').update(payload).digest('hex');
 }
+
+// Кэшируем только полный анализ: ошибка любого vision-агента не должна
+// замораживать пустой/частичный результат для повторного рендера.
+export function shouldCacheRoomAnalysis({ cached = false, failed = false } = {}) {
+  return !cached && !failed;
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { roomAnalysisKey } from '../src/roomanalysis.js';
+import { roomAnalysisKey, shouldCacheRoomAnalysis } from '../src/roomanalysis.js';
 
 const base = {
   photoPath: 'uploads/room.jpg',
@@ -35,4 +35,10 @@ test('dimension rounding and orientation case do not bust the key', () => {
     roomAnalysisKey(base),
     roomAnalysisKey({ ...base, dimensions: { ...base.dimensions, width: 3.24, orientation: ' ОКНО СЛЕВА ' } }),
   );
+});
+
+test('only a complete, non-cached analysis is written to the cache', () => {
+  assert.equal(shouldCacheRoomAnalysis({ cached: false, failed: false }), true);
+  assert.equal(shouldCacheRoomAnalysis({ cached: true, failed: false }), false);
+  assert.equal(shouldCacheRoomAnalysis({ cached: false, failed: true }), false);
 });

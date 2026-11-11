@@ -14,6 +14,13 @@ const EMPHASIS = [
   'lead with floor-to-ceiling material texture and one low horizontal line',
   'lead with a single sculptural accent object on the existing focal plane',
 ];
+// Когда мебель и планировку сохраняем, новизна живёт в отделке, свете и декоре.
+const KEEP_FURNITURE_EMPHASIS = [
+  'lead with light and material contrast',
+  'lead with textile layering and a calm wall finish',
+  'lead with wall finish, art and one sculptural accent',
+  'lead with the existing focal wall and warmer layered light',
+];
 
 function hashIndex(seed, size) {
   if (!size) return 0;
@@ -38,10 +45,11 @@ export function pickStyleAccent(palette, seed = '') {
 
 const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
 
-export function buildRoomVariability({ seed = '', styleName = '', styleKey = '', used = [] } = {}) {
+export function buildRoomVariability({ seed = '', styleName = '', styleKey = '', used = [], keepFurniture = true } = {}) {
   const palette = resolveStylePalette({ styleName, styleKey });
   const accentHex = pickStyleAccent(palette, seed);
-  const emphasis = EMPHASIS[hashIndex(`${seed}:emphasis`, EMPHASIS.length)];
+  const emphasisOptions = keepFurniture ? KEEP_FURNITURE_EMPHASIS : EMPHASIS;
+  const emphasis = emphasisOptions[hashIndex(`${seed}:emphasis`, emphasisOptions.length)];
   const previous = (Array.isArray(used) ? used : [])
     .filter(item => item && typeof item === 'object')
     .slice(-USED_WINDOW);
@@ -54,12 +62,13 @@ export function buildRoomVariability({ seed = '', styleName = '', styleKey = '',
   if (focalZones.length) avoid.push(`focal zone: ${focalZones.join(', ')}`);
   if (mainMoves.length) avoid.push(`main move: ${mainMoves.join(', ')}`);
   if (paletteDirections.length) avoid.push(`palette direction: ${paletteDirections.join(', ')}`);
-  if (previous.length) avoid.push('the same furniture arrangement and decor vignette as the previous render of this room');
+  if (previous.length && !keepFurniture) avoid.push('the same furniture arrangement and decor vignette as the previous render of this room');
 
   return {
     version: 1,
     seed: String(seed || ''),
     styleName,
+    keepFurniture: Boolean(keepFurniture),
     accentHex,
     emphasis,
     avoid: avoid.slice(0, MAX_AVOID_ITEMS),
@@ -72,7 +81,9 @@ export function variabilityPrompt(variability) {
   const lines = ['VARIABILITY — ROOM-LEVEL NOVELTY'];
   if (variability.emphasis) lines.push(`Composition emphasis: ${variability.emphasis}.`);
   lines.push(variability.avoid.length
-    ? `Do not repeat: ${variability.avoid.join('; ')}. Choose a visibly different composition while keeping the geometry lock and the style palette.`
+    ? `Do not repeat: ${variability.avoid.join('; ')}. ${variability.keepFurniture
+        ? 'Keep the existing furniture positions and layout; vary only finish, decor, lighting and the accent within the style palette.'
+        : 'Choose a visibly different composition while keeping the geometry lock and the style palette.'}`
     : 'This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.');
   if (variability.accentHex) lines.push(`Use exactly one accent colour from the style palette: ${variability.accentHex}. Do not introduce any other accent hue.`);
   return lines.join('\n');

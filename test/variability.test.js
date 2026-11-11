@@ -53,6 +53,31 @@ test('variability prompt names the emphasis and the avoided choices', () => {
   assert.match(text, /accent wall/);
 });
 
+test('kept-furniture novelty does not ask to rearrange the room', () => {
+  const out = buildRoomVariability({
+    seed: 'render-keep',
+    styleName: 'Скандинавский',
+    keepFurniture: true,
+    used: [{ focalZone: 'window', mainMove: 'accent wall', palette: ['terracotta'] }],
+  });
+  const text = variabilityPrompt(out);
+  assert.doesNotMatch(out.avoid.join(' '), /furniture arrangement/);
+  assert.match(text, /Keep the existing furniture positions and layout/);
+  assert.doesNotMatch(text, /visibly different composition/);
+});
+
+test('empty room novelty may ask for a different composition', () => {
+  const out = buildRoomVariability({
+    seed: 'render-empty',
+    styleName: 'Скандинавский',
+    keepFurniture: false,
+    used: [{ focalZone: 'window', mainMove: 'accent wall', palette: ['terracotta'] }],
+  });
+  const text = variabilityPrompt(out);
+  assert.match(out.avoid.join(' '), /furniture arrangement/);
+  assert.match(text, /visibly different composition/);
+});
+
 test('first render of a room has no avoid list', () => {
   const out = buildRoomVariability({ seed: 'first', styleName: 'Скандинавский', used: [] });
   assert.deepEqual(out.avoid, []);

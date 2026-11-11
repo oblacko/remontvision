@@ -39,8 +39,15 @@ function idbRequest<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) =>
   }))
 }
 
-export function saveDraftParams(input: Omit<DraftParams, 'saved_at'>): DraftParams | null {
+export function saveDraftParams(input: Omit<DraftParams, 'saved_at'>, { ifNewerThan = null }: { ifNewerThan?: string | null } = {}): DraftParams | null {
   if (typeof localStorage === 'undefined') return null
+  if (ifNewerThan) {
+    const existing = loadDraftParams()
+    const existingTime = existing ? new Date(existing.saved_at).getTime() : NaN
+    const baselineTime = new Date(ifNewerThan).getTime()
+    // Чужая вкладка сохранила свежее — не перетираем её более старым состоянием.
+    if (Number.isFinite(existingTime) && Number.isFinite(baselineTime) && existingTime > baselineTime) return null
+  }
   const saved_at = new Date().toISOString()
   const value: DraftParams = { ...input, saved_at }
   try { localStorage.setItem(DRAFT_PARAMS_KEY, JSON.stringify(value)) } catch { return null }

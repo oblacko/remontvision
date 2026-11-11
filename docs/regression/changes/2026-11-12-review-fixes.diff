@@ -1,0 +1,184 @@
+baseline: 2026-11-11T22:14:26.027Z
+current:  2026-11-11T23:09:03.761Z
+config hash: 963e0638ce3dc832ac74dd37ff3c59e9712e6008583715970879517114ecfa37 → 963e0638ce3dc832ac74dd37ff3c59e9712e6008583715970879517114ecfa37
+
+
+=== Гостиная (зал) / Современный минимализм ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a central furniture grouping and keep the perimeter calm.
++ Composition emphasis: lead with textile layering and a calm wall finish.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B7A99A. Do not introduce any other accent hue.
+
+=== Гостиная (зал) / Скандинавский ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with floor-to-ceiling material texture and one low horizontal line.
++ Composition emphasis: lead with wall finish, art and one sculptural accent.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C26D5A. Do not introduce any other accent hue.
+
+=== Гостиная (зал) / Джапанди ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B9B0A2. Do not introduce any other accent hue.
+
+=== Гостиная (зал) / Лофт ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #6E6A63. Do not introduce any other accent hue.
+
+=== Спальня / Современный минимализм ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C9C4BB. Do not introduce any other accent hue.
+
+=== Спальня / Скандинавский ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with the existing window wall and daylight.
++ Composition emphasis: lead with light and material contrast.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #8A9A8B. Do not introduce any other accent hue.
+
+=== Спальня / Джапанди ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with floor-to-ceiling material texture and one low horizontal line.
++ Composition emphasis: lead with wall finish, art and one sculptural accent.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4A45. Do not introduce any other accent hue.
+
+=== Спальня / Лофт ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with the existing window wall and daylight.
++ Composition emphasis: lead with light and material contrast.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #A8563A. Do not introduce any other accent hue.
+
+=== Кухня / Современный минимализм ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with the existing window wall and daylight.
++ Composition emphasis: lead with light and material contrast.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C9C4BB. Do not introduce any other accent hue.
+
+=== Кухня / Скандинавский ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a central furniture grouping and keep the perimeter calm.
++ Composition emphasis: lead with textile layering and a calm wall finish.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C26D5A. Do not introduce any other accent hue.
+
+=== Кухня / Джапанди ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4A45. Do not introduce any other accent hue.
+
+=== Кухня / Лофт ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4640. Do not introduce any other accent hue.
+
+=== Санузел / Современный минимализм ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a central furniture grouping and keep the perimeter calm.
++ Composition emphasis: lead with textile layering and a calm wall finish.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #2E2E2C. Do not introduce any other accent hue.
+
+=== Санузел / Скандинавский ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with floor-to-ceiling material texture and one low horizontal line.
++ Composition emphasis: lead with wall finish, art and one sculptural accent.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #D8CFC2. Do not introduce any other accent hue.
+
+=== Санузел / Джапанди ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a central furniture grouping and keep the perimeter calm.
++ Composition emphasis: lead with textile layering and a calm wall finish.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B9B0A2. Do not introduce any other accent hue.
+
+=== Санузел / Лофт ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a central furniture grouping and keep the perimeter calm.
++ Composition emphasis: lead with textile layering and a calm wall finish.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #A8563A. Do not introduce any other accent hue.
+
+=== Кабинет / Современный минимализм ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C9C4BB. Do not introduce any other accent hue.
+
+=== Кабинет / Скандинавский ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a central furniture grouping and keep the perimeter calm.
++ Composition emphasis: lead with textile layering and a calm wall finish.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #8A9A8B. Do not introduce any other accent hue.
+
+=== Кабинет / Джапанди ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B9B0A2. Do not introduce any other accent hue.
+
+=== Кабинет / Лофт ===
+@@ -35,5 +35,5 @@
+  
+  VARIABILITY — ROOM-LEVEL NOVELTY
+- Composition emphasis: lead with a single sculptural accent object on the existing focal plane.
++ Composition emphasis: lead with the existing focal wall and warmer layered light.
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4640. Do not introduce any other accent hue.

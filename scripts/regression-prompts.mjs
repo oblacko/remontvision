@@ -34,7 +34,7 @@ function buildRun() {
   for (const room of ROOMS) {
     for (const style of STYLES) {
       const id = `${room.roomType} / ${style}`;
-      const variability = buildRoomVariability({ seed: id, styleName: style });
+      const variability = buildRoomVariability({ seed: id, styleName: style, keepFurniture: true });
       const prompt = buildPrompt({
         style,
         roomType: room.roomType,

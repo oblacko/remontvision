@@ -376,7 +376,9 @@ export function buildPrompt({
     : 'Measurements are not supplied: preserve the room geometry exactly as seen in Image 1.';
   const factWindows = Number(architectureFacts?.windows);
   const factDoors = Number(architectureFacts?.doors);
-  const geometryOpenings = Number.isFinite(factWindows) && factWindows >= 0 && Number.isFinite(factDoors) && factDoors >= 0
+  const hasOpeningFacts = architectureFacts?.windows != null && architectureFacts?.doors != null
+    && Number.isFinite(factWindows) && factWindows >= 0 && Number.isFinite(factDoors) && factDoors >= 0;
+  const geometryOpenings = hasOpeningFacts
     ? `Detected openings in the photo: ${factWindows} window${factWindows === 1 ? '' : 's'} and ${factDoors} door${factDoors === 1 ? '' : 's'} — keep exactly these, do not invent extra openings.`
     : 'Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.';
   const geometryText = fillTemplate(rules.geometryLock, { measurements: geometryMeasurements, openings: geometryOpenings });
