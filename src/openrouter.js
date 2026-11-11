@@ -304,6 +304,8 @@ export function buildPrompt({
   productRefs = false,
   layoutPlan = null,
   architectureFacts = null,
+  accentHex = null,
+  novelty = '',
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -398,7 +400,9 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
     : 'There is no separate style reference. Build the photographic language from the style description, room and material constraints.';
   const colors = [
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
-    ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
+    accentHex
+      ? `Accent color: ${accentHex} only — sampled from the selected style palette. Do not introduce any other accent hue.`
+      : ACCENTS[accent] ? `Accent color: ${ACCENTS[accent]}.` : '',
   ].filter(Boolean).join(' ');
 
   const repairLines = repairScope
@@ -440,7 +444,7 @@ ${architectureLock}
 
 ${geometryText}
 ${repairScopeText}
-${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
+${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}${novelty ? `\n${novelty}\n` : ''}
 ${layoutPlan ? `\nLAYOUT PLAN — DESIGNED BY THE ARCHITECT\n${layoutPlanToText(layoutPlan)}\nFollow this plan as the primary layout: place each item in the described zone, keep the circulation, and do not collapse the room into a minimal desk+chair+shelf set. Exact centimetres may be adjusted to the photo, but keep the composition and the item list. If the plan lists hard furniture limits, they override the art direction.\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY

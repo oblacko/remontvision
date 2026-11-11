@@ -30,6 +30,7 @@ import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolveRenderStyleConcept } from './variants.js';
 import { workerConcurrency } from './workerknobs.js';
 import { pickArtDirection } from './artdirectionpick.js';
+import { buildRoomVariability, variabilityPrompt } from './variability.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -230,6 +231,17 @@ export async function processRender(renderId, claimedBy = null) {
     } else {
       styleInfo = await q.styleByName(styleName);
       const styleMode = getStyleConfig().mode;
+      // Новизна на уровне комнаты: что уже было в прошлых рендерах, без нового vision-вызова.
+      const pastRenders = await q.rendersForRoom(room.id).catch(() => []);
+      const usedDirections = pastRenders.slice(-5).map(row => ({
+        focalZone: row.meta?.design_direction?.focalZone || null,
+        mainMove: row.meta?.design_direction?.mainMove?.action || row.meta?.design_direction?.mainMove?.target || '',
+        palette: [
+          ...(row.meta?.art_direction?.palette || []).map(color => color?.name || color?.hex).filter(Boolean),
+          row.meta?.variability?.accentHex || null,
+        ].filter(Boolean),
+      })).filter(item => item.focalZone || item.mainMove || item.palette.length);
+      const variability = buildRoomVariability({ seed: renderId, styleName, styleKey: styleInfo?.key, used: usedDirections });
 
       let styleUserRef = false;
       const styleRefUrls = [];
@@ -458,10 +470,13 @@ export async function processRender(renderId, claimedBy = null) {
         productRefs: false,
         layoutPlan,
         architectureFacts,
+        accentHex: variability?.accentHex || null,
+        novelty: variabilityPrompt(variability),
       });
 
       referenceImagesB64 = [...styleRefUrls];
       meta.style_id = styleInfo?.id || null;
+      meta.variability = variability || null;
       meta.style_reference_mode = styleMode;
       meta.user_style_ref_ignored = Boolean(room.style_ref_path && styleMode !== 'reference');
       meta.budget = room.budget;
