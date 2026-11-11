@@ -13,3 +13,7 @@ tmp/
 
 # локальные проверки
 check-pg.mjs
+
+# регрессия промтов: baseline коммитим, текущий прогон и diff — нет
+docs/regression/last-run.json
+docs/regression/last-diff.txt
