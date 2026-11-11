@@ -23,7 +23,8 @@ export function normalizeMove(raw) {
 }
 
 // parentBuf — исходный рендер, cleanedBuf — результат удаления объекта моделью.
-export async function composeMove(parentBuf, cleanedBuf, rawMove) {
+// Диффим bbox±50%: объект может выходить за рамку, но фон за пределами не трогаем.
+export async function composeMove(parentBuf, cleanedBuf, rawMove, { onWarn = null } = {}) {
   const move = normalizeMove(rawMove);
   if (!move) throw new Error('Некорректные данные переноса');
   const parentMeta = await sharp(parentBuf).metadata();
@@ -40,10 +41,21 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
   const ty = Math.max(0, Math.min(height - sh, Math.round((y + move.dy) * height)));
 
   const cleanBase = await sharp(cleanedBuf).resize(width, height, { fit: 'fill' }).png().toBuffer();
-  const region = { left: sx, top: sy, width: sw, height: sh };
-  const parentRgb = await sharp(parentBuf).extract(region).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const cleanRgb = await sharp(cleanBase).extract(region).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const count = sw * sh;
+  const bboxRegion = { left: sx, top: sy, width: sw, height: sh };
+  const bboxArea = sw * sh;
+  const padX = Math.round(sw * 0.5);
+  const padY = Math.round(sh * 0.5);
+  const diffLeft = Math.max(0, sx - padX);
+  const diffTop = Math.max(0, sy - padY);
+  const diffRight = Math.min(width, sx + sw + padX);
+  const diffBottom = Math.min(height, sy + sh + padY);
+  const diffRegion = { left: diffLeft, top: diffTop, width: diffRight - diffLeft, height: diffBottom - diffTop };
+  const dw = diffRegion.width;
+  const dh = diffRegion.height;
+
+  const parentRgb = await sharp(parentBuf).extract(diffRegion).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const cleanRgb = await sharp(cleanBase).extract(diffRegion).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const count = dw * dh;
   const alpha = Buffer.alloc(count);
   let changed = 0;
   for (let i = 0; i < count; i += 1) {
@@ -59,10 +71,17 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
   let objectPng;
   let shadowPng = null;
   let shadowPad = 0;
-  if (changed > count * 0.02) {
+  let objectLeft = tx;
+  let objectTop = ty;
+  if (changed > bboxArea * 0.02) {
     // Силуэт объекта = область, которую модель реально изменила при удалении.
     // Это убирает прямоугольный патч стены: вставляем только сам объект.
-    const soft = await sharp(alpha, { raw: { width: sw, height: sh, channels: 1 } }).blur(1.5).raw().toBuffer();
+    // Если силуэт заметно больше bbox (>120%), это сигнал: bbox из vision-разбора неточен.
+    const ratio = changed / bboxArea;
+    if (ratio > 1.2 && typeof onWarn === 'function') {
+      onWarn({ ratio, changed, bboxArea, label: move.label || null });
+    }
+    const soft = await sharp(alpha, { raw: { width: dw, height: dh, channels: 1 } }).blur(1.5).extractChannel(0).raw().toBuffer();
     const rgba = Buffer.alloc(count * 4);
     for (let i = 0; i < count; i += 1) {
       const o = i * 3;
@@ -71,19 +90,19 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
       rgba[i * 4 + 2] = parentRgb.data[o + 2];
       rgba[i * 4 + 3] = soft[i];
     }
-    objectPng = await sharp(rgba, { raw: { width: sw, height: sh, channels: 4 } }).png().toBuffer();
+    objectPng = await sharp(rgba, { raw: { width: dw, height: dh, channels: 4 } }).png().toBuffer();
     // Мягкая тень по тому же силуэту, сдвинутая вниз: без неё вставка выглядит наклейкой.
-    // Холст с полями: иначе blur обрезается по границе bbox и тень не выходит за объект.
-    const pad = Math.max(4, Math.round(Math.min(sw, sh) * 0.12));
-    const paddedW = sw + pad * 2;
-    const paddedH = sh + pad * 2;
+    // Холст с полями: иначе blur обрезается по границе региона и тень не выходит за объект.
+    const pad = Math.max(4, Math.round(Math.min(dw, dh) * 0.12));
+    const paddedW = dw + pad * 2;
+    const paddedH = dh + pad * 2;
     const padded = await sharp({
       create: { width: paddedW, height: paddedH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
     }).composite([{ input: objectPng, left: pad, top: pad }]).png().toBuffer();
     const alphaOnly = await sharp(padded)
       .ensureAlpha()
       .extractChannel('alpha')
-      .blur(Math.max(2, Math.min(sw, sh) * 0.08))
+      .blur(Math.max(2, Math.min(dw, dh) * 0.08))
       .raw()
       .toBuffer({ resolveWithObject: true });
     if (alphaOnly.info.width === paddedW && alphaOnly.info.height === paddedH) {
@@ -94,8 +113,11 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
       shadowPng = await sharp(shadow, { raw: { width: paddedW, height: paddedH, channels: 4 } }).png().toBuffer();
       shadowPad = pad;
     }
+    // Пиксель bbox внутри расширенного кропа смещён; компенсируем, чтобы объект встал в tx/ty.
+    objectLeft = tx - (sx - diffLeft);
+    objectTop = ty - (sy - diffTop);
   } else {
-    // Fallback: если разница почти нулевая, используем мягкий кроп.
+    // Fallback: если разница почти нулевая, используем мягкий кроп по bbox.
     const inset = Math.max(1, Math.round(Math.min(sw, sh) * 0.02));
     const blur = Math.max(2, Math.round(Math.min(sw, sh) * 0.01));
     const mask = Buffer.from(
@@ -104,7 +126,7 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
       `<rect x="${inset}" y="${inset}" width="${Math.max(1, sw - inset * 2)}" height="${Math.max(1, sh - inset * 2)}" rx="${inset}" fill="#fff" filter="url(#b)"/>` +
       `</svg>`,
     );
-    objectPng = await sharp(parentBuf).extract(region).ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
+    objectPng = await sharp(parentBuf).extract(bboxRegion).ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
   }
 
   const layers = [];
@@ -112,11 +134,11 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
     // Тень чуть ниже и правее объекта: так вставка «стоит» на поверхности.
     layers.push({
       input: shadowPng,
-      left: tx + Math.round(sw * 0.03) - shadowPad,
-      top: ty + Math.round(sh * 0.10) - shadowPad,
+      left: objectLeft + Math.round(sw * 0.03) - shadowPad,
+      top: objectTop + Math.round(sh * 0.10) - shadowPad,
     });
   }
-  layers.push({ input: objectPng, left: tx, top: ty });
+  layers.push({ input: objectPng, left: objectLeft, top: objectTop });
   return sharp(cleanBase)
     .composite(layers)
     .png()

@@ -529,15 +529,24 @@ RULES:
 Photorealistic result.`;
 }
 
-export function buildMoveRemovalPrompt({ roomType = 'Другое', instruction = '' } = {}) {
+export function buildMoveRemovalPrompt({ roomType = 'Другое', instruction = '', label = '', bbox = null } = {}) {
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || 'room';
+  const region = Array.isArray(bbox) && bbox.length === 4 && bbox.every(value => Number.isFinite(Number(value)))
+    ? bbox.map(value => Math.round(Number(value) * 1000) / 1000)
+    : null;
+  const target = region
+    ? `Target object: ${label || 'the selected object'}.
+Region in Image 1 (normalized x, y, w, h): [${region.join(', ')}].
+Remove only the object inside this region. Do not touch objects outside it, even similar ones.`
+    : '';
   return `IMAGE ROLES:
 Image 1 — current interior render.
 
 This is a ${roomName}.
 TASK: remove the object specified below completely and reconstruct the background behind it. This is an object-level edit, not a room redesign.
 
+${target}
 ${instruction}
 
 RULES:

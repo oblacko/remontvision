@@ -6,7 +6,7 @@ import path from 'node:path';
 process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
-const { buildPrompt, buildEditPrompt } = await import('../src/openrouter.js');
+const { buildPrompt, buildEditPrompt, buildMoveRemovalPrompt } = await import('../src/openrouter.js');
 const { nearestRal } = await import('../src/analysis.js');
 const { designProducts, canBindProduct, canReplaceWithProduct } = await import('../src/productpipeline.js');
 
@@ -287,6 +287,18 @@ test('empty room without a layout plan still designs from scratch and does not r
   assert.match(prompt, /from scratch/);
   assert.doesNotMatch(prompt, /LAYOUT PLAN/);
   assert.doesNotMatch(prompt, /Keep the existing functional zones and furniture positions/);
+});
+
+test('move removal prompt names the exact object region', () => {
+  const prompt = buildMoveRemovalPrompt({
+    roomType: 'Спальня',
+    label: 'Шкаф',
+    bbox: [0.12, 0.2, 0.3, 0.45],
+    instruction: 'Перенести шкаф',
+  });
+  assert.match(prompt, /Шкаф/);
+  assert.match(prompt, /\[0\.12, 0\.2, 0\.3, 0\.45\]/);
+  assert.match(prompt, /Remove only the object inside this region/);
 });
 
 test('text-only edit prompt applies a single change without reference wording', () => {
