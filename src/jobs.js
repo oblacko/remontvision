@@ -291,6 +291,7 @@ export async function processRender(renderId, claimedBy = null) {
       // style×concept текст направления берём у direction-агента; свободный
       // арт-директор остаётся fallback-ом для старых комнат (откат).
       let artDirection = '';
+      let architectureFacts = null;
       let estimatedDimensions = roomDimensions;
       let effectiveKeepFurniture = keepFurniture;
       if (!MOCK_MODE) {
@@ -312,6 +313,7 @@ export async function processRender(renderId, claimedBy = null) {
             try {
               const brief = await analyzeRoomBrief({ imageDataUrl: await bufferToDataUrl(adBuf), roomType });
               if (Array.isArray(brief?.existing_furniture)) ad.existingFurniture = brief.existing_furniture;
+              if (brief?.architecture) architectureFacts = brief.architecture;
             } catch { /* остаётся null */ }
           }
           if (ad && keepFurniture && Array.isArray(ad.existingFurniture) && ad.existingFurniture.length === 0) {
@@ -454,6 +456,7 @@ export async function processRender(renderId, claimedBy = null) {
         repairScope,
         productRefs: false,
         layoutPlan,
+        architectureFacts,
       });
 
       referenceImagesB64 = [...styleRefUrls];
