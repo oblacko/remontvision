@@ -13,6 +13,7 @@ import { referenceImagesDetailed } from './curate.js';
 import { reviewDesign } from './architect.js';
 import { buildDesignDirection, DESIGN_DIRECTION_ENABLED } from './designeragent.js';
 import { buildLayoutPlan } from './layoutagent.js';
+import { cacheGet, cachePut, dimensionsKey } from './generationcache.js';
 import { buildAnalysis } from './analysis.js';
 import { composeMove } from './moveobject.js';
 import { normalizeTier } from './pricing.js';
@@ -400,34 +401,55 @@ export async function processRender(renderId, claimedBy = null) {
       if (!MOCK_MODE && !effectiveKeepFurniture) {
         try {
           const layoutStart = Date.now();
-          const layoutBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
-          layoutPlan = await buildLayoutPlan({
-            imageDataUrl: await bufferToDataUrl(layoutBuf),
-            roomType,
-            dimensions: estimatedDimensions,
-            style: styleInfo?.key || styleName,
-            concept: conceptKey || '',
-            keepFurniture: effectiveKeepFurniture,
-            sessionId: meta.render_session,
-          });
-          if (layoutPlan?.status === 'proposed' && layoutPlan.items?.length) {
-            addCost('layout', layoutPlan.cost);
-            const fitted = fitLayoutPlan({ plan: layoutPlan, dimensions: estimatedDimensions, roomType, artDirection });
-            layoutPlan = fitted.plan;
-            if (fitted.artDirection) artDirection = fitted.artDirection;
-            meta.layout_fit = fitted.fit;
-            if (fitted.dropped.length) log({ event: 'layout_fit_dropped', room_id: room.id, render_id: renderId, dropped: fitted.fit?.dropped, needed_cm: fitted.fit?.neededCm, width_m: fitted.fit?.widthM });
+          const usedStrategies = await q.rendersForRoom(room.id)
+            .then(rows => rows.map(row => row.meta?.layout_plan?.strategy).filter(Boolean).slice(-5))
+            .catch(() => []);
+          const layoutCacheKey = [
+            'layout', room.id, styleInfo?.key || styleName, conceptKey || '',
+            dimensionsKey(estimatedDimensions), effectiveKeepFurniture ? 'keep' : 'empty',
+            usedStrategies.join(';'),
+          ].join('|');
+          const cachedLayout = await cacheGet('layout_plan', layoutCacheKey, 30).catch(() => null);
+          if (cachedLayout?.plan?.status === 'proposed' && cachedLayout.plan.items?.length) {
+            layoutPlan = { ...cachedLayout.plan, cost: null };
+            if (cachedLayout.artDirection) artDirection = cachedLayout.artDirection;
             meta.layout_plan = layoutPlan;
             meta.layout_validation = layoutPlan.validation || null;
             meta.layout_assumptions = layoutPlan.assumptions || [];
-            log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, validation: layoutPlan.validation?.result || null, cost_usd: layoutPlan.cost ?? null, ms: Date.now() - layoutStart });
+            log({ event: 'layout_plan_cache_hit', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length });
           } else {
-            if (layoutPlan) {
+            const layoutBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
+            layoutPlan = await buildLayoutPlan({
+              imageDataUrl: await bufferToDataUrl(layoutBuf),
+              roomType,
+              dimensions: estimatedDimensions,
+              style: styleInfo?.key || styleName,
+              concept: conceptKey || '',
+              usedStrategies,
+              keepFurniture: effectiveKeepFurniture,
+              sessionId: meta.render_session,
+            });
+            if (layoutPlan?.status === 'proposed' && layoutPlan.items?.length) {
               addCost('layout', layoutPlan.cost);
-              meta.layout_plan_skipped = { status: layoutPlan.status, strategy: layoutPlan.strategy, questions: layoutPlan.questions || [], missing_inputs: layoutPlan.missing_inputs || [] };
+              const fitted = fitLayoutPlan({ plan: layoutPlan, dimensions: estimatedDimensions, roomType, artDirection });
+              layoutPlan = fitted.plan;
+              if (fitted.artDirection) artDirection = fitted.artDirection;
+              meta.layout_fit = fitted.fit;
+              if (fitted.dropped.length) log({ event: 'layout_fit_dropped', room_id: room.id, render_id: renderId, dropped: fitted.fit?.dropped, needed_cm: fitted.fit?.neededCm, width_m: fitted.fit?.widthM });
+              meta.layout_plan = layoutPlan;
+              meta.layout_validation = layoutPlan.validation || null;
+              meta.layout_assumptions = layoutPlan.assumptions || [];
+              log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, validation: layoutPlan.validation?.result || null, cost_usd: layoutPlan.cost ?? null, ms: Date.now() - layoutStart });
+              await cachePut('layout_plan', layoutCacheKey, { plan: { ...layoutPlan, cost: null }, artDirection })
+                .catch(e => log({ event: 'layout_cache_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 200) }));
+            } else {
+              if (layoutPlan) {
+                addCost('layout', layoutPlan.cost);
+                meta.layout_plan_skipped = { status: layoutPlan.status, strategy: layoutPlan.strategy, questions: layoutPlan.questions || [], missing_inputs: layoutPlan.missing_inputs || [] };
+              }
+              layoutPlan = null;
+              log({ event: 'layout_plan_empty', room_id: room.id, render_id: renderId, status: meta.layout_plan_skipped?.status || null });
             }
-            layoutPlan = null;
-            log({ event: 'layout_plan_empty', room_id: room.id, render_id: renderId, status: meta.layout_plan_skipped?.status || null });
           }
         } catch (e) {
           log({ event: 'layout_plan_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
