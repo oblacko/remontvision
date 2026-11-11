@@ -504,6 +504,14 @@ app.get('/api/my/generations', h(async (req, res) => {
   res.json(list);
 }));
 
+app.get('/api/credits/refunds', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const raw = String(req.query.after || '0');
+  const after = /^\d{1,19}$/.test(raw) ? raw : '0';
+  res.set('Cache-Control', 'no-store');
+  res.json(await q.creditRefunds(req.user.id, after));
+}));
+
 app.get('/api/credits', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const [balance, history, hasPurchased, hasSucceededPayment] = await Promise.all([
