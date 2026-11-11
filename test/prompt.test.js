@@ -6,7 +6,7 @@ import path from 'node:path';
 process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
-const { buildPrompt, buildEditPrompt } = await import('../src/openrouter.js');
+const { buildPrompt, buildEditPrompt, buildMoveRemovalPrompt } = await import('../src/openrouter.js');
 const { setPromptConfigForTests } = await import('../src/promptconfig.js');
 const { nearestRal } = await import('../src/analysis.js');
 const { designProducts, canBindProduct, canReplaceWithProduct } = await import('../src/productpipeline.js');
@@ -357,6 +357,18 @@ test('novelty block is injected into the base prompt', () => {
   });
   assert.match(prompt, /VARIABILITY — ROOM-LEVEL NOVELTY/);
   assert.match(prompt, /Do not repeat: focal zone: window/);
+});
+
+test('move removal prompt names the exact object region', () => {
+  const prompt = buildMoveRemovalPrompt({
+    roomType: 'Спальня',
+    label: 'Шкаф',
+    bbox: [0.12, 0.2, 0.3, 0.45],
+    instruction: 'Перенести шкаф',
+  });
+  assert.match(prompt, /Шкаф/);
+  assert.match(prompt, /\[0\.12, 0\.2, 0\.3, 0\.45\]/);
+  assert.match(prompt, /Remove only the object inside this region/);
 });
 
 test('text-only edit prompt applies a single change without reference wording', () => {

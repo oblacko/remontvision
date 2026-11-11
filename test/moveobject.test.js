@@ -33,8 +33,20 @@ test('composeMove pastes the object at the destination and clears the source', a
 })
 
 
-test('moveDestinationRegion clamps the destination to the frame', () => {
-  assert.deepEqual(moveDestinationRegion([0.1, 0.1, 0.2, 0.2], 0.3, 0.05), { x: 40, y: 15, w: 20, h: 20 })
+test('composeMove warns when the removed silhouette exceeds the bbox by 120%', async () => {
+  const blue = await sharp({ create: { width: 30, height: 30, channels: 3, background: '#0000ff' } }).png().toBuffer()
+  const parent = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#ff0000' } })
+    .composite([{ input: blue, left: 10, top: 10 }])
+    .png()
+    .toBuffer()
+  const cleaned = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#ff0000' } }).png().toBuffer()
+  const warnings = []
+  await composeMove(parent, cleaned, { bbox: [0.1, 0.1, 0.1, 0.1], dx: 0.4, dy: 0.4 }, { onWarn: info => warnings.push(info) })
+  assert.equal(warnings.length, 1)
+  assert.ok(warnings[0].ratio > 1.2, `ratio ${warnings[0].ratio} must exceed 1.2`)
+});
+
+test('moveDestinationRegion clamps the destination to the frame', () => {  assert.deepEqual(moveDestinationRegion([0.1, 0.1, 0.2, 0.2], 0.3, 0.05), { x: 40, y: 15, w: 20, h: 20 })
   assert.deepEqual(moveDestinationRegion([0.8, 0.8, 0.2, 0.2], 0.5, 0.5), { x: 80, y: 80, w: 20, h: 20 })
 })
 

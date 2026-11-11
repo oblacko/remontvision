@@ -519,7 +519,12 @@ export async function processRender(renderId, claimedBy = null) {
     }
 
     if (iteration && render.edit_move) {
-      prompt = buildMoveRemovalPrompt({ roomType, instruction: render.request_text });
+      prompt = buildMoveRemovalPrompt({
+        roomType,
+        instruction: render.request_text,
+        label: render.edit_move.label,
+        bbox: render.edit_move.bbox,
+      });
     }
     await q.setRenderPrompt(renderId, prompt);
     await q.setRenderMeta(renderId, meta);
@@ -610,7 +615,17 @@ export async function processRender(renderId, claimedBy = null) {
       addCost('design', out.cost);
       if (render.edit_move) {
         try {
-          const composed = await composeMove(originalBuf, Buffer.from(out.b64, 'base64'), render.edit_move);
+          const composed = await composeMove(originalBuf, Buffer.from(out.b64, 'base64'), render.edit_move, {
+            onWarn: info => log({
+              event: 'move_bbox_warning',
+              room_id: room.id,
+              render_id: renderId,
+              label: info.label,
+              ratio: Math.round(info.ratio * 100) / 100,
+              changed_px: info.changed,
+              bbox_px: info.bboxArea,
+            }),
+          });
           imageB64 = composed.toString('base64');
           meta.move = { ...render.edit_move, composed: true };
           log({ event: 'move_composed', room_id: room.id, render_id: renderId, label: render.edit_move.label || null });
