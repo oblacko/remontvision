@@ -150,6 +150,7 @@ app/
 | Документ | О чём |
 |---|---|
 | [docs/STATUS.md](docs/STATUS.md) | **Что сделано / что работает / что нет** — единый источник истины |
+| [docs/kit.html](docs/kit.html) | Живой UI-кит: токены, кнопки, поля, карточки, иконки (собирается `npm run kit:build`) |
 | [AGENTS.md](AGENTS.md) | Правила для агентов и разработчиков, команды, подводные камни |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Компоненты, данные, деплой |
 | [docs/GENERATION.md](docs/GENERATION.md) | Путь генерации, промт, очередь, кэш, правки |

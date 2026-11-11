@@ -11,7 +11,8 @@
     "test:integration": "node --env-file-if-exists=.env --test --test-concurrency=1 test/integration/*.test.js",
     "check:copy": "node scripts/check-copy.mjs",
     "catalog:images": "node --env-file=.env scripts/generate-catalog-images.mjs",
-    "docs:llms": "node scripts/build-llms-full.mjs"
+    "docs:llms": "node scripts/build-llms-full.mjs",
+    "kit:build": "node scripts/build-kit.mjs"
   },
   "engines": {
     "node": ">=20.19"

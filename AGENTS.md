@@ -45,6 +45,7 @@ npm run dev                                   # Vite
 # БД и документация
 docker compose up -d db                       # Postgres 127.0.0.1:5434
 npm run docs:llms                             # пересобрать llms-full.txt
+npm run kit:build                             # пересобрать docs/kit.html из web/dist
 cd catalog-service && pytest -q               # catalog-service (нужен pytest)
 ```
 
@@ -151,5 +152,6 @@ node --check src/openrouter.js
 4. `catalog-service pytest` зелёный (если менялся сервис).
 5. Обновлён `docs/HISTORY.md`; при изменении состояния — `docs/STATUS.md`.
 6. Обновлены relevant docs; `npm run docs:llms` при изменении документации.
-7. Нет секретов в diff.
-8. Деплой прошёл, smoke зелёный (после явного разрешения).
+7. `npm run kit:build` при изменении UI-кита/классов.
+8. Нет секретов в diff.
+9. Деплой прошёл, smoke зелёный (после явного разрешения).
