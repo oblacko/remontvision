@@ -87,5 +87,11 @@ export async function cropObjectPng(parentBuf, bbox) {
   const sy = Math.max(0, Math.min(height - 1, Math.round(y * height)));
   const sw = Math.max(1, Math.min(width - sx, Math.round(w * width)));
   const sh = Math.max(1, Math.min(height - sy, Math.round(h * height)));
-  return sharp(parentBuf).extract({ left: sx, top: sy, width: sw, height: sh }).png().toBuffer();
+  const crop = await sharp(parentBuf).extract({ left: sx, top: sy, width: sw, height: sh }).png().toBuffer();
+  // BFL/OpenRouter требует референс не меньше 256×256. Приводим к 512×512,
+  // вписывая объект целиком (прозрачные поля по краям).
+  return sharp(crop)
+    .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
 }

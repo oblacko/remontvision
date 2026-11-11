@@ -42,6 +42,5 @@ test('cropObjectPng extracts the bbox at full resolution', async () => {
   const parent = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#ff0000' } }).png().toBuffer()
   const crop = await cropObjectPng(parent, [0.1, 0.1, 0.2, 0.2])
   const meta = await sharp(crop).metadata()
-  assert.equal(meta.width, 20)
-  assert.equal(meta.height, 20)
+  assert.ok(meta.width >= 256 && meta.height >= 256, `reference ${meta.width}x${meta.height} must be >= 256`)
 })
