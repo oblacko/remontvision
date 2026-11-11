@@ -58,6 +58,7 @@ export const MUTABLE_TABLES = [
   'roadmap_items',
   'design_registry',
   'articles',
+  'generation_cache',
 ];
 
 process.env.RV_DATABASE_URL = testUrl;

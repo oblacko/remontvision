@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { buildDesignDirection, setDirectionAgentForTests } from '../src/designeragent.js';
 import { pickRandomCompatiblePair } from '../src/designdata.js';
 
+// Unit-тесты direction не касаются БД: кэш выключен, агент инъектируется.
+process.env.DIRECTION_CACHE_ENABLED = '0';
+
 const validDirection = (styleId, conceptId, promptEn) => ({
   style_id: styleId,
   concept_id: conceptId,

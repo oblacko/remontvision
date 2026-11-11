@@ -421,6 +421,17 @@ export const q = {
                 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now() RETURNING *`,
       [key, value]).then(r => r.rows[0]),
 
+  // кэш дорогих AI-шагов с TTL
+  cacheGet: (kind, key, ttlDays) =>
+    pool.query(`SELECT value FROM generation_cache
+                WHERE kind = $1 AND key = $2
+                  AND created_at > now() - ($3 || ' days')::interval`,
+      [kind, key, String(ttlDays)]).then(r => r.rows[0] || null),
+  cachePut: (kind, key, value) =>
+    pool.query(`INSERT INTO generation_cache (kind, key, value) VALUES ($1,$2,$3)
+                ON CONFLICT (kind, key) DO UPDATE SET value = EXCLUDED.value, created_at = now()`,
+      [kind, key, JSON.stringify(value)]),
+
   // пакеты кредитов
   creditPacks: activeOnly =>
     pool.query(`SELECT * FROM credit_packs ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)

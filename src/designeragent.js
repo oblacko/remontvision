@@ -6,6 +6,7 @@ import { callAgentJson } from './openrouteragent.js';
 import { validateDesignDirection } from './agentcontracts.js';
 import { styleById, conceptById, compatibilityOf, compatibilityNote } from './designdata.js';
 import { log } from './openrouter.js';
+import { cacheGet, cachePut, directionCacheKey, pickVariant } from './generationcache.js';
 
 export const DESIGN_DIRECTION_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.DESIGN_DIRECTION_ENABLED ?? 'true'));
 
@@ -31,6 +32,7 @@ export function composeDirectionPrompt({
   roomType = 'Другое',
   dimensions = null,
   usedDirections = [],
+  variant = null,
 } = {}) {
   const style = styleById(styleId);
   const concept = conceptById(conceptId);
@@ -42,6 +44,9 @@ export function composeDirectionPrompt({
   const system = `${getArchitectPrompt('direction').system}\n\n${DIRECTION_SCHEMA}`;
   const history = Array.isArray(usedDirections) && usedDirections.length
     ? `Последние проекты пользователя (не повторяй main_move и focal_zone): ${usedDirections.map(item => JSON.stringify(item)).join('; ')}.`
+    : '';
+  const variantLine = variant && variant.count > 1
+    ? `Это вариант ${variant.index + 1} из ${variant.count}. Сфокусируй композицию на зоне: ${(variant.focalZones || []).join(' или ')}; main_move и focal_zone должны отличаться от других вариантов этой пары.`
     : '';
   const user = [
     `Тип комнаты: ${roomType || 'Другое'}.`,
@@ -56,6 +61,7 @@ export function composeDirectionPrompt({
       ? 'Пара допустима только в ослабленной форме: сохрани главный ход концепции, но приглуши его.'
       : '',
     history,
+    variantLine,
     'Собери одно DesignDirection по схеме. Только JSON.',
   ].filter(Boolean).join('\n');
   return { compatibility, system, user, style, concept };
@@ -104,6 +110,49 @@ export function setDirectionAgentForTests(fn) {
   agentCall = fn || callAgentJson;
 }
 
+const FOCAL_ROTATION = [
+  ['window', 'wall'],
+  ['center', 'perimeter'],
+  ['floor', 'ceiling'],
+];
+
+function directionCacheEnabled() {
+  return !/^(0|false|no|off)$/i.test(String(process.env.DIRECTION_CACHE_ENABLED ?? 'true'));
+}
+
+function directionCacheTtlDays() {
+  const value = Number(process.env.DIRECTION_CACHE_TTL_DAYS || 30);
+  return Number.isFinite(value) && value > 0 ? value : 30;
+}
+
+function directionVariantCount() {
+  const value = Number(process.env.DIRECTION_CACHE_VARIANTS || 3);
+  if (!Number.isFinite(value)) return 3;
+  return Math.min(5, Math.max(1, Math.floor(value)));
+}
+
+async function callDirection({ styleId, conceptId, compatibility, system, user, model, sessionId }) {
+  const startedAt = Date.now();
+  try {
+    const agent = await agentCall({
+      instructions: system,
+      inputText: user,
+      model,
+      maxCostUsd: Number(process.env.DIRECTION_MAX_COST_USD || 0.02),
+      maxSteps: 1,
+      sessionId,
+    });
+    return {
+      result: normalizeDirectionResult(agent.parsed, { styleId, conceptId, compatibility, cost: agent.cost ?? null }),
+      parsed: agent.parsed,
+      cost: agent.cost ?? null,
+      ms: Date.now() - startedAt,
+    };
+  } catch {
+    return { result: null, parsed: null, cost: null, ms: Date.now() - startedAt };
+  }
+}
+
 export async function buildDesignDirection({
   styleId,
   conceptId,
@@ -113,52 +162,83 @@ export async function buildDesignDirection({
   sessionId = null,
 } = {}) {
   if (!DESIGN_DIRECTION_ENABLED) return null;
-  const { system, user, compatibility } = composeDirectionPrompt({ styleId, conceptId, roomType, dimensions, usedDirections });
-  if (!system || compatibility === 'conflict') return null;
-  const startedAt = Date.now();
-  let parsed = null;
-  let cost = null;
-  try {
-    const agent = await agentCall({
-      instructions: system,
-      inputText: user,
-      model: DIRECTION_MODEL,
-      maxCostUsd: Number(process.env.DIRECTION_MAX_COST_USD || 0.02),
-      maxSteps: 1,
-      sessionId,
-    });
-    parsed = agent.parsed;
-    cost = agent.cost ?? null;
-  } catch { /* retry ниже */ }
-  let result = normalizeDirectionResult(parsed, { styleId, conceptId, compatibility, cost });
-  let retried = false;
-  // Повторяем только когда JSON не распарсился. Валидный ответ без prompt_en
-  // не повторяем: jobs.js уходит на fallback арт-директора, а второй полный
-  // вызов удваивал задержку direction (p50 ~34 с на два прохода).
-  if (!parsed) {
-    retried = true;
+  const base = composeDirectionPrompt({ styleId, conceptId, roomType, dimensions, usedDirections });
+  if (!base.system || base.compatibility === 'conflict') return null;
+
+  const cacheOn = directionCacheEnabled();
+  const seed = sessionId || `${styleId}:${conceptId}:${roomType}`;
+  const cacheKey = directionCacheKey({
+    styleId, conceptId, roomType, dimensions,
+    promptVersion: getArchitectPrompt('direction').version || 0,
+  });
+
+  if (cacheOn) {
     try {
-      const retry = await agentCall({
-        instructions: system,
-        inputText: user,
-        model: undefined,
-        maxCostUsd: Number(process.env.DIRECTION_MAX_COST_USD || 0.02),
-        maxSteps: 1,
-        sessionId,
-      });
-      const retryResult = normalizeDirectionResult(retry.parsed, {
-        styleId, conceptId, compatibility,
-        cost: (cost || 0) + (retry.cost || 0),
-      });
-      if (retryResult) result = retryResult;
-    } catch { /* остаётся null */ }
+      const cached = await cacheGet('design_direction', cacheKey, directionCacheTtlDays());
+      const variants = Array.isArray(cached?.variants) ? cached.variants.filter(item => item && item.text) : [];
+      const picked = pickVariant(variants, seed);
+      if (picked) {
+        log({ event: 'design_direction_cache_hit', variants: variants.length, key: cacheKey });
+        return { ...picked, cached: true, ms: 0, retried: false, cost: null };
+      }
+    } catch (e) {
+      log({ event: 'design_direction_cache_error', error: String(e.message || e).slice(0, 200) });
+    }
   }
+
+  const startedAt = Date.now();
+  const count = cacheOn ? directionVariantCount() : 1;
+  // Варианты генерируются параллельно: первый промах платит за N вызовов,
+  // все последующие рендеры этой пары получают направление из кэша мгновенно.
+  const calls = await Promise.all(Array.from({ length: count }, (_, index) => {
+    const variant = count > 1
+      ? { index, count, focalZones: FOCAL_ROTATION[index % FOCAL_ROTATION.length] }
+      : null;
+    const prompt = composeDirectionPrompt({ styleId, conceptId, roomType, dimensions, usedDirections, variant });
+    return callDirection({
+      styleId, conceptId, compatibility: base.compatibility,
+      system: prompt.system, user: prompt.user,
+      model: DIRECTION_MODEL, sessionId,
+    });
+  }));
+
+  const totalCost = calls.reduce((sum, call) => sum + (typeof call.cost === 'number' ? call.cost : 0), 0) || null;
+  const usable = calls.map(call => call.result).filter(result => result && result.text);
   const ms = Date.now() - startedAt;
-  if (!result) {
-    log({ event: 'design_direction_empty', ms, retried, cost_usd: cost ?? null });
+
+  if (usable.length && cacheOn) {
+    try {
+      await cachePut('design_direction', cacheKey, { variants: usable.map(result => ({ ...result, cost: null })) });
+    } catch (e) {
+      log({ event: 'design_direction_cache_error', error: String(e.message || e).slice(0, 200) });
+    }
+  }
+
+  // Ни один вариант не дал валидный JSON — один повтор дефолтной моделью.
+  if (!usable.length && !calls.some(call => call.parsed)) {
+    const retry = await callDirection({
+      styleId, conceptId, compatibility: base.compatibility,
+      system: base.system, user: base.user,
+      model: undefined, sessionId,
+    });
+    const result = retry.result;
+    const cost = (totalCost || 0) + (retry.cost || 0);
+    if (!result) {
+      log({ event: 'design_direction_empty', ms: Date.now() - startedAt, retried: true, cost_usd: cost || null });
+      return null;
+    }
+    const out = { ...result, ms: Date.now() - startedAt, retried: true, cached: false, cost: cost || null };
+    log({ event: 'design_direction_call', ms: out.ms, retried: true, variants: count, usable: 0, cached: false, has_text: Boolean(out.text), cost_usd: out.cost });
+    return out;
+  }
+
+  const pool = usable.length ? usable : calls.map(call => call.result).filter(Boolean);
+  const picked = pickVariant(pool, seed);
+  if (!picked) {
+    log({ event: 'design_direction_empty', ms, retried: false, cost_usd: totalCost });
     return null;
   }
-  const out = { ...result, ms, retried };
-  log({ event: 'design_direction_call', ms, retried, has_text: Boolean(result.text), cost_usd: result.cost ?? null });
+  const out = { ...picked, ms, retried: false, cached: false, cost: totalCost };
+  log({ event: 'design_direction_call', ms, retried: false, variants: count, usable: usable.length, cached: false, has_text: Boolean(out.text), cost_usd: out.cost });
   return out;
 }
