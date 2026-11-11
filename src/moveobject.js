@@ -39,27 +39,52 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
   const tx = Math.max(0, Math.min(width - sw, Math.round((x + move.dx) * width)));
   const ty = Math.max(0, Math.min(height - sh, Math.round((y + move.dy) * height)));
 
-  const base = await sharp(cleanedBuf).resize(width, height, { fit: 'fill' }).toBuffer();
-  const crop = await sharp(parentBuf)
-    .extract({ left: sx, top: sy, width: sw, height: sh })
-    .toBuffer();
+  const cleanBase = await sharp(cleanedBuf).resize(width, height, { fit: 'fill' }).png().toBuffer();
+  const region = { left: sx, top: sy, width: sw, height: sh };
+  const parentRgb = await sharp(parentBuf).extract(region).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const cleanRgb = await sharp(cleanBase).extract(region).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const count = sw * sh;
+  const alpha = Buffer.alloc(count);
+  let changed = 0;
+  for (let i = 0; i < count; i += 1) {
+    const o = i * 3;
+    const d = Math.max(
+      Math.abs(parentRgb.data[o] - cleanRgb.data[o]),
+      Math.abs(parentRgb.data[o + 1] - cleanRgb.data[o + 1]),
+      Math.abs(parentRgb.data[o + 2] - cleanRgb.data[o + 2]),
+    );
+    if (d > 24) { alpha[i] = 255; changed += 1; }
+  }
 
-  // Мягкие края: альфа-маска с размытой рамкой, чтобы вставка не выглядела аппликацией.
-  const inset = Math.max(3, Math.round(Math.min(sw, sh) * 0.1));
-  const mask = Buffer.from(
-    `<svg width="${sw}" height="${sh}" xmlns="http://www.w3.org/2000/svg">` +
-    `<defs><filter id="b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${Math.max(2, inset)}"/></filter></defs>` +
-    `<rect x="${inset}" y="${inset}" width="${Math.max(1, sw - inset * 2)}" height="${Math.max(1, sh - inset * 2)}" rx="${inset}" fill="#fff" filter="url(#b)"/>` +
-    `</svg>`,
-  );
-  const feathered = await sharp(crop)
-    .ensureAlpha()
-    .composite([{ input: mask, blend: 'dest-in' }])
-    .png()
-    .toBuffer();
+  let objectPng;
+  if (changed > count * 0.02) {
+    // Силуэт объекта = область, которую модель реально изменила при удалении.
+    // Это убирает прямоугольный патч стены: вставляем только сам объект.
+    const soft = await sharp(alpha, { raw: { width: sw, height: sh, channels: 1 } }).blur(1.5).raw().toBuffer();
+    const rgba = Buffer.alloc(count * 4);
+    for (let i = 0; i < count; i += 1) {
+      const o = i * 3;
+      rgba[i * 4] = parentRgb.data[o];
+      rgba[i * 4 + 1] = parentRgb.data[o + 1];
+      rgba[i * 4 + 2] = parentRgb.data[o + 2];
+      rgba[i * 4 + 3] = soft[i];
+    }
+    objectPng = await sharp(rgba, { raw: { width: sw, height: sh, channels: 4 } }).png().toBuffer();
+  } else {
+    // Fallback: если разница почти нулевая, используем мягкий кроп.
+    const inset = Math.max(1, Math.round(Math.min(sw, sh) * 0.02));
+    const blur = Math.max(2, Math.round(Math.min(sw, sh) * 0.01));
+    const mask = Buffer.from(
+      `<svg width="${sw}" height="${sh}" xmlns="http://www.w3.org/2000/svg">` +
+      `<defs><filter id="b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${blur}"/></filter></defs>` +
+      `<rect x="${inset}" y="${inset}" width="${Math.max(1, sw - inset * 2)}" height="${Math.max(1, sh - inset * 2)}" rx="${inset}" fill="#fff" filter="url(#b)"/>` +
+      `</svg>`,
+    );
+    objectPng = await sharp(parentBuf).extract(region).ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
+  }
 
-  return sharp(base)
-    .composite([{ input: feathered, left: tx, top: ty }])
+  return sharp(cleanBase)
+    .composite([{ input: objectPng, left: tx, top: ty }])
     .png()
     .toBuffer();
 }
@@ -88,8 +113,6 @@ export async function cropObjectPng(parentBuf, bbox) {
   const sw = Math.max(1, Math.min(width - sx, Math.round(w * width)));
   const sh = Math.max(1, Math.min(height - sy, Math.round(h * height)));
   const crop = await sharp(parentBuf).extract({ left: sx, top: sy, width: sw, height: sh }).png().toBuffer();
-  // BFL/OpenRouter требует референс не меньше 256×256. Приводим к 512×512,
-  // вписывая объект целиком (прозрачные поля по краям).
   return sharp(crop)
     .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
