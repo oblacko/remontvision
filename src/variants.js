@@ -15,6 +15,15 @@ export function shouldMarkRoomError(roomStatus, hasDoneSibling) {
   return roomStatus !== 'done';
 }
 
+// Что делать со статусом комнаты после неудачи рендера.
+// error — если других готовых дизайнов нет; done — если упала правка при живом
+// родителе (иначе комната навсегда остаётся в rendering и блокирует действия).
+export function roomStatusAfterFailure({ roomStatus, hasDoneSibling, iteration } = {}) {
+  if (shouldMarkRoomError(roomStatus, hasDoneSibling)) return 'error';
+  if (iteration) return 'done';
+  return null;
+}
+
 export function pluralVariants(n) {
   const m = n % 100;
   const d = n % 10;

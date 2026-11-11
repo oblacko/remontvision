@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariantsCount, shouldMarkRoomError, pluralVariants, retryAllowed, parseVariantItems, isIterationRender, resolveRenderStyleConcept } from '../src/variants.js';
+import { parseVariantsCount, shouldMarkRoomError, roomStatusAfterFailure, pluralVariants, retryAllowed, parseVariantItems, isIterationRender, resolveRenderStyleConcept } from '../src/variants.js';
 
 test('parseVariantsCount clamps 1..8', () => {
   assert.equal(parseVariantsCount(undefined), 1);
@@ -89,4 +89,17 @@ test('resolveRenderStyleConcept: per-render concept wins', () => {
     resolveRenderStyleConcept({ style: 'Лофт', concept: 'craft' }, { style: 'X', concept_key: 'light' }),
     { style: 'Лофт', concept: 'craft' },
   );
+});
+
+
+test('roomStatusAfterFailure restores done after a failed edit', () => {
+  assert.equal(roomStatusAfterFailure({ roomStatus: 'rendering', hasDoneSibling: true, iteration: true }), 'done');
+});
+
+test('roomStatusAfterFailure marks error when nothing is done', () => {
+  assert.equal(roomStatusAfterFailure({ roomStatus: 'rendering', hasDoneSibling: false, iteration: false }), 'error');
+});
+
+test('roomStatusAfterFailure keeps done for a failed root with done sibling', () => {
+  assert.equal(roomStatusAfterFailure({ roomStatus: 'rendering', hasDoneSibling: true, iteration: false }), null);
 });

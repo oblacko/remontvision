@@ -27,7 +27,7 @@ import { putBuffer, getBuffer } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
-import { shouldMarkRoomError, isIterationRender, resolveRenderStyleConcept } from './variants.js';
+import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolveRenderStyleConcept } from './variants.js';
 import { workerConcurrency } from './workerknobs.js';
 import { pickArtDirection } from './artdirectionpick.js';
 
@@ -806,7 +806,9 @@ export async function processRender(renderId, claimedBy = null) {
       return;
     }
     const hasDoneSibling = await q.roomHasDoneRender(room.id);
-    if (shouldMarkRoomError(room.status, hasDoneSibling)) await q.setRoomError(msg, room.id);
+    const roomNext = roomStatusAfterFailure({ roomStatus: room.status, hasDoneSibling, iteration });
+    if (roomNext === 'error') await q.setRoomError(msg, room.id);
+    else if (roomNext === 'done') await q.setRoomStatus('done', room.id);
     try {
       const restored = await restoreCreditForRender(renderId, `render_error:${stage}`);
       log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restored: restored, ms: Date.now() - t0 });
