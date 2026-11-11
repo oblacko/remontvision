@@ -10,6 +10,8 @@ import { goal } from '@/lib/analytics'
 import { shouldConvertHeic, convertHeicToJpeg } from '@/lib/heic'
 import { buildMoveCleanupInstruction, buildObjectText, cropObjectFile, ruLabel } from '@/lib/objects'
 import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
+import { clearDraft, compressDraftPhoto, DRAFT_PARAMS_KEY, draftTimeLabel, loadDraftParams, loadDraftPhoto, saveDraftParams, saveDraftPhoto } from '@/lib/draft'
+import type { DraftParams } from '@/lib/draft'
 
 type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
 type GenItem = {
@@ -271,6 +273,8 @@ export function GenerationPanel({
   const [objectsOn, setObjectsOn] = useState(false)
   const [editObjectTarget, setEditObjectTarget] = useState<{ label?: string; bbox: number[] } | null>(null)
   const [passportNotice, setPassportNotice] = useState('')
+  const [draftBanner, setDraftBanner] = useState<{ savedAt: string; otherTab?: boolean } | null>(null)
+  const draftCreatedAtRef = useRef('')
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
@@ -550,6 +554,48 @@ export function GenerationPanel({
     return () => { cancelled = true }
   }, [open, initialRoomId, initialRenderId])
 
+  // Черновик нового дизайна: подсказываем, что фото и настройки уже сохранены.
+  useEffect(() => {
+    if (!open || initialRoomId || inline) return
+    let cancelled = false
+    ;(async () => {
+      const params = loadDraftParams()
+      if (!params) return
+      const photoBlob = await loadDraftPhoto()
+      if (cancelled) return
+      if (!photoBlob && !params.roomType && !params.stylePicks.length) return
+      setDraftBanner({ savedAt: params.saved_at })
+    })()
+    return () => { cancelled = true }
+  }, [open, initialRoomId, inline])
+
+  // Гонка двух вкладок: соседняя вкладка сохранила черновик — показываем время.
+  useEffect(() => {
+    if (!open || initialRoomId || inline) return
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== DRAFT_PARAMS_KEY || !event.newValue) return
+      try {
+        const data = JSON.parse(event.newValue) as DraftParams
+        if (data?.saved_at) setDraftBanner({ savedAt: data.saved_at, otherTab: true })
+      } catch { /* чужой формат — не мешаем работе */ }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [open, initialRoomId, inline])
+
+  // Параметры пишем в localStorage на каждом осмысленном изменении.
+  useEffect(() => {
+    if (!open || initialRoomId || inline) return
+    if (step === 'generating' || step === 'result' || step === 'estimates') return
+    if (!photo && !roomType && !stylePicks.length) return
+    if (!draftCreatedAtRef.current) draftCreatedAtRef.current = new Date().toISOString()
+    saveDraftParams({
+      roomType, stylePicks, priceTier, modelKey, resolution, isPrivate,
+      created_at: draftCreatedAtRef.current,
+    })
+    setDraftBanner(null)
+  }, [open, initialRoomId, inline, step, photo, roomType, stylePicks, priceTier, modelKey, resolution, isPrivate])
+
   useEffect(() => {
     if (step !== 'generating') return
     const started = Date.now()
@@ -589,6 +635,41 @@ export function GenerationPanel({
     setRoomType(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null)
     // Габариты и объектив оценивает архитектор по фото — пользователь их не вводит.
+    if (!initialRoomId) {
+      if (!draftCreatedAtRef.current) draftCreatedAtRef.current = new Date().toISOString()
+      void compressDraftPhoto(photoFile).then(blob => saveDraftPhoto(blob)).catch(() => {})
+    }
+  }
+
+  async function restoreDraft() {
+    const params = loadDraftParams()
+    if (!params) { setDraftBanner(null); return }
+    const blob = await loadDraftPhoto()
+    if (blob) {
+      const draftFile = new File([blob], 'room-draft.jpg', { type: 'image/jpeg' })
+      const url = URL.createObjectURL(draftFile)
+      rememberUrl(url)
+      setPhoto(url)
+      setFile(draftFile)
+      setPhotoName('Фото из черновика')
+      setPhotoRatio(4 / 3)
+    }
+    setRoomType(params.roomType)
+    setStylePicks(params.stylePicks)
+    setPriceTier(params.priceTier)
+    setModelKey(params.modelKey)
+    setModelChosen(Boolean(params.modelKey))
+    setResolution(params.resolution)
+    setIsPrivate(params.isPrivate)
+    draftCreatedAtRef.current = params.created_at
+    setDraftBanner(null)
+    setStep(blob && params.roomType ? 'style' : 'photo')
+  }
+
+  async function discardDraft() {
+    await clearDraft()
+    draftCreatedAtRef.current = ''
+    setDraftBanner(null)
   }
 
   const clearEditRefs = () => {
@@ -787,6 +868,9 @@ export function GenerationPanel({
         goal('render_start', { style: styleName, room_type: roomType })
         id = d.id
         setRoomId(id)
+        void clearDraft()
+        setDraftBanner(null)
+        draftCreatedAtRef.current = ''
         void refreshTasks()
       } else {
         const fd = new FormData()
@@ -852,6 +936,9 @@ export function GenerationPanel({
     clearEditRefs()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
     setGenError(''); setGenStage('queued'); setElapsed(0); setRoomId(''); setBusy(false); setCreditOpen(false)
+    void clearDraft()
+    draftCreatedAtRef.current = ''
+    setDraftBanner(null)
     if (photoInput.current) photoInput.current.value = ''
   }
 
@@ -885,6 +972,18 @@ export function GenerationPanel({
       </div>}
 
       <div className={inline ? 'min-w-0' : 'gen-body'}>
+        {draftBanner && (step === 'photo' || step === 'style') && (
+          <div className="mb-6 border border-primary/40 bg-primary/5 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4" role="status">
+            <p className="min-w-0 text-sm leading-6">
+              <span className="font-medium">{draftBanner.otherTab ? 'Черновик обновлён в другой вкладке' : 'Найден сохранённый черновик'}.</span>{' '}
+              Сохранён в {draftTimeLabel(draftBanner.savedAt)} — можно продолжить с фото и настройками или начать заново.
+            </p>
+            <div className="mt-3 flex shrink-0 gap-2 sm:mt-0">
+              <button type="button" onClick={() => void restoreDraft()} className="k-btn k-btn--primary k-btn--s">Продолжить</button>
+              <button type="button" onClick={() => void discardDraft()} className="k-btn k-btn--s">Начать заново</button>
+            </div>
+          </div>
+        )}
         {inline && step === 'result' && !current && <div className="py-10 text-center"><KitIcon name="sp" spin className="mx-auto size-6 text-primary-text" /></div>}
         {step === 'photo' && (
           <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
@@ -905,7 +1004,7 @@ export function GenerationPanel({
                   <img src={photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
                     <span className="truncate text-xs">{photoName}</span>
-                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); if (photoInput.current) photoInput.current.value = '' }} className="k-btn k-btn--ov k-btn--icon" aria-label="Удалить фото"><KitIcon name="x" /></button>
+                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setDraftBanner(null); void discardDraft(); if (photoInput.current) photoInput.current.value = '' }} className="k-btn k-btn--ov k-btn--icon" aria-label="Удалить фото"><KitIcon name="x" /></button>
                   </div>
                 </div>
               ) : (
