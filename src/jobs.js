@@ -16,6 +16,7 @@ import { buildAnalysis } from './analysis.js';
 import { composeMove } from './moveobject.js';
 import { normalizeTier } from './pricing.js';
 import { getModelConfig } from './modelconfig.js';
+import { parseAutoEnabled } from './renderconfig.js';
 import { modelCaps } from './modelcaps.js';
 import { getCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getStyleConfig } from './styleconfig.js';
@@ -774,7 +775,18 @@ export async function processRender(renderId, claimedBy = null) {
     let visionCost = null;
     // Разбор интерьера запускается кнопкой (POST /api/renders/:id/breakdown).
     const architectOnDemand = !/^(0|false|no|off)$/i.test(String(process.env.ARCHITECT_ON_DEMAND ?? 'true'));
-    if (!MOCK_MODE && !architectOnDemand) {
+    const parseAuto = parseAutoEnabled();
+    if (!MOCK_MODE && parseAuto) {
+      // PARSE_AUTO: разбор сразу после раннего done. Стоимость учитываем отдельной строкой.
+      try {
+        parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
+        visionCost = parsed.cost;
+        addCost('render_analysis_auto', visionCost);
+        log({ event: 'render_analysis_auto', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length, cost_usd: visionCost ?? null });
+      } catch (e) {
+        log({ event: 'render_analysis_auto_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+      }
+    } else if (!MOCK_MODE && !architectOnDemand) {
       try {
         parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
         visionCost = parsed.cost;

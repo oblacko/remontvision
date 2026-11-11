@@ -107,3 +107,15 @@ export async function resetRenderConfig() {
   cache = { ...DEFAULT_RENDER_CONFIG };
   return getRenderConfig();
 }
+
+// Флаги пайплайна, которые владелец включает через env.
+export function envFlag(name, fallback = false) {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return fallback;
+  return /^(1|true|yes|on)$/i.test(String(raw));
+}
+
+// Автоматический parseRender после done. По умолчанию выключен: vision-разбор платный.
+export function parseAutoEnabled() {
+  return envFlag('PARSE_AUTO', false);
+}
