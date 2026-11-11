@@ -11,6 +11,7 @@ import { buildScalePlan } from './scaleplan.js';
 import { layoutPlanToText } from './layoutagent.js';
 import { getImageMinGapMs } from './renderconfig.js';
 import { proxyFetch } from './proxy.js';
+import { withGlobalImageSlot } from './imageslot.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -30,12 +31,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let imageChain = Promise.resolve();
 let lastImageStart = 0;
 
-function withImageSlot(fn) {
+export function withImageSlot(fn) {
   const run = imageChain.then(async () => {
     const wait = Math.max(0, getImageMinGapMs() - (Date.now() - lastImageStart));
     if (wait) await sleep(wait);
     lastImageStart = Date.now();
-    return fn();
+    try {
+      return await withGlobalImageSlot(fn);
+    } catch (e) {
+      // Только отсутствие БД откатывает на локальную сериализацию (unit-тесты).
+      // Ошибку самого image-вызова пробрасываем: повтор здесь удваивал бы платный вызов
+      // и обходил глобальный слот. Таймаут слота тоже не повторяем.
+      if (e?.code === 'NO_DB') return fn();
+      throw e;
+    }
   });
   imageChain = run.catch(() => {});
   return run;

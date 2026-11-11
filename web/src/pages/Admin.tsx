@@ -173,6 +173,8 @@ const reasonNames: Record<string, string> = {
 function AdminImage({ src, kind, alt = '' }: { src?: string | null; kind: 'renders' | 'files'; alt?: string }) {
   const [url, setUrl] = useState('')
   useEffect(() => {
+    // Сброс поля при смене источника: состояние зависит от пропа, но читает localStorage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUrl('')
     if (!src) return
     const file = src.split('/').pop()

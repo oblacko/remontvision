@@ -53,6 +53,12 @@ function readDismissed(): Set<string> {
 export function TasksProvider({ children }: { children: ReactNode }) {
   const [all, setAll] = useState<GenTask[]>([])
   const [dismissed, setDismissed] = useState<Set<string>>(readDismissed)
+  // Отсечка «свежих» задач обновляется по таймеру: Date.now() нельзя звать в рендере.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
   const [authed, setAuthed] = useState(false)
   const [panelOpen, setPanelOpenState] = useState(false)
   const primed = useRef(false)
@@ -161,7 +167,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const setPanelOpen = useCallback((open: boolean) => setPanelOpenState(open), [])
 
   const tasks = useMemo(() => {
-    const cutoff = Date.now() - 10 * 60 * 1000
+    const cutoff = now - 10 * 60 * 1000
     return all
       .filter(task => {
         if (dismissed.has(task.id)) return false
@@ -170,7 +176,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         return Number.isFinite(created) && created > cutoff
       })
       .slice(0, 8)
-  }, [all, dismissed])
+  }, [all, dismissed, now])
 
   const activeCount = useMemo(() => tasks.filter(task => !isTerminal(task)).length, [tasks])
 

@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { q, migrate } from './db.js';
 import { startWorker, enqueueRender } from './jobs.js';
 import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect } from './openrouter.js';
@@ -2411,7 +2412,9 @@ app.use((err, req, res, _next) => {
 });
 
 // ---------- старт ----------
-async function main() {
+// Инициализация без listen/воркеров: миграции, сиды, конфиги, 404.
+// Используется и в main(), и интеграционными тестами (test/support/app.js).
+export async function initialize() {
   await migrate();          // накат миграций Postgres
   await seedStyleReferences(); // сгенерированные референсы стилей (style-refs/seed.json)
   await loadModelConfig();  // модели из app_settings / env
@@ -2428,6 +2431,15 @@ async function main() {
   await loadArchitectPrompts();  // активные версии архитектора
   await loadStyleConfig(); // источник стиля: текст/свотчи
   await loadRoomTypes();   // типы комнат: справочник и промты из app_settings
+  // Единая брендированная 404 для неизвестных маршрутов (API — JSON).
+  app.use((req, res) => {
+    if (String(req.path || '').startsWith('/api/')) return res.status(404).json({ error: 'Не найдено' });
+    res.status(404).type('html').send(notFoundPage('Страница не найдена', 'Такой страницы нет. Проверьте ссылку или вернитесь на главную.'));
+  });
+}
+
+async function main() {
+  await initialize();
   if (MOCK_MODE && (process.env.NODE_ENV === 'production' || PAYMENTS_ENABLED)) {
     throw new Error('OPENROUTER_API_KEY обязателен в production/при включённой монетизации');
   }
@@ -2438,11 +2450,6 @@ async function main() {
     log({ event: 'config_warning', error: String(e.message || e).slice(0, 300) });
   }
   if (!ADMIN_KEY) console.log('[warn] ADMIN_KEY не задан — админка каталога открыта не будет');
-  // Единая брендированная 404 для неизвестных маршрутов (API — JSON).
-  app.use((req, res) => {
-    if (String(req.path || '').startsWith('/api/')) return res.status(404).json({ error: 'Не найдено' });
-    res.status(404).type('html').send(notFoundPage('Страница не найдена', 'Такой страницы нет. Проверьте ссылку или вернитесь на главную.'));
-  });
   app.listen(PORT, () => {
     log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
     startWorker();
@@ -2450,7 +2457,14 @@ async function main() {
   });
 }
 
-main().catch(e => {
-  console.error(`[remontvision] не запускаюсь: ${e.message}`);
-  process.exit(1);
-});
+// Экспорт приложения для интеграционных тестов (test/support/app.js).
+export { app };
+
+// Старт только при прямом запуске `node src/server.js`; импорт модуля не слушает порт.
+const isDirectRun = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirectRun) {
+  main().catch(e => {
+    console.error(`[remontvision] не запускаюсь: ${e.message}`);
+    process.exit(1);
+  });
+}

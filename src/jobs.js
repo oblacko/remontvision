@@ -28,6 +28,8 @@ import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, isIterationRender, resolveRenderStyleConcept } from './variants.js';
+import { workerConcurrency } from './workerknobs.js';
+import { pickArtDirection } from './artdirectionpick.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -77,7 +79,7 @@ async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
   return { refs, user: false };
 }
 
-async function processRender(renderId) {
+export async function processRender(renderId, claimedBy = null) {
   const t0 = Date.now();
   const render = await q.getRender(renderId);
   if (!render || render.status !== 'processing') return;
@@ -103,6 +105,11 @@ async function processRender(renderId) {
   const precleanedShell = room.precleaned_shell_path || null;
   const useCleanup = !iteration && !keepFurniture && !precleanedShell && cleanupCfg.enabled;
   let stage = 'start';
+
+  // Lease: пока рендер жив, воркер продлевает аренду; при падении lease истечёт,
+  // и задача вернётся в очередь, не отбираясь у живой реплики.
+  const heartbeat = setInterval(() => { q.heartbeatRender(renderId, claimedBy).catch(() => {}); }, 30_000);
+  if (heartbeat.unref) heartbeat.unref();
 
   // Себестоимость полной генерации: каждый внешний запрос пишется отдельно.
   const costBreakdown = {
@@ -250,8 +257,10 @@ async function processRender(renderId) {
       }
 
       // Проход A: строитель определяет объём ремонта по исходному фото и cleaned shell.
+      // Параллельно с арт-директором: оба читают одно фото и не зависят друг от друга.
       let repairScope = null;
-      if (!MOCK_MODE) {
+      const repairPromise = (async () => {
+        if (MOCK_MODE) return null;
         try {
           const originalBuf = await getBuffer(room.photo_path || sourceStored);
           const cleanedBuf = precleanedShell ? await getBuffer(precleanedShell) : null;
@@ -264,18 +273,19 @@ async function processRender(renderId) {
             sessionId: `render:${renderId}`,
           });
           if (repair?.repairScope) {
-            repairScope = repair.repairScope;
             meta.repair_scope = repair.repairScope;
             meta.repair_prompt_version = repair.promptVersion ?? null;
             addCost('repair_scope', repair.cost);
             log({ event: 'repair_scope_ok', room_id: room.id, render_id: renderId, input: precleanedShell ? 'cleaned_shell' : 'original', floor: repair.repairScope.floor?.action || null, ceiling: repair.repairScope.ceiling?.action || null, doors: repair.repairScope.doors?.action || null, cost_usd: repair.cost ?? null });
-          } else {
-            log({ event: 'repair_scope_empty', room_id: room.id, render_id: renderId });
+            return repair.repairScope;
           }
+          log({ event: 'repair_scope_empty', room_id: room.id, render_id: renderId });
+          return null;
         } catch (e) {
           log({ event: 'repair_scope_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+          return null;
         }
-      }
+      })();
       meta.art_direction_input = precleanedShell ? 'cleaned_shell' : 'original';
 
       // Фото-проход: оцениваем размеры и объектив как раньше. Для новой пары
@@ -339,14 +349,15 @@ async function processRender(renderId) {
               log({ event: 'design_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
             }
           }
-          if (direction?.text) {
-            artDirection = direction.text;
+          const picked = pickArtDirection({ direction, ad });
+          if (picked.branch === 'direction') {
+            artDirection = picked.text;
             artDirectionCost = (ad.cost || 0) + (direction.cost || 0);
             addCost('art_direction', ad.cost);
             addCost('art_direction', direction.cost);
-            meta.design_direction = { ...direction, ms: Date.now() - adStart };
+            meta.design_direction = { ...direction, ms: Date.now() - adStart, call_ms: direction.ms, retried: direction.retried };
             meta.concept_key = conceptKey;
-            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart });
+            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart, call_ms: direction.ms, retried: direction.retried });
             if (room.user_id) {
               await q.recordDesignDirection({
                 userId: room.user_id,
@@ -360,19 +371,28 @@ async function processRender(renderId) {
               });
             }
             try { await q.setRoomDesign(room.id, room.concept_key, direction); } catch { /* метаданные не критичны */ }
-          } else if (ad?.text) {
-            artDirection = ad.text;
+          } else if (picked.branch === 'art_director') {
+            artDirection = picked.text;
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
             log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
+            if (direction) {
+              // Валидный контракт без prompt_en: второй вызов не делаем, в промт идёт ad.text.
+              addCost('art_direction', direction.cost);
+              log({ event: 'design_direction_incomplete', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, call_ms: direction.ms, retried: direction.retried, cost_usd: direction.cost ?? null });
+            }
           } else {
+            if (direction) addCost('art_direction', direction.cost);
             log({ event: 'art_direction_empty', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType });
           }
         } catch (e) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
       }
+
+      // Дожидаемся ремонта перед планировщиком/промтом: оба используют repairScope.
+      repairScope = await repairPromise;
 
       // Планировщик нужен только для пустой комнаты: он предлагает расстановку,
       // чтобы модель не сводила кабинет к «стол + стул + шкаф».
@@ -593,7 +613,11 @@ async function processRender(renderId) {
           if (archQaEnforce) {
             const qaTotalCost = sumCostBreakdown();
             await q.setRenderMeta(renderId, { ...meta, model, cost_usd: qaTotalCost, cost_breakdown: costBreakdown, architecture_qa: architectureQa });
-            await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id, 'architecture_qa');
+            const rejected = await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id, 'architecture_qa', claimedBy);
+            if (!rejected) {
+              log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'architecture_qa' });
+              return;
+            }
             await q.setRoomNotice(notice, room.id);
             const restored = await restoreCreditForRender(renderId, 'architecture_rejected');
             log({ event: 'architecture_rejected', room_id: room.id, render_id: renderId, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: qaTotalCost, credit_restored: restored, ms: Date.now() - t0 });
@@ -636,7 +660,11 @@ async function processRender(renderId) {
           : `Товарная правка не прошла проверку${reason ? `: ${reason}` : '.'} Прежняя версия сохранена, кредит возвращён.`;
         const qaTotalCost = sumCostBreakdown();
         await q.setRenderMeta(renderId, { ...meta, model, cost_usd: qaTotalCost, cost_breakdown: costBreakdown, product_qa: productQa });
-        await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id);
+        const rejected = await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id, 'product_qa', claimedBy);
+        if (!rejected) {
+          log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'product_qa' });
+          return;
+        }
         await q.setRoomNotice(notice, room.id);
         const restored = await restoreCreditForRender(renderId, 'product_qa_rejected');
         log({ event: 'product_qa_rejected', room_id: room.id, render_id: renderId, product_id: editProduct.id, status: productQa.status, checks: productQa.checks, cost_usd: qaTotalCost, credit_restored: restored, ms: Date.now() - t0 });
@@ -727,7 +755,11 @@ async function processRender(renderId) {
       suggestion_targets: analysis.suggestions.map(s => s.target),
     });
 
-    await q.setRenderDone(renderKey, totalCost, model, render.id);
+    const done = await q.setRenderDone(renderKey, totalCost, model, render.id, claimedBy);
+    if (!done) {
+      log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'done' });
+      return;
+    }
     await q.setRoomStatus('done', room.id);
     log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_breakdown: costBreakdown, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
 
@@ -739,7 +771,11 @@ async function processRender(renderId) {
     const msg = friendlyRenderError(rawMsg);
     addCost('failed', e.cost);
     const errorCost = sumCostBreakdown();
-    await q.setRenderError(msg, renderId, stage, errorCost);
+    const marked = await q.setRenderError(msg, renderId, stage, errorCost, claimedBy);
+    if (!marked) {
+      log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'error' });
+      return;
+    }
     const hasDoneSibling = await q.roomHasDoneRender(room.id);
     if (shouldMarkRoomError(room.status, hasDoneSibling)) await q.setRoomError(msg, room.id);
     try {
@@ -748,6 +784,8 @@ async function processRender(renderId) {
     } catch (restoreError) {
       log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
     }
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -781,11 +819,15 @@ function notifyOwner(room, render) {
 }
 
 let running = 0;
+const MAX_RUNNING = workerConcurrency();
 export function startWorker() {
   q.requeueProcessing().then(n => { if (n) console.log(`[worker] вернул в очередь ${n} прерванных рендеров`); });
 
   setInterval(async () => {
     try {
+      // Просроченные lease возвращаем в очередь; живые (вторая реплика) не трогаем.
+      const requeued = await q.requeueProcessing();
+      if (requeued) log({ event: 'render_lease_requeued', count: requeued });
       const stale = await q.staleRenders(24 * 60);
       for (const r of stale) {
         const msg = 'Генерация не завершилась за 24 часа';
@@ -801,17 +843,17 @@ export function startWorker() {
   }, 5 * 60 * 1000);
 
   setInterval(async () => {
-    if (running >= 2) return;
+    if (running >= MAX_RUNNING) return;
     try {
       const row = await q.claimNextRender();
       if (!row) return;
       running++;
-      try { await processRender(row.id); } finally { running--; }
+      try { await processRender(row.id, row.claimed_by); } finally { running--; }
     } catch (e) {
       log({ event: 'worker_error', error: String(e.message || e).slice(0, 300) });
     }
   }, 2000);
-  console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
+  console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}, concurrency: ${MAX_RUNNING}`);
 }
 
 export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, style = null, concept = null, resolution = null }) {
