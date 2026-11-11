@@ -3,12 +3,15 @@
 -- их как правки одного дизайна. batch_id связывает варианты, созданные вместе.
 CREATE TABLE IF NOT EXISTS generation_batches (
   id               TEXT PRIMARY KEY,
-  user_id          BIGINT NOT NULL REFERENCES users(id),
+  -- NULL допустим для пакетов, собранных задним числом из анонимных комнат.
+  user_id          BIGINT REFERENCES users(id),
   room_id          TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   tier             TEXT,
   idempotency_key  TEXT,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Если таблица уже создана прошлой версией миграции с NOT NULL — снимаем ограничение.
+ALTER TABLE generation_batches ALTER COLUMN user_id DROP NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_batches_idempotency
   ON generation_batches (user_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
@@ -28,6 +31,7 @@ INSERT INTO generation_batches (id, user_id, room_id, tier, created_at)
 SELECT gen_random_uuid()::text, r.user_id, r.id, NULL, MIN(rd.created_at)
 FROM rooms r
 JOIN renders rd ON rd.room_id = r.id AND rd.parent_render_id IS NULL
+WHERE r.user_id IS NOT NULL
 GROUP BY r.id, r.user_id;
 
 UPDATE renders rd
