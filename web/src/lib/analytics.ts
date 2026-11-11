@@ -21,4 +21,13 @@ export function goal(name: string, params?: Record<string, unknown>) {
     }
   }
   window.ym?.(COUNTER_ID, 'reachGoal', name, next)
+  // Дубль в собственную таблицу: Метрика может не загрузиться (адблок), а воронка нужна всегда.
+  try {
+    void fetch('/api/events', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, props: next ?? null }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch { /* события не должны ломать интерфейс */ }
 }

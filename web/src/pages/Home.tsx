@@ -244,7 +244,7 @@ export default function Home() {
             <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground"><span className="h-px flex-1 bg-border" />или по почте<span className="h-px flex-1 bg-border" /></div>
             <div>
               <label htmlFor="login-email" className="k-label">E-mail</label>
-              <input id="login-email" type="email" autoComplete="email" autoFocus placeholder="you@example.ru" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="k-field" />
+              <input id="login-email" type="email" autoComplete="email" autoFocus aria-label="E-mail для входа" placeholder="you@example.ru" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="k-field" />
             </div>
             {loginError && <p className="k-er" role="alert"><KitIcon name="warn" className="mt-0.5" /><span>{loginError}</span></p>}
             <button type="button" disabled={loginBusy} onClick={requestLogin} className="k-btn k-btn--primary k-btn--l k-btn--block">{loginBusy ? 'Отправляем…' : 'Получить код для входа'}</button>

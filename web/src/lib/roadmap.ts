@@ -1,4 +1,6 @@
 export type RoadmapItem = {
+  priority?: 'high' | 'medium' | 'low' | null
+  who?: 'self' | 'specialist' | 'measure' | null
   id: string
   section_key: string
   section_title: string

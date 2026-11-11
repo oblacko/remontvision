@@ -91,3 +91,22 @@ test('buildRoadmapUser carries accepted design decisions', () => {
   assert.match(user, /Главный ход: рейки на потолке/);
   assert.match(user, /Планировка: диван вдоль длинной стены/);
 });
+
+test('normalizeRoadmap keeps priority and who from object cards', async () => {
+  const { normalizeRoadmap } = await import('../src/roadmapdata.js');
+  const roadmap = normalizeRoadmap({
+    sections: [{
+      key: 'electrics',
+      title: 'Электрика',
+      cards: [
+        { text: 'Кабель', priority: 'high', who: 'specialist' },
+        'Розетки',
+        { text: 'Замер', who: 'measure' },
+      ],
+    }],
+  });
+  assert.equal(roadmap.sections[0].cards.length, 3);
+  assert.deepEqual(roadmap.sections[0].cards[0], { text: 'Кабель', priority: 'high', who: 'specialist' });
+  assert.equal(roadmap.sections[0].cards[1].priority, null);
+  assert.equal(roadmap.sections[0].cards[2].who, 'measure');
+});

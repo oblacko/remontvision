@@ -48,6 +48,21 @@ export function buildPassport({ render, room, now = new Date() } = {}) {
       }))
     : [];
 
+  // Если в analysis.surfaces нет отделки (новый разбор её не пишет), берём описания
+  // поверхностей из объектов: так паспорт не остаётся без блока отделки.
+  const surfaceFromObjects = () => {
+    const titles = { floor: 'Пол', walls: 'Стены', ceiling: 'Потолок', door: 'Двери', window: 'Окна' };
+    const seen = new Set();
+    const result = [];
+    for (const object of objects) {
+      const title = titles[object.category];
+      if (!title || seen.has(title)) continue;
+      seen.add(title);
+      result.push({ title, material: '', look: object.description || object.label });
+    }
+    return result;
+  };
+
   const cards = Array.isArray(breakdown?.cards)
     ? breakdown.cards.map(card => ({
         name: clean(card.name, 120),
@@ -85,7 +100,12 @@ export function buildPassport({ render, room, now = new Date() } = {}) {
     focal_point: clean(direction?.focalPoint, 200),
     materials: clean(direction?.materials || (Array.isArray(direction?.materialsStory) ? direction.materialsStory.join(', ') : ''), 400),
     palette,
-    surfaces: surfaces.map(surface => ({ title: SURFACE_TITLES[surface.key] || surface.key || 'Поверхность', material: surface.material, look: surface.look })),
+    surfaces: (surfaces.length ? surfaces : surfaceFromObjects())
+      .map(surface => ({
+        title: surface.title || SURFACE_TITLES[surface.key] || surface.key || 'Поверхность',
+        material: surface.material || '',
+        look: surface.look || '',
+      })),
     objects,
     lighting: breakdown?.lighting
       ? {

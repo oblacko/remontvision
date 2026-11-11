@@ -175,6 +175,12 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions, roomId }
                         </button>
                         <div className="min-w-0 flex-1">
                           <p className={cn('text-sm leading-5', (item.done || !item.active) && 'text-muted-foreground line-through')}>{item.text}</p>
+                          {(item.who || item.priority) && (
+                            <p className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                              {item.who && <span className="border border-foreground/20 px-1.5 py-0.5">{item.who === 'specialist' ? 'нужен мастер' : item.who === 'measure' ? 'сначала замер' : 'можно самому'}</span>}
+                              {item.priority === 'high' && <span className="border border-primary/50 px-1.5 py-0.5 text-primary-text">важное</span>}
+                            </p>
+                          )}
                           {item.comment && commentId !== item.id && <p className="mt-1 text-xs leading-5 text-muted-foreground">· {item.comment}</p>}
                           <details className="mt-1">
                             <summary className="cursor-pointer text-xs text-primary-text underline decoration-border underline-offset-2">Где купить</summary>

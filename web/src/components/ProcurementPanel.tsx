@@ -18,6 +18,8 @@ export type ProductMatch = {
   item: { key?: string; label: string; category: string }
   offers: ProductOffer[]
   note?: string
+  search_links?: Array<{ shop: string; label: string; url: string; type: 'search'; query: string }>
+  checked_at?: string
 }
 
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
@@ -129,7 +131,13 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
           <div className="divide-y border-y">
             {products.map((match, index) => (
               <section key={`${match.item.category}-${index}`} className="py-4">
-                <p className="text-sm font-medium">{match.item.label}</p>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-sm font-medium">{match.item.label}</p>
+                  {match.checked_at && <span className="text-[11px] text-muted-foreground">Цены и наличие: {new Date(match.checked_at).toLocaleDateString('ru-RU')}</span>}
+                </div>
+                {match.offers.length ? (
+                  <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">Карточки из каталога — проверить цену и наличие</p>
+                ) : null}
                 {match.offers.length ? (
                   <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
                     {match.offers.map(offer => (
@@ -153,7 +161,7 @@ export function ProcurementPanel({ renderId, image, initialProducts, productsEna
                   </div>
                 ) : <p className="mt-1 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>Найти похожее:</span>
+                  <span>Ссылки на поиск (не найденный товар):</span>
                   {MARKETPLACES.map(market => (
                     <a
                       key={market.key}

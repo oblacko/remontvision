@@ -2,7 +2,8 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestApp, closeTestApp } from '../support/app.js';
 import { api, createUser, loginAs } from '../support/helpers.js';
-import { grantCredits } from '../../src/payments.js';
+import { grantCredits, enqueueRenderWithCredit } from '../../src/payments.js';
+import crypto from 'node:crypto';
 import { q, pool } from '../../src/db.js';
 
 after(closeTestApp);
@@ -206,4 +207,55 @@ test('приватный дизайн нельзя опубликовать, о�
   await pool.query(`UPDATE renders SET is_private = true WHERE id = $1`, [render.id]);
   const denied = await api(app.url, `/api/renders/${render.id}/publish`, { method: 'POST', cookie, body: { value: true } });
   assert.equal(denied.status, 403);
+});
+
+test('отмена задачи в очереди возвращает кредит', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  // В mock-режиме загрузка не списывает кредиты, поэтому создаём оплаченный рендер явно.
+  const paidId = crypto.randomUUID();
+  await enqueueRenderWithCredit({
+    id: paidId, roomId: created.json.id, chargedUserId: user.id, modelCredits: 1, batchId: created.json.batch_id,
+  });
+  const balanceBefore = await q.creditBalance(user.id);
+
+  const res = await api(app.url, `/api/renders/${paidId}/cancel`, { method: 'POST', cookie });
+  assert.equal(res.status, 200);
+  assert.equal(res.json.status, 'cancelled');
+  assert.equal(await q.creditBalance(user.id), balanceBefore + 1);
+  const stored = await q.getRender(paidId);
+  assert.equal(stored.status, 'cancelled');
+});
+
+test('нельзя отменить задачу, которая уже в работе', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+  await pool.query(`UPDATE renders SET status = 'processing' WHERE id = $1`, [render.id]);
+  const res = await api(app.url, `/api/renders/${render.id}/cancel`, { method: 'POST', cookie });
+  assert.equal(res.status, 409);
+});
+
+test('события воронки пишутся и видны в админ-метриках', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  const cookie = await loginAs(user);
+  const res = await fetch(`${app.url}/api/events`, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'upload_ok', props: { room_type: 'Кухня' } }),
+  });
+  assert.equal(res.status, 204);
+
+  const metrics = await fetch(`${app.url}/api/admin/metrics`, { headers: { 'x-admin-key': process.env.ADMIN_KEY || 'test-admin-key' } });
+  assert.equal(metrics.status, 200);
+  const data = await metrics.json();
+  assert.ok(Array.isArray(data.events));
+  assert.ok(data.events.some(item => item.name === 'upload_ok'));
 });

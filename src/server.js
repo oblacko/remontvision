@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { q, migrate } from './db.js';
 import { startWorker, enqueueRender } from './jobs.js';
-import { enqueueRenderWithCredit } from './payments.js';
+import { enqueueRenderWithCredit, restoreCreditForRender } from './payments.js';
 import { startBalanceMonitor, getBalanceSnapshot } from './openrouterbalance.js';
 import { imageSlotStats } from './imageslot.js';
 import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect } from './openrouter.js';
@@ -33,6 +33,8 @@ import { curateProducts } from './curate.js';
 import { fetchRemoteImage, firstImageUrl } from './remoteimage.js';
 import { seedStyleReferences } from './stylerefseed.js';
 import { getModelConfig, loadModelConfig, loadRenderModels, saveModelConfig, resolveModelSelection, resolveDefaultModelKey, inheritPrivate, validateModelInput, privateAllowed } from './modelconfig.js';
+import { modelResolutions } from './openrouter.js';
+import { buildShopSearchLinks } from './shoplinks.js';
 import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
 import { pluralVariants, retryAllowed, parseVariantItems } from './variants.js';
 import { sharePageHtml } from './sharepage.js';
@@ -344,16 +346,20 @@ app.get('/api/health', (_req, res) => res.json({
 app.get('/api/models', h(async (_req, res) => {
   const models = await q.listRenderModels(true);
   const defaultKey = resolveDefaultModelKey(models, getModelConfig().render);
-  res.json({
-    models: models.map(m => ({
+  const modelsOut = await Promise.all(models.map(async m => {
+    const configured = modelCaps(m.model_id).resolutions;
+    const supported = await modelResolutions(m.model_id);
+    // Показываем только то, что владелец включил в админке И провайдер реально принимает.
+    const resolutions = supported ? configured.filter(value => supported.includes(value)) : configured;
+    return {
       key: m.id,
       label: m.label,
       credits: m.credits,
-      resolutions: modelCaps(m.model_id).resolutions,
+      resolutions,
       resolution_prices: m.resolution_prices || {},
-    })),
-    default_key: defaultKey,
-  });
+    };
+  }));
+  res.json({ models: modelsOut, default_key: defaultKey });
 }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
 app.get('/api/styles', h(async (_req, res) => {
@@ -605,9 +611,11 @@ app.all(['/api/payments/robokassa/fail', '/api/payments/robokassa/fail/'], (_req
 // ---------- каталог: админ ----------
 app.get('/api/admin/metrics', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const metrics = await q.adminMetrics(Number(req.query.days) || 30);
+  const days = Number(req.query.days) || 30;
+  const metrics = await q.adminMetrics(days);
   res.json({
     ...metrics,
+    events: await q.usageEventCounts(Math.min(days, 90)),
     openrouter: getBalanceSnapshot(),
     image_slots: imageSlotStats(),
     concurrency: {
@@ -1713,6 +1721,9 @@ app.get('/api/rooms/:id', h(async (req, res) => {
   // Счётчик правок нужен UI, чтобы честно показать цену действия «переместить/редактировать».
   const renderRootId = render ? (render.root_render_id || render.id) : null;
   const editsUsed = renderRootId ? await q.rootEditCount(renderRootId) : 0;
+  const pendingRender = await q.latestActiveRender(room.id);
+  // Варианты последнего пакета: статусы, повтор, независимое открытие.
+  const batchVariants = render?.batch_id ? await q.batchRenders(render.batch_id) : [];
   res.json({
     id: room.id,
     style: room.style,
@@ -1734,6 +1745,17 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     notice: room.notice || null,
     photo_url: `/files/${path.basename(room.photo_path)}`,
     has_purchased: hasPurchased,
+    pending_render: pendingRender ? { id: pendingRender.id, status: pendingRender.status } : null,
+    batch_id: render?.batch_id || null,
+    variants: batchVariants.map(item => ({
+      id: item.id,
+      status: item.status,
+      error: item.error,
+      image: item.image_path ? `/renders/${path.basename(item.image_path)}` : null,
+      style: item.style,
+      concept: item.concept,
+      is_edit: Boolean(item.parent_render_id),
+    })),
     roadmap: render?.analysis?.roadmap || null,
     roadmap_items: roadmapItems,
     render: render ? {
@@ -2117,13 +2139,15 @@ app.post('/api/renders/:id/roadmap', h(async (req, res) => {
   }
   const analysis = { ...(render.analysis || {}), roadmap: result.roadmap };
   await q.setRenderAnalysis(render.id, analysis);
-  const flat = result.roadmap.sections.flatMap(section => section.cards.map((text, index) => ({
+  const flat = result.roadmap.sections.flatMap(section => section.cards.map((card, index) => ({
     section_key: section.key,
     section_title: section.title,
     section_icon: section.icon,
     section_sort: section.sort,
     sort: index,
-    text,
+    text: card.text,
+    priority: card.priority || null,
+    who: card.who || null,
   })));
   await q.replaceRoadmapSeed(room.id, flat);
   const finishedAt = new Date().toISOString();
@@ -2251,6 +2275,7 @@ app.post('/api/renders/:id/product-search', h(async (req, res) => {
       }
     });
     await Promise.all(workers);
+    const checkedAt = new Date().toISOString();
     const products = (agent.items || []).map(item => {
       const seen = new Set();
       const itemOffers = (item.offer_ids || [])
@@ -2265,8 +2290,10 @@ app.post('/api/renders/:id/product-search', h(async (req, res) => {
         .slice(0, 4);
       return {
         item: { key: item.category || item.label, label: item.label || item.category || 'Товар', category: item.category || '' },
-        offers: itemOffers,
-        ...(itemOffers.length ? {} : { note: 'В каталоге не нашлось подходящего товара' }),
+        offers: itemOffers.map(offer => ({ ...offer, result_type: offer.id ? 'offer' : 'similar' })),
+        search_links: buildShopSearchLinks(item.label || item.category, { style: room?.style || '' }),
+        checked_at: checkedAt,
+        ...(itemOffers.length ? {} : { note: 'В каталоге не нашлось подходящего товара — ниже ссылки на поиск' }),
       };
     });
     const analysis = {
@@ -2577,6 +2604,29 @@ app.post('/api/renders/:id/variant', rateLimit, h(async (req, res) => {
     if (e.status === 402) return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: await q.creditBalance(req.user.id) });
     throw e;
   }
+}));
+
+// События воронки: пишем имена и небольшие props, без персональных данных.
+app.post('/api/events', rateLimit, h(async (req, res) => {
+  const name = String(req.body?.name || '').slice(0, 60).trim();
+  if (!name || !/^[a-z0-9_]+$/i.test(name)) return res.status(400).json({ error: 'Некорректное событие' });
+  const props = req.body?.props && typeof req.body.props === 'object' ? { ...req.body.props, ...(req.user ? { user: true } : {}) } : null;
+  await q.addUsageEvent(req.user?.id || null, name, props);
+  res.status(204).end();
+}));
+
+// Отмена задачи, которая ещё не ушла в работу. Кредит возвращается.
+app.post('/api/renders/:id/cancel', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  const cancelled = await q.cancelQueuedRender(render.id);
+  if (!cancelled) return res.status(409).json({ error: 'Уже выполняется — отмена недоступна' });
+  await restoreCreditForRender(render.id, 'render_cancelled').catch(() => {});
+  const hasDoneSibling = await q.roomHasDoneRender(render.room_id);
+  if (hasDoneSibling) await q.setRoomStatus('done', render.room_id);
+  else await q.setRoomError('Отменено пользователем', render.room_id);
+  res.json({ id: render.id, status: 'cancelled' });
 }));
 
 // Публичный промпт для SEO-страницы: безопасная пользовательская версия,

@@ -44,8 +44,11 @@ type Render = {
     breakdown?: Breakdown | null
   } | null
 }
+type RoomVariant = { id: string; status: string; error?: string | null; image: string | null; style?: string | null; concept?: string | null; is_edit?: boolean }
 type RoomData = {
   id: string
+  pending_render?: { id: string; status: string } | null
+  variants?: RoomVariant[]
   style: string
   room_type?: string | null
   status: string
@@ -93,6 +96,30 @@ export default function Room() {
   const [renderRatio, setRenderRatio] = useState(1.5)
   const [objectBusy, setObjectBusy] = useState(false)
   const [retryBusy, setRetryBusy] = useState(false)
+
+  const cancelPending = async () => {
+    const pending = room?.pending_render
+    if (!pending) return
+    try {
+      const r = await fetch(`/api/renders/${pending.id}/cancel`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Не удалось отменить')
+      await loadRoom()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось отменить')
+    }
+  }
+
+  const retryVariant = async (variantId: string) => {
+    try {
+      const r = await fetch(`/api/renders/${variantId}/retry`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Не удалось повторить')
+      await loadRoom()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось повторить')
+    }
+  }
 
   const retryRoom = async () => {
     if (retryBusy) return
@@ -365,6 +392,9 @@ export default function Room() {
             <h1 className="display-title mt-4 text-3xl">{stageLabel(room.status)}</h1>
             <p className="mt-2 text-sm text-muted-foreground">Дизайн создаётся. Функции комнаты откроются автоматически.</p>
             <div className="k-pb mt-6"><i style={{ width: '33%' }} className="rv-progress" /></div>
+            {room.pending_render?.status === 'queued' && (
+              <button type="button" onClick={() => void cancelPending()} className="k-btn mt-5">Отменить запуск</button>
+            )}
           </div>
         ) : room.status === 'error' ? (
           <div className="mx-auto max-w-xl py-16 text-center">
@@ -410,6 +440,29 @@ export default function Room() {
                   {render?.id && <button type="button" onClick={() => setStylePanel(value => !value)} aria-pressed={stylePanel} className="k-btn k-btn--ov k-btn--icon" aria-label="Повторить в другом стиле"><KitIcon name="re" /></button>}
                 </div>
               </div>
+            )}
+
+            {(room.variants?.length || 0) > 1 && (
+              <section className="mt-4 border bg-card p-3">
+                <p className="eyebrow">Варианты запуска</p>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {(room.variants || []).map(variant => (
+                    <div key={variant.id} className="w-28 shrink-0">
+                      <button type="button" onClick={() => variant.status === 'done' ? void loadRoom(variant.id) : undefined} className="block w-full">
+                        <span className="block h-16 w-full overflow-hidden border border-foreground/15 bg-secondary">
+                          {variant.image
+                            ? <img src={variant.image} alt="" className="h-full w-full object-cover" />
+                            : <span className="flex h-full items-center justify-center text-[10px] text-muted-foreground">{variant.status === 'error' ? 'ошибка' : 'в очереди'}</span>}
+                        </span>
+                        <span className="mt-1 block truncate text-[11px] text-muted-foreground">{variant.style || 'дизайн'}</span>
+                      </button>
+                      {variant.status === 'error' && (
+                        <button type="button" onClick={() => void retryVariant(variant.id)} className="mt-1 text-[11px] text-primary-text underline">Повторить</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
 
             {stylePanel && (

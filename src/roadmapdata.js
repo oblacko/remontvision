@@ -38,7 +38,11 @@ export const ROADMAP_SCHEMA = `Верни СТРОГО один JSON без mark
       "key": "demolition",
       "title": "Демонтаж и подготовка",
       "icon": "hammer",
-      "cards": ["Подрозетники и гофра", "Кабель и автоматы", "Светильники и ленты"]
+      "cards": [
+        {"text": "Подрозетники и гофра", "priority": "high", "who": "specialist"},
+        {"text": "Кабель и автоматы", "priority": "high", "who": "specialist"},
+        {"text": "Светильники и ленты", "priority": "medium", "who": "self"}
+      ]
     }
   ]
 }
@@ -47,7 +51,8 @@ export const ROADMAP_SCHEMA = `Верни СТРОГО один JSON без mark
 - 5–9 этапов, в каждом 3–8 позиций.
 - key — короткий латинский идентификатор этапа, уникальный.
 - title — понятное название этапа закупки по-русски.
-- cards — массив строк, каждая строка — конкретная покупка без слова «купить».
+- cards — массив объектов: text (покупка без слова «купить»), priority (high|medium|low),
+  who (self — можно самому, specialist — нужен мастер, measure — сначала замер).
 - Если для покупки нужен мастер (электрика, сантехника, окна, натяжной потолок),
   допиши в конце строки «— монтаж: мастер»; если справится сам — «— можно самому».
 - Если перед покупкой нужен замер (двери, окна, столешница, техника), допиши «— сначала замер».
@@ -113,7 +118,14 @@ export function normalizeRoadmap(parsed = {}) {
     const key = text(raw?.key, 60) || `phase-${sections.length + 1}`;
     if (sections.some(section => section.key === key)) continue;
     const cards = (Array.isArray(raw.cards) ? raw.cards : [])
-      .map(card => text(typeof card === 'string' ? card : card?.text, 200))
+      .map(card => {
+        const value = typeof card === 'string' ? { text: card } : (card || {});
+        const cardText = text(value.text, 200);
+        if (!cardText) return null;
+        const priority = ['high', 'medium', 'low'].includes(text(value.priority, 10)) ? text(value.priority, 10) : null;
+        const who = ['self', 'specialist', 'measure'].includes(text(value.who, 12)) ? text(value.who, 12) : null;
+        return { text: cardText, priority, who };
+      })
       .filter(Boolean)
       .slice(0, MAX_CARDS);
     if (!cards.length) continue;

@@ -117,6 +117,17 @@ export const q = {
     pool.query(`UPDATE renders SET public_prompt = $2 WHERE id = $1`, [id, value]),
   setRenderPublishConsent: (id, value) =>
     pool.query(`UPDATE renders SET publish_consent = $2 WHERE id = $1`, [id, Boolean(value)]),
+  cancelQueuedRender: (id) =>
+    pool.query(`UPDATE renders SET status = 'cancelled', finished_at = now()
+                WHERE id = $1 AND status = 'queued' RETURNING id`, [id]).then(r => r.rows[0] || null),
+  addUsageEvent: (userId, name, props) =>
+    pool.query(`INSERT INTO usage_events (user_id, name, props) VALUES ($1,$2,$3)`,
+      [userId || null, name, props ? JSON.stringify(props) : null]),
+  usageEventCounts: (days = 7) => pool.query(`
+    SELECT name, COUNT(*)::int AS n FROM usage_events
+    WHERE created_at > now() - ($1 || ' days')::interval
+    GROUP BY name ORDER BY n DESC`, [String(Math.max(1, Math.min(90, Number(days) || 7)))])
+    .then(r => r.rows),
   setRenderFavorite: (id, value) =>
     pool.query(`UPDATE renders SET is_favorite = $2 WHERE id = $1`, [id, Boolean(value)]),
   setRenderCostFinalized: (id, costUsd) =>
@@ -191,6 +202,9 @@ export const q = {
   removeLike: (renderId, visitor) => pool.query(`DELETE FROM render_likes WHERE render_id = $1 AND visitor = $2`, [renderId, visitor]),
   listComments: renderId => pool.query(`SELECT id, name, text, created_at FROM render_comments WHERE render_id = $1 ORDER BY created_at DESC LIMIT 100`, [renderId]).then(r => r.rows),
   addComment: (renderId, name, text, visitor) => pool.query(`INSERT INTO render_comments (render_id, name, text, visitor) VALUES ($1,$2,$3,$4) RETURNING id, name, text, created_at`, [renderId, name || null, text, visitor || null]).then(r => r.rows[0]),
+  latestActiveRender: roomId =>
+    pool.query(`SELECT id, status FROM renders WHERE room_id = $1 AND status IN ('queued','processing')
+                ORDER BY created_at DESC LIMIT 1`, [roomId]).then(r => r.rows[0] || null),
   latestRender: roomId =>
     pool.query(`SELECT * FROM renders WHERE room_id = $1 AND status = 'done' ORDER BY created_at DESC LIMIT 1`, [roomId])
       .then(r => r.rows[0] || null),
@@ -892,7 +906,7 @@ export const q = {
       .then(r => Boolean(r.rows[0]?.purchased)),
 
   roadmapItemsForRoom: roomId =>
-    pool.query(`SELECT id, section_key, section_title, section_icon, section_sort, sort, text, done, active, comment, is_custom, created_at
+    pool.query(`SELECT id, section_key, section_title, section_icon, section_sort, sort, text, priority, who, done, active, comment, is_custom, created_at
                 FROM roadmap_items WHERE room_id = $1
                 ORDER BY section_sort, sort, created_at`, [roomId]).then(r => r.rows),
 
@@ -906,10 +920,11 @@ export const q = {
       for (const item of items) {
         const prev = carried.get(`${item.section_key}\u0000${item.text}`);
         await client.query(
-          `INSERT INTO roadmap_items (id, room_id, section_key, section_title, section_icon, section_sort, sort, text, done, active, comment, is_custom)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false)`,
+          `INSERT INTO roadmap_items (id, room_id, section_key, section_title, section_icon, section_sort, sort, text, priority, who, done, active, comment, is_custom)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,false)`,
           [crypto.randomUUID(), roomId, item.section_key, item.section_title, item.section_icon || 'hammer',
-            item.section_sort, item.sort, item.text, prev?.done ?? false, prev?.active ?? true, prev?.comment ?? null]);
+            item.section_sort, item.sort, item.text, item.priority || null, item.who || null,
+            prev?.done ?? false, prev?.active ?? true, prev?.comment ?? null]);
       }
     }),
 

@@ -85,6 +85,32 @@ export const supportsInputRefs = () => INPUT_REFS_OK;
 
 // Баланс и дневной расход ключа: GET /api/v1/key. Нужен мониторингу, чтобы
 // параллельные вызовы не упирались в лимиты незаметно для владельца.
+// Разрешённые значения resolution по эндпоинтам модели (кэш 24 ч).
+// Нужны, чтобы UI не показывал 4K там, где провайдер его не принимает.
+const RESOLUTIONS_CACHE = new Map();
+export async function modelResolutions(modelId) {
+  if (!modelId || MOCK_MODE) return null;
+  const hit = RESOLUTIONS_CACHE.get(modelId);
+  if (hit && Date.now() - hit.at < 24 * 60 * 60 * 1000) return hit.values;
+  try {
+    const r = await proxyFetch(`${BASE}/images/models/${modelId}/endpoints`, {
+      headers: headers(), signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => ({}));
+    const values = new Set();
+    for (const endpoint of data.endpoints || []) {
+      const list = endpoint?.supported_parameters?.resolution?.values;
+      if (Array.isArray(list)) list.forEach(value => values.add(String(value)));
+    }
+    const result = values.size ? [...values] : null;
+    if (result) RESOLUTIONS_CACHE.set(modelId, { at: Date.now(), values: result });
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchKeyInfo() {
   if (MOCK_MODE) return { mock: true };
   const r = await proxyFetch(`${BASE}/key`, { headers: headers(), signal: AbortSignal.timeout(15_000) });
