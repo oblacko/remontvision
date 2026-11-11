@@ -321,19 +321,6 @@ export async function adjustCredits(userId, delta, reason = 'admin_adjust', note
   });
 }
 
-// атомарное списание: блокируем строку юзера — списания сериализуются, гонки исключены
-export async function spendCredit(userId, reason) {
-  return withTransaction(async client => {
-    const lock = await client.query(`SELECT id FROM users WHERE id = $1 FOR UPDATE`, [userId]);
-    if (!lock.rows[0]) return false;
-    const { rows } = await client.query(
-      `SELECT COALESCE(SUM(delta),0)::int AS balance FROM credit_txn WHERE user_id = $1`, [userId]);
-    if (rows[0].balance < 1) return false;
-    await client.query(`INSERT INTO credit_txn (user_id, delta, reason) VALUES ($1,-1,$2)`, [userId, reason]);
-    return true;
-  });
-}
-
 // списание с привязкой к рендеру: именно этот списанный кредит вернём при сбое
 export async function spendCreditForRender(userId, renderId, reason = 'iterate') {
   return withTransaction(async client => {
