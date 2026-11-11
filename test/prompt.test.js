@@ -7,6 +7,7 @@ process.env.OPENROUTER_API_KEY = 'test-key';
 process.env.RENDER_MODEL = 'test/model';
 
 const { buildPrompt, buildEditPrompt } = await import('../src/openrouter.js');
+const { setPromptConfigForTests } = await import('../src/promptconfig.js');
 const { nearestRal } = await import('../src/analysis.js');
 const { designProducts, canBindProduct, canReplaceWithProduct } = await import('../src/productpipeline.js');
 
@@ -82,7 +83,7 @@ test('prompt modes can drop furniture and catalog', () => {
     imageMap: [{ role: 'style reference' }],
   });
   assert.match(prompt, /FURNITURE MODE/);
-  assert.match(prompt, /The room is empty/);
+  assert.match(prompt, /Replace and restyle existing loose furniture/);
   assert.match(prompt, /CATALOG DISABLED/);
   assert.doesNotMatch(prompt, /Инженерная доска/);
 });
@@ -276,17 +277,28 @@ test('kept-furniture room still locks the existing layout', () => {
   assert.match(prompt, /Preserve existing large furniture/);
 });
 
-test('empty room without a layout plan still designs from scratch and does not reference a missing plan', () => {
+test('empty room without a layout plan uses the configurable furniture-off rule', () => {
   const prompt = buildPrompt({
     style: 'Неоклассика',
     roomType: 'Кабинет',
     keepFurniture: false,
     useCatalog: false,
   });
-  assert.match(prompt, /The room is empty/);
-  assert.match(prompt, /from scratch/);
+  assert.match(prompt, /Replace and restyle existing loose furniture/);
+  assert.doesNotMatch(prompt, /The room is empty/);
   assert.doesNotMatch(prompt, /LAYOUT PLAN/);
   assert.doesNotMatch(prompt, /Keep the existing functional zones and furniture positions/);
+});
+
+test('furniture-off rule is taken from promptconfig', () => {
+  setPromptConfigForTests({ furnitureOff: 'ZZ_CUSTOM_FURNITURE_OFF' });
+  try {
+    const prompt = buildPrompt({ style: 'Неоклассика', roomType: 'Кабинет', keepFurniture: false, useCatalog: false });
+    assert.match(prompt, /ZZ_CUSTOM_FURNITURE_OFF/);
+    assert.doesNotMatch(prompt, /The room is empty/);
+  } finally {
+    setPromptConfigForTests({});
+  }
 });
 
 test('text-only edit prompt applies a single change without reference wording', () => {

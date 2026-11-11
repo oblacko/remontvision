@@ -327,7 +327,7 @@ export function buildPrompt({
     ? rules.furnitureOn
     : layoutPlan
       ? 'The room is empty. Furnish it from scratch according to the LAYOUT PLAN. Keep all architecture, openings, plumbing and electrical points. Do not reproduce old furniture positions and do not leave the room half-finished.'
-      : 'The room is empty. Furnish it from scratch: create 2–3 functional zones and a complete, lived-in composition. Keep all architecture, openings, plumbing and electrical points. Do not reproduce old furniture positions and do not leave the room half-finished.';
+      : rules.furnitureOff;
   const placementRule = keepFurniture
     ? 'Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation; do not center it under the window if it was not there. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.'
     : layoutPlan
