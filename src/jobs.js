@@ -28,6 +28,7 @@ import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, isIterationRender, resolveRenderStyleConcept } from './variants.js';
+import { workerConcurrency } from './workerknobs.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -255,8 +256,10 @@ export async function processRender(renderId) {
       }
 
       // Проход A: строитель определяет объём ремонта по исходному фото и cleaned shell.
+      // Параллельно с арт-директором: оба читают одно фото и не зависят друг от друга.
       let repairScope = null;
-      if (!MOCK_MODE) {
+      const repairPromise = (async () => {
+        if (MOCK_MODE) return null;
         try {
           const originalBuf = await getBuffer(room.photo_path || sourceStored);
           const cleanedBuf = precleanedShell ? await getBuffer(precleanedShell) : null;
@@ -269,18 +272,19 @@ export async function processRender(renderId) {
             sessionId: `render:${renderId}`,
           });
           if (repair?.repairScope) {
-            repairScope = repair.repairScope;
             meta.repair_scope = repair.repairScope;
             meta.repair_prompt_version = repair.promptVersion ?? null;
             addCost('repair_scope', repair.cost);
             log({ event: 'repair_scope_ok', room_id: room.id, render_id: renderId, input: precleanedShell ? 'cleaned_shell' : 'original', floor: repair.repairScope.floor?.action || null, ceiling: repair.repairScope.ceiling?.action || null, doors: repair.repairScope.doors?.action || null, cost_usd: repair.cost ?? null });
-          } else {
-            log({ event: 'repair_scope_empty', room_id: room.id, render_id: renderId });
+            return repair.repairScope;
           }
+          log({ event: 'repair_scope_empty', room_id: room.id, render_id: renderId });
+          return null;
         } catch (e) {
           log({ event: 'repair_scope_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+          return null;
         }
-      }
+      })();
       meta.art_direction_input = precleanedShell ? 'cleaned_shell' : 'original';
 
       // Фото-проход: оцениваем размеры и объектив как раньше. Для новой пары
@@ -378,6 +382,9 @@ export async function processRender(renderId) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
       }
+
+      // Дожидаемся ремонта перед планировщиком/промтом: оба используют repairScope.
+      repairScope = await repairPromise;
 
       // Планировщик нужен только для пустой комнаты: он предлагает расстановку,
       // чтобы модель не сводила кабинет к «стол + стул + шкаф».
@@ -788,6 +795,7 @@ function notifyOwner(room, render) {
 }
 
 let running = 0;
+const MAX_RUNNING = workerConcurrency();
 export function startWorker() {
   q.requeueProcessing().then(n => { if (n) console.log(`[worker] вернул в очередь ${n} прерванных рендеров`); });
 
@@ -811,7 +819,7 @@ export function startWorker() {
   }, 5 * 60 * 1000);
 
   setInterval(async () => {
-    if (running >= 2) return;
+    if (running >= MAX_RUNNING) return;
     try {
       const row = await q.claimNextRender();
       if (!row) return;
@@ -821,7 +829,7 @@ export function startWorker() {
       log({ event: 'worker_error', error: String(e.message || e).slice(0, 300) });
     }
   }, 2000);
-  console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}`);
+  console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}, concurrency: ${MAX_RUNNING}`);
 }
 
 export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, style = null, concept = null, resolution = null }) {
