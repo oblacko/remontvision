@@ -1,0 +1,384 @@
+baseline: 2026-11-11T22:06:52.747Z
+current:  2026-11-11T22:08:48.687Z
+config hash: bb8e4b6162637bd1a7167aae82de33c5f3937ffa99d8334d91a067e47c605e43 → 963e0638ce3dc832ac74dd37ff3c59e9712e6008583715970879517114ecfa37
+
+
+=== Гостиная (зал) / Современный минимализм ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 5.2 m, length 4.1 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на длинной стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Гостиная (зал) / Скандинавский ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 5.2 m, length 4.1 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на длинной стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Гостиная (зал) / Джапанди ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 5.2 m, length 4.1 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на длинной стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Гостиная (зал) / Лофт ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 5.2 m, length 4.1 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на длинной стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Спальня / Современный минимализм ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.6 m, length 4.2 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на короткой стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Спальня / Скандинавский ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.6 m, length 4.2 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на короткой стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Спальня / Джапанди ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.6 m, length 4.2 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на короткой стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Спальня / Лофт ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.6 m, length 4.2 m, finished floor-to-ceiling height 2.7 m. Orientation: окно на короткой стене.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кухня / Современный минимализм ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.1 m, length 4.6 m, finished floor-to-ceiling height 2.7 m. Orientation: окно в торце.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кухня / Скандинавский ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.1 m, length 4.6 m, finished floor-to-ceiling height 2.7 m. Orientation: окно в торце.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кухня / Джапанди ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.1 m, length 4.6 m, finished floor-to-ceiling height 2.7 m. Orientation: окно в торце.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кухня / Лофт ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 3.1 m, length 4.6 m, finished floor-to-ceiling height 2.7 m. Orientation: окно в торце.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Санузел / Современный минимализм ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2 m, length 2.6 m, finished floor-to-ceiling height 2.7 m. Orientation: без окна.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Санузел / Скандинавский ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2 m, length 2.6 m, finished floor-to-ceiling height 2.7 m. Orientation: без окна.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Санузел / Джапанди ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2 m, length 2.6 m, finished floor-to-ceiling height 2.7 m. Orientation: без окна.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Санузел / Лофт ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2 m, length 2.6 m, finished floor-to-ceiling height 2.7 m. Orientation: без окна.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кабинет / Современный минимализм ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2.8 m, length 3.4 m, finished floor-to-ceiling height 2.7 m. Orientation: окно слева от входа.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кабинет / Скандинавский ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2.8 m, length 3.4 m, finished floor-to-ceiling height 2.7 m. Orientation: окно слева от входа.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кабинет / Джапанди ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2.8 m, length 3.4 m, finished floor-to-ceiling height 2.7 m. Orientation: окно слева от входа.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  
+
+=== Кабинет / Лофт ===
+@@ -21,4 +21,16 @@
+  - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.
+  
++ GEOMETRY LOCK — DO NOT CHANGE
++ Verbatim clear internal dimensions: width 2.8 m, length 3.4 m, finished floor-to-ceiling height 2.7 m. Orientation: окно слева от входа.
++ Keep the same room. These are immutable invariants, not suggestions:
++ - Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
++ - Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
++ - Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
++ - Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
++ - Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
++ - Floor plane: keep the same level and geometry; change only the surface finish.
++ - If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
++ Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.
++ 
+  
+  

@@ -303,6 +303,7 @@ export function buildPrompt({
   repairScope = null,
   productRefs = false,
   layoutPlan = null,
+  architectureFacts = null,
 }) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
@@ -367,6 +368,16 @@ export function buildPrompt({
     : '';
   const radiatorsText = fillTemplate(rules.radiators, { room: roomName });
   const scaleText = [dimensionsText, scalePlanText, bedText, radiatorsText].filter(Boolean).join('\n\n');
+  // Геометрия идёт отдельной нерушимой секцией: дословные метры + запреты на проёмы/высоту/камеру.
+  const geometryMeasurements = hasRoomDimensions
+    ? `Verbatim clear internal dimensions: width ${Number(dimensions.width)} m, length ${Number(dimensions.length)} m, finished floor-to-ceiling height ${Number(dimensions.height)} m. Orientation: ${dimensions.orientation || 'not specified by the user'}.`
+    : 'Measurements are not supplied: preserve the room geometry exactly as seen in Image 1.';
+  const factWindows = Number(architectureFacts?.windows);
+  const factDoors = Number(architectureFacts?.doors);
+  const geometryOpenings = Number.isFinite(factWindows) && factWindows >= 0 && Number.isFinite(factDoors) && factDoors >= 0
+    ? `Detected openings in the photo: ${factWindows} window${factWindows === 1 ? '' : 's'} and ${factDoors} door${factDoors === 1 ? '' : 's'} — keep exactly these, do not invent extra openings.`
+    : 'Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.';
+  const geometryText = fillTemplate(rules.geometryLock, { measurements: geometryMeasurements, openings: geometryOpenings });
   const useLockV2 = archLockV2 === null ? ARCH_LOCK_V2_ENABLED : Boolean(archLockV2);
   const architectureLock = useLockV2 ? ARCH_LOCK_V2 : ARCH_LOCK_V1;
 
@@ -426,6 +437,8 @@ The result must feel like a completed designer renovation with a genuine WOW eff
 ${productRefs ? 'This render includes specific hero products shown in the reference images. Place each one naturally in the room, keep its exact shape, colour, material and proportions, light it with the room\'s own light and add a soft contact shadow.' : 'This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.'}
 
 ${architectureLock}
+
+${geometryText}
 ${repairScopeText}
 ${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}
 ${layoutPlan ? `\nLAYOUT PLAN — DESIGNED BY THE ARCHITECT\n${layoutPlanToText(layoutPlan)}\nFollow this plan as the primary layout: place each item in the described zone, keep the circulation, and do not collapse the room into a minimal desk+chair+shelf set. Exact centimetres may be adjusted to the photo, but keep the composition and the item list. If the plan lists hard furniture limits, they override the art direction.\n` : ''}

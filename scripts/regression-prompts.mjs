@@ -62,18 +62,26 @@ function buildRun() {
 }
 
 function naiveDiff(before, after) {
-  const beforeLines = before.prompt.split('\n');
-  const afterLines = after.prompt.split('\n');
-  const out = [`=== ${after.id} ===`];
-  const max = Math.max(beforeLines.length, afterLines.length);
-  let shown = 0;
-  for (let i = 0; i < max && shown < 40; i += 1) {
-    if (beforeLines[i] === afterLines[i]) continue;
-    if (beforeLines[i] !== undefined) out.push(`- ${beforeLines[i]}`);
-    if (afterLines[i] !== undefined) out.push(`+ ${afterLines[i]}`);
-    shown += 1;
-  }
-  if (shown >= 40) out.push('... diff обрезан, смотрите last-run.json');
+  const a = before.prompt.split('\n');
+  const b = after.prompt.split('\n');
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start += 1;
+  let endA = a.length - 1;
+  let endB = b.length - 1;
+  while (endA >= start && endB >= start && a[endA] === b[endB]) { endA -= 1; endB -= 1; }
+
+  const context = 2;
+  const from = Math.max(0, start - context);
+  const aTo = Math.min(a.length, endA + 1 + context);
+  const bTo = Math.min(b.length, endB + 1 + context);
+  const out = [`=== ${after.id} ===`, `@@ -${from + 1},${aTo - from} +${from + 1},${bTo - from} @@`];
+  for (let i = from; i < start; i += 1) out.push(`  ${a[i]}`);
+  for (let i = start; i <= endA; i += 1) out.push(`- ${a[i]}`);
+  for (let i = start; i <= endB; i += 1) out.push(`+ ${b[i]}`);
+  const tailA = a.slice(endA + 1, aTo);
+  const tailB = b.slice(endB + 1, bTo);
+  const tail = Math.min(tailA.length, tailB.length);
+  for (let i = 0; i < tail; i += 1) out.push(`  ${tailB[i]}`);
   return out.join('\n');
 }
 

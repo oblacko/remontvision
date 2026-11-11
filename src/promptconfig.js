@@ -3,6 +3,7 @@
 export const PROMPT_FIELDS = [
   { key: 'lighting', label: 'Свет', help: 'Главный вау-инструмент: слои, cove, подсветка, запреты.' },
   { key: 'dimensions', label: 'Размеры комнаты', help: 'Реальные метры: {room}, {width}, {length}, {height}, {orientation}.' },
+  { key: 'geometryLock', label: 'Геометрия — нерушимая секция', help: 'Метры и запреты на окна/двери/высоту/перспективу: {measurements}, {openings}.' },
   { key: 'scalePlan', label: 'План масштаба', help: 'Обёртка вокруг вычисленного плана мебели и проходов: {room}, {plan}.' },
   { key: 'bed', label: 'Кровать', help: 'Длина кровати: {room}, {bed_length}.' },
   { key: 'radiators', label: 'Радиаторы', help: 'Вентилируемые экраны; не выдумывать радиаторы и не закрывать вентиляцию.' },
@@ -31,6 +32,17 @@ These measurements describe the existing room. Use them as real-world scale cons
 Scale all furniture consistently with these dimensions. Arrange furniture so that doors can open and windows, heating controls and storage remain accessible. Account for the physical depth of radiator covers when arranging furniture and circulation routes. Do not treat radiator covers as flat wall graphics.
 If the proposed composition is too crowded, choose smaller supporting furniture or omit secondary pieces. Do not change the room dimensions. Do not unnaturally shrink furniture to fit.
 Do not show dimension lines, arrows, labels, floor plans or measurement text in the final image.`,
+  geometryLock: `GEOMETRY LOCK — DO NOT CHANGE
+{measurements}
+Keep the same room. These are immutable invariants, not suggestions:
+- Windows: keep the exact count, position, width, height, sill level, reveal depth, frame and glazing bars. Do not add, remove, resize, move or invent a window.
+- Doors: keep the exact count, position, width, height, frame, swing and threshold. Do not add, remove, resize, move or invent a doorway.
+- Ceiling: keep the exact height and plane. No raised, lowered, coffered or new suspended ceiling.
+- Perspective: keep the same camera position, eye height, focal length, horizon, framing and aspect ratio. Do not widen, stretch, tilt or reframe the room.
+- Walls: keep the same wall planes, corners, columns, beams, niches and soffits.
+- Floor plane: keep the same level and geometry; change only the surface finish.
+- If any design idea conflicts with these, change the finish, furniture or decor instead; never the geometry.
+{openings}`,
   scalePlan: `SCALE PLAN — FURNITURE MUST FIT THESE CONSTRAINTS
 {plan}
 Use these sizes and clearances as real-world constraints for any furniture that is added, replaced or moved. Do not overscale furniture, do not shrink it unnaturally, and do not change the room dimensions or camera view to make the plan fit. If the requested composition is impossible, choose smaller furniture and show the honest compromise.`,

@@ -64,6 +64,41 @@ test('dimensions, bed length and radiator covers are injected as mandatory block
   assert.match(prompt, /Do not invent radiators/);
 });
 
+test('geometry lock restates verbatim metres and bans opening changes', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    useCatalog: false,
+    dimensions: { width: 3.2, length: 4.4, height: 2.7, orientation: 'окно слева от входа' },
+  });
+  assert.match(prompt, /GEOMETRY LOCK/);
+  assert.match(prompt, /width 3\.2 m/);
+  assert.match(prompt, /length 4\.4 m/);
+  assert.match(prompt, /height 2\.7 m/);
+  assert.match(prompt, /окно слева от входа/);
+  assert.match(prompt, /Do not add, remove, resize, move or invent a window/);
+  assert.match(prompt, /Do not add, remove, resize, move or invent a doorway/);
+});
+
+test('geometry lock keeps opening counts from the photo when provided', () => {
+  const prompt = buildPrompt({
+    style: 'Лофт',
+    roomType: 'Гостиная (зал)',
+    useCatalog: false,
+    dimensions: { width: 5, length: 4, height: 2.7 },
+    architectureFacts: { windows: 2, doors: 1 },
+  });
+  assert.match(prompt, /2 windows and 1 door/);
+  assert.match(prompt, /do not invent extra openings/);
+});
+
+test('geometry lock still forbids changes when metres are unknown', () => {
+  const prompt = buildPrompt({ style: 'Джапанди', roomType: 'Кухня', useCatalog: false });
+  assert.match(prompt, /GEOMETRY LOCK/);
+  assert.match(prompt, /Measurements are not supplied/);
+  assert.match(prompt, /keep the same camera position/i);
+});
+
 test('dimension blocks are omitted without room measurements but radiator rules stay global', () => {
   const prompt = buildPrompt({ style: 'Современный', roomType: 'Гостиная (зал)' });
   assert.doesNotMatch(prompt, /ROOM DIMENSIONS AND SCALE/);
