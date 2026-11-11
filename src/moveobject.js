@@ -45,7 +45,7 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
     .toBuffer();
 
   // Мягкие края: альфа-маска с размытой рамкой, чтобы вставка не выглядела аппликацией.
-  const inset = Math.max(2, Math.round(Math.min(sw, sh) * 0.04));
+  const inset = Math.max(3, Math.round(Math.min(sw, sh) * 0.1));
   const mask = Buffer.from(
     `<svg width="${sw}" height="${sh}" xmlns="http://www.w3.org/2000/svg">` +
     `<defs><filter id="b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${Math.max(2, inset)}"/></filter></defs>` +
