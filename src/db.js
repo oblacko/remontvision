@@ -332,6 +332,13 @@ export const q = {
                 FROM credit_txn ct LEFT JOIN renders r ON r.id = ct.render_id
                 WHERE ct.user_id = $1 ORDER BY ct.created_at DESC, ct.id DESC LIMIT 100`, [userId])
       .then(r => r.rows),
+  // Свежие возвраты для тоста: только новые id, чтобы не переигрывать историю.
+  creditRefunds: (userId, afterId = '0') =>
+    pool.query(`SELECT id, delta, reason, note, render_id, created_at
+                FROM credit_txn
+                WHERE user_id = $1 AND reason = 'iterate_refund' AND id > $2::bigint
+                ORDER BY id DESC LIMIT 20`, [userId, afterId])
+      .then(r => r.rows.reverse()),
 
   // реферальная программа
   referralCodeByUser: userId =>

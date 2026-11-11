@@ -6,6 +6,7 @@ import Room from './pages/Room'
 import Procurement from './pages/Procurement'
 import Share from './pages/Share'
 import { TaskDock, TasksProvider } from './components/TaskDock'
+import { CreditRefundToast } from './components/CreditRefundToast'
 import { Metrika } from './components/Metrika'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/s/:token" element={<Share />} />
       </Routes>
       <TaskDock />
+      <CreditRefundToast />
     </TasksProvider>
   )
 }
