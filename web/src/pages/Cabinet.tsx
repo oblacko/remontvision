@@ -11,7 +11,7 @@ type Me = { email: string; balance: number }
 // Согласие действием (вариант A): чекбоксов нет, флаги уходят при клике по кнопке.
 const CONSENTS = { offer: true, privacy: true, cross_border: true }
 type GenRow = {
-  id: string; room_id: string; batch_id?: string | null; parent_render_id?: string | null; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
+  id: string; room_id: string; batch_id?: string | null; parent_render_id?: string | null; is_favorite?: boolean; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
   created_at: string; finished_at: string | null; request_text: string | null;
   credits_spent: number; image_url: string | null; photo_url: string | null;
 }
@@ -211,6 +211,17 @@ export default function Cabinet() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось открыть комнату') }
     finally { setDetailLoading(false) }
   }
+  const toggleFavorite = async (renderId: string, value: boolean) => {
+    try {
+      const r = await fetch(`/api/renders/${renderId}/favorite`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ value }),
+      })
+      if (!r.ok) throw new Error()
+      setGenerations(prev => prev.map(item => item.id === renderId ? { ...item, is_favorite: value } : item))
+    } catch {
+      setError('Не удалось обновить избранное')
+    }
+  }
   const retryFailed = async (group: RoomGroup) => {
     const failed = group.designs.filter(item => item.status === 'error')
     if (!failed.length) return
@@ -400,7 +411,7 @@ export default function Cabinet() {
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
             <a href="/?panel=1" className="k-btn k-btn--primary k-btn--s">Новый дизайн <KitIcon name="ur" /></a>
             <div className="relative">
-              <button type="button" onClick={() => setProfileOpen(value => !value)} aria-expanded={profileOpen} aria-haspopup="menu" className="k-badge inline-flex min-h-11 items-center gap-1"><b>{me.balance}</b> кр. <KitIcon name="cd" className="size-3.5" /></button>
+              <button type="button" onClick={() => setProfileOpen(value => !value)} aria-expanded={profileOpen} aria-haspopup="menu" aria-label={`Меню аккаунта, баланс ${me.balance} кредитов`} className="k-badge inline-flex min-h-11 items-center gap-1"><b>{me.balance}</b> кр. <KitIcon name="cd" className="size-3.5" /></button>
               {profileOpen && (
                 <>
                   <button type="button" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)} className="fixed inset-0 z-20 cursor-default" />
@@ -458,15 +469,37 @@ export default function Cabinet() {
                   <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="k-badge absolute left-2 top-2">{group.designs.length > 1 ? `${group.designs.length} ${plural(group.designs.length, 'дизайн', 'дизайна', 'дизайнов')}` : `${group.versions.length} ${plural(group.versions.length, 'версия', 'версии', 'версий')}`}</span></div>
                   <div className="bo"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{editName(group.latest.request_text, 'Базовый дизайн')}</p></div><span className={`k-caption shrink-0 ${statusView(group.latest.status).className}`}>{statusView(group.latest.status).label}</span></div><div className="mt-2 text-xs text-muted-foreground">Готово {group.designs.filter(item => item.status === 'done').length} из {group.designs.length}</div><div className="rw mt-3 border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span>{group.credits} кр.</span></div></div>
                   </Link>
+                  {group.designs.length > 1 && (
+                    <div className="flex gap-1.5 overflow-x-auto border-t p-2">
+                      {group.designs.slice(0, 6).map(design => (
+                        <button
+                          key={design.id}
+                          type="button"
+                          onClick={() => void openRoom(group, design.id)}
+                          aria-label={`Открыть дизайн: ${design.style}`}
+                          className="relative h-14 w-20 shrink-0 overflow-hidden border border-foreground/15 bg-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+                        >
+                          {design.image_url
+                            ? <img src={design.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                            : <span className="flex h-full items-center justify-center text-[10px] text-muted-foreground">{design.status === 'error' ? 'ошибка' : '…'}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {group.designs.some(item => item.status === 'error') && (
                     <div className="border-t p-2">
                       <button type="button" onClick={() => void retryFailed(group)} className="k-btn k-btn--s w-full">Повторить неудачные ({group.designs.filter(item => item.status === 'error').length})</button>
                     </div>
                   )}
+                  <button type="button" onClick={() => void toggleFavorite(group.latest.id, !group.latest.is_favorite)} aria-pressed={Boolean(group.latest.is_favorite)} aria-label={group.latest.is_favorite ? 'Убрать из избранного' : 'Добавить в избранное'} className="k-btn k-btn--ov k-btn--icon absolute right-12 top-2 text-base leading-none">{group.latest.is_favorite ? '★' : '☆'}</button>
                   <button type="button" onClick={() => { setShareRenderId(group.latest.id); setShareOpen(true) }} className="k-btn k-btn--ov k-btn--icon absolute right-2 top-2" aria-label="Поделиться дизайном"><KitIcon name="sh" /></button>
                 </div>)}
               </div>
-            ) : <div className="k-empty mt-8"><p className="display-title text-3xl">Пока пусто</p><p className="text-sm text-muted-foreground">Создайте первый дизайн — он появится здесь вместе с версиями и подборкой.</p><a href="/?panel=1" className="k-btn k-btn--primary">Создать дизайн <KitIcon name="ur" /></a></div>}
+            ) : groups.length ? (
+              <div className="k-empty mt-8"><p className="display-title text-3xl">Ничего не найдено</p><p className="text-sm text-muted-foreground">Измените запрос или сбросьте фильтры.</p><button type="button" onClick={() => { setQuery(''); setStatusFilter('all') }} className="k-btn k-btn--primary mt-2">Сбросить фильтры</button></div>
+            ) : (
+              <div className="k-empty mt-8"><p className="display-title text-3xl">Пока пусто</p><p className="text-sm text-muted-foreground">Создайте первый дизайн — он появится здесь вместе с вариантами и подборкой.</p><a href="/?panel=1" className="k-btn k-btn--primary">Создать дизайн <KitIcon name="ur" /></a></div>
+            )}
           </div>
         ) : (
           <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_24rem]">

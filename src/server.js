@@ -311,6 +311,7 @@ function generationDto(g) {
     room_id: g.room_id,
     batch_id: g.batch_id || null,
     parent_render_id: g.parent_render_id || null,
+    is_favorite: g.is_favorite === true,
     style: g.style,
     room_type: g.room_type,
     budget: g.budget,
@@ -2531,6 +2532,62 @@ app.use((err, _req, res, next) => {
   if (err?.message === UPLOAD_REJECT_MESSAGE) return res.status(400).json({ error: err.message });
   next(err);
 });
+
+// «Повторить в другом стиле»: новый дизайн той же комнаты в выбранном стиле.
+// Отдельный пакет и отдельная оплата: это самостоятельный дизайн, не правка.
+app.post('/api/renders/:id/variant', rateLimit, h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.parent_render_id) return res.status(400).json({ error: 'Выберите базовый дизайн' });
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  if (room.status !== 'done') return res.status(409).json({ error: 'Дождитесь готовности текущего дизайна' });
+  const requested = String(req.body?.style || '').trim();
+  if (!requested) return res.status(400).json({ error: 'Выберите стиль' });
+  const dbStyle = await q.styleByName(requested);
+  const allowed = dbStyle?.active ? dbStyle.name : (DESIGN_STYLES.some(item => item.name === requested) ? requested : null);
+  if (!allowed) return res.status(400).json({ error: 'Стиль недоступен' });
+  const credits = Number(render.model_credits) || 1;
+  const balance = await q.creditBalance(req.user.id);
+  if (!MOCK_MODE && balance < credits) {
+    return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance });
+  }
+  const batchId = crypto.randomUUID();
+  await q.createBatch({ id: batchId, userId: req.user.id, roomId: room.id, tier: room.price_tier || null, idempotencyKey: null });
+  try {
+    const id = crypto.randomUUID();
+    await enqueueRenderWithCredit({
+      id,
+      roomId: room.id,
+      chargedUserId: req.user.id,
+      requestIp: clientIp(req),
+      requestText: `Стиль: ${allowed}`,
+      modelKey: render.model_key || null,
+      modelCredits: credits,
+      isPrivate: render.is_private === true,
+      resolution: render.resolution || null,
+      style: allowed,
+      concept: null,
+      batchId,
+    });
+    res.status(202).json({ id, batch_id: batchId, style: allowed, status: 'queued' });
+  } catch (e) {
+    await q.deleteBatch(batchId).catch(() => {});
+    if (e.status === 402) return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: await q.creditBalance(req.user.id) });
+    throw e;
+  }
+}));
+
+// Избранное: отметка дизайна.
+app.post('/api/renders/:id/favorite', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  const value = req.body?.value === undefined ? !render.is_favorite : Boolean(req.body.value);
+  await q.setRenderFavorite(render.id, value);
+  res.json({ id: render.id, is_favorite: value });
+}));
 
 // Повтор конкретного неудачного варианта: новый рендер в том же пакете.
 // Правки не повторяем здесь — у них свои референсы, пользователь повторяет действие.

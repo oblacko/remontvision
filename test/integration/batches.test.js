@@ -123,3 +123,54 @@ test('повтор доступен только для неудачного б�
   const res = await api(app.url, `/api/renders/${edit.rows[0].id}/retry`, { method: 'POST', cookie });
   assert.equal(res.status, 400);
 });
+
+test('другой стиль создаёт отдельный пакет и списывает кредит', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+  await q.setRoomStatus('done', created.json.id);
+  const balanceBefore = await q.creditBalance(user.id);
+
+  const res = await api(app.url, `/api/renders/${render.id}/variant`, { method: 'POST', cookie, body: { style: 'Джапанди' } });
+  assert.equal(res.status, 202);
+  assert.notEqual(res.json.batch_id, created.json.batch_id);
+  assert.equal(res.json.style, 'Джапанди');
+
+  const renders = await q.batchRenders(res.json.batch_id);
+  assert.equal(renders.length, 1);
+  assert.equal(renders[0].style, 'Джапанди');
+  assert.equal(await q.creditBalance(user.id), balanceBefore - 1);
+});
+
+test('другой стиль отвергает неизвестный стиль', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+  await q.setRoomStatus('done', created.json.id);
+  const res = await api(app.url, `/api/renders/${render.id}/variant`, { method: 'POST', cookie, body: { style: 'Несуществующий стиль' } });
+  assert.equal(res.status, 400);
+});
+
+test('избранное переключается и сохраняется', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+
+  const on = await api(app.url, `/api/renders/${render.id}/favorite`, { method: 'POST', cookie, body: { value: true } });
+  assert.equal(on.status, 200);
+  assert.equal(on.json.is_favorite, true);
+  const stored = await q.getRender(render.id);
+  assert.equal(stored.is_favorite, true);
+
+  const off = await api(app.url, `/api/renders/${render.id}/favorite`, { method: 'POST', cookie, body: { value: false } });
+  assert.equal(off.json.is_favorite, false);
+});

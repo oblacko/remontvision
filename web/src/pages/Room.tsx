@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ShareDialog } from '@/components/ShareDialog'
 import { ObjectLayer } from '@/components/ObjectLayer'
+import { ImageComparison } from '@/components/ImageComparison'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { buildMoveCleanupInstruction } from '@/lib/objects'
 import { useTasks } from '@/components/TaskDock'
@@ -80,6 +81,10 @@ export default function Room() {
   const [items, setItems] = useState<RoadmapItem[]>([])
   const [roadmapBusy, setRoadmapBusy] = useState(false)
   const [roadmapError, setRoadmapError] = useState('')
+  const [styles, setStyles] = useState<string[]>([])
+  const [stylePanel, setStylePanel] = useState(false)
+  const [variantBusy, setVariantBusy] = useState('')
+  const [compareOpen, setCompareOpen] = useState(false)
   const [passport, setPassport] = useState<PassportDoc | null>(null)
   const [passportBusy, setPassportBusy] = useState(false)
   const [passportError, setPassportError] = useState('')
@@ -204,6 +209,31 @@ export default function Room() {
       if (selectedRenderRef.current === targetId) setBreakdownError(e instanceof Error ? e.message : 'Не удалось собрать разбор')
     } finally {
       if (selectedRenderRef.current === targetId) setBreakdownBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    fetch('/api/styles')
+      .then(r => r.ok ? r.json() : [])
+      .then((list: Array<{ name?: string }>) => setStyles(Array.isArray(list) ? list.map(item => String(item.name || '')).filter(Boolean) : []))
+      .catch(() => setStyles([]))
+  }, [])
+
+  const startVariant = async (style: string) => {
+    if (!render?.id || variantBusy) return
+    setVariantBusy(style); setError('')
+    try {
+      const r = await fetch(`/api/renders/${render.id}/variant`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ style }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Не удалось запустить дизайн')
+      setStylePanel(false)
+      await loadRoom()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось запустить дизайн')
+    } finally {
+      setVariantBusy('')
     }
   }
 
@@ -376,8 +406,36 @@ export default function Room() {
                   <button type="button" onClick={() => setFullscreen(true)} className="k-btn k-btn--ov k-btn--icon" aria-label="Во весь экран"><KitIcon name="fs" /></button>
                   <a href={image} download="remontvision-design.webp" className="k-btn k-btn--ov k-btn--icon" aria-label="Скачать"><KitIcon name="dl" /></a>
                   {render?.id && <button type="button" onClick={() => setShareOpen(true)} className="k-btn k-btn--ov k-btn--icon" aria-label="Поделиться"><KitIcon name="sh" /></button>}
+                  {image && room.photo_url && <button type="button" onClick={() => setCompareOpen(true)} className="k-btn k-btn--ov k-btn--icon" aria-label="Сравнить с исходным фото"><KitIcon name="img" /></button>}
+                  {render?.id && <button type="button" onClick={() => setStylePanel(value => !value)} aria-pressed={stylePanel} className="k-btn k-btn--ov k-btn--icon" aria-label="Повторить в другом стиле"><KitIcon name="re" /></button>}
                 </div>
               </div>
+            )}
+
+            {stylePanel && (
+              <section className="mt-4 border bg-card p-4">
+                <p className="eyebrow">Другой стиль</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">Создадим новый дизайн этой же комнаты в выбранном стиле. Это отдельный дизайн и отдельная оплата.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {styles.filter(style => style !== room.style).map(style => (
+                    <button key={style} type="button" disabled={Boolean(variantBusy)} onClick={() => void startVariant(style)} className="k-btn k-btn--s disabled:opacity-50">
+                      {variantBusy === style ? 'Запускаем…' : style}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {compareOpen && image && room.photo_url && (
+              <section className="mt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="eyebrow">Было / стало</p>
+                  <button type="button" onClick={() => setCompareOpen(false)} className="k-btn k-btn--s">Закрыть</button>
+                </div>
+                <div className="mt-2">
+                  <ImageComparison before={room.photo_url} after={image} beforeAlt="Исходное фото комнаты" afterAlt="Дизайн" ratio={renderRatio} label="Сравнение с фото" />
+                </div>
+              </section>
             )}
 
             <nav className="k-ut mt-6" aria-label="Разделы комнаты">

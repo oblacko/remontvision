@@ -113,6 +113,8 @@ export const q = {
       .then(r => r.rows[0] || null),
   setRenderShellPath: (id, shellPath) =>
     pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),
+  setRenderFavorite: (id, value) =>
+    pool.query(`UPDATE renders SET is_favorite = $2 WHERE id = $1`, [id, Boolean(value)]),
   setRenderCostFinalized: (id, costUsd) =>
     pool.query(`UPDATE renders SET cost_final_usd = $1 WHERE id = $2`, [costUsd, id]),
   setRenderDone: (imagePath, costUsd, model, id, claimedBy = null) =>
@@ -195,6 +197,7 @@ export const q = {
   batchByIdempotency: (userId, key) =>
     pool.query(`SELECT * FROM generation_batches WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1`,
       [userId, key]).then(r => r.rows[0] || null),
+  deleteBatch: id => pool.query(`DELETE FROM generation_batches WHERE id = $1`, [id]),
   getBatch: id => pool.query(`SELECT * FROM generation_batches WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   batchRenders: batchId =>
     pool.query(`SELECT id, room_id, status, error, image_path, parent_render_id, created_at, style, concept, resolution
@@ -328,7 +331,7 @@ export const q = {
     pool.query(`SELECT id, style, budget, price_tier, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
       .then(r => r.rows),
   userGenerations: userId =>
-    pool.query(`SELECT r.id, r.room_id, r.batch_id, r.parent_render_id, r.status, r.error, r.error_stage, r.created_at, r.finished_at, r.request_text,
+    pool.query(`SELECT r.id, r.room_id, r.batch_id, r.parent_render_id, r.is_favorite, r.status, r.error, r.error_stage, r.created_at, r.finished_at, r.request_text,
                        r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms, r.meta,
                        rm.style, rm.budget, rm.price_tier, rm.photo_path, rm.room_type,
                        GREATEST(0,
