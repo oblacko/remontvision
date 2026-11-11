@@ -30,6 +30,7 @@ import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolve
 import { workerConcurrency } from './workerknobs.js';
 import { pickArtDirection } from './artdirectionpick.js';
 import { buildRoomVariability, variabilityPrompt } from './variability.js';
+import { roomAnalysisKey } from './roomanalysis.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -230,6 +231,21 @@ export async function processRender(renderId, claimedBy = null) {
     } else {
       styleInfo = await q.styleByName(styleName);
       const styleMode = getStyleConfig().mode;
+      // Кэш анализа: повторный рендер той же комнаты/стиля/концепта не платит за vision.
+      const analysisKey = roomAnalysisKey({
+        photoPath: room.photo_path,
+        shellPath: precleanedShell || '',
+        style: styleName,
+        conceptId: conceptKey,
+        keepFurniture,
+        dimensions: roomDimensions,
+      });
+      const cachedRow = await q.roomAnalysis(room.id).catch(() => null);
+      const cachedAnalysis = cachedRow?.cache_key === analysisKey ? cachedRow.data : null;
+      if (cachedAnalysis) {
+        meta = { ...meta, ...(cachedAnalysis.meta || {}) };
+        log({ event: 'room_analysis_cache_hit', room_id: room.id, render_id: renderId, style: styleName });
+      }
       // Новизна на уровне комнаты: что уже было в прошлых рендерах, без нового vision-вызова.
       const pastRenders = await q.rendersForRoom(room.id).catch(() => []);
       const usedDirections = pastRenders.slice(-5).map(row => ({
@@ -269,8 +285,8 @@ export async function processRender(renderId, claimedBy = null) {
 
       // Проход A: строитель определяет объём ремонта по исходному фото и cleaned shell.
       // Параллельно с арт-директором: оба читают одно фото и не зависят друг от друга.
-      let repairScope = null;
-      const repairPromise = (async () => {
+      let repairScope = cachedAnalysis?.repair_scope || null;
+      const repairPromise = cachedAnalysis ? Promise.resolve(repairScope) : (async () => {
         if (MOCK_MODE) return null;
         try {
           const originalBuf = await getBuffer(room.photo_path || sourceStored);
@@ -302,11 +318,11 @@ export async function processRender(renderId, claimedBy = null) {
       // Фото-проход: оцениваем размеры и объектив как раньше. Для новой пары
       // style×concept текст направления берём у direction-агента; свободный
       // арт-директор остаётся fallback-ом для старых комнат (откат).
-      let artDirection = '';
-      let architectureFacts = null;
-      let estimatedDimensions = roomDimensions;
-      let effectiveKeepFurniture = keepFurniture;
-      if (!MOCK_MODE) {
+      let artDirection = cachedAnalysis?.art_direction || '';
+      let architectureFacts = cachedAnalysis?.architecture_facts || null;
+      let estimatedDimensions = cachedAnalysis?.dimensions || roomDimensions;
+      let effectiveKeepFurniture = cachedAnalysis?.effective_keep_furniture ?? keepFurniture;
+      if (!MOCK_MODE && !cachedAnalysis) {
         try {
           const adStart = Date.now();
           const adBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
@@ -409,8 +425,8 @@ export async function processRender(renderId, claimedBy = null) {
 
       // Планировщик нужен только для пустой комнаты: он предлагает расстановку,
       // чтобы модель не сводила кабинет к «стол + стул + шкаф».
-      let layoutPlan = null;
-      if (!MOCK_MODE && !effectiveKeepFurniture) {
+      let layoutPlan = cachedAnalysis?.layout_plan || null;
+      if (!MOCK_MODE && !cachedAnalysis && !effectiveKeepFurniture) {
         try {
           const layoutStart = Date.now();
           const layoutBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
@@ -445,6 +461,26 @@ export async function processRender(renderId, claimedBy = null) {
         } catch (e) {
           log({ event: 'layout_plan_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
         }
+      }
+
+      // Сохраняем результат трёх vision-этапов до image-вызова: он не зависит от рендера.
+      if (!MOCK_MODE && !cachedAnalysis) {
+        const snapshotKeys = [
+          'art_direction', 'design_direction', 'concept_key', 'repair_scope', 'repair_prompt_version',
+          'room_dimensions_estimate', 'lens', 'layout_fit', 'layout_plan', 'layout_validation',
+          'layout_assumptions', 'layout_plan_skipped', 'empty_room_detected',
+        ];
+        const snapshotMeta = {};
+        for (const key of snapshotKeys) if (meta[key] !== undefined) snapshotMeta[key] = meta[key];
+        await q.upsertRoomAnalysis(room.id, analysisKey, {
+          dimensions: estimatedDimensions,
+          effective_keep_furniture: effectiveKeepFurniture,
+          repair_scope: repairScope,
+          art_direction: artDirection,
+          architecture_facts: architectureFacts,
+          layout_plan: layoutPlan,
+          meta: snapshotMeta,
+        }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) }));
       }
 
       prompt = buildPrompt({
