@@ -10,6 +10,7 @@ process.env.OPENROUTER_API_KEY ||= 'regression-no-calls';
 
 const { buildPrompt } = await import('../src/openrouter.js');
 const { getPromptConfig } = await import('../src/promptconfig.js');
+const { buildRoomVariability, variabilityPrompt } = await import('../src/variability.js');
 
 const OUT_DIR = path.join(process.cwd(), 'docs', 'regression');
 const BASELINE = path.join(OUT_DIR, 'baseline.json');
@@ -32,6 +33,8 @@ function buildRun() {
   const cases = [];
   for (const room of ROOMS) {
     for (const style of STYLES) {
+      const id = `${room.roomType} / ${style}`;
+      const variability = buildRoomVariability({ seed: id, styleName: style });
       const prompt = buildPrompt({
         style,
         roomType: room.roomType,
@@ -41,9 +44,11 @@ function buildRun() {
         useCatalog: false,
         imageMap: [{ role: 'source room' }],
         dimensions: room.bedLength ? { ...room.dimensions, bedLength: room.bedLength } : room.dimensions,
+        accentHex: variability.accentHex,
+        novelty: variabilityPrompt(variability),
       });
       cases.push({
-        id: `${room.roomType} / ${style}`,
+        id,
         roomType: room.roomType,
         style,
         dimensions: room.dimensions,

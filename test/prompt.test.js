@@ -336,6 +336,29 @@ test('furniture-off rule is taken from promptconfig', () => {
   }
 });
 
+test('style palette accent hex overrides the named accent', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Гостиная (зал)',
+    useCatalog: false,
+    accent: 'terra',
+    accentHex: '#C26D5A',
+  });
+  assert.match(prompt, /Accent color: #C26D5A only/);
+  assert.doesNotMatch(prompt, /Accent color: terracotta/);
+});
+
+test('novelty block is injected into the base prompt', () => {
+  const prompt = buildPrompt({
+    style: 'Джапанди',
+    roomType: 'Спальня',
+    useCatalog: false,
+    novelty: 'VARIABILITY — ROOM-LEVEL NOVELTY\nDo not repeat: focal zone: window.',
+  });
+  assert.match(prompt, /VARIABILITY — ROOM-LEVEL NOVELTY/);
+  assert.match(prompt, /Do not repeat: focal zone: window/);
+});
+
 test('text-only edit prompt applies a single change without reference wording', () => {
   const prompt = buildEditPrompt({ roomType: 'Спальня', instruction: 'Поменять шторы на лён' });
   assert.match(prompt, /Apply only this change: Поменять шторы на лён/);
