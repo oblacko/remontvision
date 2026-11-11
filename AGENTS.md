@@ -15,11 +15,11 @@
 0. **Спрашивать разрешение перед действием.** Перед эмбеддингом, импортом, удалением/откатом данных, пересборкой, деплоем и любыми долгими/платными операциями — спросить и дождаться явного «да».
 1. **Каталог демонстрационный.** 100 активных товаров, 0 URL; реальных заказов нет. Не утверждайте в UI/доках, что товар можно купить.
 2. **Не хардкодьте модели.** Render/vision/edit/cleanup/direction — в `app_settings` и `.env`, меняются через админку. Перед выводами проверяйте фактическую конфигурацию (`GET /api/health`, `/api/admin/settings/models`).
-3. **FLUX.2 Pro не принимает `resolution`.** Отправка даёт 400. `supportsResolution()` — Seedream и FLUX 3 Image/Klein. У FLUX возможна content moderation на спальнях.
+3. **FLUX.2 Pro не принимает `resolution`.** Отправка даёт 400. `supportsResolution()` в `src/modelcaps.js` — Seedream и FLUX 3 Image/Klein. У FLUX возможна content moderation на спальнях.
 4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации; не «чините» их вслепую — см. docs/redesign.
 5. **Design-first.** Базовый кадр получает исходник + один art ref и текстовые материалы, без product refs. Следствие: `render_items` у новых базовых рендеров **пуст**. Товарная правка использует один product ref и обязательный vision QA; при отказе версия отклоняется, кредит возвращается.
-6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (1–8) — параллелизм; image-вызовы сериализуются глобальным advisory-слотом (`src/imageslot.js`).
-7. **Direction кэшируется.** `src/designeragent.js` + `src/generationcache.js`; 3 варианта, TTL 30 дней. Не вызывайте direction дважды при пустом `prompt_en`.
+6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — параллелизм; image-вызовы ограничиваются общим семафором (`src/imageslot.js`), а не advisory-lock.
+7. **Direction кэшируется.** `src/designeragent.js` + `src/generationcache.js`; 3 варианта, TTL 30 дней; пустой `prompt_en` — негативный маркер на 24 ч, чтобы не платить повторно. Не вызывайте direction дважды при пустом `prompt_en`.
 8. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
 ## Команды
@@ -141,7 +141,7 @@ node --check src/openrouter.js
 - Нет inpainting люстр/розеток.
 - Один провайдер (OpenRouter).
 - Бэкап/restore-скрипты есть, но расписание/off-site/алерты не настроены; диск прода 91%.
-- Возвраты выключены, чеки вручную.
+- Возвраты выключены (`REFUNDS_ENABLED=false`); чеки — автоматически через `src/receipts.js` при `RECEIPTS_WEBHOOK_URL`, иначе `pending` в `receipts`.
 - `/app` — 301; старый редактор — fallback.
 
 ## Definition of done
