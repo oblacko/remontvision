@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-11T10:57:13.279Z
+Generated: 2026-11-11T11:10:12.689Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -208,7 +208,8 @@ app/
    - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
    Не дублируйте правила в разных местах: меняйте defaults в `promptconfig.js` и/или через админку.
 5. **Design-first и смета:** базовый рендер получает только исходник + один art ref и текстовые материалы, без product refs. Curated-товары — подборка, не обещание точного совпадения. Товарная правка использует один product ref и обязательное vision QA; при отказе версия отклоняется, кредит возвращается.
-6. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
+6. **Очередь рендеров:** claim только через lease/`claimed_by` (`FOR UPDATE SKIP LOCKED`); завершение и heartbeat проверяют владельца. `WORKER_CONCURRENCY` (1–8) задаёт число одновременных рендеров, image-вызовы сериализуются глобальным advisory-слотом. Direction кэшируется (`DIRECTION_CACHE_*`), новизна выбирается из вариантов, а не генерацией заново.
+7. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
 ## Команды
 
