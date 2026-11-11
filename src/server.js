@@ -2622,7 +2622,8 @@ app.post('/api/renders/:id/cancel', h(async (req, res) => {
   if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
   const cancelled = await q.cancelQueuedRender(render.id);
   if (!cancelled) return res.status(409).json({ error: 'Уже выполняется — отмена недоступна' });
-  await restoreCreditForRender(render.id, 'render_cancelled').catch(() => {});
+  await restoreCreditForRender(render.id, 'render_cancelled')
+    .catch(e => log({ event: 'credit_restore_failed', render_id: render.id, error: String(e.message || e).slice(0, 300) }));
   const hasDoneSibling = await q.roomHasDoneRender(render.room_id);
   if (hasDoneSibling) await q.setRoomStatus('done', render.room_id);
   else await q.setRoomError('Отменено пользователем', render.room_id);
