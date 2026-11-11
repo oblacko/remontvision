@@ -82,3 +82,44 @@ test('чужой пакет недоступен', async () => {
   const res = await api(app.url, `/api/batches/${created.json.batch_id}`, { cookie: strangerCookie });
   assert.equal(res.status, 404);
 });
+
+test('повтор неудачного варианта создаёт новый рендер в том же пакете', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+  await pool.query(`UPDATE renders SET status = 'error', error = 'provider failed' WHERE id = $1`, [render.id]);
+  const balanceBefore = await q.creditBalance(user.id);
+
+  const res = await api(app.url, `/api/renders/${render.id}/retry`, { method: 'POST', cookie });
+  assert.equal(res.status, 202);
+  assert.equal(res.json.batch_id, created.json.batch_id);
+
+  const renders = await q.batchRenders(created.json.batch_id);
+  assert.equal(renders.length, 2);
+  assert.equal(renders.filter(item => item.status === 'queued').length, 1);
+  assert.equal(await q.creditBalance(user.id), balanceBefore - 1);
+});
+
+test('повтор доступен только для неудачного базового дизайна', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+
+  const ok = await api(app.url, `/api/renders/${render.id}/retry`, { method: 'POST', cookie });
+  assert.equal(ok.status, 409);
+
+  await pool.query(`UPDATE renders SET status = 'error' WHERE id = $1`, [render.id]);
+  const edit = await pool.query(
+    `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, status, batch_id)
+     VALUES ('edit-retry-test', $1, $2, $2, 'error', $3) RETURNING id`,
+    [render.room_id, render.id, created.json.batch_id],
+  );
+  const res = await api(app.url, `/api/renders/${edit.rows[0].id}/retry`, { method: 'POST', cookie });
+  assert.equal(res.status, 400);
+});

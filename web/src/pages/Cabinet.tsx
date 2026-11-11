@@ -211,6 +211,21 @@ export default function Cabinet() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось открыть комнату') }
     finally { setDetailLoading(false) }
   }
+  const retryFailed = async (group: RoomGroup) => {
+    const failed = group.designs.filter(item => item.status === 'error')
+    if (!failed.length) return
+    try {
+      for (const item of failed) {
+        const r = await fetch(`/api/renders/${item.id}/retry`, { method: 'POST' })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(d.error || 'Не удалось повторить')
+      }
+      setNotice(`Повторяем ${failed.length} ${plural(failed.length, 'дизайн', 'дизайна', 'дизайнов')}`)
+      await loadData()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось повторить')
+    }
+  }
   const selectVersion = async (versionId: string) => {
     if (!selectedRoom) return
     setFullscreen(false)
@@ -441,8 +456,13 @@ export default function Cabinet() {
                 {filteredGroups.map(group => <div key={group.batchId} className="k-card group relative min-w-0">
                   <Link to={`/room/${encodeURIComponent(group.roomId)}`} className="block text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
                   <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="k-badge absolute left-2 top-2">{group.designs.length > 1 ? `${group.designs.length} ${plural(group.designs.length, 'дизайн', 'дизайна', 'дизайнов')}` : `${group.versions.length} ${plural(group.versions.length, 'версия', 'версии', 'версий')}`}</span></div>
-                  <div className="bo"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{editName(group.latest.request_text, 'Базовый дизайн')}</p></div><span className={`k-caption shrink-0 ${statusView(group.latest.status).className}`}>{statusView(group.latest.status).label}</span></div><div className="rw mt-4 border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span>{group.credits} кр.</span></div></div>
+                  <div className="bo"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{editName(group.latest.request_text, 'Базовый дизайн')}</p></div><span className={`k-caption shrink-0 ${statusView(group.latest.status).className}`}>{statusView(group.latest.status).label}</span></div><div className="mt-2 text-xs text-muted-foreground">Готово {group.designs.filter(item => item.status === 'done').length} из {group.designs.length}</div><div className="rw mt-3 border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span>{group.credits} кр.</span></div></div>
                   </Link>
+                  {group.designs.some(item => item.status === 'error') && (
+                    <div className="border-t p-2">
+                      <button type="button" onClick={() => void retryFailed(group)} className="k-btn k-btn--s w-full">Повторить неудачные ({group.designs.filter(item => item.status === 'error').length})</button>
+                    </div>
+                  )}
                   <button type="button" onClick={() => { setShareRenderId(group.latest.id); setShareOpen(true) }} className="k-btn k-btn--ov k-btn--icon absolute right-2 top-2" aria-label="Поделиться дизайном"><KitIcon name="sh" /></button>
                 </div>)}
               </div>

@@ -692,6 +692,7 @@ export async function processRender(renderId, claimedBy = null) {
       completedEarly = true;
       await q.setRoomStatus('done', room.id);
       await q.setRenderMeta(renderId, { ...meta, model, cost_usd: earlyCost, cost_breakdown: costBreakdown });
+      await q.setRenderCostFinalized(renderId, cost);
       log({ event: 'render_done_early', room_id: room.id, render_id: renderId, cost_usd: earlyCost, ms: Date.now() - t0 });
       if (room.user_id && !render.parent_render_id) notifyOwner(room, render);
     }

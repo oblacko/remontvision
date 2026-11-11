@@ -113,6 +113,8 @@ export const q = {
       .then(r => r.rows[0] || null),
   setRenderShellPath: (id, shellPath) =>
     pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),
+  setRenderCostFinalized: (id, costUsd) =>
+    pool.query(`UPDATE renders SET cost_final_usd = $1 WHERE id = $2`, [costUsd, id]),
   setRenderDone: (imagePath, costUsd, model, id, claimedBy = null) =>
     pool.query(`UPDATE renders SET status='done', image_path = $1, cost_usd = $2, model = $3,
                 finished_at = now(),

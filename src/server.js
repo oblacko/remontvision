@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { q, migrate } from './db.js';
 import { startWorker, enqueueRender } from './jobs.js';
+import { enqueueRenderWithCredit } from './payments.js';
 import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect } from './openrouter.js';
 import { analyzeRoomBrief } from './artdirector.js';
 import { rateLimit } from './ratelimit.js';
@@ -2501,6 +2502,47 @@ app.use((err, _req, res, next) => {
   if (err?.message === UPLOAD_REJECT_MESSAGE) return res.status(400).json({ error: err.message });
   next(err);
 });
+
+// Повтор конкретного неудачного варианта: новый рендер в том же пакете.
+// Правки не повторяем здесь — у них свои референсы, пользователь повторяет действие.
+app.post('/api/renders/:id/retry', rateLimit, h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.parent_render_id) return res.status(400).json({ error: 'Повтор правки недоступен — повторите действие в редакторе' });
+  if (render.status !== 'error') return res.status(409).json({ error: 'Повтор доступен только для неудачного дизайна' });
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  const balance = await q.creditBalance(req.user.id);
+  const credits = Number(render.model_credits) || 1;
+  if (!MOCK_MODE && balance < credits) {
+    return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance });
+  }
+  try {
+    // Повтор — платная операция и в mock-режиме для тестов: списываем напрямую,
+    // без «бесплатного» обнуления, которое enqueueRender делает для витрины.
+    const id = crypto.randomUUID();
+    await enqueueRenderWithCredit({
+      id,
+      roomId: render.room_id,
+      chargedUserId: req.user.id,
+      requestIp: clientIp(req),
+      modelKey: render.model_key || null,
+      modelCredits: credits,
+      isPrivate: render.is_private === true,
+      resolution: render.resolution || null,
+      style: render.style || null,
+      concept: render.concept || null,
+      batchId: render.batch_id || null,
+    });
+    res.status(202).json({ id, batch_id: render.batch_id || null, status: 'queued' });
+  } catch (e) {
+    if (e.status === 402) {
+      return res.status(402).json({ error: 'Нужен кредит', buy_url: '/?buy=1', balance: await q.creditBalance(req.user.id) });
+    }
+    throw e;
+  }
+}));
 
 // единый обработчик ошибок async-обработчиков — отдаём json, не HTML
 app.use((err, req, res, _next) => {

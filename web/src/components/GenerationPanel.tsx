@@ -292,14 +292,9 @@ export function GenerationPanel({
     ? (Number(selectedModel.resolution_prices?.[effectiveResolution ?? '']) || Number(selectedModel.credits) || 1)
     : 1
   const styleKeyOf = (name: string) => stylePresets.find(item => item.name === name)?.key || null
-  // Пользователю не показываем названия моделей: три уровня по возрастанию цены.
-  const TIER_LABELS = ['Старт', 'Про', 'Студия']
-  const tierByModel = (() => {
-    const ranked = [...renderModels].sort((a, b) => a.credits - b.credits)
-    const map = new Map<string, string>()
-    ranked.forEach((model, index) => map.set(model.key, TIER_LABELS[index] || 'Дополнительно'))
-    return map
-  })()
+  // Уровни задаёт владелец в админке: label строки render_models — подпись уровня,
+  // порядок — sort. Фронт не придумывает названия и не пересортировывает по цене.
+  const tierLabelOf = (key: string | null) => renderModels.find(model => model.key === key)?.label || 'Уровень'
   const variantItems = stylePicks.flatMap(pick => pick.concepts.length
     ? pick.concepts.map(concept => ({ style: pick.style, concept }))
     : [{ style: pick.style, concept: null as string | null }])
@@ -1017,7 +1012,7 @@ export function GenerationPanel({
                         <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true); if (resolution && !m.resolutions.includes(resolution)) setResolution(null) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
                           <span className={`block ${highlighted ? '' : 'opacity-80'}`}>
                             <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                              {tierByModel.get(m.key) || 'Уровень'}
+                              {m.label}
                               {highlighted ? <KitIcon name="ok" className="size-4 shrink-0 text-primary-text" /> : null}
                             </span>
                             <span className="mt-1 block font-mono text-xs text-primary-text">{m.credits} кр.</span>
@@ -1074,7 +1069,7 @@ export function GenerationPanel({
               <div className="mt-8 border-t pt-6 text-xs leading-5 text-muted-foreground">
                 <p>
                   Создам <b className="text-foreground">{variantCount}</b> {variantCount === 1 ? 'дизайн' : variantCount < 5 ? 'дизайна' : 'дизайнов'}
-                  {' · '}<b className="text-foreground">{modelKey ? (tierByModel.get(modelKey) || 'Уровень') : 'Уровень'}</b>
+                  {' · '}<b className="text-foreground">{tierLabelOf(modelKey)}</b>
                   {effectiveResolution ? <> · <b className="text-foreground">{effectiveResolution}</b></> : null}
                   {' · '}<b className="text-foreground">{totalCredits} кр.</b>
                 </p>
