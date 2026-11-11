@@ -77,7 +77,7 @@ async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
   return { refs, user: false };
 }
 
-async function processRender(renderId) {
+export async function processRender(renderId) {
   const t0 = Date.now();
   const render = await q.getRender(renderId);
   if (!render || render.status !== 'processing') return;

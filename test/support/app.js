@@ -27,3 +27,9 @@ export async function createTestApp() {
     close: () => new Promise((resolve, reject) => cached.server.close(err => (err ? reject(err) : resolve()))),
   };
 }
+
+export async function closeTestApp() {
+  if (!cached) return;
+  await new Promise(resolve => cached.server.close(() => resolve()));
+  cached = null;
+}

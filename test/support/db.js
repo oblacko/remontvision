@@ -64,6 +64,10 @@ process.env.RV_DATABASE_URL = testUrl;
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 process.env.ADMIN_KEY = process.env.ADMIN_KEY || 'test-admin-key';
 process.env.APP_URL = process.env.APP_URL || 'http://127.0.0.1:3000';
+process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX || '0'; // middleware-лимит выключен; OTP-лимиты проверяем отдельно
+// Тестовые значения не наследуем из .env: resend-интервал и админ-ключ должны быть предсказуемы.
+process.env.OTP_RESEND_SECONDS = '60';
+process.env.ADMIN_KEY = 'test-admin-key';
 if (!process.env.DATA_DIR) {
   process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-test-'));
 }
