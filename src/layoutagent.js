@@ -35,7 +35,7 @@ export function composeLayoutPrompt({ roomType = 'Другое', dimensions = nu
     ? `ширина ${width} см, длина ${length} см, высота ${height || '—'} см (предварительная оценка по фото)`
     : 'размеры не заданы — оцени масштаб по фото и отметь допущения';
   const history = Array.isArray(usedStrategies) && usedStrategies.length
-    ? `не повторяй прошлые ходы: ${usedStrategies.filter(Boolean).join('; ')}`
+    ? `не повторяй прошлые ходы: ${usedStrategies.filter(Boolean).slice(-5).join('; ')}`
     : 'нет';
   const system = `${getArchitectPrompt('layout').system}`;
   const user = [
@@ -92,8 +92,6 @@ export function normalizeLayoutPlanV2(parsed = {}) {
       label: text(item?.label, 160) || text(item?.type, 40),
       position: text(item?.position, 300),
       size_cm: Number.isFinite(width) && Number.isFinite(depth) ? `${Math.round(width)}x${Math.round(depth)}` : '',
-      x_cm: Number.isFinite(Number(item?.x_cm)) ? Number(item.x_cm) : null,
-      y_cm: Number.isFinite(Number(item?.y_cm)) ? Number(item.y_cm) : null,
       width_cm: Number.isFinite(width) ? Math.round(width) : null,
       depth_cm: Number.isFinite(depth) ? Math.round(depth) : null,
       height_cm: Number.isFinite(Number(item?.height_cm)) ? Number(item.height_cm) : null,
@@ -134,8 +132,7 @@ export function layoutPlanToText(plan) {
     .join('\n');
   const items = (plan.items || [])
     .map((item, index) => {
-      const coords = item.x_cm != null && item.y_cm != null ? ` @ (${item.x_cm},${item.y_cm})${item.rotation_deg ? ` rot ${item.rotation_deg}` : ''}` : '';
-      return `${index + 1}. ${item.label || item.type}${item.position ? ` — ${item.position}` : ''}${item.size_cm ? `, ${item.size_cm}` : ''}${coords}`;
+      return `${index + 1}. ${item.label || item.type}${item.position ? ` — ${item.position}` : ''}${item.size_cm ? `, ${item.size_cm}` : ''}`;
     })
     .join('\n');
   return [

@@ -72,10 +72,10 @@ desk, office_chair, shelf, storage, armchair, sofa, table, coffee_table, sideboa
   "items": [
     { "id": "item_1", "existing_id": null, "zone_ids": ["zone_1"],
       "type": "sofa", "label": "название и размер", "existing": false, "movable": true,
-      "position": "текстовое положение", "x_cm": 0, "y_cm": 0,
+      "position": "текстовое положение относительно стен, окон, двери и других предметов; без координат",
       "width_cm": 0, "depth_cm": 0, "height_cm": 0, "rotation_deg": 0,
       "priority": 1, "mounting_requirement": "...",
-      "use_clearances": [ { "purpose": "...", "x_cm": 0, "y_cm": 0, "width_cm": 0, "depth_cm": 0, "required_state": "..." } ],
+      "use_clearances": [ { "purpose": "...", "width_cm": 0, "depth_cm": 0, "required_state": "..." } ],
       "alternate_states": [], "seated_facing": null, "entrance_visibility": null }
   ],
   "circulation": {

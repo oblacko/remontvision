@@ -47,6 +47,29 @@ test('layout prompt asks for a non-template layout for the room', () => {
   assert.match(out.system, /минимум|один основной вариант/i);
 });
 
+test('layout prompt does not ask for centimetre coordinates', () => {
+  const out = composeLayoutPrompt({ roomType: 'Кабинет', dimensions: { width: 3, length: 4, height: 2.7 } });
+  assert.doesNotMatch(out.system, /x_cm|y_cm/);
+  assert.match(out.system, /position.*текст/i);
+});
+
+test('layout text contains no x/y coordinates', () => {
+  const text = layoutPlanToText({
+    items: [{ type: 'sofa', label: 'Диван', position: 'у стены', x_cm: 40, y_cm: 50, rotation_deg: 90 }],
+  });
+  assert.match(text, /Диван/);
+  assert.doesNotMatch(text, /@ \(/);
+});
+
+test('previous layout strategies are capped at five', () => {
+  const out = composeLayoutPrompt({
+    roomType: 'Гостиная (зал)',
+    usedStrategies: Array.from({ length: 9 }, (_, i) => `strategy-${i}`),
+  });
+  assert.doesNotMatch(out.user, /strategy-0/);
+  assert.match(out.user, /strategy-8/);
+});
+
 test('layout text renders zones, items and circulation', () => {
   const text = layoutPlanToText({
     strategy: 'Рабочая зона у окна',
