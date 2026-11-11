@@ -29,8 +29,8 @@ export function log(obj) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // Один вызов = один слот семафора (см. src/imageslot.js). Ошибки не повторяем:
 // повтор здесь удваивал бы платный вызов, повторы живут в retry-цикле ниже.
-export function withImageSlot(fn) {
-  return acquireImageSlot(fn);
+export function withImageSlot(fn, options = {}) {
+  return acquireImageSlot(fn, options);
 }
 
 
@@ -82,6 +82,16 @@ async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = TIME
 let INPUT_REFS_OK = true;
 const INPUT_REFS_BY_MODEL = new Map();
 export const supportsInputRefs = () => INPUT_REFS_OK;
+
+// Баланс и дневной расход ключа: GET /api/v1/key. Нужен мониторингу, чтобы
+// параллельные вызовы не упирались в лимиты незаметно для владельца.
+export async function fetchKeyInfo() {
+  if (MOCK_MODE) return { mock: true };
+  const r = await proxyFetch(`${BASE}/key`, { headers: headers(), signal: AbortSignal.timeout(15_000) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`key ${r.status}: ${JSON.stringify(data).slice(0, 200)}`);
+  return data.data || data;
+}
 
 export async function listImageModels() {
   if (MOCK_MODE) return { mock: true, models: [] };
@@ -578,12 +588,12 @@ export function snapAspect(width, height, allowed = null) {
   return best;
 }
 
-export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio, model = null, aspect = null, resolution = null }) {
-  return generateWithModel(model || getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, aspectOverride: aspect, resolutionOverride: resolution });
+export async function generateRender({ prompt, sourceImageB64, referenceImagesB64 = [], aspectRatio, model = null, aspect = null, resolution = null, slotUser = null }) {
+  return generateWithModel(model || getModelConfig().render, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, aspectOverride: aspect, resolutionOverride: resolution, slotUser });
 }
 
 // Пустой каркас: отдельная модель/промт/разрешение из админки, только исходник, без style/product refs.
-export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect }) {
+export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect, slotUser = null }) {
   return generateWithModel(model, {
     prompt,
     sourceImageB64,
@@ -592,10 +602,11 @@ export async function generateCleanupRender({ prompt, sourceImageB64, aspectRati
     resolutionOverride: resolution,
     aspectOverride: aspect,
     allowChatFallback: false,
+    slotUser,
   });
 }
 
-async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, resolutionOverride = null, aspectOverride = null, allowChatFallback = null }) {
+async function generateWithModel(model, { prompt, sourceImageB64, referenceImagesB64, aspectRatio, resolutionOverride = null, aspectOverride = null, allowChatFallback = null, slotUser = null }) {
   const refsOk = INPUT_REFS_BY_MODEL.has(model) ? INPUT_REFS_BY_MODEL.get(model) : INPUT_REFS_OK;
   const productRefs = refsOk ? referenceImagesB64 : [];
   const refs = [
@@ -649,7 +660,7 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
           signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
         });
         try {
-          r = endpoint.endsWith('/images') ? await withImageSlot(doFetch) : await doFetch();
+          r = endpoint.endsWith('/images') ? await withImageSlot(doFetch, { userKey: slotUser }) : await doFetch();
         } catch (e) {
           if ((e.name === 'AbortError' || /aborted|timeout/i.test(String(e.message || ''))) && tryNo < 1) {
             log({ event: 'render_timeout_retry', model, endpoint, attempt: tryNo + 1, timeout_ms: IMAGE_TIMEOUT_MS });
@@ -763,7 +774,7 @@ export async function generateFromText({ prompt, aspectRatio = '3:2' }) {
 }
 
 // Генерация по тексту с явной моделью и разрешением; делит глобальный image-slot с рендером.
-export async function generateTextImage({ prompt, aspectRatio = '21:9', model, resolution = null }) {
+export async function generateTextImage({ prompt, aspectRatio = '21:9', model, resolution = null, slotUser = null }) {
   if (!model) throw new Error('generateTextImage: нужна модель');
   if (!prompt) throw new Error('generateTextImage: пустой промпт');
   const body = {
@@ -777,7 +788,7 @@ export async function generateTextImage({ prompt, aspectRatio = '21:9', model, r
     headers: headers(),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
-  }));
+  }), { userKey: slotUser });
   const data = await r.json().catch(() => ({}));
   const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : 0;
   if (!r.ok) {

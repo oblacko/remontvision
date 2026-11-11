@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { q, migrate } from './db.js';
 import { startWorker, enqueueRender } from './jobs.js';
 import { enqueueRenderWithCredit } from './payments.js';
+import { startBalanceMonitor, getBalanceSnapshot } from './openrouterbalance.js';
+import { imageSlotStats } from './imageslot.js';
 import { listImageModels, MOCK_MODE, assertConfig, log, generateCleanupRender, snapAspect } from './openrouter.js';
 import { analyzeRoomBrief } from './artdirector.js';
 import { rateLimit } from './ratelimit.js';
@@ -601,7 +603,18 @@ app.all(['/api/payments/robokassa/fail', '/api/payments/robokassa/fail/'], (_req
 // ---------- каталог: админ ----------
 app.get('/api/admin/metrics', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  res.json(await q.adminMetrics(Number(req.query.days) || 30));
+  const metrics = await q.adminMetrics(Number(req.query.days) || 30);
+  res.json({
+    ...metrics,
+    openrouter: getBalanceSnapshot(),
+    image_slots: imageSlotStats(),
+    concurrency: {
+      system: getRenderConfig().image_concurrency,
+      user: getRenderConfig().image_concurrency_user,
+      provider: getRenderConfig().image_concurrency_provider,
+      workers: Number(process.env.WORKER_CONCURRENCY || 6),
+    },
+  });
 }));
 
 app.get('/api/admin/products', h(async (req, res) => {
@@ -2601,6 +2614,7 @@ async function main() {
     log({ event: 'listen', port: PORT, mock: MOCK_MODE, payments_enabled: PAYMENTS_ENABLED });
     startWorker();
     startSearchWorker();
+    startBalanceMonitor();
   });
 }
 

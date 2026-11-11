@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { getRenderConfig, getRenderDefaults, getImageMinGapMs, getImageConcurrency, setRenderConfigForTests } = await import('../src/renderconfig.js');
+const { getRenderConfig, getRenderDefaults, getImageMinGapMs, getImageConcurrency, getImageConcurrencyUser, getImageConcurrencyProvider, setRenderConfigForTests } = await import('../src/renderconfig.js');
 
 test('product matching is controlled separately from product refs', () => {
   const defaults = getRenderDefaults();
@@ -20,9 +20,20 @@ test('image min gap defaults to zero: варианты идут параллел
   assert.equal(getImageMinGapMs(), 0);
 });
 
-test('image concurrency defaults to 4 and clamps 1..12', () => {
-  assert.equal(getRenderDefaults().image_concurrency, 4);
-  assert.equal(getImageConcurrency(), 4);
+test('image concurrency defaults: system 8, user 5, provider 6', () => {
+  assert.equal(getRenderDefaults().image_concurrency, 8);
+  assert.equal(getRenderDefaults().image_concurrency_user, 5);
+  assert.equal(getRenderDefaults().image_concurrency_provider, 6);
+  setRenderConfigForTests({ image_concurrency_user: 0 });
+  assert.equal(getImageConcurrencyUser(), 1);
+  setRenderConfigForTests({ image_concurrency_user: 99 });
+  assert.equal(getImageConcurrencyUser(), 8);
+  setRenderConfigForTests({ image_concurrency_provider: 2 });
+  assert.equal(getImageConcurrencyProvider(), 2);
+});
+
+test('image concurrency clamps 1..12', () => {
+  assert.equal(getImageConcurrency(), 8);
   setRenderConfigForTests({ image_concurrency: 0 });
   assert.equal(getImageConcurrency(), 1);
   setRenderConfigForTests({ image_concurrency: 99 });

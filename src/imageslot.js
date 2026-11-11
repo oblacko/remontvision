@@ -1,33 +1,68 @@
-// Семафор image-вызовов: ограничивает число одновременных запросов к провайдеру.
-// Раньше здесь был глобальный Postgres advisory-lock на весь HTTP-запрос: из-за этого
-// варианты одного пакета (5 картинок) выполнялись строго по очереди, хотя провайдер
-// позволяет параллельные запросы. Лимит настраивается в app_settings
-// (render.product_refs.v1.image_concurrency), пауза между стартами — там же.
-import { getImageConcurrency, getImageMinGapMs } from './renderconfig.js';
+// Семафор image-вызовов: три уровня ограничения — система, провайдер, пользователь.
+// Раньше здесь был глобальный Postgres advisory-lock на весь HTTP-запрос: варианты
+// одного пакета выполнялись строго по очереди. Теперь ограничиваем конкурентность,
+// а не сериализуем: пакет из 5 стартует одновременно, пока не упрётся в лимит.
+import { getImageConcurrency, getImageConcurrencyUser, getImageConcurrencyProvider, getImageMinGapMs } from './renderconfig.js';
 
-let active = 0;
-const queue = [];
+let activeSystem = 0;
+let activeProvider = 0;
+const activeByUser = new Map();
+const waiters = [];
 
-export async function withImageSlot(fn) {
-  const limit = Math.max(1, getImageConcurrency());
-  // Ждём, пока освободится слот. Цикл нужен на случай, если между разбудившим
-  // сигналом и продолжением слот успел занять другой вызов.
-  while (active >= limit) {
-    await new Promise(resolve => queue.push(resolve));
+const canTake = userKey => {
+  const userLimit = getImageConcurrencyUser();
+  const userActive = userKey ? (activeByUser.get(userKey) || 0) : 0;
+  return activeSystem < getImageConcurrency()
+    && activeProvider < getImageConcurrencyProvider()
+    && userActive < userLimit;
+};
+
+const take = userKey => {
+  activeSystem += 1;
+  activeProvider += 1;
+  if (userKey) activeByUser.set(userKey, (activeByUser.get(userKey) || 0) + 1);
+};
+
+const release = userKey => {
+  activeSystem = Math.max(0, activeSystem - 1);
+  activeProvider = Math.max(0, activeProvider - 1);
+  if (userKey) {
+    const next = (activeByUser.get(userKey) || 1) - 1;
+    if (next > 0) activeByUser.set(userKey, next);
+    else activeByUser.delete(userKey);
   }
-  active += 1;
+  // Будим всех ожидающих: каждый перепроверит свой лимит. Так один пользователь
+  // не может занять освободившийся слот, если упёрся в свой потолок.
+  for (const wake of waiters.splice(0)) wake();
+};
+
+async function acquire(userKey) {
+  for (;;) {
+    if (canTake(userKey)) {
+      take(userKey);
+      return;
+    }
+    await new Promise(resolve => waiters.push(resolve));
+  }
+}
+
+// userKey — идентификатор пользователя (или комнаты) для справедливого распределения.
+export async function withImageSlot(fn, { userKey = null } = {}) {
+  await acquire(userKey);
   try {
     const gap = getImageMinGapMs();
     if (gap > 0) await new Promise(resolve => setTimeout(resolve, gap));
     return await fn();
   } finally {
-    active -= 1;
-    const next = queue.shift();
-    if (next) next();
+    release(userKey);
   }
 }
 
-// Для тестов: сколько вызовов сейчас в работе.
+// Для тестов и мониторинга.
+export function imageSlotStats() {
+  return { activeSystem, activeProvider, users: [...activeByUser.entries()].map(([key, active]) => ({ key, active })) };
+}
+
 export function activeImageCalls() {
-  return active;
+  return activeSystem;
 }

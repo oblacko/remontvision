@@ -497,6 +497,7 @@ export async function processRender(renderId, claimedBy = null) {
             ? snapAspect(width, height, modelCaps(cleanupCfg.model).aspects)
             : cleanupCfg.aspect_ratio;
           const cleanupOut = await generateCleanupRender({
+          slotUser: room.user_id || null,
             prompt: cleanupPrompt,
             sourceImageB64: await bufferToDataUrl(originalBuf),
             aspectRatio: cleanupAspect,
@@ -544,6 +545,7 @@ export async function processRender(renderId, claimedBy = null) {
         log({ event: 'render_prepared_source', room_id: room.id, render_id: renderId });
       } else {
       out = await generateRender({
+        slotUser: room.user_id || null,
         prompt,
         sourceImageB64: srcB64,
         referenceImagesB64,
