@@ -174,3 +174,36 @@ test('избранное переключается и сохраняется', 
   const off = await api(app.url, `/api/renders/${render.id}/favorite`, { method: 'POST', cookie, body: { value: false } });
   assert.equal(off.json.is_favorite, false);
 });
+
+test('публичный промпт не содержит внутренних инструкций и сохраняется', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+
+  const res = await api(app.url, `/api/renders/${render.id}/public-prompt`, { method: 'POST', cookie });
+  assert.equal(res.status, 200);
+  assert.ok(res.json.public_prompt.length > 20);
+  assert.doesNotMatch(res.json.public_prompt, /system|instruction|assistant|model/i);
+  const stored = await q.getRender(render.id);
+  assert.equal(stored.public_prompt, res.json.public_prompt);
+});
+
+test('приватный дизайн нельзя опубликовать, обычный можно', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 5, 'test_grant');
+  const cookie = await loginAs(user);
+  const created = await uploadWith(app.url, cookie, { styles: ['Скандинавский'] });
+  const [render] = await q.batchRenders(created.json.batch_id);
+
+  const on = await api(app.url, `/api/renders/${render.id}/publish`, { method: 'POST', cookie, body: { value: true } });
+  assert.equal(on.status, 200);
+  assert.equal(on.json.publish_consent, true);
+
+  await pool.query(`UPDATE renders SET is_private = true WHERE id = $1`, [render.id]);
+  const denied = await api(app.url, `/api/renders/${render.id}/publish`, { method: 'POST', cookie, body: { value: true } });
+  assert.equal(denied.status, 403);
+});

@@ -36,5 +36,8 @@
   },
   "allowScripts": {
     "better-sqlite3@11.10.0": true
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.17.0"
   }
 }

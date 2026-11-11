@@ -113,6 +113,10 @@ export const q = {
       .then(r => r.rows[0] || null),
   setRenderShellPath: (id, shellPath) =>
     pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),
+  setRenderPublicPrompt: (id, value) =>
+    pool.query(`UPDATE renders SET public_prompt = $2 WHERE id = $1`, [id, value]),
+  setRenderPublishConsent: (id, value) =>
+    pool.query(`UPDATE renders SET publish_consent = $2 WHERE id = $1`, [id, Boolean(value)]),
   setRenderFavorite: (id, value) =>
     pool.query(`UPDATE renders SET is_favorite = $2 WHERE id = $1`, [id, Boolean(value)]),
   setRenderCostFinalized: (id, costUsd) =>

@@ -406,10 +406,10 @@ export default function Cabinet() {
     <div className="min-h-dvh bg-page text-foreground">
       <header className="sticky top-0 z-40 border-b bg-page">
         <div className="page-shell flex min-h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><Logo animated /><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex min-w-0 items-center gap-3"><Logo animated /><span className="eyebrow hidden sm:inline">/ кабинет</span></div>
+          <div className="flex shrink-0 items-center gap-1.5 text-sm sm:gap-2">
             <a href="/" className="hidden min-h-11 items-center px-2 hover:opacity-50 sm:flex">На сайт</a>
-            <a href="/?panel=1" className="k-btn k-btn--primary k-btn--s">Новый дизайн <KitIcon name="ur" /></a>
+            <a href="/?panel=1" aria-label="Новый дизайн" className="k-btn k-btn--primary k-btn--s gap-1"><span className="hidden sm:inline">Новый дизайн</span><span className="sm:hidden">Новый</span><KitIcon name="ur" /></a>
             <div className="relative">
               <button type="button" onClick={() => setProfileOpen(value => !value)} aria-expanded={profileOpen} aria-haspopup="menu" aria-label={`Меню аккаунта, баланс ${me.balance} кредитов`} className="k-badge inline-flex min-h-11 items-center gap-1"><b>{me.balance}</b> кр. <KitIcon name="cd" className="size-3.5" /></button>
               {profileOpen && (

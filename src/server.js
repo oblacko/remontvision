@@ -2579,6 +2579,42 @@ app.post('/api/renders/:id/variant', rateLimit, h(async (req, res) => {
   }
 }));
 
+// Публичный промпт для SEO-страницы: безопасная пользовательская версия,
+// без внутренних инструкций, системных правил и названий моделей.
+app.post('/api/renders/:id/public-prompt', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  const style = DESIGN_STYLES.find(item => item.name === (render.style || room.style)) || null;
+  const direction = render.meta?.design_direction || null;
+  const parts = [
+    style?.prompt_en || `interior in ${render.style || room.style} style`,
+    room.room_type ? `room type: ${room.room_type}` : '',
+    direction?.concept ? `concept: ${String(direction.concept).slice(0, 200)}` : '',
+    direction?.materials ? `materials: ${String(direction.materials).slice(0, 200)}` : '',
+    Array.isArray(direction?.palette) && direction.palette.length
+      ? `palette: ${direction.palette.map(color => color?.hex || color).filter(Boolean).slice(0, 6).join(', ')}`
+      : '',
+    'photorealistic interior photography, natural daylight, no text, no watermark, no people',
+  ].filter(Boolean);
+  const publicPrompt = parts.join('; ').slice(0, 1200);
+  await q.setRenderPublicPrompt(render.id, publicPrompt);
+  res.json({ render_id: render.id, public_prompt: publicPrompt });
+}));
+
+// Согласие на публикацию дизайна в статьях. Приватный дизайн публиковать нельзя.
+app.post('/api/renders/:id/publish', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  const value = req.body?.value === undefined ? !render.publish_consent : Boolean(req.body.value);
+  if (value && render.is_private) return res.status(403).json({ error: 'Приватный дизайн нельзя опубликовать' });
+  await q.setRenderPublishConsent(render.id, value);
+  res.json({ id: render.id, publish_consent: value });
+}));
+
 // Избранное: отметка дизайна.
 app.post('/api/renders/:id/favorite', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
