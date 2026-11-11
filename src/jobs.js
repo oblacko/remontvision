@@ -353,9 +353,9 @@ export async function processRender(renderId) {
             artDirectionCost = (ad.cost || 0) + (direction.cost || 0);
             addCost('art_direction', ad.cost);
             addCost('art_direction', direction.cost);
-            meta.design_direction = { ...direction, ms: Date.now() - adStart };
+            meta.design_direction = { ...direction, ms: Date.now() - adStart, call_ms: direction.ms, retried: direction.retried };
             meta.concept_key = conceptKey;
-            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart });
+            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart, call_ms: direction.ms, retried: direction.retried });
             if (room.user_id) {
               await q.recordDesignDirection({
                 userId: room.user_id,
@@ -369,6 +369,10 @@ export async function processRender(renderId) {
               });
             }
             try { await q.setRoomDesign(room.id, room.concept_key, direction); } catch { /* метаданные не критичны */ }
+          } else if (direction && !direction.text) {
+            // Валидный контракт без prompt_en: второй вызов не делаем, в промт идёт ad.text.
+            addCost('art_direction', direction.cost);
+            log({ event: 'design_direction_incomplete', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, call_ms: direction.ms, retried: direction.retried, cost_usd: direction.cost ?? null });
           } else if (ad?.text) {
             artDirection = ad.text;
             artDirectionCost = ad.cost || 0;

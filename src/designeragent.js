@@ -5,6 +5,7 @@ import { getArchitectPrompt } from './architectprompts.js';
 import { callAgentJson } from './openrouteragent.js';
 import { validateDesignDirection } from './agentcontracts.js';
 import { styleById, conceptById, compatibilityOf, compatibilityNote } from './designdata.js';
+import { log } from './openrouter.js';
 
 export const DESIGN_DIRECTION_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.DESIGN_DIRECTION_ENABLED ?? 'true'));
 
@@ -96,6 +97,13 @@ export function normalizeDirectionResult(parsed, {
   };
 }
 
+let agentCall = callAgentJson;
+
+// Тестовый шов: инъекция фейкового агента без обращения к провайдеру.
+export function setDirectionAgentForTests(fn) {
+  agentCall = fn || callAgentJson;
+}
+
 export async function buildDesignDirection({
   styleId,
   conceptId,
@@ -107,37 +115,50 @@ export async function buildDesignDirection({
   if (!DESIGN_DIRECTION_ENABLED) return null;
   const { system, user, compatibility } = composeDirectionPrompt({ styleId, conceptId, roomType, dimensions, usedDirections });
   if (!system || compatibility === 'conflict') return null;
+  const startedAt = Date.now();
   let parsed = null;
   let cost = null;
   try {
-    const agent = await callAgentJson({
+    const agent = await agentCall({
       instructions: system,
       inputText: user,
       model: DIRECTION_MODEL,
       maxCostUsd: Number(process.env.DIRECTION_MAX_COST_USD || 0.02),
-      maxSteps: 2,
+      maxSteps: 1,
       sessionId,
     });
     parsed = agent.parsed;
     cost = agent.cost ?? null;
   } catch { /* retry ниже */ }
   let result = normalizeDirectionResult(parsed, { styleId, conceptId, compatibility, cost });
-  if (!result?.text) {
+  let retried = false;
+  // Повторяем только когда JSON не распарсился. Валидный ответ без prompt_en
+  // не повторяем: jobs.js уходит на fallback арт-директора, а второй полный
+  // вызов удваивал задержку direction (p50 ~34 с на два прохода).
+  if (!parsed) {
+    retried = true;
     try {
-      const retry = await callAgentJson({
+      const retry = await agentCall({
         instructions: system,
         inputText: user,
         model: undefined,
         maxCostUsd: Number(process.env.DIRECTION_MAX_COST_USD || 0.02),
-        maxSteps: 2,
+        maxSteps: 1,
         sessionId,
       });
       const retryResult = normalizeDirectionResult(retry.parsed, {
         styleId, conceptId, compatibility,
         cost: (cost || 0) + (retry.cost || 0),
       });
-      if (retryResult?.text) result = retryResult;
-    } catch { /* остаётся первый результат */ }
+      if (retryResult) result = retryResult;
+    } catch { /* остаётся null */ }
   }
-  return result;
+  const ms = Date.now() - startedAt;
+  if (!result) {
+    log({ event: 'design_direction_empty', ms, retried, cost_usd: cost ?? null });
+    return null;
+  }
+  const out = { ...result, ms, retried };
+  log({ event: 'design_direction_call', ms, retried, has_text: Boolean(result.text), cost_usd: result.cost ?? null });
+  return out;
 }
