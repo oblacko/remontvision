@@ -104,6 +104,11 @@ export async function processRender(renderId) {
   const useCleanup = !iteration && !keepFurniture && !precleanedShell && cleanupCfg.enabled;
   let stage = 'start';
 
+  // Lease: пока рендер жив, воркер продлевает аренду; при падении lease истечёт,
+  // и задача вернётся в очередь, не отбираясь у живой реплики.
+  const heartbeat = setInterval(() => { q.heartbeatRender(renderId).catch(() => {}); }, 30_000);
+  if (heartbeat.unref) heartbeat.unref();
+
   // Себестоимость полной генерации: каждый внешний запрос пишется отдельно.
   const costBreakdown = {
     art_direction: null,
@@ -748,6 +753,8 @@ export async function processRender(renderId) {
     } catch (restoreError) {
       log({ event: 'render_error', room_id: room.id, render_id: renderId, stage, error: msg, raw_error: rawMsg, cost_usd: errorCost, cost_breakdown: costBreakdown, credit_restore_error: String(restoreError.message || restoreError).slice(0, 300), ms: Date.now() - t0 });
     }
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -786,6 +793,9 @@ export function startWorker() {
 
   setInterval(async () => {
     try {
+      // Просроченные lease возвращаем в очередь; живые (вторая реплика) не трогаем.
+      const requeued = await q.requeueProcessing();
+      if (requeued) log({ event: 'render_lease_requeued', count: requeued });
       const stale = await q.staleRenders(24 * 60);
       for (const r of stale) {
         const msg = 'Генерация не завершилась за 24 часа';

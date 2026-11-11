@@ -2,7 +2,15 @@
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-10. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+Дата обновления: 2026-11-11. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+
+## 2026-11-11 — тестовая сетка и инварианты очереди генерации
+
+- **Интеграционные тесты.** `test/support/` (тестовая БД `<db>_test`, фабрика приложения без listen/воркеров, хелперы сессий и комнат), `npm run test:integration` — 37 тестов: кредиты и возвраты, очередь, auth, комнаты, админ-настройки, шаринг, платежи, файлы, глобальный image-слот. `src/server.js`: `initialize()`/`app` экспортируются, `main()` запускается только при прямом `node src/server.js`.
+- **CI-гейт.** `.github/workflows/ci.yml`: unit + integration (Postgres service), web lint/build, catalog pytest. В `deploy.yml` добавлен job `test`, деплой зависит от него.
+- **Очередь: аренда вместо blanket-requeue.** Миграция `051`: `renders.claimed_at`, `renders.lease_expires_at`, partial-индексы `(created_at) WHERE status='queued'` и `(lease_expires_at) WHERE status='processing'`. `claimNextRender` — `FOR UPDATE SKIP LOCKED` + lease 5 минут; воркер продлевает lease каждые 30 с; `requeueProcessing` и reaper трогают только истёкшие lease / queued старше 24 ч. Вторая реплика больше не крадёт in-flight задачи; восстановление после падения — в пределах 5 минут.
+- **Глобальный image-слот.** `src/imageslot.js`: advisory lock в Postgres вокруг image-вызовов, чтобы несколько воркеров не долбили провайдера параллельно; без БД (unit-тесты) — локальная сериализация.
+- **Тесты.** `npm test` 350/351 (1 skip); `npm run test:integration` 37/37.
 
 ## 2026-11-10 — мульти-стиль генерация
 

@@ -137,7 +137,7 @@ export const q = {
                 RETURNING id`, [id, error, stage]).then(r => r.rows[0] || null),
   staleRenders: minutes =>
     pool.query(`SELECT id, room_id FROM renders
-                WHERE status IN ('queued','processing')
+                WHERE status = 'queued'
                   AND created_at < now() - ($1 || ' minutes')::interval`, [String(minutes)]).then(r => r.rows),
   setRenderPrompt: (id, prompt) =>
     pool.query(`UPDATE renders SET prompt = $2 WHERE id = $1`, [id, prompt]),
@@ -179,13 +179,28 @@ export const q = {
   latestRender: roomId =>
     pool.query(`SELECT * FROM renders WHERE room_id = $1 AND status = 'done' ORDER BY created_at DESC LIMIT 1`, [roomId])
       .then(r => r.rows[0] || null),
-  // атомарный claim следующей queued-задачи
+  // атомарный claim следующей queued-задачи с арендой: SKIP LOCKED не даёт двум
+  // воркерам взять одну строку, lease защищает in-flight работу от чужого requeue.
   claimNextRender: () =>
-    pool.query(`UPDATE renders SET status = 'processing', started_at = now()
-                WHERE id = (SELECT id FROM renders WHERE status = 'queued' ORDER BY created_at LIMIT 1)
-                RETURNING id`).then(r => r.rows[0] || null),
+    withTransaction(async client => {
+      const { rows } = await client.query(
+        `SELECT id FROM renders WHERE status = 'queued'
+         ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`);
+      const row = rows[0];
+      if (!row) return null;
+      const updated = await client.query(
+        `UPDATE renders SET status = 'processing', started_at = now(),
+                            claimed_at = now(), lease_expires_at = now() + interval '5 minutes'
+         WHERE id = $1 RETURNING id`, [row.id]);
+      return updated.rows[0] || null;
+    }),
+  heartbeatRender: (id, seconds = 300) =>
+    pool.query(`UPDATE renders SET claimed_at = now(), lease_expires_at = now() + ($2 || ' seconds')::interval
+                WHERE id = $1 AND status = 'processing'`, [id, String(seconds)]),
   requeueProcessing: () =>
-    pool.query(`UPDATE renders SET status = 'queued' WHERE status = 'processing'`).then(r => r.rowCount),
+    pool.query(`UPDATE renders SET status = 'queued', claimed_at = NULL, lease_expires_at = NULL
+                WHERE status = 'processing'
+                  AND (lease_expires_at IS NULL OR lease_expires_at < now())`).then(r => r.rowCount),
   saveItem: (renderId, productId, score, presentationStatus = score == null ? 'curated' : 'matched') =>
     pool.query(`INSERT INTO render_items (render_id, product_id, match_score, presentation_status) VALUES ($1,$2,$3,$4)`, [renderId, productId, score, presentationStatus]),
   clearItems: renderId => pool.query(`DELETE FROM render_items WHERE render_id = $1`, [renderId]),

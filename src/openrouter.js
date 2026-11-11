@@ -11,6 +11,7 @@ import { buildScalePlan } from './scaleplan.js';
 import { layoutPlanToText } from './layoutagent.js';
 import { getImageMinGapMs } from './renderconfig.js';
 import { proxyFetch } from './proxy.js';
+import { withGlobalImageSlot } from './imageslot.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -35,7 +36,14 @@ function withImageSlot(fn) {
     const wait = Math.max(0, getImageMinGapMs() - (Date.now() - lastImageStart));
     if (wait) await sleep(wait);
     lastImageStart = Date.now();
-    return fn();
+    try {
+      return await withGlobalImageSlot(fn);
+    } catch (e) {
+      // Без БД (unit-тесты) или при сбое БД сохраняем внутрипроцессную сериализацию:
+      // глобальный слот нужен при нескольких воркерах, но не должен ломать рендер.
+      if (e?.code !== 'NO_DB') log({ event: 'image_slot_fallback', error: String(e.message || e).slice(0, 200) });
+      return fn();
+    }
   });
   imageChain = run.catch(() => {});
   return run;
