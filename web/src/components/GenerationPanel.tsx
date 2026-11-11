@@ -167,18 +167,18 @@ const presentationLabel = (status?: GenItem['presentation_status']) => status ==
 const stepLabels = ['Фото', 'Стиль', 'Результат', 'Итог'] as const
 
 const BASE_GEN_STAGES = [
-  { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик' },
-  { key: 'analyzing', label: 'Анализ фото', hint: 'Разбираем комнату, свет и материалы' },
-  { key: 'rendering', label: 'Создание дизайна', hint: 'Модель рисует изображение' },
-  { key: 'matching', label: 'Разбор и товары', hint: 'Архитектор смотрит кадр, даёт подсказки и ищет товары в каталоге' },
-  { key: 'done', label: 'Готово', hint: 'Открываем визуализацию' },
+  { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик', eta: 'Обычно меньше минуты' },
+  { key: 'analyzing', label: 'Анализ фото', hint: 'Разбираем комнату, свет и материалы', eta: 'Обычно до минуты' },
+  { key: 'rendering', label: 'Создание дизайна', hint: 'Модель рисует изображение', eta: 'Обычно 1–3 минуты' },
+  { key: 'matching', label: 'Разбор и товары', hint: 'Архитектор смотрит кадр, даёт подсказки и ищет товары в каталоге', eta: 'Обычно до минуты' },
+  { key: 'done', label: 'Готово', hint: 'Открываем визуализацию', eta: '' },
 ] as const
 
 const EDIT_GEN_STAGES = [
-  { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик' },
-  { key: 'rendering', label: 'Применяем редактирование', hint: 'Модель перерисовывает кадр по референсам' },
-  { key: 'matching', label: 'Разбор редактирования', hint: 'Проверяем результат и обновляем подсказки и товары' },
-  { key: 'done', label: 'Готово', hint: 'Открываем новую версию' },
+  { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик', eta: 'Обычно меньше минуты' },
+  { key: 'rendering', label: 'Применяем редактирование', hint: 'Модель перерисовывает кадр по референсам', eta: 'Обычно 1–3 минуты' },
+  { key: 'matching', label: 'Разбор редактирования', hint: 'Проверяем результат и обновляем подсказки и товары', eta: 'Обычно до минуты' },
+  { key: 'done', label: 'Готово', hint: 'Открываем новую версию', eta: '' },
 ] as const
 const defaultRoomTypes = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое']
 const SUMMARY_TABS = [
@@ -1104,6 +1104,7 @@ export function GenerationPanel({
               <div>
                 <h3 className="display-title text-3xl">{generatingTitle || (productBinding ? 'Привязываем товар' : genMode === 'edit' ? 'Применяем редактирование' : 'Создаём ваш дизайн')}</h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{genStageInfo.hint}</p>
+                {genStageInfo.eta && <p className="mt-1 font-mono text-xs uppercase tracking-wider text-primary-text">{genStageInfo.eta}</p>}
               </div>
             </div>
             <div className="k-pb mt-8" role="progressbar" aria-valuenow={genPercent} aria-valuemin={0} aria-valuemax={100}>
