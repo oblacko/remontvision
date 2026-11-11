@@ -115,6 +115,12 @@ const emptyEditRef = (): EditRefDraft => ({
   id: crypto.randomUUID(), file: null, url: '', preview: null, name: '', text: '', drag: false,
 })
 const MAX_EDIT_BLOCKS = 3
+const EDIT_PRESETS = [
+  { key: 'lighter', label: 'Светлее', text: 'Сделай интерьер светлее: стены и текстиль на полтона светлее, сохрани материалы и расстановку.' },
+  { key: 'darker', label: 'Темнее', text: 'Сделай интерьер темнее: более глубокие тона стен и текстиля, сохрани материалы и расстановку.' },
+  { key: 'textile', label: 'Текстиль', text: 'Замени текстиль: шторы, подушки и плед в той же палитре, но другой фактуры.' },
+  { key: 'floor', label: 'Пол', text: 'Замени покрытие пола на тёплый натуральный дуб, сохрани геометрию комнаты и плинтусы.' },
+] as const
 const editName = (text?: string | null) => text ? text.replace(/(^|\n)\d+\)\s*/g, '$1').trim() || 'Базовая версия' : 'Базовая версия'
 
 type RoomResult = {
@@ -600,6 +606,16 @@ export function GenerationPanel({
 
   const addEditBlock = () => setEditRefs(prev => prev.length >= MAX_EDIT_BLOCKS ? prev : [...prev, emptyEditRef()])
   const addEditBlockWithText = (text: string) => setEditRefs(prev => prev.length >= MAX_EDIT_BLOCKS ? prev : [...prev, { ...emptyEditRef(), text }])
+  // Пресет заполняет первый пустой блок, иначе создаёт новый — без свободного текста.
+  const applyEditPreset = (text: string) => {
+    setEditRefs(prev => {
+      const empty = prev.find(ref => !ref.file && !ref.url && !ref.text.trim())
+      if (empty) return prev.map(ref => ref.id === empty.id ? { ...ref, text } : ref)
+      if (prev.length >= MAX_EDIT_BLOCKS) { showToast('Максимум 3 изменения за раз'); return prev }
+      return [...prev, { ...emptyEditRef(), text }]
+    })
+    requestAnimationFrame(() => document.getElementById('edit-blocks')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+  }
 
   const removeEditRef = (id: string) => setEditRefs(prev => {
     const target = prev.find(ref => ref.id === id)
@@ -1365,6 +1381,22 @@ export function GenerationPanel({
                             {effectiveObjectTarget && (
                               <p className="mt-5 border-l-2 border-primary pl-3 text-sm font-medium">Редактирование объекта «{ruLabel(effectiveObjectTarget.label)}»</p>
                             )}
+                            <div className="mt-5">
+                              <p className="eyebrow">Быстрые изменения</p>
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">Одна кнопка вместо свободного текста — формулировку можно поправить ниже.</p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {EDIT_PRESETS.map(preset => (
+                                  <button
+                                    key={preset.key}
+                                    type="button"
+                                    onClick={() => applyEditPreset(preset.text)}
+                                    className="k-btn k-btn--ov k-btn--s"
+                                  >
+                                    {preset.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                             <div id="edit-blocks" className="mt-5 space-y-3">
                               {editRefs.map((ref) => {
                                 const hasSource = Boolean(ref.file || ref.url)
