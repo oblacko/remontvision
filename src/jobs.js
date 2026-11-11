@@ -10,7 +10,6 @@ import { MOCK_MODE, buildPrompt, buildEditPrompt, buildMoveRemovalPrompt, genera
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
-import { reviewDesign } from './architect.js';
 import { buildDesignDirection, DESIGN_DIRECTION_ENABLED } from './designeragent.js';
 import { buildLayoutPlan } from './layoutagent.js';
 import { buildAnalysis } from './analysis.js';
@@ -703,41 +702,17 @@ export async function processRender(renderId, claimedBy = null) {
     stage = 'matching';
     await q.setRoomStatus(completedEarly ? 'done' : 'matching', room.id);
     let parsed = { items: [], surfaces: [], visible: [], electrical: [] };
-    let architectReview = null;
     let visionCost = null;
     // Разбор интерьера запускается кнопкой (POST /api/renders/:id/breakdown).
     const architectOnDemand = !/^(0|false|no|off)$/i.test(String(process.env.ARCHITECT_ON_DEMAND ?? 'true'));
     if (!MOCK_MODE && !architectOnDemand) {
-      const imageDataUrl = `data:${MIME_BY_EXT[ext] || 'image/jpeg'};base64,${bytes.toString('base64')}`;
       try {
-        if (!architectOnDemand) throw new Error('architect on demand');
-        const reviewed = await reviewDesign({
-          imageDataUrl,
-          roomType,
-          style: styleName,
-          priceTier,
-          mode: 'hints',
-          sessionId: meta.render_session,
-        });
-        if (reviewed) {
-          parsed = reviewed.parsed;
-          architectReview = reviewed.architect;
-          visionCost = reviewed.cost;
-          addCost('architect_review', reviewed.cost);
-          log({ event: 'architect_review', room_id: room.id, render_id: renderId, items: architectReview.items.length, surfaces: architectReview.surfaces.length, hints: architectReview.hints.length, cost_usd: reviewed.cost ?? null });
-        }
+        parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
+        visionCost = parsed.cost;
+        addCost('render_analysis', visionCost);
+        log({ event: 'render_analysis_fallback', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length });
       } catch (e) {
-        log({ event: 'architect_review_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-      }
-      if (!architectReview) {
-        try {
-          parsed = await parseRender(bytes.toString('base64'), MIME_BY_EXT[ext] || 'image/jpeg');
-          visionCost = parsed.cost;
-          addCost('render_analysis', visionCost);
-          log({ event: 'render_analysis_fallback', room_id: room.id, render_id: renderId, items: parsed.items.length, surfaces: parsed.surfaces.length, visible: parsed.visible.length });
-        } catch (e) {
-          log({ event: 'render_analysis_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-        }
+        log({ event: 'render_analysis_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
       }
     }
 
@@ -765,14 +740,12 @@ export async function processRender(renderId, claimedBy = null) {
       priceTier,
       style: styleName,
     });
-    if (architectReview) {
-      analysis.architect = { ...architectReview, status: 'ready', render_id: renderId };
-    } else if (!MOCK_MODE) {
+    if (!MOCK_MODE) {
       // on-demand: разбор ещё не запускали, это не ошибка.
       analysis.architect = { status: architectOnDemand ? 'pending' : 'failed', render_id: renderId, changes: [], items: [], hints: [] };
     }
     await q.setRenderAnalysis(renderId, analysis);
-    log({ event: 'render_analyzed', room_id: room.id, render_id: renderId, items: parsed.items.length, architect_hints: architectReview?.hints?.length || 0, suggestions: analysis.suggestions.length });
+    log({ event: 'render_analyzed', room_id: room.id, render_id: renderId, items: parsed.items.length, suggestions: analysis.suggestions.length });
 
     const totalCost = sumCostBreakdown();
     await q.setRenderMeta(renderId, {
