@@ -495,6 +495,16 @@ export const q = {
                 ON CONFLICT (kind, key) DO UPDATE SET value = EXCLUDED.value, created_at = now()`,
       [kind, key, JSON.stringify(value)]),
 
+  // кэш анализа комнаты (размеры/мебель/ремонт/арт-направление/layout)
+  roomAnalysis: roomId =>
+    pool.query(`SELECT cache_key, data FROM room_analysis WHERE room_id = $1`, [roomId])
+      .then(r => r.rows[0] || null),
+  upsertRoomAnalysis: (roomId, cacheKey, data) =>
+    pool.query(`INSERT INTO room_analysis (room_id, cache_key, data, updated_at) VALUES ($1,$2,$3,now())
+                ON CONFLICT (room_id) DO UPDATE SET cache_key = EXCLUDED.cache_key,
+                  data = EXCLUDED.data, updated_at = now()`,
+      [roomId, cacheKey, JSON.stringify(data)]),
+
   // пакеты кредитов
   creditPacks: activeOnly =>
     pool.query(`SELECT * FROM credit_packs ${activeOnly ? 'WHERE active = true' : ''} ORDER BY sort, id`)
