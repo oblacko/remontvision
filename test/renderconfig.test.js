@@ -1,7 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { getRenderConfig, getRenderDefaults, getImageMinGapMs, getImageConcurrency, getImageConcurrencyUser, getImageConcurrencyProvider, setRenderConfigForTests } = await import('../src/renderconfig.js');
+const { getRenderConfig, getRenderDefaults, getImageMinGapMs, getImageConcurrency, getImageConcurrencyUser, getImageConcurrencyProvider, setRenderConfigForTests, parseAutoEnabled } = await import('../src/renderconfig.js');
+
+test('PARSE_AUTO is off by default and only truthy values enable it', () => {
+  delete process.env.PARSE_AUTO;
+  assert.equal(parseAutoEnabled(), false);
+  for (const value of ['1', 'true', 'yes', 'on', 'TRUE']) {
+    process.env.PARSE_AUTO = value;
+    assert.equal(parseAutoEnabled(), true, value);
+  }
+  for (const value of ['0', 'false', 'no', 'off', '']) {
+    process.env.PARSE_AUTO = value;
+    assert.equal(parseAutoEnabled(), false, value);
+  }
+  delete process.env.PARSE_AUTO;
+});
 
 test('product matching is controlled separately from product refs', () => {
   const defaults = getRenderDefaults();
