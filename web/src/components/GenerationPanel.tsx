@@ -270,7 +270,6 @@ export function GenerationPanel({
   const [finalError, setFinalError] = useState('')
   const [objectsOn, setObjectsOn] = useState(false)
   const [editObjectTarget, setEditObjectTarget] = useState<{ label?: string; bbox: number[] } | null>(null)
-  const [passportNotice, setPassportNotice] = useState('')
   const closeRef = useRef<HTMLButtonElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
@@ -1549,11 +1548,6 @@ export function GenerationPanel({
                   <section className="mt-5" aria-labelledby="gen-products">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h4 id="gen-products" className="eyebrow">Товары</h4>
-                      {current.productsEnabled === false ? (
-                        <button type="button" disabled className="k-btn k-btn--primary min-h-11 px-4 text-sm">Подбор выключен</button>
-                      ) : (
-                        <a href={`/room/${encodeURIComponent(current.roomId)}/procurement`} target="_blank" rel="noopener noreferrer" className="k-btn k-btn--primary min-h-11 px-4 text-sm">Найти товары <KitIcon name="ur" className="size-4" /></a>
-                      )}
                     </div>
                     {productMatches.length ? (
                       <div className="mt-4 space-y-4">
@@ -1582,7 +1576,7 @@ export function GenerationPanel({
                           </div>
                         ))}
                       </div>
-                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Подбор товаров ещё не запущен. Откройте «Найти товары» в новой вкладке — подберём похожие товары по кадру.'}</p>}
+                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Подбор товаров скоро вернётся.'}</p>}
                     {selectedOffersList.length ? (
                       <div className="mt-5 border-t pt-3">
                         <p className="eyebrow">Выбрано</p>
@@ -1662,18 +1656,14 @@ export function GenerationPanel({
                       >
                         <KitIcon name="dl" className="size-4" /> ТЗ для мастера (.txt)
                       </button>
-                      <button
-                        type="button"
+                      <Link
+                        to={`/room/${encodeURIComponent(current.roomId)}?tab=passport`}
                         className="k-btn min-h-11 px-4 text-sm"
-                        onClick={() => {
-                          goal('passport_click', { room_id: current.roomId })
-                          setPassportNotice('Готовим PDF-паспорт ремонта — скоро. Пока можно скачать ТЗ для мастера выше.')
-                        }}
+                        onClick={() => goal('passport_click', { room_id: current.roomId })}
                       >
-                        Паспорт ремонта (PDF) — скоро
-                      </button>
+                        <KitIcon name="dl" className="size-4" /> Паспорт ремонта (PDF)
+                      </Link>
                     </div>
-                    {passportNotice && <p className="mt-2 text-xs leading-5 text-muted-foreground">{passportNotice}</p>}
                   </section>
                 )}
               </div>

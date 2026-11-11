@@ -51,6 +51,7 @@ export default function Home() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelRoomId, setPanelRoomId] = useState('')
   const [packs, setPacks] = useState<PublicPack[]>(defaultPacks)
+  const [referralInvited, setReferralInvited] = useState(false)
   const { refresh: refreshTasks, setPanelOpen: setTasksPanelOpen } = useTasks()
 
   useEffect(() => {
@@ -66,6 +67,15 @@ export default function Home() {
   }
 
   useEffect(() => { void loadMe() }, [])
+  // Реферальная кука HttpOnly: спрашиваем бэкенд, пришёл ли пользователь по ссылке.
+  useEffect(() => {
+    let alive = true
+    fetch('/api/referral/context')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (alive && data?.invited) setReferralInvited(true) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
   // Возврат с неудачного OAuth: открываем вход и объясняем, что пошло не так.
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -317,6 +327,15 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {referralInvited && !me && (
+          <section className="border-b border-foreground/15 bg-secondary" aria-label="Приглашение по ссылке">
+            <div className="page-shell flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="min-w-0 text-sm leading-6"><span className="font-medium">Вас пригласили в Ремонтвижн.</span> Начните с бесплатных дизайнов — пригласивший получит 2 кредита после вашей первой покупки.</p>
+              <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--s shrink-0">Создать дизайн</button>
+            </div>
+          </section>
+        )}
 
         <section className="mt-8 bg-foreground text-background" aria-label="Главные преимущества">
           <div className="page-shell grid md:grid-cols-3">

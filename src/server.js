@@ -463,6 +463,14 @@ app.get('/api/me', h(async (req, res) => {
 }));
 
 // Реферальная ссылка текущего пользователя + счётчик приглашённых.
+app.get('/api/referral/context', rateLimit, h(async (req, res) => {
+  // Кука HttpOnly: фронтенд не может прочитать её сам, поэтому отдаём только флаг.
+  const code = referralCookieValue(req);
+  const ownerId = code ? await resolveCode(code).catch(() => null) : null;
+  res.set('Cache-Control', 'no-store');
+  res.json({ invited: Boolean(ownerId) });
+}));
+
 app.get('/api/referral', h(async (req, res) => {
   if (!requireAuth(req, res)) return;
   const code = await getOrCreateCode(req.user.id);
