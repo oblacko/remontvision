@@ -1,7 +1,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestApp, closeTestApp } from '../support/app.js';
-import { api, createUser, loginAs, uploadRoom } from '../support/helpers.js';
+import { api, createUser, loginAs, uploadRoom, seedRoom, insertRender } from '../support/helpers.js';
 
 after(closeTestApp);
 
@@ -75,4 +75,20 @@ test('retry is rejected while the room is not in error', async () => {
 
   const res = await api(app.url, `/api/rooms/${created.json.id}/retry`, { method: 'POST', cookie });
   assert.equal(res.status, 409);
+});
+
+test('versions exposes edits_used so the UI can price a move before confirming', async () => {
+  const app = await createTestApp();
+  const user = await createUser();
+  const cookie = await loginAs(user);
+  const room = await seedRoom({ userId: user.id, status: 'done' });
+  const baseId = await insertRender({ roomId: room.id, status: 'done', imagePath: 'renders/base.png' });
+  await insertRender({ roomId: room.id, status: 'done', imagePath: 'renders/edit.png', parentId: baseId });
+
+  const res = await api(app.url, `/api/rooms/${room.id}/versions`, { cookie });
+  assert.equal(res.status, 200);
+  assert.equal(res.json.length, 2);
+  for (const version of res.json) {
+    assert.equal(version.edits_used, 1, 'обе версии одного корня знают, что правка уже одна');
+  }
 });

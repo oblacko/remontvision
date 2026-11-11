@@ -1833,12 +1833,19 @@ app.get('/api/rooms/:id/versions', h(async (req, res) => {
   const room = await q.getRoom(req.params.id);
   if (!room || Number(room.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Не найдено' });
   const rows = await q.rendersForRoom(room.id);
+  // Счётчик правок на корень нужен панели, чтобы показать цену до подтверждения.
+  const editCounts = new Map();
+  for (const row of rows) {
+    const rootId = row.root_render_id || row.id;
+    if (!editCounts.has(rootId)) editCounts.set(rootId, await q.rootEditCount(rootId));
+  }
   res.json(rows.map(render => ({
     id: render.id,
     image: `/renders/${path.basename(render.image_path)}`,
     status: render.status,
     request_text: render.request_text || null,
     created_at: render.created_at,
+    edits_used: editCounts.get(render.root_render_id || render.id) || 0,
     analysis: render.analysis || null,
     art_direction: render.meta?.art_direction ? {
       palette: render.meta.art_direction.palette || [],
