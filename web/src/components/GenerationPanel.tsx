@@ -124,7 +124,7 @@ type RoomResult = {
   room_width_m?: number | null; room_length_m?: number | null; room_height_m?: number | null; bed_length_m?: number | null;
   dimension_orientation?: string | null;
   keep_furniture?: boolean; use_catalog?: boolean; products_enabled?: boolean; concept_key?: string | null;
-  render?: { id: string; image: string | null; status: string; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null; repair_scope?: RepairScope | null; design_direction?: DesignDirection | null } | null;
+  render?: { id: string; image: string | null; status: string; edits_used?: number; analysis?: Analysis | null; art_direction?: ArtDirection | null; dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null; repair_scope?: RepairScope | null; design_direction?: DesignDirection | null } | null;
   items: GenItem[]; total: number; prices_as_of?: string | null;
 }
 type Iteration = {
@@ -133,7 +133,7 @@ type Iteration = {
   budget: number; priceTier: string; pricesAsOf?: string | null; analysis?: Analysis | null;
   keepFurniture?: boolean; useCatalog?: boolean; productsEnabled?: boolean; artDirection?: ArtDirection | null;
   dimensionsEstimate?: DimensionsEstimate | null; lens?: LensInfo | null; repairScope?: RepairScope | null;
-  designDirection?: DesignDirection | null;
+  designDirection?: DesignDirection | null; editsUsed?: number;
 }
 type DesignDirection = {
   conceptId?: string | null; concept?: string; mainMove?: { target?: string; action?: string; effect?: string } | null;
@@ -281,6 +281,11 @@ export function GenerationPanel({
   const retryRef = useRef<{ roomId: string; request: string; styleName: string } | null>(null)
 
   const current = iterations.find((item) => item.id === currentId) ?? iterations[iterations.length - 1] ?? null
+  // Цена правки/переноса — из счётчика правок корня. Видна до подтверждения.
+  const currentEditsUsed = Number(current?.editsUsed || 0)
+  const editCostLabel = currentEditsUsed < 3
+    ? `Бесплатно · редактирование ${currentEditsUsed + 1} из 3`
+    : 'Спишется 1 кредит'
   const heroItems = current?.items.filter(item => item.can_bind).slice(0, 3) ?? []
   const showResultMain = !inline || heroItems.length > 0
   // Редактируем существующий дизайн, а не создаём новый: модель и приватность наследуются от родителя.
@@ -492,7 +497,7 @@ export function GenerationPanel({
         const render = d.render
         if (render?.image) {
           const makeIteration = (v: {
-            id: string; image: string; request_text?: string | null;
+            id: string; image: string; request_text?: string | null; edits_used?: number;
             analysis?: Iteration['analysis']; art_direction?: ArtDirection | null;
             dimensions_estimate?: DimensionsEstimate | null; lens?: LensInfo | null;
             repair_scope?: RepairScope | null; design_direction?: DesignDirection | null;
@@ -510,6 +515,7 @@ export function GenerationPanel({
             roomId: initialRoomId,
             ratio: 4 / 3,
             pricesAsOf: d.prices_as_of,
+            editsUsed: Number(v.edits_used) || 0,
             analysis: v.analysis || null,
             artDirection: v.art_direction || null,
             dimensionsEstimate: v.dimensions_estimate || null,
@@ -531,6 +537,7 @@ export function GenerationPanel({
                 id: render.id,
                 image: render.image,
                 request_text: render.request_text,
+                edits_used: render.edits_used,
                 analysis: render.analysis,
                 art_direction: render.art_direction,
                 dimensions_estimate: render.dimensions_estimate,
@@ -798,6 +805,7 @@ export function GenerationPanel({
       lens: render.lens || null,
       repairScope: render.repair_scope || null,
       designDirection: render.design_direction || null,
+      editsUsed: Number(render.edits_used) || 0,
     }
     setIterations(prev => [...prev, next])
     setCurrentId(next.id)
@@ -1256,6 +1264,7 @@ export function GenerationPanel({
                         image={current.image}
                         ratio={current.ratio}
                         objects={visibleObjects}
+                        costLabel={editCostLabel}
                         onCreateEdit={(index) => {
                           const object = visibleObjects[index]
                           if (!object) return
