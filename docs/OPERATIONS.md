@@ -12,8 +12,6 @@
 
 ## Переменные окружения
 
-Значения — только placeholder; реальные секреты не коммитить.
-
 ```bash
 # Core
 PORT=3000
@@ -24,18 +22,24 @@ ADMIN_KEY=<admin-key>
 # OpenRouter
 OPENROUTER_API_KEY=<key>
 RENDER_MODEL=black-forest-labs/flux-3-image
-VISION_MODEL=google/gemini-3-flash-preview
+VISION_MODEL=google/gemini-3.1-pro-preview
+DIRECTION_MODEL=deepseek/deepseek-v4.1-flash-1017
 RENDER_RESOLUTION=1K
 RENDER_ASPECT_RATIO=auto
 OPENROUTER_TIMEOUT_MS=120000
-HTTPS_PROXY=<optional-proxy-url>
+
+# Очередь и скорость
+WORKER_CONCURRENCY=2              # 1–8
+IMAGE_MIN_GAP_MS=10000            # пауза между image-вызовами
+DIRECTION_CACHE_ENABLED=1
+DIRECTION_CACHE_VARIANTS=3        # 1–3
+DIRECTION_CACHE_TTL_DAYS=30
 
 # Auth/mail
 RESEND_API_KEY=<key>
-RESEND_TEMPLATE_ID=<id>
 MAIL_FROM=<from>
-MAIL_REPLY_TO=support@remontvision.ru
 SESSION_DAYS=365
+OTP_RESEND_SECONDS=60
 
 # Payments
 PAYMENTS_ENABLED=true
@@ -48,171 +52,131 @@ ROBOKASSA_PASSWORD_3=<password-3>
 ROBOKASSA_TEST=0
 ROBOKASSA_HASH_ALGO=md5
 ROBOKASSA_RECEIPT_ENABLED=1
-# YUKASSA_SHOP_ID=<id>
-# YUKASSA_SECRET_KEY=<key>
 
-# Catalog import
-PRODUCT_IMPORT_DOMAINS=market.yandex.ru,leroymerlin.ru,...
-
-# Storage (optional)
+# Storage (optional; иначе диск)
 S3_BUCKET=
 S3_ACCESS_KEY=
 S3_SECRET_KEY=
 S3_ENDPOINT=
 ```
 
-Особенности:
+`RV_DATABASE_URL` — не `DATABASE_URL` (стандартная переменная может быть занята другим проектом). Node ≥ 20.19.
 
-- `RV_DATABASE_URL`, не `DATABASE_URL` — стандартная переменная может быть занята другим проектом.
-- `APP_URL` нужен для платёжных return/webhook и share-ссылок.
+## CI и деплой
 
-## Robokassa
+1. Пуш в `main`.
+2. GitHub Actions `ci`: backend unit + integration (Postgres service), web lint/build, catalog pytest.
+3. `deploy`: job `test` → SSH на VPS → `git pull` → `docker compose up -d --build` → prune.
+4. При старте: миграции → сиды → конфиги → listen.
+5. Smoke: `/api/health`, `/`, `/app`, `/offer`.
 
-В кабинете Robokassa → «Технические настройки» укажите:
+Деплой не запускается без зелёного `test`. Откат: revert/предыдущий коммит + пуш; миграции append-only. [ops/ROLLBACK.md](ops/ROLLBACK.md).
+
+## Миграции
+
+- `migrations/NNN_name.sql`, по порядку, учёт в `_migrations`.
+- Применённые не редактировать; только новые файлы.
+- Текущий диапазон: `001–053`; файла `048` нет (историческое переименование `046/047 → 048/049`).
+- Перед рискованными изменениями — `pg_dump` на VPS.
+
+## Очередь рендеров
+
+| Параметр | Значение |
+|---|---|
+| Claim | `FOR UPDATE SKIP LOCKED`, lease 5 мин, `claimed_by` |
+| Heartbeat | каждые 30 с |
+| Requeue | только истёкшие lease; раз в 5 мин |
+| Reaper | queued > 24 ч или processing > 60 мин → error + refund |
+| Параллелизм | `WORKER_CONCURRENCY` (1–8) |
+| Image-слот | Postgres advisory lock, ожидание ≤ 5 мин |
+
+Проверка очереди:
+
+```sql
+SELECT status, count(*) FROM renders GROUP BY status;
+SELECT count(*) FROM renders WHERE status='queued';
+SELECT id, status, started_at, lease_expires_at FROM renders
+WHERE status='processing' ORDER BY started_at LIMIT 20;
+```
+
+Метрики и canary: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
+
+## Платежи (Robokassa)
 
 | Поле | Значение |
 |---|---|
 | ResultURL | `${APP_URL}/api/payments/robokassa/result` |
 | SuccessURL | `${APP_URL}/cabinet/paid` |
 | FailURL | `${APP_URL}/cabinet/fail` |
-| Метод ResultURL / Success / Fail | GET или POST (обрабатываются оба) |
+| Метод | GET или POST |
 
-ResultURL — только серверное уведомление Robokassa (начисление кредитов). SuccessURL/FailURL — возврат браузера пользователя на страницы приложения без query-параметров, чтобы Robokassa могла безопасно добавить свои GET-параметры.
-
-- Алгоритм подписи в кабинете должен совпадать с `ROBOKASSA_HASH_ALGO` (по умолчанию `md5`).
-- `ROBOKASSA_PASSWORD_1` — подпись платежа и SuccessURL, `ROBOKASSA_PASSWORD_2` — ResultURL и OpStateExt, `ROBOKASSA_PASSWORD_3` — возвраты.
-- `ROBOKASSA_TEST=1` включает `IsTest=1`; используйте тестовую пару паролей, иначе Robokassa вернёт ошибку подписи. В тестовом режиме OpStateExt недоступен — подтверждение приходит только на ResultURL.
-- `ROBOKASSA_RECEIPT_ENABLED=1` (по умолчанию) передаёт `Receipt` с номенклатурой: `Доступ к онлайн-сервису генерации дизайна интерьера — пакет на N генераций`, `quantity=1`, `sum=цена пакета`, `payment_method=full_payment`, `payment_object=service`, `tax=none`. Это нужно для Робочеков СМЗ и требований 54-ФЗ. `Receipt` участвует в подписи и передаётся дважды URL-кодированным, как в официальном SDK. Если фискализация ещё не подключена и Robokassa отклоняет чек, временно поставьте `0`.
-- Отдельный `RECEIPTS_WEBHOOK_URL` — альтернативный путь чеков. Не включайте его одновременно с Робочеками, иначе будут дубли.
-- `PAYMENT_PROVIDER=robokassa` принудительно выбирает провайдера; без переменной Robokassa выбирается автоматически, если заданы её ключи.
-- `InvId` = локальный `payments.id`; `provider_payment_id` хранит его же строкой. Начисление кредитов идемпотентно по ResultURL/синхронизации.
-- Автоматический возврат Robokassa использует `OpKey` из OpStateExt (миграций не требует). Без `OpKey`/`ROBOKASSA_PASSWORD_3` доступен только ручной возврат.
-- Прокси нужен, если OpenRouter блокирует IP VPS; настраивается и в админке.
-
-## Деплой
-
-1. Пуш в `main`.
-2. GitHub Actions: SSH на VPS, `git pull`, `docker compose up -d --build`, prune.
-3. При старте: миграции → сид каталога → сид style refs → загрузка моделей → прокси → prompt rules → listen.
-4. Smoke: `/api/health`, `/`, `/app`.
-
-Откат: `git revert`/предыдущий коммит + пуш; миграции append-only, не удалять.
-Процедура и smoke: [ops/ROLLBACK.md](ops/ROLLBACK.md).
-
-## Миграции
-
-- Файлы `migrations/NNN_name.sql`, применяются по порядку, учёт в `_migrations`.
-- Не редактировать применённые миграции; добавлять новую.
-- Перед рискованными изменениями — `pg_dump` на VPS.
-
-## Домен и TLS
-
-- `www.remontvision.ru` — основной, `remontvision.ru` → 301 → www.
-- Сертификат Let's Encrypt на оба домена, автопродление `certbot.timer`.
-- Nginx: HTTP/2, HSTS, security headers, proxy на `127.0.0.1:3000`.
-- Проверка: `certbot renew --dry-run`, `curl -I` apex/www.
+- `ROBOKASSA_PASSWORD_1` — платёж и SuccessURL, `_2` — ResultURL/OpStateExt, `_3` — возвраты.
+- `ROBOKASSA_TEST=1` — тестовая пара паролей.
+- `ROBOKASSA_RECEIPT_ENABLED=1` — чек 54-ФЗ; при проблемах временно `0`.
+- `InvId` = локальный `payments.id`; начисление идемпотентно.
+- Возвраты: `REFUNDS_ENABLED=false`; ручной режим.
+- ЮKassa — fallback.
 
 ## Файлы
 
-- `uploads/` — фото комнат и референсы.
-- `renders/` — результаты.
-- `products/` — картинки товаров.
-- `style-images/` — hero/board.
+- `uploads/` — фото и референсы; `renders/` — результаты; `products/`, `style-images/`.
 - S3 включается переменными; иначе диск.
 - EXIF/GPS удаляются при загрузке.
 
 ## Бэкапы
 
-Полная процедура: [ops/BACKUP-RESTORE.md](ops/BACKUP-RESTORE.md). Скрипт: `scripts/ops/backup.sh`.
+Процедура: [ops/BACKUP-RESTORE.md](ops/BACKUP-RESTORE.md), скрипт `scripts/ops/backup.sh`.
 
-Автоматического расписания пока нет. Скрипт и restore-учения проверены 2026-11-09:
-дамп БД 1.3 MB, архив файлов 254 MB, restore в чистую БД — PASS (42 таблицы, счётчики
-совпали). Копия вне VPS ещё не настроена — нужен таргет хранения и ключи.
+**Текущий статус (2026-11-11):** последний бэкап 45 ч назад, в manifest **нет `db_dump`**, off-site не настроен. Это CRIT — до запуска нужно восстановить регулярный дамп и копию вне VPS.
 
 ```bash
 cd /root/remontvision
 ./scripts/ops/backup.sh                 # БД + файлы
-./scripts/ops/backup.sh --db-only       # быстро, перед миграцией
-./scripts/ops/restore-verify.sh --latest # restore в чистую БД
+./scripts/ops/backup.sh --db-only       # перед миграцией
+./scripts/ops/restore-verify.sh --latest
 ```
-
-Cron, retention, rclone, полное восстановление на новом сервере — в
-[ops/BACKUP-RESTORE.md](ops/BACKUP-RESTORE.md).
 
 ## Мониторинг
 
-Полная процедура: [ops/MONITORING.md](ops/MONITORING.md). Инциденты:
-[ops/RUNBOOK.md](ops/RUNBOOK.md).
+Процедура: [ops/MONITORING.md](ops/MONITORING.md). Инциденты: [ops/RUNBOOK.md](ops/RUNBOOK.md).
 
-Сейчас: Docker logs + `/api/health` + `scripts/ops/daily-check.sh` (вручную).
-Внешнего uptime-монитора и алертов пока нет — G8 не закрыт.
+**Текущий статус:** Docker logs + `/api/health` + `scripts/ops/daily-check.sh` вручную; внешнего монитора и алертов нет.
 
 ```bash
 cd /root/remontvision
-./scripts/ops/daily-check.sh            # health, диск, контейнеры, бэкапы, render_error, 429
-./scripts/ops/smoke.sh                  # после деплоя/отката
+./scripts/ops/daily-check.sh
+./scripts/ops/smoke.sh
 ```
 
-Проверять ежедневно:
-
-- `docker compose ps`, `/api/health`, `daily-check.sh`;
-- `render_error`/`render_timeout` и их `stage`;
-- `webhook_error`/`payment_created`, 429;
-- свежесть бэкапа и свободное место (диск 86% на 2026-11-09).
+Daily-check от 2026-11-11: здоровье/контейнеры OK; **диск 91% CRIT**, бэкап 45 ч CRIT, нет `db_dump` CRIT.
 
 ## Типовые проблемы
 
 | Симптом | Причина | Что делать |
 |---|---|---|
-| `403 Access denied by security policy` | OpenRouter WAF блокирует IP VPS | проверить прокси, `HTTPS_PROXY` или админку |
-| `/images 400` | неподдерживаемый параметр/модель | проверить `modelcaps`, у FLUX нет resolution |
-| `chat/completions 404` | image-only модель + fallback | не использовать chat fallback для Seedream/FLUX |
-| content moderation | FLUX/BFL блокирует фото | переключить на другую модель или препроцессить фото |
-| cleanup_error | очистка не удалась | дизайн продолжится с исходника; проверить модель/промт очистки |
-| нет сметы | каталог отключён/пуст | проверить `use_catalog`, товары, curated |
-| нет approved refs | стиль без approved | админка → стили → approve |
+| `403 Access denied by security policy` | OpenRouter WAF блокирует IP VPS | проверить прокси (`HTTPS_PROXY`/админка) |
+| `/images 400` | неподдерживаемый параметр/модель | проверить `modelcaps`; FLUX 2 Pro без resolution |
+| content moderation | BFL блокирует фото | другая модель/препроцессинг |
+| рендер висит `processing` | воркер/сеть зависли | ждать reaper (60 мин) или `requeueProcessing` после lease |
+| два воркера обрабатывают одно | старый код без `claimed_by` | проверить миграцию `053`, версию app |
+| нет сметы | design-first/демо-каталог | это ожидаемо для новых рендеров |
+| нет approved refs | режим `text`/стиль без approved | режим `reference` + approve в админке |
 | 402 | нет кредитов | пополнить |
 | 409 | рендер ещё идёт | подождать |
-| сайт не открывается | DNS/прокси клиента | проверить apex/www, сертификат, локальный DNS |
+| `/app` 301 | старый редактор удалён | использовать `/` |
 
 ## Безопасность
 
 - Не логировать ключи/пароли/прокси.
-- `ADMIN_KEY` только в заголовке; не в URL.
+- `ADMIN_KEY` только в заголовке.
 - Owner-check на комнаты/файлы.
-- SSRF-защита в `remoteimage.js`.
+- SSRF-защита в `remoteimage.js`; внешние картинки — только `fetchRemoteImage`.
 - Rate limit на OTP, комнаты, share.
 - Не включать возвраты без state machine.
 
 ## Связанные документы
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
-- [API.md](API.md)
+- [STATUS.md](STATUS.md)
 - [ROADMAP.md](ROADMAP.md)
-- [ops/README.md](ops/README.md) — бэкапы, мониторинг, откат, runbook, G4/G8
-
-## Подбор товаров
-
-Сервис «Найти товары» использует Yandex Search API и allowlist магазинов, а не демо-каталог.
-
-```bash
-PROCUREMENT_ENABLED=1
-PROCUREMENT_REGION=213
-YANDEX_SEARCH_API_KEY=<key>
-YANDEX_FOLDER_ID=<folder-id>
-PROCUREMENT_DOMAINS=divan.ru,askona.ru,stoolgroup.ru,divanboss.ru,sonum.ru,wooden-world.ru,mebelion.ru,mnogosna.ru,leoparquet.ru,poli24.ru,profiplitka.ru,sanok.ru
-PROCUREMENT_MIN_SCORE=80
-PROCUREMENT_ALT_SCORE=60
-PROCUREMENT_MAX_RUN_COST_USD=0.5
-PROCUREMENT_VISION_MODEL=google/gemini-3.1-pro-preview
-```
-
-- Ключ должен иметь scope `yc.search-api.execute`; нужен активный платёжный аккаунт Yandex Cloud.
-- Один запуск стоит 1 кредит. Повторное открытие уже готового списка бесплатно. При ошибке или нуле проверенных товаров кредит возвращается.
-- Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он исключён из allowlist. Discovery идёт по обычной выдаче, карточки проверяются только в магазинах из allowlist.
-- Цены и наличие сохраняются на момент проверки. Это список товаров, не смета: количества и итог появятся отдельным этапом.
-- Если нужно временно выключить: `PROCUREMENT_ENABLED=0` и пересоздать контейнер.
-- `IMAGE_MIN_GAP_MS` (по умолчанию 10000) сериализует вызовы image-модели и снижает риск 429 от OpenRouter. При 429 код делает до 4 попыток с паузами 10/20/40 секунд.
-- Кнопка «Очистить комнату» после загрузки фото вызывает `/api/cleanup` и показывает shell. Если пользователь оставляет «Очищенная», shell загружается в `/api/rooms` как `cleanup_photo`; генерация использует его без повторной очистки. Очистка в админке (`cleanup.config.v1`) на ручную кнопку не влияет.
-- Источник стиля переключается в админке → «Стили»: текст, референс или свотчи. По умолчанию текст; фото-референс в этом режиме не отправляется. Активны только «Скандинавский» и «Джапанди».
-- В админке → «Поиск» настраиваются включение, слои (по умолчанию только мебель/свет/декор и текстиль), регион, домены, пороги score и лимиты. Выключенные слои не создают позиции и не тратят запросы. Настройки хранятся в `app_settings` (`procurement.settings.v1`).
+- [ops/README.md](ops/README.md)

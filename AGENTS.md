@@ -4,23 +4,23 @@
 
 ## Что это за проект
 
-`ремонтвижн` — AI-редизайн интерьера по фото. Пользователь загружает фото, выбирает комнату/стиль/класс материалов, получает визуализацию, затем может запустить платный подбор реальных товаров по рендеру. Есть кабинет, публичный шаринг, админка, импорт товаров, кредиты и платежи.
+`ремонтвижн` — AI-редизайн интерьера по фото: пользователь загружает фото, выбирает тип комнаты и до 8 пар «стиль × концепция», получает визуализацию, затем может делать правки, разбирать интерьер, строить план ремонта и искать реальные товары. Есть кабинет, публичный шаринг, админка, статьи, кредиты и платежи.
 
-Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt). Рабочая память и текущие решения: [docs/MEMORY.md](docs/MEMORY.md).
+- Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt).
+- **Что реально работает:** [docs/STATUS.md](docs/STATUS.md) — источник истины.
+- Рабочая память: [docs/MEMORY.md](docs/MEMORY.md).
 
 ## Главное, что нужно знать до изменений
 
-0. **Спрашивать разрешение перед действием.** Перед эмбеддингом, импортом, удалением/откатом данных, пересборкой, деплоем и любыми долгими/платными операциями — спросить и дождаться явного «да». Не запускать эмбеддинг/импорт и не удалять данные без явной команды.
-1. **Сейчас каталог демонстрационный.** 100 активных товаров, у всех `url = NULL`, реальных заказов нет. Не утверждайте в UI/доках, что товары можно купить, пока не импортированы URL.
-2. **Не хардкодьте модели.** Render/vision/cleanup-модели хранятся в `app_settings` и `.env` (`RENDER_MODEL`, `VISION_MODEL`, cleanup-конфиг) и меняются через админку. Перед выводами проверяйте фактическую конфигурацию; architecture QA по умолчанию выключен (`ARCHITECTURE_QA_ENABLED=0`).
-3. **FLUX.2 Pro не принимает `resolution`.** Отправка resolution даёт 400. `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; FLUX 2 Pro resolution не принимает. У FLUX возможна блокировка content moderation на спальнях/кроватях — проверяйте.
-4. **Промт состоит из двух слоёв:**
-   - код: `src/openrouter.js`, `src/roomtypes.js`;
-   - редактируемые правила: `src/promptconfig.js` + `app_settings.prompt.rules.v1` + админка «Промт».
-   Не дублируйте правила в разных местах: меняйте defaults в `promptconfig.js` и/или через админку.
-5. **Design-first и смета:** базовый рендер получает только исходник + один art ref и текстовые материалы, без product refs. Curated-товары — подборка, не обещание точного совпадения. Товарная правка использует один product ref и обязательное vision QA; при отказе версия отклоняется, кредит возвращается.
-6. **Очередь рендеров:** claim только через lease/`claimed_by` (`FOR UPDATE SKIP LOCKED`); завершение и heartbeat проверяют владельца. `WORKER_CONCURRENCY` (1–8) задаёт число одновременных рендеров, image-вызовы сериализуются глобальным advisory-слотом. Direction кэшируется (`DIRECTION_CACHE_*`), новизна выбирается из вариантов, а не генерацией заново.
-7. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
+0. **Спрашивать разрешение перед действием.** Перед эмбеддингом, импортом, удалением/откатом данных, пересборкой, деплоем и любыми долгими/платными операциями — спросить и дождаться явного «да».
+1. **Каталог демонстрационный.** 100 активных товаров, 0 URL; реальных заказов нет. Не утверждайте в UI/доках, что товар можно купить.
+2. **Не хардкодьте модели.** Render/vision/edit/cleanup/direction — в `app_settings` и `.env`, меняются через админку. Перед выводами проверяйте фактическую конфигурацию (`GET /api/health`, `/api/admin/settings/models`).
+3. **FLUX.2 Pro не принимает `resolution`.** Отправка даёт 400. `supportsResolution()` — Seedream и FLUX 3 Image/Klein. У FLUX возможна content moderation на спальнях.
+4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации; не «чините» их вслепую — см. docs/redesign.
+5. **Design-first.** Базовый кадр получает исходник + один art ref и текстовые материалы, без product refs. Следствие: `render_items` у новых базовых рендеров **пуст**. Товарная правка использует один product ref и обязательный vision QA; при отказе версия отклоняется, кредит возвращается.
+6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (1–8) — параллелизм; image-вызовы сериализуются глобальным advisory-слотом (`src/imageslot.js`).
+7. **Direction кэшируется.** `src/designeragent.js` + `src/generationcache.js`; 3 варианта, TTL 30 дней. Не вызывайте direction дважды при пустом `prompt_en`.
+8. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
 ## Команды
 
@@ -29,27 +29,26 @@
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, unit-тесты, Postgres не нужен
-npm run test:integration                      # интеграционные тесты: отдельная <db>_test, Postgres обязателен
+npm test                                      # unit, Postgres не нужен
+npm run test:integration                      # HTTP/БД, отдельная <db>_test, Postgres нужен
 node --test test/prompt.test.js               # один файл
-node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
 npm start                                     # Node 20.19+, .env через node --env-file
 npm run dev                                   # watch-режим
 
 # Frontend
 cd web
 npm install
-npm run lint                                  # ESLint 9, flat config
+npm run lint
 npm run build                                 # tsc -b + vite build → web/dist
-npx tsc -b                                    # только проверка типов (без сборки)
-npm run dev                                   # Vite dev-сервер
+npm run dev                                   # Vite
 
-# Локальная БД и документация
+# БД и документация
 docker compose up -d db                       # Postgres 127.0.0.1:5434
-npm run docs:llms                             # пересобрать llms-full.txt после правок docs
+npm run docs:llms                             # пересобрать llms-full.txt
+cd catalog-service && pytest -q               # catalog-service (нужен pytest)
 ```
 
-Проверка синтаксиса backend-файлов:
+Проверка синтаксиса backend:
 
 ```bash
 node --check src/server.js
@@ -57,106 +56,100 @@ node --check src/jobs.js
 node --check src/openrouter.js
 ```
 
-## Деплой
+## CI и деплой
 
-- Пуш в `main` → GitHub Actions `.github/workflows/deploy.yml` → SSH на VPS → `git pull` + `docker compose up -d --build` + smoke.
-- Smoke проверяет `/api/health`, наличие `id="root"` на `/`, доступность `/app`.
-- Миграции накатываются при старте контейнера из `migrations/*.sql` (append-only, учёт в `_migrations`).
+- Push/PR → `.github/workflows/ci.yml`: backend unit + integration (Postgres service), web lint/build, catalog pytest.
+- Push в `main` → `deploy.yml`: job `test` → SSH на VPS → `git pull` + `docker compose up -d --build` + smoke.
+- Деплой не стартует без зелёного `test`.
+- Миграции накатываются при старте контейнера (`migrations/*.sql`, append-only, учёт в `_migrations`).
 - `.env` на VPS деплоем не перезаписывается.
-- После изменений обновляйте `docs/HISTORY.md` и relevant docs.
+- После изменений обновляйте `docs/HISTORY.md` и relevant docs; `docs/STATUS.md` — при изменении состояния.
 
 ## Где что менять
 
 | Задача | Файлы |
 |---|---|
 | Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
-| Размеры комнаты, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js`, `web/src/components/GenerationPanel.tsx` |
-| Оценка размеров по фото | `src/openrouter.js`, `src/server.js`, `web/src/components/GenerationPanel.tsx` |
-| Правила комнат, слоты, запреты | `src/roomtypes.js` |
-| Подбор товаров (старый каталог) | `src/curate.js` |
-| Подбор товаров по рендеру | `src/procurement.js`, `src/procurementjobs.js`, `src/procurementtemplates.js`, `src/yandexsearch.js` |
-| Настройки поиска в админке | `web/src/pages/Admin.tsx`, `src/procurementconfig.js` |
-| Источник стиля и свотчи | `src/styleconfig.js`, `src/styleswatch.js`, `migrations/024_style_briefs.sql` |
-| Очистка комнаты кнопкой | `web/src/components/GenerationPanel.tsx`, `POST /api/cleanup`, `rooms.precleaned_shell_path` |
-| Панель подбора | `web/src/components/ProcurementPanel.tsx` |
-| Генерация/очередь | `src/jobs.js`, `src/openrouter.js` |
-| Анализ рендера, RAL, подсказки | `src/analysis.js`, `src/openrouter.js` |
-| API, auth, admin, share | `src/server.js` |
+| Размеры, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js` |
+| Правила комнат, слоты | `src/roomtypes.js` |
+| Direction и кэш | `src/designeragent.js`, `src/generationcache.js`, `src/directionprompt.js` |
+| Очередь, lease, claim | `src/db.js`, `src/jobs.js`, `src/workerknobs.js` |
+| Глобальный image-слот | `src/imageslot.js`, `src/openrouter.js` |
+| Генерация/стадии | `src/jobs.js`, `src/openrouter.js` |
+| Анализ, RAL, подсказки | `src/analysis.js`, `src/architect.js`, `src/openrouter.js` |
+| API, auth, admin, share | `src/server.js`, `src/auth.js`, `src/oauth.js` |
 | SQL/данные | `src/db.js`, `migrations/` |
-| Бэкапы, мониторинг, runbook | `scripts/ops/`, `docs/ops/` |
-| Каталог | `catalog/seed.json`, `public/catalog/`, `src/catalogseed.js` |
-| Импорт товаров | `src/productimport.js`, `src/remoteimage.js` |
-| Стилевые референсы | `scripts/generate-style-references.mjs`, `style-refs/`, `src/stylerefseed.js` |
-| Модели/прокси | `src/modelconfig.js`, `src/modelcaps.js`, `src/proxy.js` |
-| Очистка комнаты | `src/cleanupconfig.js`, `src/jobs.js`, `src/openrouter.js`, админка «Очистка» |
-| UI генератора | `web/src/components/GenerationPanel.tsx` |
-| Кабинет | `web/src/pages/Cabinet.tsx` |
-| Админка | `web/src/pages/Admin.tsx` |
-| Публичный шаринг | `web/src/pages/Share.tsx`, `web/src/components/ShareDialog.tsx` |
+| Подбор товаров (текущий) | `src/visionagent.js`, `src/catalogclient.js`, `catalog-service/` |
+| Legacy procurement (не подключён) | `src/procurement*.js` — не развивать, на удаление |
+| Search Lab | `src/search*.js`, `web/src/components/Search*.tsx` |
+| Статьи | `src/articles.js` |
+| Платежи | `src/payments.js`, `src/robokassa.js` |
+| Каталог | `catalog/seed.json`, `src/productimport.js`, `src/remoteimage.js` |
+| Админка UI | `web/src/pages/Admin.tsx` |
+| Генератор UI | `web/src/components/GenerationPanel.tsx` |
+| Кабинет / шаринг | `web/src/pages/Cabinet.tsx`, `Share.tsx`, `ShareDialog.tsx` |
+| Тестовая инфраструктура | `test/support/` |
 
 ## Стиль кода
 
 ### Backend (ESM, JavaScript)
 
-- ESM (`"type": "module"`), Node 20.6+, без TypeScript. В относительных импортах всегда указывайте `.js`.
-- 2 пробела, одинарные кавычки, точка с запятой в конце инструкций. Не переформатируйте чужие файлы целиком.
-- Порядок импортов: `node:*` → внешние пакеты → локальные `./*.js`. Именованные импорты предпочтительнее `default`.
-- Имена файлов — одним словом в нижнем регистре (`promptconfig.js`, `modelcaps.js`). Функции/переменные — `camelCase`, константы — `UPPER_SNAKE_CASE`, таблицы/колонки SQL — `snake_case`.
-- Все async route-обработчики оборачивайте в `h()`; ошибки бросайте как `Error` и при необходимости ставьте `e.status` (400/402/404/409/429/502/503).
-- Клиенту отдавайте `{ error: 'текст на русском' }`; для 5xx — общее «Внутренняя ошибка», детали только в `log({ event, ... })`.
-- Секреты, токены и URL прокси не логируйте и маскируйте в API (`maskProxy`).
-- SQL — только параметризованный (`$1`, `$2`), значения не интерполируйте. Транзакции — через `withTransaction`.
-- Миграции только добавляйте новыми файлами `NNN_snake_name.sql`; уже применённые не редактируйте.
-- Внешние изображения по URL — только через `fetchRemoteImage` (защита от SSRF и больших файлов).
-- Комментарии — на русском, только про неочевидные причины/ограничения, без пересказа кода.
+- ESM, Node 20.19+, без TypeScript. В относительных импортах — `.js`.
+- 2 пробела, одинарные кавычки, точка с запятой. Не переформатируйте чужие файлы целиком.
+- Порядок импортов: `node:*` → внешние → локальные `./*.js`.
+- Имена файлов — одним словом в нижнем регистре; функции/переменные — `camelCase`, константы — `UPPER_SNAKE_CASE`, SQL — `snake_case`.
+- Async-роуты — в `h()`; ошибки — `Error` с `e.status`; клиенту `{ error: 'русский текст' }`.
+- SQL — только параметризованный (`$1`); транзакции — `withTransaction`.
+- Миграции — только новые файлы; применённые не редактировать.
+- Внешние картинки — только `fetchRemoteImage`.
+- Комментарии — на русском, про неочевидные причины/ограничения.
 
 ### Frontend (TypeScript, React 19)
 
-- Строгий TS: `strict`, `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`. Типы импортируйте через `import type`; `any` не добавляйте без необходимости.
-- 2 пробела, одинарные кавычки, без точки с запятой в коде приложения. Файлы `web/src/components/ui/*` — сгенерированный shadcn/ui: сохраняйте их стиль (двойные кавычки, точки с запятой).
-- Порядок импортов: React → внешние пакеты → `@/...` → относительные пути. Алиас `@/*` указывает на `web/src/*`.
-- Компоненты — function components. Страницы в `web/src/pages/` экспортируются по умолчанию; переиспользуемые компоненты в `web/src/components/` — именованным экспортом (`export function X`).
-- Имена: компоненты/типы — `PascalCase`, функции/переменные — `camelCase`, хуки — `useSomething`, файлы компонентов — `PascalCase.tsx`.
-- Стили — Tailwind 3 и семантические токены из `index.css` (`bg-background`, `text-foreground`, `border-border`). Для условных классов используйте `cn()` из `@/lib/utils`.
-- **Mobile-first.** Приложение проектируется от мобильного: сначала 390×844, потом планшет и десктоп. Любой новый экран/блок обязан не давать горизонтальный скролл (`documentElement.scrollWidth === clientWidth`); длинный текст — `min-w-0`/`break-words`/`line-clamp`, а не фиксированная ширина. Табы и списки на мобильном — горизонтальный скролл или стек, не выход за экран. Перед сдачей проверяйте мобильный viewport.
-- UI-примитивы берите из `web/src/components/ui/` (Radix/shadcn), иконки — `lucide-react`; не добавляйте новые UI-библиотеки без необходимости.
-- `fetch` оборачивайте в `try/catch`, проверяйте `r.ok`, не считайте ответ JSON без проверки. Пользовательские ошибки — на русском.
+- `strict`, `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`; `any` не добавлять.
+- 2 пробела, одинарные кавычки, без точки с запятой; `ui/*` — сгенерированный shadcn, стиль сохранять.
+- Импорты: React → внешние → `@/...` → относительные.
+- Страницы — default export, компоненты — `export function X`.
+- Tailwind + токены из `index.css`; условные классы — `cn()`.
+- **Mobile-first:** 390×844, без горизонтального скролла; длинный текст — `min-w-0`/`break-words`.
+- UI-примитивы — из `web/src/components/ui/`, иконки — `lucide-react`.
+- `fetch` — в `try/catch`, проверять `r.ok`; ошибки на русском.
 
 ### Тесты
 
-- `node:test` + `node:assert/strict`. Описания тестов — короткие английские фразы.
-- Переменные окружения выставляйте до динамического `await import(...)`; в unit-тестах не импортируйте `db.js` напрямую (он делает `process.exit(1)` без `RV_DATABASE_URL`).
-- Для конфигов используйте тестовые хелперы, если они есть (например, `setPromptConfigForTests`), чтобы не трогать БД.
+- `node:test` + `node:assert/strict`; описания — короткие английские фразы.
+- Env — до динамического `import(...)`; `db.js` напрямую не импортировать в unit-тестах.
+- Для конфигов — тестовые хелперы (`setPromptConfigForTests` и т.п.).
+- Интеграционные тесты — `test/integration/*.test.js`, отдельная `<db>_test`, без S3.
 
 ## Тесты и проверка
 
-- `npm test` — unit-тесты: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
-- `npm run test:integration` — HTTP/БД-инварианты (кредиты, очередь/lease, auth, комнаты, шаринг, платежи, файлы, image-слот); нужен локальный Postgres (`docker compose up -d db`) и `.env`; тесты пишут в отдельную `<db>_test` и не ходят в S3.
-- `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
-- Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
-- При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
+- `npm test` — unit: промт, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, импорт, model caps, подписи Robokassa, procurement templates, типы комнат, direction, workerknobs.
+- `npm run test:integration` — кредиты/refund, очередь/lease/fencing, auth, комнаты, шаринг, платежи, файлы, image-слот, direction-кэш.
+- `cd web && npm run lint && npm run build`.
+- `cd catalog-service && pytest -q`.
+- Живой smoke — на VPS/canary, не на прод-пользователях.
 
-## Известные ограничения (на 2026-10-30)
+## Известные ограничения (2026-11-11)
 
-- Нет реального каталога с URL → нет заказов из старой сметы.
-- Подбор товаров использует Yandex Search API и allowlist магазинов; Яндекс Маркет отдаёт серверу SmartCaptcha, поэтому он не используется как основной магазин.
-- Смета по площади и количествам пока не считается: только список товаров.
-- Покрытие подбора неполное: hero-предметы, свет, ковры, пол и часть текстиля находятся; стены/потолок/плинтус и часть магазинов пока дают fallback-ссылку. Расширять через новые адаптеры и category-page extraction.
-- Очистка комнаты по умолчанию выключена: design pass идёт по исходному фото, чтобы сохранить планировку. Architecture QA по умолчанию выключен (`ARCHITECTURE_QA_ENABLED=0`), включается только через env. Image-вызовы сериализуются, при 429 — до 4 попыток (10/20/40 с).
-- Очистка «пустой каркас → дизайн» работает только при `keep_furniture=false`; биллинг пока 1 кредит за 2 вызова.
-- Нет inpainting для люстр/розеток; позиции могут плавать.
-- Нет автоматического обновления цен/наличия и фидов.
-- Бэкап/restore скрипты есть и проверены (`scripts/ops/`, `docs/ops/`); автоматическое расписание, копия вне VPS и алерты пока не включены.
-- Старый редактор `/app` не переделан в новый стиль.
-- Возвраты выключены (`REFUNDS_ENABLED=false`), чеки — вручную.
+- Нет реального каталога с URL → нет заказов; смета новых рендеров пуста.
+- Legacy procurement (Yandex) не подключён; текущий подбор — MCP/catalog-service (бесплатно, один проход).
+- Style-ref/hero-референсы выключены по умолчанию (`text`).
+- Очистка комнаты выключена по умолчанию.
+- `furnitureOff`/`catalogOn`/`styling` не доходят до промта.
+- Нет inpainting люстр/розеток.
+- Один провайдер (OpenRouter).
+- Бэкап/restore-скрипты есть, но расписание/off-site/алерты не настроены; диск прода 91%.
+- Возвраты выключены, чеки вручную.
+- `/app` — 301; старый редактор — fallback.
 
 ## Definition of done
 
 1. `npm test` зелёный.
-2. `cd web && npm run lint` проходит.
-3. `cd web && npm run build` собирается.
-4. Обновлён `docs/HISTORY.md`.
-5. Обновлены relevant docs и, если менялась архитектура/статус, `llms.txt`/`llms-full.txt`.
-6. Нет секретов в diff.
-7. `npm run docs:llms` при изменении документации.
-8. Деплой прошёл, smoke зелёный.
+2. `npm run test:integration` зелёный.
+3. `cd web && npm run lint && npm run build` проходит.
+4. `catalog-service pytest` зелёный (если менялся сервис).
+5. Обновлён `docs/HISTORY.md`; при изменении состояния — `docs/STATUS.md`.
+6. Обновлены relevant docs; `npm run docs:llms` при изменении документации.
+7. Нет секретов в diff.
+8. Деплой прошёл, smoke зелёный (после явного разрешения).

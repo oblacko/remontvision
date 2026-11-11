@@ -3,7 +3,6 @@
 Базовый URL: `https://www.remontvision.ru`.  
 Auth: cookie `rv_sid` (httpOnly).  
 Admin: заголовок `X-Admin-Key`.
-
 Ошибки — JSON `{ "error": "..." }` с HTTP-статусом.
 
 ## Публичные
@@ -11,44 +10,49 @@ Admin: заголовок `X-Admin-Key`.
 | Метод | Путь | Описание |
 |---|---|---|
 | GET | `/api/health` | статус, `mock`, `payments_enabled`, `refunds_enabled` |
-| GET | `/api/models` | image-модели OpenRouter |
+| GET | `/api/models` | активные render-модели из `render_models` (не каталог OpenRouter) |
 | GET | `/api/legal` | версии и ссылки юридических документов |
 | GET | `/api/styles` | активные стили |
-| GET | `/api/room-types` | активные типы комнат (из админки) |
+| GET | `/api/design` | стили и концепции (хардкод `designdata`) |
+| GET | `/api/room-types` | активные типы комнат |
 | GET | `/api/packs` | пакеты кредитов |
-| GET/POST | `/api/payments/robokassa/result` | ResultURL Robokassa: проверка `Password#2`, ответ `OK{InvId}` |
-| GET/POST | `/api/payments/robokassa/success` | fallback-редирект в кабинет; SuccessURL указывается на `/cabinet/paid` |
-| GET/POST | `/api/payments/robokassa/fail` | fallback-редирект в кабинет; FailURL указывается на `/cabinet/fail` |
 | POST | `/api/auth/request-code` | `{email}` → OTP |
-| POST | `/api/auth/verify` | `{email, code}` → cookie |
+| POST | `/api/auth/verify` | `{email, code, consents}` → cookie |
 | POST | `/api/auth/logout` | выход |
-| GET | `/go/:id?r=renderId` | 302 на товар/поиск, лог клика |
+| GET/POST | `/api/payments/robokassa/result` | ResultURL: проверка подписи, `OK{InvId}` |
+| GET/POST | `/api/payments/robokassa/success` / `fail` | fallback-редиректы |
 | GET | `/s/:token` | SPA публичного шаринга |
 | GET | `/s/:token/image` | публичная картинка дизайна |
-| GET | `/api/share/:token` | данные шаринга: стиль, комната, лайки, комментарии |
+| GET | `/api/share/:token` | стиль, комната, лайки, комментарии |
 | POST | `/api/share/:token/like` | toggle лайк |
 | POST | `/api/share/:token/comments` | `{name?, text}` |
+| GET | `/articles/:slug`, `/sitemap.xml` | статьи и sitemap |
+| GET | `/go/:id?r=renderId` | 302 на товар/поиск, лог клика |
 
 ## Авторизованные
 
 | Метод | Путь | Описание |
 |---|---|---|
-| GET | `/api/me` | email, баланс |
-| GET | `/api/my/rooms` | комнаты пользователя |
-| GET | `/api/my/generations` | все рендеры пользователя |
-| GET | `/api/credits` | баланс/ledger |
+| GET | `/api/me` | email, баланс (или `null`) |
+| GET | `/api/referral` | код, ссылка, приглашённые |
+| GET | `/api/my/rooms`, `/api/my/generations` | комнаты/рендеры |
+| GET | `/api/credits` | баланс и ledger |
 | POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
-| POST | `/api/payments/sync` | синхронизация последнего pending-платежа |
-| POST | `/api/renders/:id/procurement` | запуск подбора товаров, списывает 1 кредит; повторный вызов отдаёт существующий запуск |
-| POST | `/api/cleanup` | очистка комнаты по загруженному фото; возвращает data URL пустой комнаты |
-| POST | `/api/estimate-room` | vision-оценка размеров по фото: `{width_m, length_m, height_m, bed_present, confidence, reasoning}`; требует авторизацию |
-| GET | `/api/procurement/:id` | статус, позиции и найденные товары |
-| GET | `/buy/:candidateId` | лог клика и 302 на карточку товара |
-| POST | `/api/rooms` | multipart: фото, стиль/ref, комната, tier, флаги |
-| GET | `/api/rooms/:id` | комната + последний/выбранный render |
-| POST | `/api/rooms/:id/iterate` | правка: multipart `text`, `target`, `product_id`, `refs`/`ref_meta`, `ref`, `ref_url`, `parent_id` |
-| DELETE | `/api/rooms/:id` | удалить комнату и файлы (owner) |
-| POST | `/api/renders/:id/share` | создать/вернуть share token (owner) |
+| POST | `/api/payments/sync` | синхронизация pending-платежа |
+| POST | `/api/cleanup` | очистка комнаты по фото → data URL |
+| POST | `/api/estimate-room` | vision-оценка размеров (фронтенд сейчас не использует) |
+| POST | `/api/rooms` | multipart: фото, `items` (1–8 пар), тип, tier, флаги |
+| GET | `/api/rooms/:id` | комната + последний done-рендер |
+| GET | `/api/rooms/:id/versions` | все версии |
+| DELETE | `/api/rooms/:id` | удалить комнату (owner) |
+| POST | `/api/rooms/:id/retry` | повтор упавшего базового рендера |
+| POST | `/api/rooms/:id/iterate` | правка: `text`, `target`, `product_id`, `refs`/`ref_meta`, `ref`, `ref_url`, `parent_id`, `move` |
+| POST | `/api/rooms/:id/roadmap/items` | прогресс роадмапа |
+| POST | `/api/renders/:id/final-review` | итоговый разбор |
+| POST | `/api/renders/:id/breakdown` | разбор интерьера |
+| POST | `/api/renders/:id/roadmap` | план ремонта (после покупки) |
+| POST | `/api/renders/:id/product-search` | MCP-подбор товаров (бесплатно) |
+| POST | `/api/renders/:id/share` | создать/вернуть share token |
 
 ### `POST /api/rooms`
 
@@ -56,132 +60,78 @@ Admin: заголовок `X-Admin-Key`.
 
 | Поле | Обяз. | Значение |
 |---|---|---|
-| `photo` | да | JPG/PNG/WebP ≤ 15 МБ |
-| `room_type` | нет | один из активных типов, иначе `Другое` |
-| `style` | нет* | название стиля |
-| `style_ref` | нет* | файл референса |
-| `style_ref_url` | нет* | URL референса |
+| `photo` | да | JPG/PNG/WebP/HEIC ≤ 15 МБ |
+| `items` | да* | JSON-массив до 8 `{style, concept}` |
+| `style` | legacy | один стиль, если нет `items` |
+| `concept` | нет | id концепции |
+| `variants` | legacy | 1–8 копий стиля |
+| `room_type` | нет | активный тип, иначе `Другое` |
 | `price_tier` | нет | `start|comfort|premium|atelier` |
 | `keep_furniture` | нет | `1/0`, default `1` |
-| `use_catalog` | нет | `1/0`, default `1` |
-| `room_width_m`, `room_length_m`, `room_height_m` | нет | реальные размеры комнаты в метрах; либо все три, либо ни одного |
-| `bed_length_m` | нет | только для спальни/детской; по умолчанию 2.0 м. Для остальных комнат игнорируется |
+| `use_catalog` | нет | `1/0`, default `1` (на базовый промт не влияет) |
+| `room_width_m`, `room_length_m`, `room_height_m` | нет | либо все три, либо ни одного |
+| `bed_length_m` | нет | спальня/детская, default 2.0 |
 | `dimension_orientation` | нет | что считается шириной/длиной |
 | `palette`, `accent` | нет | цветовая схема/акцент |
+| `resolution` | нет | разрешение из списка модели |
+| `model` | нет | key активной render-модели |
+| `private` | нет | приватный рендер (после покупки) |
 
-\* Нужен стиль или референс. Если есть только референс — стиль `Референс пользователя`.
+\* Нужен `items` или legacy `style`.
 
 ### `GET /api/rooms/:id`
 
-Возвращает:
-
-```json
-{
-  "id": "...",
-  "style": "...",
-  "room_type": "Спальня",
-  "room_width_m": 3,
-  "room_length_m": 6,
-  "room_height_m": 2.5,
-  "bed_length_m": 2,
-  "dimension_orientation": "ширина — стена с окном",
-  "price_tier": "comfort",
-  "keep_furniture": true,
-  "use_catalog": true,
-  "status": "done",
-  "photo_url": "/files/...",
-  "render": {"id": "...", "image": "/renders/...", "analysis": {...}},
-  "notice": null,
-  "items": [{"id": 1, "name": "...", "category": "sofa", "price": 0, "presentation_status": "curated", "target": "sofa", "can_bind": true, "url": "/go/1?r=...", "direct_url": false, "link_label": "Найти похожие"}],
-  "total": 0
-}
-```
+Возвращает комнату, последний done-рендер, `items`, `total`, `roadmap`, `notice`, `render.design_direction`, `render.layout_plan`, `render.repair_scope` и др. Для нового базового рендера `items` пуст, `total = 0`.
 
 ### `POST /api/rooms/:id/iterate`
 
-- `text` — общий комментарий к правке; обязателен, если не передан ни один референс.
-- `refs` — до 4 файлов JPG/PNG/WebP, по одному на правку.
-- `ref_meta` — JSON-массив `{ "description": "замените шторы", "url": "https://…"? }`; порядок совпадает с файлами `refs`, `url` используется вместо файла.
-- `target` — `light`, `floor`, `wall`, `backsplash`, `tile`, `cabinet`, `countertop`, `faucet`, `sink`, `toilet`, `shower`, `bathtub`, `appliance`, `outlets`, `textile`, `skirting`, `bed`, `sofa`, ….
-- `product_id` — товар-референс.
-- `ref` — один файл (legacy); `ref_url` — один URL (legacy).
+- `text` — инструкция (≤ 500 символов); обязательна, если нет референса.
+- `refs` — до 4 файлов; `ref_meta` — JSON-массив `{description, url?}`.
+- `target` — `light`, `floor`, `wall`, `backsplash`, `tile`, `cabinet`, `countertop`, `faucet`, `sink`, `toilet`, `shower`, `bathtub`, `appliance`, `outlets`, `textile`, `skirting`, `bed`, `sofa`, …
+- `product_id` — товар-референс; проверяется совместимость с `target`.
+- `ref`/`ref_url` — один референс (legacy).
 - `parent_id` — версия для правки (по умолчанию последняя).
+- `move` — JSON `{bbox, dx, dy, label}` для переноса объекта.
 
-Для `product_id` нужны активный товар, его изображение и совместимый `target`. При `keep_furniture=true` замена крупной мебели запрещена. После товарной правки vision сравнивает родителя, результат и карточку. Принятая версия получает `status=done`, а позиция — `presentation_status=verified`. При провале или недоступности QA дочерняя версия получает `status=rejected`, кредит возвращается, родитель остаётся активным, причина приходит в `GET /api/rooms/:id` → `notice`. В mock-режиме QA пропускается и товар остаётся `curated`. Безопасный результат проверки доступен в `render.product_qa`.
+Первые 3 правки бесплатны, 4-я и далее — 1 кредит. Товарная правка проходит vision QA: при отказе `rejected`, родитель активен, кредит возвращается, причина — в `notice`.
 
 ## Админ (`X-Admin-Key`)
 
-### Каталог
-
-| Метод | Путь | Описание |
-|---|---|---|
-| GET | `/api/admin/products` | все товары + clicks |
-| POST | `/api/admin/products/import` | `{url}` → preview |
-| POST | `/api/admin/products` | JSON/multipart, создать товар |
-| PUT | `/api/admin/products/:id` | обновить |
-| DELETE | `/api/admin/products/:id` | удалить |
-
-### Пользователи/кредиты
-
-| Метод | Путь |
+| Группа | Маршруты |
 |---|---|
-| GET | `/api/admin/users` |
-| GET | `/api/admin/users/:id` |
-| POST | `/api/admin/users/:id/credits` `{delta, reason, note}` |
-
-### Пакеты
-
-| Метод | Путь |
-|---|---|
-| GET/POST | `/api/admin/packs` |
-| PUT/DELETE | `/api/admin/packs/:id` |
-
-### Стили и референсы
-
-| Метод | Путь |
-|---|---|
-| GET/POST | `/api/admin/styles` |
-| GET/PUT/DELETE | `/api/admin/styles/:id` |
-| POST | `/api/admin/styles/:id/references` (multipart `images`) |
-| PATCH/DELETE | `/api/admin/styles/:id/references/:refId` |
-| POST/DELETE | `/api/admin/styles/:id/products`, `/:productId` |
-| POST | `/api/admin/styles/:id/products/bulk` `{product_ids, room_type}` |
-| POST | `/api/admin/styles/:id/kit` `{room_type, price_tier}` |
-
-### Настройки
-
-| Метод | Путь | Описание |
-|---|---|---|
-| GET/PUT | `/api/admin/settings/models` | render/vision/resolution/aspect |
-| GET/PUT | `/api/admin/settings/room-types` | типы комнат: prompt, категории, слоты, электрика, активность |
-| POST | `/api/admin/settings/room-types/reset` | вернуть заводской справочник комнат |
-| GET/PUT | `/api/admin/settings/prompt` | правила промта |
-| POST | `/api/admin/settings/prompt/reset` | сброс |
-| GET/PUT | `/api/admin/settings/proxy` | прокси |
-| POST | `/api/admin/settings/proxy/test` | health-check |
-
-### Логи/платежи
-
-| Метод | Путь |
-|---|---|
-| GET | `/api/admin/renders` |
-| GET | `/api/admin/renders/:file` |
-| GET | `/api/admin/payments` |
-| GET | `/api/admin/refunds/quote` |
-| POST | `/api/admin/refunds` |
+| Пользователи | `GET /api/admin/users`, `GET /api/admin/users/:id`, `POST /api/admin/users/:id/credits` |
+| Пакеты | `GET/POST /api/admin/packs`, `PUT/DELETE /api/admin/packs/:id` |
+| Комнаты | `GET/POST /api/admin/rooms`, `PUT/DELETE /api/admin/rooms/:id` |
+| Стили | CRUD `/api/admin/styles`, референсы, товары стиля, kit |
+| Промт | `GET/PUT /api/admin/settings/prompt`, `POST .../prompt/reset` |
+| Архитектор | `GET/POST /api/admin/architect-prompts`, активация, reset |
+| Логи | `GET /api/admin/renders`, `GET /api/admin/renders/:file` |
+| Модели | `GET/PUT /api/admin/settings/models`, `POST .../models/refresh`, `POST .../models/test` |
+| Очистка | `GET/PUT /api/admin/settings/cleanup`, reset |
+| Генерация | `GET/PUT /api/admin/settings/render`, reset |
+| Статьи | `GET/POST /api/admin/articles`, `POST .../generate`, публикация/удаление |
+| Поиск | `GET/PUT /api/admin/settings/procurement`, reset |
+| Search Lab | `GET /api/admin/search/*`, промты, jobs, vision/grid/crops/objects |
+| Прокси | `GET/PUT /api/admin/settings/proxy`, `POST .../proxy/test` |
+| Каталог | `GET /api/admin/products`, импорт по URL/списку, CRUD |
+| Платежи | `GET /api/admin/payments`, `GET /api/admin/refunds/quote`, `POST /api/admin/refunds` |
 
 ## Коды
 
+- `400` — неверные данные/модель/стиль.
 - `401` — нет авторизации.
 - `402` — нет кредитов.
 - `403` — нет админ-доступа.
 - `404` — не найдено.
-- `409` — комната ещё генерируется.
-- `400` — неверные данные/модель.
+- `409` — комната ещё генерируется / повтор недоступен.
+- `413` — файл больше 15 МБ.
+- `429` — rate limit / слишком много кодов.
 - `500` — внутренняя ошибка.
+- `503` — сервис/функция выключены.
 
 ## Связанные документы
 
 - [GENERATION.md](GENERATION.md)
-- [CATALOG.md](CATALOG.md)
+- [PROCUREMENT.md](PROCUREMENT.md)
 - [ADMIN.md](ADMIN.md)
+- [STATUS.md](STATUS.md)

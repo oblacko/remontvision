@@ -1,206 +1,131 @@
 # Генерация
 
-Как фото превращается в дизайн, смету, RAL и правки.
+Как фото превращается в дизайн, правки и разбор. Актуальное состояние — [STATUS.md](STATUS.md).
 
 ## Режимы
 
 | Режим | Что делает | Флаги комнаты |
 |---|---|---|
-| Обычный редизайн | меняет отделку, свет, текстиль; крупная мебель сохраняется/двигается | `keep_furniture=true` |
-| Свободный дизайн | очищает комнату до пустого каркаса, затем обставляет заново | `keep_furniture=false` + очистка включена |
-| С каталогом | подбирает товары, строит смету, ссылки | `use_catalog=true` |
-| Без каталога | свободный дизайн без товаров и сметы | `use_catalog=false` |
+| Обычный редизайн | меняет отделку, свет, текстиль; мебель сохраняется/двигается | `keep_furniture=true` |
+| Свободный дизайн | очищает комнату до пустого каркаса, затем обставляет | `keep_furniture=false` + очистка включена |
+| Мульти-стиль | до 8 пар «стиль × концепция», каждая — отдельный рендер | `items: [{style, concept}]` |
 
-Важно: при выключенной мебели работает **два прохода**: очистка (пустой каркас) → дизайн. Очистка настраивается в админке «Очистка» и по умолчанию включена. Если мебель сохраняем — очистка не применяется, один проход.
+Очистка **выключена по умолчанию** (`cleanupconfig.js`). При `keep_furniture=false` и включённой очистке — два прохода: shell → дизайн.
 
-## Путь первого рендера
+## Путь базового рендера
 
 ```mermaid
 flowchart LR
-  A["Фото + комната + стиль/ref + класс"] --> B["POST /api/rooms"]
-  B --> C["credit + room + render queued"]
-  C --> D["Worker"]
-  D --> E["room types + style + tier"]
-  E --> F["style refs: user > approved hero > cover"]
-  F --> G["curate: room slots × tier × style"]
-  G --> AD["art director: vision → bespoke direction"]
-  AD --> H["prompt: roles, keep/change, light, styling, catalog, dimensions, ART DIRECTION"]
-  H --> C1["cleanup: FLUX 3 Klein → empty shell"] 
+  A["Фото + items + тип + tier"] --> B["POST /api/rooms"]
+  B --> C["N × renders(queued) + кредиты"]
+  C --> W["Worker: claim + lease"]
+  W --> V["repair_scope ∥ art_direction"]
+  V --> D["design_direction (кэш)"]
+  D --> L["layout (пустая комната)"]
+  L --> P["buildPrompt (design-first)"]
+  P --> C1["cleanup (если включён)"]
   C1 --> I["design: FLUX 3 Image"]
-  I --> J["fitAspect + storage"]
-  J --> K["Gemini vision"]
-  K --> L["items + surfaces + RAL + electrical + suggestions"]
-  L --> M["render_items + analysis + done"]
+  I --> S["fitAspect + storage"]
+  S --> R["architect review (vision)"]
+  R --> ANA["analysis: surfaces/RAL/electrical/suggestions"]
+  ANA --> DONE["render done"]
 ```
 
 ### 1. Ввод
 
-`POST /api/rooms` (multipart):
+`POST /api/rooms` (multipart): фото, `items` (1–8 `{style, concept}`), тип комнаты, tier, флаги, размеры, разрешение, модель. Валидация: нет фото → 400, нет стиля/items → 400, размеры 1–30 м, высота 2–10 м, кровать 1–4 м.
 
-- `photo` — фото комнаты;
-- `room_type` — один из активных типов комнат (по умолчанию 12);
-- `style` — название стиля или пусто, если есть референс;
-- `style_ref` / `style_ref_url` — пользовательский референс;
-- `price_tier` — `start|comfort|premium|atelier`;
-- `keep_furniture` — `1/0`;
-- `use_catalog` — `1/0`;
-- `palette`, `accent`;
-- `room_width_m`, `room_length_m`, `room_height_m` — необязательные реальные размеры комнаты; заполняются только все три вместе;
-- `bed_length_m` — только для спальни/детской; если не передан, подставляется 2.0 м. Для остальных комнат игнорируется;
-- `dimension_orientation` — что считается шириной/длиной, например «ширина — стена с окном».
+### 2. Очередь и аренда
 
-Если нет стиля и нет референса — API возвращает 400. Если стиль не выбран, но референс есть — стиль становится `Референс пользователя`. Размеры валидируются: комната 1–30 м, высота 2–10 м, кровать 1–4 м.
-
-Перед созданием комнаты пользователь может нажать «Определить по фото»: `POST /api/estimate-room` (multipart `photo`, `room_type`) вызывает `analyzeRoomBrief()` из `src/artdirector.js`. Vision оценивает ширину/длину/высоту по типовым ориентирам (дверь, кровать, шкафы, перспектива), определяет тип комнаты и предлагает 2–3 стиля. Ответ содержит `width_m`, `length_m`, `height_m`, `bed_present`, `confidence`, `reasoning`, `room_type_guess`, `style_suggestions`, `architecture`, `existing_furniture`. Бриф запускается автоматически при загрузке фото (401 не открывает логин) и по кнопке; тип, размеры и первый подходящий стиль подставляются в форму — пользователь только проверяет и правит.
-
-### 2. Очередь и кредит
-
-- Создаётся `rooms` + `renders(status=queued)`.
-- Один кредит списывается атомарно; при ошибке/таймауте возвращается.
-- Worker держит до 2 параллельных рендеров.
+- В одной транзакции создаются `rooms` и N `renders(status=queued)`; кредит списывается за каждый вариант.
+- `claimNextRender` — `FOR UPDATE SKIP LOCKED` + lease 5 минут + `claimed_by`.
+- Heartbeat каждые 30 с; requeue/reaper — только истёкшие lease; processing старше 60 минут → error + refund.
+- `WORKER_CONCURRENCY` (1–8) — сколько рендеров в работе в процессе; image-вызовы сериализуются глобальным слотом.
 
 ### 3. Стиль и референсы
 
-Приоритет:
+Режим стиля (`style.config.v1`): `text` (по умолчанию), `reference`, `swatches`.
 
-1. пользовательский `style_ref_path` — переопределяет админские/обложку;
-2. approved `style_references` для стиля + комнаты (hero, затем board/upload);
-3. статическая обложка стиля.
+- `reference`: approved `style_references` для комнаты; в базовый кадр — **один** art ref.
+- `swatches`: material board из стиля.
+- Пользовательский style-ref и hero-референсы по умолчанию не используются (режим `text`).
+- Product refs в базовый кадр не попадают: только в точечную правку.
 
-В базовый дизайн уходит исходник + максимум **один art reference**, без изображений товаров. Art ref передаёт только свет, атмосферу, палитру, материалы и стайлинг; мебель, планировку и композицию из него копировать запрещено. Product ref появляется позже — в отдельной точечной правке.
+### 4. Vision-этапы
 
-### 4. Curate
+- `repair_scope` — объём ремонта (пол/потолок/стены/двери), параллельно с арт-директором.
+- `art_direction` — размеры, объектив, мебель, палитра.
+- `design_direction` — текст направления стиль×концепт; фото не использует.
+- `layout` — только для пустой комнаты.
 
-`src/curate.js`:
+### 5. Direction и кэш
 
-- тип комнаты задаёт слоты (`src/roomtypes.js`);
-- класс материала (`price_tier`) задаёт уровень;
-- стиль — точный тег 1.0, синоним 0.6;
-- `style_products` (избранные) имеют приоритет;
-- товары с реальным URL используются в style kit; для обычной генерации берутся активные товары;
-- каждому товару присваивается `slot` (bed, floor, wall, light, …).
+- Один вызов агента (`maxSteps: 1`); повтор только при нераспарсенном JSON.
+- Кэш `generation_cache`: 3 варианта на `стиль|концепт|комната|точные размеры|версия промта`, TTL 30 дней.
+- Выбор варианта — детерминированный хэш по `sessionId`; «не повторяй прошлые ходы» применяется при выборе.
+- Пустой `prompt_en` → fallback на art direction и негативный маркер на сутки.
+- Настройки: `DIRECTION_CACHE_ENABLED`, `DIRECTION_CACHE_VARIANTS` (1–3), `DIRECTION_CACHE_TTL_DAYS`.
 
-### 5. Prompt
+### 6. Промт
 
-Собирается в `src/openrouter.js`:
+`src/openrouter.js`:
 
-- карта изображений: 1 — исходник, 2 — необязательный art ref; product refs отсутствуют;
-- `ART DIRECTION — BESPOKE FOR THIS ROOM` — авторское направление, которое арт-директор написал по конкретному фото (палитра, focal point, feature wall, материалы, свет, текстиль, декор). Вставляется сразу после `ARCHITECTURE LOCK` и не может отменять архитектуру/масштаб;
-- `ROOM DIMENSIONS AND SCALE` — реальные ширина/длина/высота, если пользователь их указал;
-- `SCALE PLAN` — вычисленный `src/scaleplan.js` план: размер кровати по ширине комнаты, проходы, кухня по площади, низкие потолки, узкие и длинные комнаты;
-- `BED SIZE` — полная длина кровати с каркасом, если указана;
-- `RADIATOR COVERS` — вентилируемые экраны для видимых радиаторов; не выдумывать их, если радиаторов нет;
-- `KEEP EXACTLY` — архитектура, камера, окна/двери, мебель (если включено);
-- `FURNITURE MODE` — сохранить/убрать;
-- `CHANGE / DEEP TRANSFORMATION`;
-- `COMPOSITION`;
-- `LIGHTING DESIGN` — главный wow-инструмент;
-- `CLEANUP / REALISM` — ТВ, провода, радиатор, старые зеркала/люстры;
-- `WINDOW STYLING` — шторы/жалюзи;
-- `LIFE & STYLING` + `PINTEREST-LEVEL STYLING` — арт, полки, техника, плюш, декор;
-- `CATALOG / MATERIALS` — текстовые материалы, цвета, фактуры и габариты; hero-мебель в этот список не входит;
-- `STYLE`, `MATERIAL CLASS`;
-- `OUTPUT` — фото-язык (24–35 мм, golden hour, film grain, не CGI);
-- `AVOID` — негативный список.
+- карта изображений: исходник + необязательный art ref; product refs нет;
+- `ARCHITECTURE LOCK`, `ART DIRECTION`, `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`;
+- `KEEP EXACTLY`, `FURNITURE MODE`, `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`;
+- `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`;
+- `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
 
-Правила `lighting`, `dimensions`, `scalePlan`, `bed`, `radiators`, `cleanup`, `window`, `pinterest`, `photo`, `furnitureOn/Off`, `catalogOn/Off`, `extra`, `avoid` редактируются в админке («Промт») и хранятся в `app_settings.prompt.rules.v1`. Дефолты — в `src/promptconfig.js`.
+Правила редактируются в админке «Промт» (`app_settings.prompt.rules.v1`), дефолты — `src/promptconfig.js`. Известный баг: `furnitureOff`, `catalogOn`, `styling` не доходят до генерации (см. [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md)).
 
-### 6. Очистка и image generation
+### 7. Очистка и image generation
 
-- Если `keep_furniture=false` и очистка включена: первый вызов — FLUX 3 Image Klein 1K auto с промтом очистки. Он убирает мебель/декор/старые предметы, оставляя архитектуру, окно, размеры и перспективу. Результат — `shell_path`.
-- Второй вызов — дизайн: FLUX 3 Image (модель из app_settings), 1K, aspect auto, source = пустой каркас.
-- Если очистка выключена/упала — дизайн идёт с исходного фото, ошибка в `renders.meta.cleanup.error`.
-- Очистка стоит ещё один вызов, но кредит пока списывается один.
-- Основной провайдер: OpenRouter Image API `/images`.
-- Для FLUX 3 Image/Klein и Seedream отправляются `resolution` и `aspect_ratio`; FLUX 2 Pro resolution не принимает.
-- Для FLUX/Gemini `resolution` не отправляется.
-- FLUX.2 Pro: не принимает `resolution`; возможна блокировка content moderation на спальнях/кроватях.
-- Исходник и референсы идут как `input_references`.
-- Выход прогоняется через `fitAspect` к пропорции исходника.
-- Стоимость (`usage.cost`) пишется в `renders.cost_usd`.
+- При `keep_furniture=false` + включённой очистке: FLUX 3 Klein → `shell_path`, затем дизайн по shell.
+- Основной вызов — FLUX 3 Image (модель/разрешение из админки), 1K/auto по умолчанию.
+- `resolution` не отправляется для моделей, которые его не поддерживают (FLUX 2 Pro).
+- Выход прогоняется через `fitAspect` к пропорции исходника; стоимость (`usage.cost`) — в `renders.cost_usd`.
+- Без `OPENROUTER_API_KEY` — mock-режим: демо-картинка, расходов нет.
 
-### 7. Vision analysis
+### 8. Анализ
 
-`parseRender` (Gemini) возвращает:
+`reviewDesign` (vision) возвращает items, surfaces, hints, electrical. Fallback — `parseRender`. RAL считается только для окрашиваемых поверхностей. Анализ — в `renders.analysis`.
 
-```json
-{
-  "items": [{"category": "floor", "description": "...", "keywords": ["..."]}],
-  "surfaces": [{"surface": "walls", "hex": "#E8DCCB", "description": "..."}],
-  "visible": ["bed", "pendant light", "..."],
-  "electrical": [{"title": "...", "text": "..."}]
-}
-```
+### 9. Смета
 
-- `surfaces` → `nearestRal` только для стен/потолка/фасадов; дерево/плитка не переводятся в RAL.
-- `electrical` — vision + шаблон комнаты.
-- `suggestions` — 4 быстрые правки по слотам и альтернативным товарам.
-- Анализ хранится в `renders.analysis`.
-
-### 8. Смета
-
-- Первый рендер: curated-товары — источник сметы; vision только добавляет недостающие группы.
-- `curated` — подобран к дизайну, точное присутствие не подтверждено; `matched` — похожая позиция по vision; `verified` — конкретный товар прошёл QA после товарной правки.
-- Правка: копируется смета родителя, заменяется только target (товар из подсказки фиксируется).
-- Стены `paint`/`wallpaper` — одна группа.
-- Для товаров с URL ссылка идёт через `/go/:productId?r=renderId`; для демо — поиск.
-- `/go` логирует клик в `product_clicks`.
+**Важно:** для новых базовых рендеров `render_items` пуст (design-first). Смета заполняется у старых рендеров и при правках (копируется у родителя). Подбор товаров — отдельный MCP-путь, см. [PROCUREMENT.md](PROCUREMENT.md).
 
 ## Правки
 
 `POST /api/rooms/:id/iterate`:
 
-- `text` — инструкция;
-- `target` — `light`, `floor`, `wall`, `tile`, `faucet`, …;
-- `product_id` — товар из быстрой подсказки;
-- `ref` — файл;
-- `ref_url` — ссылка;
-- `parent_id` — версия, от которой правим.
-
-Edit-промт короткий:
-
-```text
-Image 1 — current render.
-Image 2 — reference for the new pendant.
-Change only the pendant. Keep everything else exactly as in Image 1.
-```
-
-Это лучше, чем полный стилевой промт: модель не перерисовывает комнату. У product ref используются только внешний вид и габариты товара; фон, студийный свет, ракурс и стейджинг карточки игнорируются. При `keep_furniture=true` нельзя заменять крупную мебель.
-
-Для товарной правки `assessProductEdit` получает родителя, результат и карточку товара. Он проверяет `architecture_preserved`, `product_match`, `no_artifacts`, `quality_not_worse`; принимаются только четыре строгих `true`. При отказе или ошибке QA дочерний render получает `rejected`, родитель остаётся активным, причина записывается в `rooms.notice`, кредит возвращается с reason `product_qa_rejected`. Смета отклонённой версии не публикуется. В mock-режиме QA имеет статус `skipped`, поэтому товар остаётся `curated`, а не `verified`.
+- `text`, `target`, `product_id`, `refs`/`ref_meta`, `ref`/`ref_url`, `parent_id`, `move`.
+- Первые 3 правки бесплатны, 4-я и далее — 1 кредит.
+- Edit-промт короткий: «Image 1 — current render; Image 2 — reference; change only X».
+- Товарная правка: vision QA проверяет архитектуру, соответствие товару, артефакты, качество; все четыре `true` — иначе `rejected` + refund.
 
 ## Ошибки и кредиты
 
 - Ошибка generation/vision → `render.error`, `room.error`, кредит возвращается.
-- Отказ товарного QA → `render.rejected`, `rooms.notice`, прежняя версия сохраняется, кредит возвращается.
-- Таймаут 24 часа → ошибка + возврат кредита.
-- 402 → UI открывает пополнение.
-- 401 → требуется вход.
-- 409 → комната ещё генерируется.
+- Таймаут/зависание → error + refund.
+- 402 → пополнение; 401 → вход; 409 → комната ещё генерируется.
 
-## Логи
+## Логи и метрики
 
-- JSON-логи в stdout: `render_start`, `render_endpoint`, `render_image_ok`, `render_analysis`, `render_matched`, `render_done`, `render_error`.
-- Товарный QA: `product_qa_done`, `product_qa_rejected`, `product_qa_error`; результат и стоимость пишутся в `renders.meta.product_qa` и `renders.cost_usd`.
-- Полный промт хранится в `renders.prompt`, метаданные (pipeline, refs, model, tier, flags) — в `renders.meta`.
-- В админке «Логи» видно промт, модель, стоимость, референсы и отклонённые версии.
+- `render_start`, `repair_scope_ok`, `art_direction_ok`, `design_direction_call`, `design_direction_cache_hit`, `render_image_ok`, `render_done`, `render_error`, `render_lease_lost`.
+- `renders.prompt`, `renders.meta`, `renders.cost_breakdown`.
+- Замеры ёмкости: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 
-## Текущие ограничения
+## Ограничения
 
-- Очистка + дизайн работают только при выключенной мебели; при включённой — один проход.
-- Арт-директор добавляет один vision-вызов на базовый рендер (отключается `ART_DIRECTION_ENABLED=0`); его стоимость входит в `renders.cost_usd`.
-- Каталог/смета по умолчанию выключены (`use_catalog=false`), пока в каталоге нет реальных URL.
-- Нет автоматической генерации и выбора 2–4 дизайн-вариантов; нужны отдельные UI выбора и биллинг.
-- Нет inpainting для люстр/розеток; товарная привязка использует обычную edit-генерацию.
-- Очистка добавляет второй вызов, но биллинг пока 1 кредит.
-- Один основной провайдер.
-- Каталог демонстрационный, 0 URL.
-- Vision может ошибаться в мелких предметах; curated защищает смету от ложного обещания точного совпадения.
+- Смета новых рендеров пуста; старый procurement не подключён.
+- Нет inpainting люстр/розеток.
+- Один провайдер — OpenRouter.
+- Style-ref/hero-референсы выключены по умолчанию.
+- Часть правил админки не применяется (см. выше).
 
 ## Связанные документы
 
-- [GENERATION-FLOW.md](GENERATION-FLOW.md) — полная схема: данные, источники, зависимости и себестоимость
-- [CATALOG.md](CATALOG.md)
-- [PROMPT-RULES.md](PROMPT-RULES.md) — если добавлен отдельный файл; иначе раздел в ADMIN.md
-- [OPS.md](OPERATIONS.md)
-- [HISTORY.md](HISTORY.md)
+- [GENERATION-FLOW.md](GENERATION-FLOW.md)
+- [GENERATION-QUEUE.md](GENERATION-QUEUE.md)
+- [PROMPT-RULES.md](PROMPT-RULES.md)
+- [API.md](API.md)

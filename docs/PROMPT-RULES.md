@@ -2,95 +2,62 @@
 
 Промт = **код** + **редактируемые правила**.
 
-- Код: `src/openrouter.js` (структура, KEEP/CHANGE, product palette, output), `src/roomtypes.js` (комнаты, слоты, стиль).
+- Код: `src/openrouter.js` (структура, KEEP/CHANGE, output), `src/roomtypes.js` (комнаты, слоты), `src/designeragent.js` (direction).
 - Правила: `src/promptconfig.js` (дефолты) + `app_settings.prompt.rules.v1` (админка «Промт»).
 
 ## Поля
 
-| Ключ | Что задаёт |
-|---|---|
-| `lighting` | тёплый многослойный свет, cove, лампы, запрет плоского света |
-| `cleanup` | убрать/спрятать ТВ, провода, радиатор, старые зеркала/люстры, мусор |
-| `window` | шторы, тюль, римские/рулонные, скрытый карниз |
-| `pinterest` | арт, полки, мелочи, техника, плюш, 3–5 сцен |
-| `photo` | 24–35 мм, golden hour, film grain, color grading, не CGI |
-| `furnitureOn` | правило «Оставить мебель» |
-| `furnitureOff` | правило «Мебель не учитывать» — удалить всё и обставить заново |
-| `catalogOn` | как использовать товары и смету |
-| `catalogOff` | свободный дизайн без товаров |
-| `extra` | свободный текст в конец art direction |
-| `avoid` | негативный список |
+| Ключ | Что задаёт | Применяется |
+|---|---|---|
+| `lighting` | тёплый многослойный свет, cove, лампы, запрет плоского света | да |
+| `cleanup` | убрать/спрятать ТВ, провода, радиатор, старые зеркала/люстры | да |
+| `window` | шторы, тюль, римские/рулонные, скрытый карниз | да |
+| `pinterest` | арт, полки, мелочи, техника, плюш, сцены | да |
+| `photo` | 24–35 мм, golden hour, film grain, grading, не CGI | да |
+| `dimensions` | блок размеров комнаты | да |
+| `scalePlan` | план мебели/проходов | да |
+| `bed` | длина кровати (спальня/детская) | да |
+| `radiators` | вентилируемые экраны | да |
+| `furnitureOn` | «оставить мебель» | да |
+| `furnitureOff` | «мебель не учитывать» | **нет — известный баг** |
+| `catalogOn` / `catalogOff` | товары/смета | **нет — известный баг** |
+| `styling` (room) | Pinterest-стайлинг комнаты | **нет — известный баг** |
+| `extra` | свободный текст | да |
+| `avoid` | негативный список | да |
+
+Баг зафиксирован в [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md); до фикса правки `furnitureOff`/`catalogOn`/`styling` не влияют на генерацию.
 
 ## Структура base-промта
 
-1. `IMAGE ROLES` — исходник как единственный источник геометрии + максимум один art ref; product refs в base не передаются.
-2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум и не сборка каталога.
-3. `KEEP EXACTLY` — архитектура/камера/мебель.
-4. `FURNITURE MODE`.
-5. `CHANGE / DEEP TRANSFORMATION`.
-6. `COMPOSITION`.
-7. `LIGHTING DESIGN`.
-8. `CLEANUP / REALISM`.
-9. `WINDOW STYLING`.
-10. `ROOM RULES` — guidance/forbid комнаты.
-11. `LIFE & STYLING` + `PINTEREST-LEVEL STYLING`.
-12. `CATALOG / MATERIALS` — только текстовые ограничения для материалов и фоновых товаров, без hero-мебели.
-13. `STYLE` — style ref/text/palette/accent.
-14. `MATERIAL CLASS`.
-15. `OUTPUT` + `AVOID`.
+1. `IMAGE ROLES` — исходник + максимум один art ref; product refs нет.
+2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум.
+3. `ARCHITECTURE LOCK` — архитектура/камера/пропорции.
+4. `ART DIRECTION` — из direction-агента (или fallback арт-директора).
+5. `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`.
+6. `KEEP EXACTLY`, `FURNITURE MODE`.
+7. `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`.
+8. `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`.
+9. `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
 
-Дополнительно после architecture lock вставляются `ROOM DIMENSIONS AND SCALE` (если переданы размеры комнаты), `SCALE PLAN` (вычисленный план мебели и проходов), `BED SIZE` (только для спальни/детской, длина по умолчанию 2.0 м) и `RADIATOR COVERS` (всегда, с условием «только если радиатор виден»).
+## Direction
 
-## Сохранённые эталонные промты
-
-### Scandinavian 3×6 bedroom
-
-- Файл: [prompts/scandinavian-bedroom-3x6.txt](prompts/scandinavian-bedroom-3x6.txt) — полный эталон.
-- В генерацию подключены его ключевые блоки: размеры комнаты, длина кровати и вентилируемые радиаторные экраны.
-- Поля админки «Промт»: `dimensions` (`{room}`, `{width}`, `{length}`, `{height}`, `{orientation}`), `bed` (`{room}`, `{bed_length}`), `radiators`.
-- В генераторе появились необязательные поля «Ширина / Длина / Высота» и «Ориентация размеров», а также кнопка «Определить по фото». Длина кровати в форме не спрашивается: для спальни/детской подставляется 2.0 м, для остальных комнат блок не добавляется. Радиаторные правила действуют всегда.
-- Референсы 2–N трактуются только как цвета/материалы/текстуры, без копирования мебели, планировки и архитектуры.
-
-### Scandinavian style-driven room
-
-- Файл: [prompts/scandinavian-style-driven.txt](prompts/scandinavian-style-driven.txt) — полный эталон.
-- Его style-блоки (палитра, главная стена, мебель, материалы, свет, текстиль, декор, композиция, avoid) перенесены в `styles.prompt_description` стиля «Скандинавский» миграцией `026_prompt_integration.sql`.
-- `buildPrompt()` вставляет их в `STYLE BRIEF`; архитектура, image roles и material class остаются из текущего пайплайна.
-- Полный файл сохранён для ручных прогонов и сравнения, но в генерации используется структурированный style brief, а не whole-prompt override.
-
-### Interior Prompt Generator 2026
-
-- Файл: [prompts/interior-prompt-generator-2026.md](prompts/interior-prompt-generator-2026.md) — внешний референс на 2321 строку: 7-блочный шаблон, таблицы масштаба, нормы проходов, режимы референсов, 10 стилей × 5 промтов и QA-чеклист.
-- **Внедрено:** детерминированный `src/scaleplan.js` (кровать по ширине комнаты, проходы 60/80 см, кухня по площади, низкие потолки, узкие/длинные комнаты) и поле админки `scalePlan` (`{room}`, `{plan}`). План добавляется в `buildPrompt()` только при наличии размеров.
-- **Внедрено:** 7 новых стилей из референса добавлены неактивными миграцией `027_trend_styles.sql`: Ваби-саби, Органик модерн, Тёплый минимализм, Биофильный, Современная классика, Новый максимализм, Средиземноморский модерн. Включаются в админке «Стили».
-- **Не внедрено:** `must_use/preferred/inspiration` для product refs в base-генерации (у нас design-first, product refs только в edit), автоматический `analyze_room` геометрии по фото и QA-порог `scaleHonesty`/`walkwaysPlausible` — это следующие шаги.
-
-## Правила по умолчанию (смысл)
-
-- Свет важнее мебели: cove/подсветка/лампы, без одной плоской люстры.
-- Убрать визуальный мусор: ТВ, провода, радиатор, старые зеркала/люстры/жалюзи.
-- Окна: новые шторы/жалюзи, без пластиковых старых.
-- Pinterest: арт-группа, полка/консоль, текстиль, техника на поверхностях, плюш только в спальне/детской.
-- Электроника не на полу, провода скрыты.
-- Радиатор — за flush-решёткой или убрать.
-- Светильник соответствует выбранному стилю и художественному референсу, без generic-хрусталя.
-- Фото: editorial, 24–35 мм, natural/golden hour, film grain, не 3D/CGI.
-- Если мебель не учитываем — удалить всё, кроме архитектуры/встроенного/сантехники/электрики, и обставить заново.
-- Если каталог выключен — не добавлять товары/смету.
+- `composeDirectionPrompt` (стиль, концепт, комната, размеры, история пользователя) → JSON `DesignDirection`.
+- `prompt_en` (60–120 слов) идёт в `ART DIRECTION`.
+- Кэш 3 варианта; новизна выбирается из вариантов. См. [GENERATION.md](GENERATION.md#5-direction-и-кэш).
 
 ## Очистка комнаты
 
-Очистка — **отдельный** промт/модель (`cleanup.config.v1`, админка «Очистка»), не часть base-промта. Она применяется только при `keep_furniture=false`. Плейсхолдеры: `{room}`, `{keep}`, `{remove}`. Подробнее: [ADMIN.md](ADMIN.md#очистка).
+Отдельный промт/модель (`cleanup.config.v1`, админка «Очистка»), не часть base. Только при `keep_furniture=false`. Плейсхолдеры `{room}`, `{keep}`, `{remove}`. Выключена по умолчанию.
 
 ## Правки
 
-Edit-промт **не** использует полный base. Он короткий: «Image 1 — current render, Image 2 — reference, change only target, keep everything else». Правила `lighting/cleanup/...` к нему не применяются. У товарной карточки игнорируются фон, студийный свет, ракурс и стейджинг. После товарной правки vision проверяет архитектуру, сходство с товаром, артефакты и качество кадра; при провале версия отклоняется.
+Edit-промт короткий: «Image 1 — current render, Image 2 — reference, change only target». Правила `lighting/cleanup/...` к нему не применяются. У товарной карточки игнорируются фон, свет, ракурс, стейджинг. После правки — vision QA.
 
 ## Как менять
 
-1. Малые изменения — в админке «Промт», сохранить, сделать тестовую генерацию.
-2. Если правило должно стать дефолтом — обновить `DEFAULT_PROMPT_CONFIG` в `src/promptconfig.js`.
-3. Не дублировать один и тот же текст в `openrouter.js` и `promptconfig.js`.
+1. Малые изменения — в админке «Промт», сохранить, тестовая генерация.
+2. Дефолт — обновить `DEFAULT_PROMPT_CONFIG` в `src/promptconfig.js`.
+3. Не дублировать текст в `openrouter.js` и `promptconfig.js`.
 4. После изменения — `npm test`, canary, `docs/HISTORY.md`.
 
 ## Связанные документы

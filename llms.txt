@@ -1,115 +1,77 @@
-# Remontvision (ремонтвижн)
+# ремонтвижн — карта проекта для LLM
 
-> AI-сервис редизайна интерьера по фото: визуализация, подбор материалов и товаров, ориентировочная стоимость, RAL, электрика, точечные правки, кабинет, публичный шаринг и админка.
+> Полный контекст: `llms-full.txt`. Что реально работает: `docs/STATUS.md`. Правила для агентов: `AGENTS.md`.
 
-Repo: https://github.com/oblacko/remontvision (private)  
-Prod: https://www.remontvision.ru  
-Last updated: 2026-11-03
+## Что это
 
-## Start here
+AI-редизайн интерьера по фото: генерация (FLUX 3 Image), vision-разбор (Gemini 3.1 Pro), direction (DeepSeek Flash), до 8 пар «стиль × концепт», правки, разбор/роадмап, шаринг, платежи, админка, статьи, MCP-подбор товаров.
 
-- [README](https://github.com/oblacko/remontvision/blob/main/README.md) — human overview, status, quick start.
-- [AGENTS.md](https://github.com/oblacko/remontvision/blob/main/AGENTS.md) — rules and commands for coding agents.
-- [docs/ARCHITECTURE.md](https://github.com/oblacko/remontvision/blob/main/docs/ARCHITECTURE.md) — components, data model, deploy.
-- [docs/GENERATION.md](https://github.com/oblacko/remontvision/blob/main/docs/GENERATION.md) — generation pipeline and prompt.
-- [docs/GENERATION-FLOW.md](https://github.com/oblacko/remontvision/blob/main/docs/GENERATION-FLOW.md) — full flow diagram: data sources, dependencies and per-request cost.
-- [docs/CATALOG.md](https://github.com/oblacko/remontvision/blob/main/docs/CATALOG.md) — products, styles, import, orders.
-- [docs/CATALOG-SERVICE.md](https://github.com/oblacko/remontvision/blob/main/docs/CATALOG-SERVICE.md) — separate catalog/search service: feeds, DINOv2 embeddings, hybrid search, MCP and vision agent.
-- [docs/PROCUREMENT.md](https://github.com/oblacko/remontvision/blob/main/docs/PROCUREMENT.md) — future product search and low-cost pilot plan.
-- [docs/ADMIN.md](https://github.com/oblacko/remontvision/blob/main/docs/ADMIN.md) — admin tabs.
-- [docs/PROMPT-RULES.md](https://github.com/oblacko/remontvision/blob/main/docs/PROMPT-RULES.md) — editable prompt rules.
-- [docs/API.md](https://github.com/oblacko/remontvision/blob/main/docs/API.md) — API reference.
-- [docs/OPERATIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/OPERATIONS.md) — prod, deploy, TLS, proxy, backups.
-- [docs/ops/README.md](https://github.com/oblacko/remontvision/blob/main/docs/ops/README.md) — backups/restore, monitoring, rollback, incident runbook, G4/G8.
-- [docs/ROADMAP.md](https://github.com/oblacko/remontvision/blob/main/docs/ROADMAP.md) — launch plan.
-- [docs/DECISIONS.md](https://github.com/oblacko/remontvision/blob/main/docs/DECISIONS.md) — key decisions.
-- [docs/HISTORY.md](https://github.com/oblacko/remontvision/blob/main/docs/HISTORY.md) — chronological changelog.
-- [llms-full.txt](https://github.com/oblacko/remontvision/blob/main/llms-full.txt) — full docs in one file.
+Прод: https://www.remontvision.ru. Репозиторий private.
 
-## Current state (2026-10-30)
+## Стек
 
-- Generation: FLUX 3 Image 1K (`app_settings`/`.env`; code default `black-forest-labs/flux-3-image`), aspect auto; cleanup FLUX 3 Image Klein; vision Gemini 3 Flash + art director.
-- Room cleanup: FLUX 3 Image Klein, 1K, auto; enabled by default, applied only when `keep_furniture=false`.
-- 15 styles in DB, 8 active (scandi, japandi, wabi-sabi, organic, warm-minimal, biophilic, heritage, mediterranean); minimal/neo removed by migration 030, modern kept because old rooms use it. 12 default room types, 100 active demo products, **0 products with real URL**.
-- Production deployed from `main` via GitHub Actions; migrations `001`–`030` (new migrations apply on deploy).
-- 120 style references, 26 approved (pilot 5 styles × 6 rooms).
-- Prompt rules editable in admin (`app_settings.prompt.rules.v1`), including room dimensions, bed length and ventilated radiator-cover rules.
-- Art director (`src/artdirector.js`): a vision pass reads the real photo and writes a bespoke `ART DIRECTION` block (palette, focal point, feature wall, materials, lighting, textiles, decor); injected after `ARCHITECTURE LOCK`. Disable with `ART_DIRECTION_ENABLED=0`; cost is included in `renders.cost_usd`.
-- Full generation cost: `renders.cost_usd` is the sum of all requests; `renders.meta.cost_breakdown` stores art_direction, cleanup, design, design_retry, architecture_qa, product_qa, render_analysis and failed. Cabinet shows the total + breakdown and a fullscreen render viewer.
-- Room dimensions: user can enter width/length/height manually or use `POST /api/estimate-room`, which now also detects room type and suggests 2-3 styles. The brief runs automatically on photo upload (silent on 401) and prefills the form; the user confirms. Bed length is only for bedroom/children rooms and defaults to 2.0 m.
-- Room types editable in admin (`app_settings.roomtypes.config.v1`): prompt, categories, slots, keep/change, electrical, styling, active/sort; `/api/room-types` returns only active types.
-- Saved reference prompts are now wired in: `docs/prompts/scandinavian-bedroom-3x6.txt` blocks live in `promptconfig` (`dimensions`, `scalePlan`, `bed`, `radiators`) and room dimension fields; `docs/prompts/scandinavian-style-driven.txt` style blocks live in the Scandinavian `styles.prompt_description` (migration 026).
-- New reference `docs/prompts/interior-prompt-generator-2026.md`: deterministic scale planner in `src/scaleplan.js` (bed width, 60/80 cm walkways, kitchen by area, low ceilings, narrow/long rooms) and 7 trend styles added in migration 027; migration 028 activates a curated set of 8 (Wabi-Sabi, Organic Modern, Warm Minimalism, Biophilic, Modern Heritage, Mediterranean Modern + Scandi, Japandi).
-- Catalog import by URL and bulk list; drafts only, manual activation.
-- Order links use `/go/:productId?r=renderId`; demo products fall back to search.
-- Share page `/s/:token` with likes/comments.
-- Payments on (Robokassa default, YooKassa fallback), refunds off. Robokassa sends fiscal `Receipt` (service, tax none) for Roboчеки СМЗ.
-- Billing: packs 10/20/60 credits (399/599/1 499 ₽); 1 design = result + 3 free edits, the 4th and later edits cost 1 credit; each render model has its own credit price (admin). Product procurement is a separate 1-credit action.
-- Product procurement on: 1 credit per render, Yandex Search API + store allowlist, product list only (no estimate/quantities).
-- Catalog service (2026-11-03): separate `catalog-service/` (Python/FastAPI + Postgres/pgvector) imports CPA YML feeds, vectorizes images with **DINOv2 ViT-B/14 (768d)**, and serves hybrid `/search` + `/search-text`. Hoff 793: 36 092 offers, 0 without category; **36 074/36 092 embeddings** (16 images 404, 2 without picture). Remontvision uses it as an extra hybrid source in Search Lab (`search.v1.catalog_enabled`, `src/catalogclient.js`); results carry `affiliate_url`/`erid` (migration `034`). Not deployed/enabled by default. MCP server (`mcp_server.py`, 5 tools) and DeepSeek vision agent (`scripts/vision_agent.py`, tool-calling) are in the image. Full description: `docs/CATALOG-SERVICE.md`.
-- Main launch blocker: no real product URLs → no real orders.
+- Backend: Node 20.19+, Express, pg, multer, sharp, ESM.
+- Frontend: React 19, Vite, TypeScript, Tailwind.
+- БД: PostgreSQL 16.
+- Очередь: Postgres + воркер (`jobs.js`), lease/`claimed_by`, `FOR UPDATE SKIP LOCKED`.
+- Файлы: диск или S3.
+- AI: OpenRouter (FLUX 3 Image/Klein, Gemini, DeepSeek).
+- Почта: Resend/SMTP; платежи: Robokassa/ЮKassa.
+- Инфра: Docker Compose, Nginx, GitHub Actions (CI + deploy).
 
-## Architecture (short)
+## Главные факты
 
-- Node 20 + Express + PostgreSQL 16 + worker in `src/jobs.js`.
-- React/Vite frontend in `web/`.
-- Nginx + Let's Encrypt; apex → 301 → www.
-- OpenRouter for image + vision; optional proxy for WAF.
-- Storage: disk or S3.
-- Deploy: push `main` → GitHub Actions → VPS Docker Compose + smoke.
+- Базовый рендер — design-first: исходник + один art ref, без product refs; `render_items` у новых рендеров пуст.
+- Мульти-стиль: `items: [{style, concept}]` (1–8), каждый — отдельный рендер и кредит.
+- Кредиты: 10/20/60 (399/599/1499 ₽); первые 3 правки бесплатны, 4-я+ — 1 кредит.
+- Очистка выключена по умолчанию; style-ref/hero-референсы — режим `text` по умолчанию.
+- Direction кэшируется: 3 варианта, TTL 30 дней (`generation_cache`).
+- Очередь: lease 5 мин, heartbeat 30 с, reaper queued 24 ч / processing 60 мин, `WORKER_CONCURRENCY` 1–8.
+- Image-вызовы сериализуются глобальным advisory-слотом.
+- Каталог демо: 100 товаров, 0 URL; заказов нет. Legacy Yandex procurement не подключён; текущий подбор — MCP/catalog-service (бесплатно).
+- Известный баг: `furnitureOff`, `catalogOn`, `styling` не доходят до промта.
+- Тесты: unit + integration (45) + catalog pytest (72); CI-гейт перед деплоем.
+- Миграции: `001–053`, файла `048` нет.
 
-## Generation flow (short)
+## Ключевые файлы
 
-1. `POST /api/rooms` with photo, room type, style or reference, tier, flags.
-2. Credit + `render(status=queued)`.
-3. Worker: room/style/tier → one art ref → curate products → text-only material constraints → cleanup when furniture off → design without product refs → vision → estimate.
-4. `render_items` have `curated|matched|verified` statuses; unverified products are not claimed as exact matches.
-5. Product edit: parent + one target/product ref → mandatory vision QA → `done|rejected`; rejection restores the credit and keeps the parent active.
-6. Share/links: `/s/:token`, `/go/:id`.
-
-## Key files
-
-- `src/server.js` — HTTP API/auth/admin/share/payments.
-- `src/auth.js`, `src/oauth.js` — вход по e-mail коду и OAuth (Яндекс): сессии, state, склейка аккаунтов.
-- `src/jobs.js` — worker.
-- `src/openrouter.js` — provider, prompt, vision, matching.
-- `src/promptconfig.js` — prompt defaults/config.
-- `src/roomtypes.js` — room types, slots/keep/change/styling, admin config load/save.
-- `src/curate.js` — product selection + refs.
-- `src/productimport.js` — URL import.
-- `src/modelcaps.js` — model capabilities.
-- `src/payments.js`, `src/robokassa.js` — credits, Robokassa/YooKassa, refunds.
-- `src/procurement.js`, `src/yandexsearch.js`, `src/procurementtemplates.js` — product search by render.
-- `src/db.js` + `migrations/` — data.
-- `web/src/components/GenerationPanel.tsx` — generator UI.
-- `web/src/pages/Admin.tsx`, `Cabinet.tsx`, `Share.tsx`.
-
-## Commands
-
-```bash
-npm install
-npm test                 # 53 tests
-npm start                # Node >=20.6, --env-file
-cd web && npm run build  # tsc + vite
-docker compose up -d db  # local Postgres 127.0.0.1:5434
+```text
+src/server.js          HTTP API, auth, admin, share
+src/jobs.js            воркер, claim/lease, processRender
+src/openrouter.js      image/vision, buildPrompt, image-слот
+src/db.js              pg pool, migrations, SQL
+src/designeragent.js   direction + кэш вариантов
+src/generationcache.js кэш AI-шагов (TTL)
+src/imageslot.js       глобальный advisory-слот
+src/workerknobs.js     WORKER_CONCURRENCY
+src/payments.js        кредиты, платежи, refund
+src/visionagent.js     MCP-подбор товаров
+web/src/               React SPA
+catalog-service/       FastAPI + pgvector + MCP
+migrations/            SQL
+test/                  unit + integration
+docs/                  документация
 ```
 
-## Constraints / gotchas
+## Команды
 
-- `.env` secrets are not committed.
-- DB env is `RV_DATABASE_URL`, not `DATABASE_URL`.
-- FLUX.2 Pro does not accept `resolution`; may be blocked by content moderation.
-- Seedream/FLUX are image-only: do not use chat fallback.
-- Demo catalog has no real URLs; do not claim real checkout works.
-- Design-first product binding exists; no automatic 2–4 design variants or inpainting yet.
-- Backup/restore scripts exist and are verified (`scripts/ops/`, `docs/ops/`); schedule, off-site copy and alerts are not enabled yet.
-- No automated metrics/alerting yet.
-- `db.js` exits without `RV_DATABASE_URL`; avoid importing it in unit tests.
+```bash
+npm test
+npm run test:integration
+cd web && npm run lint && npm run build
+cd catalog-service && pytest -q
+npm start
+npm run docs:llms
+```
 
-## Next priorities
+## Документация
 
-1. Import 20–50 real products with URLs for one style/room.
-2. Build a style kit from real products, re-generate hero refs.
-3. Validate `/go` and real order links.
-4. Add automatic design variants with explicit selection and billing, plus inpainting.
-5. Add feeds/CPA, price/availability sync, backups/monitoring.
+- `docs/STATUS.md` — что сделано/работает/нет.
+- `AGENTS.md` — правила и команды.
+- `docs/ARCHITECTURE.md` — компоненты, потоки, данные, деплой.
+- `docs/GENERATION.md`, `GENERATION-FLOW.md`, `GENERATION-QUEUE.md` — генерация, очередь, ёмкость.
+- `docs/API.md` — HTTP API.
+- `docs/PROCUREMENT.md`, `CATALOG.md`, `CATALOG-SERVICE.md` — товары и каталог.
+- `docs/ADMIN.md`, `PROMPT-RULES.md`, `AI-INTEGRATION.md` — админка, промт, AI.
+- `docs/OPERATIONS.md`, `ROADMAP.md`, `DECISIONS.md`, `MEMORY.md`, `HISTORY.md`.
+- Historical: `AUDIT-2026-10-26.md`, `PLAN-3H.md`, `SEARCH-SERVICE-PLAN.md`, `DESIGN-SESSION.md`.

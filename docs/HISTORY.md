@@ -4,6 +4,14 @@
 
 Дата обновления: 2026-11-11. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
 
+## 2026-11-11 — документация приведена к коду
+
+- **Единый источник истины.** Добавлен `docs/STATUS.md`: что сделано, что работает, что нет, свежие проверки, отложенные пункты.
+- **Переписаны под фактическое состояние:** `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/GENERATION.md`, `docs/GENERATION-FLOW.md`, `docs/PROCUREMENT.md`, `docs/ADMIN.md`, `docs/OPERATIONS.md`, `docs/ROADMAP.md`, `docs/MEMORY.md`, `docs/DECISIONS.md`, `docs/CATALOG.md`, `docs/PROMPT-RULES.md`, `docs/AI-INTEGRATION.md`, `llms.txt`; `llms-full.txt` пересобран.
+- **Зафиксированы реальные ограничения:** пустая смета новых рендеров, legacy procurement не подключён, `/app` — 301, style-ref/hero-референсы и очистка выключены по умолчанию, `furnitureOff`/`catalogOn`/`styling` не доходят до промта, диск 91% и бэкап 45 ч без `db_dump`.
+- **Исторические документы помечены:** `AUDIT-2026-10-26.md`, `PLAN-3H.md`, `SEARCH-SERVICE-PLAN.md`, `DESIGN-SESSION.md`.
+- **Проверки:** `npm run check:copy` — ok (90 файлов); `npm run docs:llms` — 22 файла; unit/integration зелёные.
+
 ## 2026-11-11 — тестовая сетка и инварианты очереди генерации
 
 - **Интеграционные тесты.** `test/support/` (тестовая БД `<db>_test`, фабрика приложения без listen/воркеров, хелперы сессий и комнат), `npm run test:integration` — 37 тестов: кредиты и возвраты, очередь, auth, комнаты, админ-настройки, шаринг, платежи, файлы, глобальный image-слот. `src/server.js`: `initialize()`/`app` экспортируются, `main()` запускается только при прямом `node src/server.js`.

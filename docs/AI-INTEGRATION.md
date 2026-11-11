@@ -1,16 +1,19 @@
 # AI-интеграция
 
-Провайдер генерации и vision изолирован в `src/openrouter.js`. Остальной код общается с ним через экспорты.
-
-Актуальный пайплайн: [GENERATION.md](GENERATION.md). Правила промта: [PROMPT-RULES.md](PROMPT-RULES.md).
+Провайдер генерации/vision изолирован в `src/openrouter.js`; direction — `src/designeragent.js` + `src/openrouteragent.js`. Актуальный пайплайн — [GENERATION.md](GENERATION.md).
 
 ## Текущая конфигурация
 
-- Render: FLUX 3 Image 1K (значение из `app_settings`/`.env`; код-дефолт `black-forest-labs/flux-3-image`).
-- Cleanup: `black-forest-labs/flux-3-image-klein`, 1K, auto (только при `keep_furniture=false`).
-- Vision: `google/gemini-3-flash-preview`; он же пишет авторский art direction по фото (`src/artdirector.js`).
-- Модели хранятся в `app_settings` и меняются в админке «Модели».
-- Прокси — `src/proxy.js`, применяется без рестарта.
+| Роль | Модель (код-дефолт) | Где менять |
+|---|---|---|
+| Render | `black-forest-labs/flux-3-image` | `app_settings.model.render` / `RENDER_MODEL` / админка |
+| Edit | пусто = render | `app_settings.model.edit` / `EDIT_MODEL` |
+| Vision | `google/gemini-3.1-pro-preview` | `app_settings.model.vision` / `VISION_MODEL` |
+| Direction | `deepseek/deepseek-v4.1-flash-1017` | `DIRECTION_MODEL` / `ART_DIRECTOR_MODEL` |
+| Cleanup | `black-forest-labs/flux-3-image-klein` | `cleanup.config.v1` |
+| Layout | DeepSeek Flash | `LAYOUT_MODEL` / `DIRECTION_MODEL` |
+
+Прокси — `src/proxy.js`, применяется без рестарта. `MOCK_MODE` включается отсутствием `OPENROUTER_API_KEY`.
 
 ## Контракт модуля
 
@@ -19,62 +22,67 @@ export const MOCK_MODE;
 export function log(obj);
 export async function assertConfig();
 export async function listImageModels();
-export function buildPrompt({ style, priceTier, products, roomType, imageMap, keepFurniture, useCatalog, ... });
+export function buildPrompt({ style, priceTier, roomType, imageMap, keepFurniture, dimensions, artDirection, repairScope, layoutPlan, ... });
 export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabel, refDimensions });
-export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio });
-export async function generateFromText({ prompt, aspectRatio }); // shells для style refs
+export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio, resolution, model });
 export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect });
-export async function visionJson({ system, user, images, model }); // JSON-ответ vision-модели
-export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture }); // src/artdirector.js
-export async function analyzeRoomBrief({ imageDataUrl, roomType }); // src/artdirector.js
+export async function visionJson({ system, user, images, model });
+export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture });
+export async function analyzeRoomBrief({ imageDataUrl, roomType });
 export async function parseRender(renderB64, mime);
-export function matchCatalog(items, products);
 export function snapAspect(width, height, allowed);
 export const MAX_REFERENCES; // 4
 ```
 
-## Арт-директор
+## Direction и кэш
 
-`src/artdirector.js` — отдельный vision-проход, который смотрит на реальное фото и пишет bespoke-направление под выбранный стиль: палитру, focal point, feature wall, материалы, свет, текстиль, декор и `avoid`. Блок `ART DIRECTION` вставляется в `buildPrompt()` сразу после `ARCHITECTURE LOCK`; он не может отменять блокировку архитектуры и план масштаба.
+- `buildDesignDirection` — один шаг агента (`maxSteps: 1`); повтор только при нераспарсенном JSON.
+- `generation_cache`: 3 варианта на `стиль|концепт|комната|размеры|версия промта`, TTL 30 дней.
+- Выбор — `sessionId` hash; новизна — при выборе из вариантов.
+- Кэш-хит: `cached: true`, `cost: null`; пустой `prompt_en` — негативный маркер на сутки.
+- Настройки: `DIRECTION_CACHE_ENABLED/VARIANTS/TTL_DAYS`.
 
-- `buildArtDirection()` вызывается в `jobs.js` для базового рендера, пока `ART_DIRECTION_ENABLED` не выключен (`0/false`).
-- Стоимость vision-вызова добавляется в `renders.cost_usd`, результат — в `renders.meta.art_direction`.
-- `analyzeRoomBrief()` использует `POST /api/estimate-room`: оценка размеров + тип комнаты + 2–3 рекомендованных стиля; кнопка в генераторе подставляет их в форму.
+## Арт-директор и repair scope
+
+- `buildArtDirection` — vision по фото: размеры, объектив, мебель, палитра, свет.
+- `buildRepairScope` — объём ремонта; запускается параллельно с арт-директором.
+- `buildLayoutPlan` — только пустая комната; `fitLayoutPlan` проверяет проходы.
+- Стоимость каждого вызова — в `renders.cost_breakdown`.
 
 ## Возможности моделей
 
 `src/modelcaps.js`:
 
-- Seedream: `resolution` 1K/2K, aspect.
-- FLUX 3 Image/Klein: `resolution` 768/1K/1.5K/2K/4K, aspect.
-- FLUX: aspect; **resolution не отправляется**; content moderation возможен.
+- Seedream: resolution 1K/2K, aspect.
+- FLUX 3 Image/Klein: 768/1K/1.5K/2K/4K, aspect.
+- FLUX 2 Pro: **resolution не отправляется**; content moderation возможен.
 - Gemini: resolution не отправляется; aspect из безопасного списка.
-- `supportsResolution()` true для Seedream и FLUX 3 Image/Klein; у FLUX 2 Pro resolution нет.
-- Для Seedream/FLUX нет chat-fallback: это image-only модели.
+- Image-only модели (Seedream/FLUX) не используют chat-fallback.
 
 ## Провайдерские грабли
 
-- `/images` 400 → смотреть тело ошибки; не маскировать chat-fallback.
-- FLUX.2 Pro: не поддерживает `resolution`; BFL может блокировать спальни/кровати.
-- Формат выхода может быть JPEG/WebP/PNG — определять по сигнатуре (`detectImageExt`).
-- Стоимость суммировать по `usage.cost`.
-- Референсы дорожают: следить за `refs` и `MAX_REFERENCES`.
-- Прокси: OpenRouter WAF может блокировать IP VPS; `HTTPS_PROXY`/`proxy.url`.
+- `/images` 400 — смотреть тело; не маскировать chat-fallback.
+- FLUX 2 Pro: без resolution; BFL может блокировать спальни/кровати.
+- Формат выхода JPEG/WebP/PNG — определять по сигнатуре (`detectImageExt`).
+- Стоимость — `usage.cost`.
+- `withImageSlot` + глобальный advisory lock: не обходить слот и не повторять упавший вызов.
+- 429: до 4 попыток 10/20/40 с + `Retry-After`.
+- Прокси: OpenRouter WAF может блокировать IP VPS.
 
 ## Добавить провайдера
 
 1. Создать `src/provider-<name>.js` с контрактом выше.
-2. Переключить импорты в `src/server.js` и `src/jobs.js` (или фабрику по env).
+2. Переключить импорты в `server.js`/`jobs.js` (или фабрику по env).
 3. Добавить ключи в env.
-4. Проверить `assertConfig`, `/api/models`, один живой рендер, итерацию, вертикальное фото.
+4. Проверить `assertConfig`, `/api/models`, живой рендер, итерацию, вертикальное фото.
 5. Обновить `modelcaps.js` и docs.
 
 ## Не входит в провайдера
 
-- Эмбеддинг-матчинг товаров (pgvector/CLIP) — отдельный слой.
-- Metric depth/размеры комнаты — отдельный сервис.
-- Inpainting/маски — следующий этап.
-- Двухстадийная генерация — orchestration в `jobs.js`, не провайдер.
+- Эмбеддинг-матчинг товаров (catalog-service).
+- Metric depth/размеры комнаты.
+- Inpainting/маски.
+- Стадийная оркестрация — `jobs.js`.
 
 ## Связанные документы
 
