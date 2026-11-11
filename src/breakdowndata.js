@@ -49,7 +49,18 @@ export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без ma
     "plan": "линейная LED-щель в колонне, подсветка фартука и точечные по потолку",
     "temperature": "2700–3000K, тёплая",
     "why": "нижний свет делает фартук светящейся полосой, а вертикальная щель даёт акцент без люстры"
-  }
+  },
+  "objects": [
+    {
+      "id": "sofa-1",
+      "category": "furniture_major",
+      "label": "диван",
+      "description": "светло-серый, низкий, с тонкими подлокотниками",
+      "bbox": [0.1, 0.45, 0.42, 0.28],
+      "confidence": 0.8,
+      "note": "материал и точные габариты не определить по фото"
+    }
+  ]
 }
 
 Правила контракта:
@@ -61,6 +72,14 @@ export const BREAKDOWN_SCHEMA = `Верни СТРОГО один JSON без ma
 - hex — цвет из изображения, только если очевиден; иначе не указывай. Формат #RRGGBB.
 - icon — только из списка: ${BREAKDOWN_ICON_KEYS.join(', ')}.
 - lighting — как применить свет именно здесь: plan, temperature, why.
+- objects — карта объектов, до 12 значимых позиций: пол, стены, потолок, двери и окна,
+  крупная и встроенная мебель, освещение, сантехника, значимый текстиль и отделка.
+  Не включай бытовые мелочи (пылесос, мелкий декор, посуда) и не теряй двери, окна и пол.
+- category — только: floor, walls, ceiling, door, window, furniture_major, furniture_builtin,
+  lighting, sanitary, textile_finish.
+- bbox — [x, y, w, h] в долях кадра 0..1 от левого верхнего угла; весь предмет, не обрезай.
+- confidence — 0..1; если меньше 0.6, обязательно опиши сомнение в note.
+- В note — что нельзя определить по картинке (материал, точный размер, бренд).
 - Не выдумывай бренды, цены, ссылки и точные материалы.
 - Все тексты — на русском. Только JSON.`;
 
@@ -105,6 +124,30 @@ export function buildBreakdownUser({ roomType, style, priceTier, budget, dimensi
   ].filter(Boolean).join('\n');
 }
 
+const OBJECT_CATEGORIES = new Set(['floor','walls','ceiling','door','window','furniture_major','furniture_builtin','lighting','sanitary','textile_finish']);
+const clamp01 = value => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+};
+const normalizeObject = (raw, index) => {
+  const label = text(raw?.label, 80);
+  const category = text(raw?.category, 40).toLowerCase();
+  if (!label || !OBJECT_CATEGORIES.has(category)) return null;
+  const rawBox = Array.isArray(raw?.bbox) && raw.bbox.length === 4 ? raw.bbox.map(clamp01) : null;
+  const bbox = rawBox && rawBox.every(value => value !== null) && rawBox[2] > 0 && rawBox[3] > 0 ? rawBox : null;
+  const confidence = Number(raw?.confidence);
+  return {
+    id: text(raw?.id, 60) || `${category}-${index + 1}`,
+    category,
+    label,
+    description: text(raw?.description, 240),
+    bbox,
+    area: bbox ? bbox[2] * bbox[3] : 0,
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
+    note: text(raw?.note, 240),
+  };
+};
+
 function normalizeCard(raw) {
   const name = text(raw?.name, 120) || text(raw?.title, 120);
   if (!name) return null;
@@ -133,11 +176,18 @@ export function normalizeBreakdown(parsed = {}) {
     why: text(lightingRaw.why, 300),
   } : null;
 
+  const objects = (Array.isArray(parsed.objects) ? parsed.objects : [])
+    .map(normalizeObject)
+    .filter(Boolean)
+    .sort((a, b) => b.area - a.area)
+    .slice(0, 12);
+
   return {
     version: BREAKDOWN_VERSION,
     title: text(parsed.title, 120) || 'Что подобрать',
     lead: text(parsed.lead, 200),
     cards,
     lighting: lighting && (lighting.plan || lighting.temperature || lighting.why) ? lighting : null,
+    objects,
   };
 }

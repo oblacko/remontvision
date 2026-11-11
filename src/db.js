@@ -186,6 +186,22 @@ export const q = {
   latestRender: roomId =>
     pool.query(`SELECT * FROM renders WHERE room_id = $1 AND status = 'done' ORDER BY created_at DESC LIMIT 1`, [roomId])
       .then(r => r.rows[0] || null),
+  createBatch: ({ id, userId, roomId, tier = null, idempotencyKey = null }) =>
+    pool.query(`INSERT INTO generation_batches (id, user_id, room_id, tier, idempotency_key)
+                VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [id, userId, roomId, tier, idempotencyKey]).then(r => r.rows[0]),
+  batchByIdempotency: (userId, key) =>
+    pool.query(`SELECT * FROM generation_batches WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1`,
+      [userId, key]).then(r => r.rows[0] || null),
+  getBatch: id => pool.query(`SELECT * FROM generation_batches WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  batchRenders: batchId =>
+    pool.query(`SELECT id, room_id, status, error, image_path, parent_render_id, created_at, style, concept, resolution
+                FROM renders WHERE batch_id = $1 ORDER BY created_at ASC`, [batchId]).then(r => r.rows),
+  // Сколько правок уже сделано у корневого дизайна: те же правила, что у биллинга
+  // (src/billing.js, FREE_EDITS=3), поэтому считаем по root_render_id без самого корня.
+  rootEditCount: rootId =>
+    pool.query(`SELECT COUNT(*)::int AS n FROM renders WHERE root_render_id = $1 AND id <> $1`, [rootId])
+      .then(r => r.rows[0]?.n || 0),
   // атомарный claim следующей queued-задачи с арендой: SKIP LOCKED не даёт двум
   // воркерам взять одну строку, lease защищает in-flight работу от чужого requeue.
   claimNextRender: () =>
@@ -310,7 +326,7 @@ export const q = {
     pool.query(`SELECT id, style, budget, price_tier, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
       .then(r => r.rows),
   userGenerations: userId =>
-    pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.error_stage, r.created_at, r.finished_at, r.request_text,
+    pool.query(`SELECT r.id, r.room_id, r.batch_id, r.parent_render_id, r.status, r.error, r.error_stage, r.created_at, r.finished_at, r.request_text,
                        r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms, r.meta,
                        rm.style, rm.budget, rm.price_tier, rm.photo_path, rm.room_type,
                        GREATEST(0,
@@ -321,6 +337,19 @@ export const q = {
                 WHERE rm.user_id = $1 AND r.status <> 'rejected' ORDER BY r.created_at DESC LIMIT 100`, [userId])
       .then(r => r.rows),
 
+  // Минимальные метрики без отдельной аналитики: успех, время, себестоимость.
+  adminMetrics: (days = 30) => pool.query(`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE status = 'done')::int AS done,
+      COUNT(*) FILTER (WHERE status = 'error')::int AS failed,
+      COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
+      AVG(EXTRACT(EPOCH FROM (finished_at - created_at))) FILTER (WHERE status = 'done')::float AS avg_seconds,
+      AVG(cost_usd) FILTER (WHERE status = 'done')::float AS avg_cost_usd,
+      SUM(cost_usd) FILTER (WHERE status = 'done')::float AS total_cost_usd
+    FROM renders
+    WHERE created_at > now() - ($1 || ' days')::interval`, [String(Math.max(1, Math.min(365, Number(days) || 30)))])
+    .then(r => r.rows[0] || null),
   // админка: аккаунты
   adminRenders: (limit = 100) =>
     pool.query(`SELECT r.id, r.room_id, r.status, r.error, r.created_at, r.finished_at,

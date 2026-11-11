@@ -27,6 +27,7 @@
     "multer": "^1.4.5-lts.2",
     "node-fetch": "^3.3.2",
     "nodemailer": "^10.2.1",
+    "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
     "sharp": "^0.33.5",
     "socks-proxy-agent": "^10.1.0",

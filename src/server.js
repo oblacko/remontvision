@@ -40,6 +40,7 @@ import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupCo
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { generateArticle, articlePage } from './articles.js';
 import { normalizeMove } from './moveobject.js';
+import { buildPassport, renderPassportPdf } from './passport.js';
 import { buildSitemapXml, STATIC_ENTRIES } from './sitemap.js';
 import { canBindProduct, canReplaceWithProduct, productTarget } from './productpipeline.js';
 import { logProcurementClick } from './procurement.js';
@@ -304,6 +305,8 @@ function generationDto(g) {
   return {
     id: g.id,
     room_id: g.room_id,
+    batch_id: g.batch_id || null,
+    parent_render_id: g.parent_render_id || null,
     style: g.style,
     room_type: g.room_type,
     budget: g.budget,
@@ -595,6 +598,11 @@ app.all(['/api/payments/robokassa/fail', '/api/payments/robokassa/fail/'], (_req
 });
 
 // ---------- каталог: админ ----------
+app.get('/api/admin/metrics', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(await q.adminMetrics(Number(req.query.days) || 30));
+}));
+
 app.get('/api/admin/products', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   res.json(await q.adminProducts());
@@ -1563,9 +1571,19 @@ app.post('/api/rooms', rateLimit, upload.fields([
   }
   const effectiveBedLengthM = isBedRoom ? (bedLengthM ?? 2) : null;
   const dimensionOrientation = String(req.body.dimension_orientation || '').trim().slice(0, 200) || null;
+  // Повторный клик не должен создавать вторую комнату и списывать кредиты ещё раз.
+  const idempotencyKey = String(req.headers['idempotency-key'] || req.body?.idempotency_key || '').trim().slice(0, 120) || null;
+  if (idempotencyKey) {
+    const existing = await q.batchByIdempotency(req.user.id, idempotencyKey);
+    if (existing) {
+      return res.status(202).json({ id: existing.room_id, batch_id: existing.id, status: 'queued', idempotent: true });
+    }
+  }
   const photoKey = await saveUpload(photo, 'uploads');
   let cleanupKey = cleanupPhoto ? await saveUpload(cleanupPhoto, 'uploads') : null;
   await q.createRoom(id, resolvedVariants[0].style, budget, photoKey, req.user.id, roomType, palette, accent, null, priceTier, keepFurniture, useCatalog, cleanupKey, roomWidthM, roomLengthM, roomHeightM, effectiveBedLengthM, dimensionOrientation, resolvedVariants[0].concept);
+  const batchId = crypto.randomUUID();
+  await q.createBatch({ id: batchId, userId: req.user.id, roomId: id, tier: priceTier, idempotencyKey });
   let enqueued = 0;
   try {
     for (const item of resolvedVariants) {
@@ -1578,6 +1596,7 @@ app.post('/api/rooms', rateLimit, upload.fields([
         modelCredits: perRenderCredits,
         isPrivate,
         resolution,
+        batchId,
         style: item.style,
         concept: item.concept,
         requestText: `Стиль: ${item.style}${conceptName ? ` · концепция: ${conceptName}` : ''}`,
@@ -1597,7 +1616,44 @@ app.post('/api/rooms', rateLimit, upload.fields([
     }
     throw e;
   }
-  res.status(201).json({ id, status: 'queued', concept_key: resolvedVariants[0].concept });
+  res.status(201).json({ id, status: 'queued', concept_key: resolvedVariants[0].concept, batch_id: batchId });
+}));
+
+// Пакет генерации: все варианты одного запуска и их статусы.
+// Нужен кабинету, чтобы показывать «готово 4 из 5» и повторять только неудачные.
+app.get('/api/batches/:id', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const batch = await q.getBatch(String(req.params.id));
+  if (!batch || Number(batch.user_id) !== Number(req.user.id)) return res.status(404).json({ error: 'Пакет не найден' });
+  const renders = await q.batchRenders(batch.id);
+  const done = renders.filter(r => r.status === 'done').length;
+  const failed = renders.filter(r => r.status === 'error').length;
+  const status = renders.length === 0
+    ? 'running'
+    : done === renders.length
+      ? 'done'
+      : failed + done === renders.length
+        ? (done > 0 ? 'partial' : 'failed')
+        : 'running';
+  res.json({
+    id: batch.id,
+    room_id: batch.room_id,
+    tier: batch.tier,
+    status,
+    done,
+    total: renders.length,
+    renders: renders.map(r => ({
+      id: r.id,
+      status: r.status,
+      error: r.error,
+      image: r.image_path ? `/renders/${path.basename(r.image_path)}` : null,
+      style: r.style,
+      concept: r.concept,
+      resolution: r.resolution,
+      is_edit: Boolean(r.parent_render_id),
+      created_at: r.created_at,
+    })),
+  });
 }));
 
 // Повтор упавшего базового рендера. Кредит за упавший рендер уже возвращён
@@ -1638,6 +1694,9 @@ app.get('/api/rooms/:id', h(async (req, res) => {
     q.roadmapItemsForRoom(room.id),
     q.hasPurchased(req.user.id),
   ]);
+  // Счётчик правок нужен UI, чтобы честно показать цену действия «переместить/редактировать».
+  const renderRootId = render ? (render.root_render_id || render.id) : null;
+  const editsUsed = renderRootId ? await q.rootEditCount(renderRootId) : 0;
   res.json({
     id: room.id,
     style: room.style,
@@ -1668,6 +1727,8 @@ app.get('/api/rooms/:id', h(async (req, res) => {
       created_at: render.created_at,
       request_text: render.request_text,
       model: render.model,
+      root_render_id: renderRootId,
+      edits_used: editsUsed,
       edit_target: render.edit_target || null,
       analysis: render.analysis || null,
       art_direction: render.meta?.art_direction ? {
@@ -1925,7 +1986,12 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
     log({ event: 'breakdown_error', render_id: render.id, user_id: req.user.id });
     return res.status(502).json({ error: 'Не удалось собрать разбор интерьера' });
   }
-  const analysis = { ...(render.analysis || {}), breakdown: result.breakdown };
+  // Карта объектов приходит из того же разбора: отдельный vision-вызов не нужен.
+  const breakdownObjects = Array.isArray(result.breakdown.objects) ? result.breakdown.objects : [];
+  const visible = breakdownObjects
+    .filter(object => Array.isArray(object.bbox) && object.bbox.length === 4)
+    .map(object => ({ label: object.label, bbox: object.bbox, area: object.area, confidence: object.confidence }));
+  const analysis = { ...(render.analysis || {}), breakdown: result.breakdown, visible };
   await q.setRenderAnalysis(render.id, analysis);
   const finishedAt = new Date().toISOString();
   const meta = {
@@ -1941,6 +2007,45 @@ app.post('/api/renders/:id/breakdown', h(async (req, res) => {
     cost_usd: result.cost ?? null,
   });
   res.json({ analysis, breakdown: result.breakdown, cost_usd: result.cost ?? null });
+}));
+
+// «Паспорт дизайна»: собирается из разбора, без новых AI-вызовов.
+// Если разбора ещё нет — 409 с подсказкой запустить разбор.
+app.post('/api/renders/:id/passport', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.status !== 'done' || !render.image_path) return res.status(409).json({ error: 'Дизайн ещё не готов' });
+  if (!render.analysis?.breakdown) {
+    return res.status(409).json({ error: 'Сначала запустите разбор интерьера', needs_breakdown: true });
+  }
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  const cached = render.meta?.passport && render.meta.passport.render_id === render.id ? render.meta.passport : null;
+  const passport = cached || buildPassport({ render, room });
+  if (!cached) {
+    await q.setRenderMeta(render.id, { ...(render.meta || {}), passport: { ...passport, at: new Date().toISOString() } });
+  }
+  res.json({ passport, cached: Boolean(cached) });
+}));
+
+app.get('/api/renders/:id/passport.pdf', h(async (req, res) => {
+  if (!requireAuth(req, res)) return;
+  const render = await q.renderOwnedByUser(req.params.id, req.user.id);
+  if (!render) return res.status(404).json({ error: 'Дизайн не найден' });
+  if (render.status !== 'done' || !render.image_path) return res.status(409).json({ error: 'Дизайн ещё не готов' });
+  if (!render.analysis?.breakdown) {
+    return res.status(409).json({ error: 'Сначала запустите разбор интерьера', needs_breakdown: true });
+  }
+  const room = await q.getRoom(render.room_id);
+  if (!room) return res.status(404).json({ error: 'Комната не найдена' });
+  const passport = (render.meta?.passport && render.meta.passport.render_id === render.id)
+    ? render.meta.passport
+    : buildPassport({ render, room });
+  const pdf = await renderPassportPdf(passport);
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="remontvision-passport-${render.id}.pdf"`);
+  res.send(pdf);
 }));
 
 // «Роадмап ремонта»: только платным, с кэшем и сохранением прогресса.

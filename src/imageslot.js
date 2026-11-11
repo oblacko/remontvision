@@ -1,47 +1,33 @@
-// Глобальный слот image-вызовов между процессами через Postgres advisory lock.
-// Если БД не сконфигурирована (unit-тесты без RV_DATABASE_URL), бросаем NO_DB —
-// вызывающая сторона откатывается на локальную сериализацию.
-const IMAGE_SLOT_KEY = 0x52564D31; // 'RVM1'
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+// Семафор image-вызовов: ограничивает число одновременных запросов к провайдеру.
+// Раньше здесь был глобальный Postgres advisory-lock на весь HTTP-запрос: из-за этого
+// варианты одного пакета (5 картинок) выполнялись строго по очереди, хотя провайдер
+// позволяет параллельные запросы. Лимит настраивается в app_settings
+// (render.product_refs.v1.image_concurrency), пауза между стартами — там же.
+import { getImageConcurrency, getImageMinGapMs } from './renderconfig.js';
 
-function slotError(code, message) {
-  const error = new Error(message);
-  error.code = code;
-  return error;
-}
+let active = 0;
+const queue = [];
 
-export { IMAGE_SLOT_KEY };
-
-export async function withGlobalImageSlot(fn, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
-  if (!process.env.RV_DATABASE_URL) throw slotError('NO_DB', 'no database for image slot');
-  const { pool } = await import('./db.js');
-  let client = null;
-  try {
-    client = await pool.connect();
-  } catch (e) {
-    throw slotError('SLOT_UNAVAILABLE', `image slot connect: ${e.message}`);
+export async function withImageSlot(fn) {
+  const limit = Math.max(1, getImageConcurrency());
+  // Ждём, пока освободится слот. Цикл нужен на случай, если между разбудившим
+  // сигналом и продолжением слот успел занять другой вызов.
+  while (active >= limit) {
+    await new Promise(resolve => queue.push(resolve));
   }
-  let acquired = false;
+  active += 1;
   try {
-    // Ограниченное ожидание: pg_advisory_lock без таймаута держал бы воркер вечно.
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const { rows } = await client.query('SELECT pg_try_advisory_lock($1) AS ok', [IMAGE_SLOT_KEY]);
-      if (rows[0]?.ok) { acquired = true; break; }
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-    if (!acquired) throw slotError('SLOT_UNAVAILABLE', 'image slot timeout');
+    const gap = getImageMinGapMs();
+    if (gap > 0) await new Promise(resolve => setTimeout(resolve, gap));
     return await fn();
   } finally {
-    if (client) {
-      // Ошибку fn не глотаем: finally только освобождает слот.
-      let broken = false;
-      if (acquired) {
-        try { await client.query('SELECT pg_advisory_unlock($1)', [IMAGE_SLOT_KEY]); }
-        catch { broken = true; }
-      }
-      // Если unlock не прошёл, соединение нельзя возвращать в пул с удерживаемым локом.
-      client.release(broken);
-    }
+    active -= 1;
+    const next = queue.shift();
+    if (next) next();
   }
+}
+
+// Для тестов: сколько вызовов сейчас в работе.
+export function activeImageCalls() {
+  return active;
 }

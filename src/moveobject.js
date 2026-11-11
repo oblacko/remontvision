@@ -57,6 +57,8 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
   }
 
   let objectPng;
+  let shadowPng = null;
+  let shadowPad = 0;
   if (changed > count * 0.02) {
     // Силуэт объекта = область, которую модель реально изменила при удалении.
     // Это убирает прямоугольный патч стены: вставляем только сам объект.
@@ -70,6 +72,28 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
       rgba[i * 4 + 3] = soft[i];
     }
     objectPng = await sharp(rgba, { raw: { width: sw, height: sh, channels: 4 } }).png().toBuffer();
+    // Мягкая тень по тому же силуэту, сдвинутая вниз: без неё вставка выглядит наклейкой.
+    // Холст с полями: иначе blur обрезается по границе bbox и тень не выходит за объект.
+    const pad = Math.max(4, Math.round(Math.min(sw, sh) * 0.12));
+    const paddedW = sw + pad * 2;
+    const paddedH = sh + pad * 2;
+    const padded = await sharp({
+      create: { width: paddedW, height: paddedH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    }).composite([{ input: objectPng, left: pad, top: pad }]).png().toBuffer();
+    const alphaOnly = await sharp(padded)
+      .ensureAlpha()
+      .extractChannel('alpha')
+      .blur(Math.max(2, Math.min(sw, sh) * 0.08))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    if (alphaOnly.info.width === paddedW && alphaOnly.info.height === paddedH) {
+      const shadow = Buffer.alloc(paddedW * paddedH * 4);
+      for (let i = 0; i < paddedW * paddedH; i += 1) {
+        shadow[i * 4 + 3] = Math.round(alphaOnly.data[i] * 0.35);
+      }
+      shadowPng = await sharp(shadow, { raw: { width: paddedW, height: paddedH, channels: 4 } }).png().toBuffer();
+      shadowPad = pad;
+    }
   } else {
     // Fallback: если разница почти нулевая, используем мягкий кроп.
     const inset = Math.max(1, Math.round(Math.min(sw, sh) * 0.02));
@@ -83,8 +107,18 @@ export async function composeMove(parentBuf, cleanedBuf, rawMove) {
     objectPng = await sharp(parentBuf).extract(region).ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
   }
 
+  const layers = [];
+  if (shadowPng) {
+    // Тень чуть ниже и правее объекта: так вставка «стоит» на поверхности.
+    layers.push({
+      input: shadowPng,
+      left: tx + Math.round(sw * 0.03) - shadowPad,
+      top: ty + Math.round(sh * 0.10) - shadowPad,
+    });
+  }
+  layers.push({ input: objectPng, left: tx, top: ty });
   return sharp(cleanBase)
-    .composite([{ input: objectPng, left: tx, top: ty }])
+    .composite(layers)
     .png()
     .toBuffer();
 }

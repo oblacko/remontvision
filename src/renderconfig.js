@@ -10,9 +10,12 @@ const clampInt = (value, min, max, fallback) => {
 
 // Разумный потолок паузы между image-вызовами: больше двух минут не нужно.
 export const IMAGE_MIN_GAP_MAX_MS = 120_000;
-// Фолбэк на env сохранён: пока app_settings не задаёт image_min_gap_ms,
-// берём IMAGE_MIN_GAP_MS (как раньше в openrouter.js), иначе 10 секунд.
-const ENV_IMAGE_MIN_GAP_MS = clampInt(process.env.IMAGE_MIN_GAP_MS, 0, IMAGE_MIN_GAP_MAX_MS, 10_000);
+// Сколько image-запросов может идти одновременно (варианты одного пакета — параллельно).
+// Пауза по умолчанию 0: раньше она была 10 с и вместе с глобальным локом
+// превращала пять вариантов в последовательную очередь.
+export const IMAGE_CONCURRENCY_MAX = 12;
+const ENV_IMAGE_MIN_GAP_MS = clampInt(process.env.IMAGE_MIN_GAP_MS, 0, IMAGE_MIN_GAP_MAX_MS, 0);
+const ENV_IMAGE_CONCURRENCY = clampInt(process.env.IMAGE_CONCURRENCY, 1, IMAGE_CONCURRENCY_MAX, 4);
 
 export const DEFAULT_RENDER_CONFIG = {
   product_refs_enabled: false,
@@ -21,6 +24,8 @@ export const DEFAULT_RENDER_CONFIG = {
   product_matching_enabled: true,
   // Минимальная пауза между вызовами image-модели (анти-429). 0 — без паузы.
   image_min_gap_ms: ENV_IMAGE_MIN_GAP_MS,
+  // Одновременных image-вызовов. Больше лимита — вызовы ждут в очереди семафора.
+  image_concurrency: ENV_IMAGE_CONCURRENCY,
 };
 
 let cache = { ...DEFAULT_RENDER_CONFIG };
@@ -31,6 +36,7 @@ const validate = (input = {}) => {
   if ('product_matching_enabled' in input) out.product_matching_enabled = Boolean(input.product_matching_enabled);
   if ('max_products' in input) out.max_products = clampInt(input.max_products, 2, 4, DEFAULT_RENDER_CONFIG.max_products);
   if ('image_min_gap_ms' in input) out.image_min_gap_ms = clampInt(input.image_min_gap_ms, 0, IMAGE_MIN_GAP_MAX_MS, DEFAULT_RENDER_CONFIG.image_min_gap_ms);
+  if ('image_concurrency' in input) out.image_concurrency = clampInt(input.image_concurrency, 1, IMAGE_CONCURRENCY_MAX, DEFAULT_RENDER_CONFIG.image_concurrency);
   return out;
 };
 
@@ -42,6 +48,11 @@ export function getRenderConfig() {
 // поэтому не требует БД и безопасно импортируется из openrouter.js (без цикла).
 export function getImageMinGapMs() {
   return clampInt(cache.image_min_gap_ms, 0, IMAGE_MIN_GAP_MAX_MS, DEFAULT_RENDER_CONFIG.image_min_gap_ms);
+}
+
+// Сколько image-вызовов разрешено одновременно, как это видит imageslot.js.
+export function getImageConcurrency() {
+  return clampInt(cache.image_concurrency, 1, IMAGE_CONCURRENCY_MAX, DEFAULT_RENDER_CONFIG.image_concurrency);
 }
 
 export function getRenderDefaults() {

@@ -673,15 +673,41 @@ export async function processRender(renderId, claimedBy = null) {
       log({ event: 'product_qa_done', room_id: room.id, render_id: renderId, product_id: editProduct.id, status: productQa.status, checks: productQa.checks, cost_usd: productQa.cost ?? null });
     }
 
+    // Картинку показываем сразу после QA: разбор «архитектора» не должен
+    // задерживать первый результат. ANALYZE_BEFORE_DONE=1 возвращает старое поведение.
+    const analyzeBeforeDone = /^(1|true|yes|on)$/i.test(String(process.env.ANALYZE_BEFORE_DONE || ''));
+    let completedEarly = false;
+    if (!analyzeBeforeDone) {
+      await q.setRenderAnalysis(renderId, {
+        ...(render.analysis || {}),
+        visible: [],
+        architect: { status: 'pending', render_id: renderId },
+      });
+      const earlyCost = sumCostBreakdown();
+      const earlyDone = await q.setRenderDone(renderKey, earlyCost, model, render.id, claimedBy);
+      if (!earlyDone) {
+        log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'early_done' });
+        return;
+      }
+      completedEarly = true;
+      await q.setRoomStatus('done', room.id);
+      await q.setRenderMeta(renderId, { ...meta, model, cost_usd: earlyCost, cost_breakdown: costBreakdown });
+      log({ event: 'render_done_early', room_id: room.id, render_id: renderId, cost_usd: earlyCost, ms: Date.now() - t0 });
+      if (room.user_id && !render.parent_render_id) notifyOwner(room, render);
+    }
+
     // Один разбор архитектора вместо parseRender + matchCatalog + buildAnalysis + architecture QA.
     stage = 'matching';
-    await q.setRoomStatus('matching', room.id);
+    await q.setRoomStatus(completedEarly ? 'done' : 'matching', room.id);
     let parsed = { items: [], surfaces: [], visible: [], electrical: [] };
     let architectReview = null;
     let visionCost = null;
-    if (!MOCK_MODE) {
+    // Разбор интерьера запускается кнопкой (POST /api/renders/:id/breakdown).
+    const architectOnDemand = !/^(0|false|no|off)$/i.test(String(process.env.ARCHITECT_ON_DEMAND ?? 'true'));
+    if (!MOCK_MODE && !architectOnDemand) {
       const imageDataUrl = `data:${MIME_BY_EXT[ext] || 'image/jpeg'};base64,${bytes.toString('base64')}`;
       try {
+        if (!architectOnDemand) throw new Error('architect on demand');
         const reviewed = await reviewDesign({
           imageDataUrl,
           roomType,
@@ -739,7 +765,8 @@ export async function processRender(renderId, claimedBy = null) {
     if (architectReview) {
       analysis.architect = { ...architectReview, status: 'ready', render_id: renderId };
     } else if (!MOCK_MODE) {
-      analysis.architect = { status: 'failed', render_id: renderId, changes: [], items: [], hints: [] };
+      // on-demand: разбор ещё не запускали, это не ошибка.
+      analysis.architect = { status: architectOnDemand ? 'pending' : 'failed', render_id: renderId, changes: [], items: [], hints: [] };
     }
     await q.setRenderAnalysis(renderId, analysis);
     log({ event: 'render_analyzed', room_id: room.id, render_id: renderId, items: parsed.items.length, architect_hints: architectReview?.hints?.length || 0, suggestions: analysis.suggestions.length });
@@ -755,17 +782,19 @@ export async function processRender(renderId, claimedBy = null) {
       suggestion_targets: analysis.suggestions.map(s => s.target),
     });
 
-    const done = await q.setRenderDone(renderKey, totalCost, model, render.id, claimedBy);
-    if (!done) {
-      log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'done' });
-      return;
-    }
-    await q.setRoomStatus('done', room.id);
-    log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_breakdown: costBreakdown, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
+    if (!completedEarly) {
+      const done = await q.setRenderDone(renderKey, totalCost, model, render.id, claimedBy);
+      if (!done) {
+        log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'done' });
+        return;
+      }
+      await q.setRoomStatus('done', room.id);
+      log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_breakdown: costBreakdown, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
 
-    // Уведомление «Готово» по e-mail: только для базового рендера (не правок),
-    // fire-and-forget, ошибки не влияют на результат рендера.
-    if (room.user_id && !render.parent_render_id) notifyOwner(room, render);
+      // Уведомление «Готово» по e-mail: только для базового рендера (не правок),
+      // fire-and-forget, ошибки не влияют на результат рендера.
+      if (room.user_id && !render.parent_render_id) notifyOwner(room, render);
+    }
   } catch (e) {
     const rawMsg = String(e.message || e).slice(0, 500);
     const msg = friendlyRenderError(rawMsg);
@@ -856,7 +885,7 @@ export function startWorker() {
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}, concurrency: ${MAX_RUNNING}`);
 }
 
-export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, style = null, concept = null, resolution = null }) {
+export async function enqueueRender({ roomId, parentRenderId = null, requestText = null, chargedUserId = null, requestIp = null, editTarget = null, refPath = null, refProductId = null, editRefs = null, modelKey = null, modelCredits = 1, isPrivate = false, editSourcePath = null, editMove = null, style = null, concept = null, resolution = null, batchId = null }) {
   const id = crypto.randomUUID();
   const chargeUser = MOCK_MODE ? null : chargedUserId;
   await enqueueRenderWithCredit({
@@ -878,6 +907,7 @@ export async function enqueueRender({ roomId, parentRenderId = null, requestText
     style,
     concept,
     resolution,
+    batchId,
   });
   return id;
 }

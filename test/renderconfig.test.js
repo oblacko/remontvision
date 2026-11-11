@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { getRenderConfig, getRenderDefaults, getImageMinGapMs, setRenderConfigForTests } = await import('../src/renderconfig.js');
+const { getRenderConfig, getRenderDefaults, getImageMinGapMs, getImageConcurrency, setRenderConfigForTests } = await import('../src/renderconfig.js');
 
 test('product matching is controlled separately from product refs', () => {
   const defaults = getRenderDefaults();
@@ -14,10 +14,21 @@ test('product matching is controlled separately from product refs', () => {
   setRenderConfigForTests({ product_matching_enabled: true });
 });
 
-test('image min gap defaults to 10 seconds', () => {
-  assert.equal(getRenderDefaults().image_min_gap_ms, 10_000);
+test('image min gap defaults to zero: варианты идут параллельно', () => {
+  assert.equal(getRenderDefaults().image_min_gap_ms, 0);
   setRenderConfigForTests({});
-  assert.equal(getImageMinGapMs(), 10_000);
+  assert.equal(getImageMinGapMs(), 0);
+});
+
+test('image concurrency defaults to 4 and clamps 1..12', () => {
+  assert.equal(getRenderDefaults().image_concurrency, 4);
+  assert.equal(getImageConcurrency(), 4);
+  setRenderConfigForTests({ image_concurrency: 0 });
+  assert.equal(getImageConcurrency(), 1);
+  setRenderConfigForTests({ image_concurrency: 99 });
+  assert.equal(getImageConcurrency(), 12);
+  setRenderConfigForTests({ image_concurrency: 5 });
+  assert.equal(getImageConcurrency(), 5);
 });
 
 test('image min gap clamps negative and out-of-range values', () => {
@@ -36,5 +47,5 @@ test('image min gap accepts valid integers and rounds floats', () => {
 
 test('image min gap rejects non-numeric input by falling back to default', () => {
   setRenderConfigForTests({ image_min_gap_ms: 'не число' });
-  assert.equal(getImageMinGapMs(), 10_000);
+  assert.equal(getImageMinGapMs(), 0);
 });

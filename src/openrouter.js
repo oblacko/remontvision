@@ -9,9 +9,8 @@ import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 import { getPromptConfig } from './promptconfig.js';
 import { buildScalePlan } from './scaleplan.js';
 import { layoutPlanToText } from './layoutagent.js';
-import { getImageMinGapMs } from './renderconfig.js';
 import { proxyFetch } from './proxy.js';
-import { withGlobalImageSlot } from './imageslot.js';
+import { withImageSlot as acquireImageSlot } from './imageslot.js';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -28,26 +27,10 @@ export function log(obj) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let imageChain = Promise.resolve();
-let lastImageStart = 0;
-
+// Один вызов = один слот семафора (см. src/imageslot.js). Ошибки не повторяем:
+// повтор здесь удваивал бы платный вызов, повторы живут в retry-цикле ниже.
 export function withImageSlot(fn) {
-  const run = imageChain.then(async () => {
-    const wait = Math.max(0, getImageMinGapMs() - (Date.now() - lastImageStart));
-    if (wait) await sleep(wait);
-    lastImageStart = Date.now();
-    try {
-      return await withGlobalImageSlot(fn);
-    } catch (e) {
-      // Только отсутствие БД откатывает на локальную сериализацию (unit-тесты).
-      // Ошибку самого image-вызова пробрасываем: повтор здесь удваивал бы платный вызов
-      // и обходил глобальный слот. Таймаут слота тоже не повторяем.
-      if (e?.code === 'NO_DB') return fn();
-      throw e;
-    }
-  });
-  imageChain = run.catch(() => {});
-  return run;
+  return acquireImageSlot(fn);
 }
 
 
@@ -72,17 +55,25 @@ async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = TIME
       if (r.ok) return r;
       const body = (await r.text()).slice(0, 300);
       lastErr = new Error(`${url}: ${r.status} ${body}`);
-      if (r.status !== 429 && r.status < 500) break;
-      if (r.status === 429) {
-        const retryAfter = Number(r.headers.get('retry-after') || 0);
-        if (retryAfter > 0) await sleep(Math.min(20_000, retryAfter * 1000));
+      // 402 in-flight budget транзиентен: OpenRouter просит подождать (Retry-After).
+      // 402 по балансу/лимиту ключа повторять бессмысленно.
+      const inFlight402 = r.status === 402 && body.includes('in_flight_budget');
+      const waitBody = inFlight402 ? body : '';
+      if (r.status !== 429 && r.status !== 402 && r.status < 500) break;
+      if (r.status === 402 && !inFlight402) break;
+      const retryAfter = Number(r.headers.get('retry-after') || 0);
+      if (r.status === 429 || inFlight402) {
+        // Джиттер, чтобы параллельные вызовы не били провайдера синхронно.
+        const base = retryAfter > 0 ? Math.min(20_000, retryAfter * 1000) : 1000 * 2 ** attempt;
+        await sleep(base + Math.floor(Math.random() * 750));
+        log({ event: 'llm_retry_wait', status: r.status, url: url.replace(/^https?:\/\/[^/]+/, ''), wait_ms: base, in_flight: Boolean(waitBody) });
       }
     } catch (e) {
       lastErr = e.name === 'AbortError' ? new Error(`${url}: timeout ${timeoutMs}ms`) : e;
     } finally {
       clearTimeout(timer);
     }
-    if (attempt < retries) await sleep(1000 * 2 ** attempt);
+    if (attempt < retries) await sleep(1000 * 2 ** attempt + Math.floor(Math.random() * 500));
     attempt++;
   }
   throw lastErr;
@@ -668,10 +659,30 @@ async function generateWithModel(model, { prompt, sourceImageB64, referenceImage
         }
         if (r.status === 429 && tryNo < 3) {
           const retryAfter = Number(r.headers.get('retry-after') || 0);
-          const wait = Math.max(10, Math.min(60, retryAfter || (10 * 2 ** tryNo)));
+          const wait = Math.max(5, Math.min(60, retryAfter || (5 * 2 ** tryNo)));
           log({ event: 'render_rate_limited', model, endpoint, attempt: tryNo + 1, wait_s: wait });
-          await sleep(wait * 1000);
+          await sleep(wait * 1000 + Math.floor(Math.random() * 1000));
           continue;
+        }
+        // Провайдер перегружен или упал: повтор с паузой и джиттером.
+        if ((r.status === 502 || r.status === 503 || r.status === 504) && tryNo < 2) {
+          const wait = Math.min(30, 3 * 2 ** tryNo);
+          log({ event: 'render_provider_unavailable', model, endpoint, status: r.status, attempt: tryNo + 1, wait_s: wait });
+          await sleep(wait * 1000 + Math.floor(Math.random() * 750));
+          continue;
+        }
+        // 402 in-flight budget: баланс есть, но резерв занят параллельными запросами.
+        // Ждём по Retry-After и продолжаем: это не ошибка конфигурации.
+        if (r.status === 402 && tryNo < 3) {
+          const peek = await r.clone().json().catch(() => ({}));
+          const inFlight = peek?.error?.metadata?.limit_source === 'openrouter_in_flight_budget';
+          if (inFlight) {
+            const retryAfter = Number(r.headers.get('retry-after') || 0);
+            const wait = Math.max(5, Math.min(60, retryAfter || 5 * 2 ** tryNo));
+            log({ event: 'render_in_flight_budget', model, endpoint, attempt: tryNo + 1, wait_s: wait });
+            await sleep(wait * 1000);
+            continue;
+          }
         }
         break;
       }

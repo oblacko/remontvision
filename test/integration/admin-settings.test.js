@@ -19,7 +19,7 @@ test('render settings save and reset', async () => {
   const app = await createTestApp();
   const initial = await api(app.url, '/api/admin/settings/render', { headers: ADMIN });
   assert.equal(initial.status, 200);
-  assert.equal(initial.json.config.image_min_gap_ms, 10000);
+  assert.equal(initial.json.config.image_min_gap_ms, 0);
 
   try {
     const saved = await api(app.url, '/api/admin/settings/render', {
@@ -33,6 +33,6 @@ test('render settings save and reset', async () => {
   } finally {
     const reset = await api(app.url, '/api/admin/settings/render/reset', { method: 'POST', headers: ADMIN });
     assert.equal(reset.status, 200);
-    assert.equal(reset.json.config.image_min_gap_ms, 10000);
+    assert.equal(reset.json.config.image_min_gap_ms, 0);
   }
 });
