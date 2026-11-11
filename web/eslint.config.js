@@ -20,4 +20,17 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Сгенерированные shadcn-компоненты: HMR-правило и purity к ним не применяем.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/purity': 'off',
+    },
+  },
+  {
+    // TaskDock экспортирует контекст и хелперы рядом с провайдером.
+    files: ['src/components/TaskDock.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])

@@ -6,7 +6,7 @@
 
 | Метрика | Источник | Зачем |
 |---|---|---|
-| `direction_ms`, `retried` | JSON-лог `design_direction_call` | задержка direction и доля повторных вызовов |
+| `ms`, `retried` | JSON-лог `design_direction_call` | задержка direction и доля повторных вызовов |
 | cache hit rate | `design_direction_cache_hit` vs `design_direction_call` | эффективность кэша |
 | `renders.duration_ms` | таблица `renders` (status='done') | полное время рендера, p50/p90 |
 | wait time | `started_at - created_at` | сколько задача ждала в очереди |
@@ -53,7 +53,7 @@ docker compose logs --since 24h app | grep -c 'design_direction_call'
 
 ## Ожидаемый эффект
 
-- `direction_ms` p50: было ~34 с (двойной вызов) → ожидается ~15–20 с на промахе и 0 на попадании.
+- `ms` p50: было ~34 с (двойной вызов) → ожидается ~15–20 с на промахе и 0 на попадании.
 - При прогретом кэше большинство рендеров не платят за direction вовсе.
 - `WORKER_CONCURRENCY` увеличивает число рендеров в работе, но не число одновременных image-вызовов (их держит глобальный advisory-слот).
 

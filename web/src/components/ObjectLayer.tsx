@@ -23,6 +23,8 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
   const [popup, setPopup] = useState<Popup | null>(null)
   const [dragImage, setDragImage] = useState<string | null>(null)
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
+  // Размер обёртки, снятый в обработчике события: в рендере ref читать нельзя.
+  const [wrapSize, setWrapSize] = useState<{ width: number; height: number } | null>(null)
 
   const safeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1.5
 
@@ -36,7 +38,10 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     const box = objects[index]?.bbox
     if (box) void cropObjectDataUrl(image, box).then(url => setDragImage(url))
     const rect = wrapRef.current?.getBoundingClientRect()
-    if (rect) setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+    if (rect) {
+      setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+      setWrapSize({ width: rect.width, height: rect.height })
+    }
   }
 
   const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
@@ -47,7 +52,10 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true
     setOffset({ index: drag.index, dx, dy })
     const rect = wrapRef.current?.getBoundingClientRect()
-    if (rect) setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+    if (rect) {
+      setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+      setWrapSize({ width: rect.width, height: rect.height })
+    }
   }
 
   const onPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
@@ -56,6 +64,7 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     setOffset(null)
     setDragImage(null)
     setPointer(null)
+    setWrapSize(null)
     if (!drag) return
     const rect = wrapRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return
@@ -97,7 +106,7 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
             onPointerDown={event => onPointerDown(event, index)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            onPointerCancel={() => { dragRef.current = null; setOffset(null) }}
+            onPointerCancel={() => { dragRef.current = null; setOffset(null); setPointer(null); setWrapSize(null) }}
             className={`absolute cursor-move touch-none border-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary ${selected ? 'border-primary bg-primary/15' : 'border-primary/70 bg-transparent hover:bg-primary/10'}`}
             style={{
               left: `${x * 100}%`,
@@ -113,16 +122,15 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
           </button>
         )
       })}
-      {offset && dragImage && pointer && (() => {
+      {offset && dragImage && pointer && wrapSize && (() => {
         const object = objects[offset.index]
         const box = object?.bbox
-        const rect = wrapRef.current?.getBoundingClientRect()
-        if (!box || !rect) return null
+        if (!box) return null
         const [x = 0, y = 0, w = 0, h = 0] = box
         return (
           <>
             <div className="pointer-events-none absolute z-10 border-2 border-dashed border-primary" style={{ left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`, transform: `translate(${offset.dx}px, ${offset.dy}px)` }} />
-            <img src={dragImage} alt="" className="pointer-events-none absolute z-10 border-2 border-primary object-cover opacity-90 shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ left: pointer.x - (w * rect.width) / 2, top: pointer.y - (h * rect.height) / 2, width: w * rect.width, height: h * rect.height }} />
+            <img src={dragImage} alt="" className="pointer-events-none absolute z-10 border-2 border-primary object-cover opacity-90 shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ left: pointer.x - (w * wrapSize.width) / 2, top: pointer.y - (h * wrapSize.height) / 2, width: w * wrapSize.width, height: h * wrapSize.height }} />
           </>
         )
       })()}

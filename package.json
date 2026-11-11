@@ -14,7 +14,7 @@
     "docs:llms": "node scripts/build-llms-full.mjs"
   },
   "engines": {
-    "node": ">=20.6"
+    "node": ">=20.19"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

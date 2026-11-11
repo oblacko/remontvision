@@ -29,6 +29,7 @@ import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, isIterationRender, resolveRenderStyleConcept } from './variants.js';
 import { workerConcurrency } from './workerknobs.js';
+import { pickArtDirection } from './artdirectionpick.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -78,7 +79,7 @@ async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
   return { refs, user: false };
 }
 
-export async function processRender(renderId) {
+export async function processRender(renderId, claimedBy = null) {
   const t0 = Date.now();
   const render = await q.getRender(renderId);
   if (!render || render.status !== 'processing') return;
@@ -107,7 +108,7 @@ export async function processRender(renderId) {
 
   // Lease: пока рендер жив, воркер продлевает аренду; при падении lease истечёт,
   // и задача вернётся в очередь, не отбираясь у живой реплики.
-  const heartbeat = setInterval(() => { q.heartbeatRender(renderId).catch(() => {}); }, 30_000);
+  const heartbeat = setInterval(() => { q.heartbeatRender(renderId, claimedBy).catch(() => {}); }, 30_000);
   if (heartbeat.unref) heartbeat.unref();
 
   // Себестоимость полной генерации: каждый внешний запрос пишется отдельно.
@@ -348,8 +349,9 @@ export async function processRender(renderId) {
               log({ event: 'design_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
             }
           }
-          if (direction?.text) {
-            artDirection = direction.text;
+          const picked = pickArtDirection({ direction, ad });
+          if (picked.branch === 'direction') {
+            artDirection = picked.text;
             artDirectionCost = (ad.cost || 0) + (direction.cost || 0);
             addCost('art_direction', ad.cost);
             addCost('art_direction', direction.cost);
@@ -369,17 +371,19 @@ export async function processRender(renderId) {
               });
             }
             try { await q.setRoomDesign(room.id, room.concept_key, direction); } catch { /* метаданные не критичны */ }
-          } else if (direction && !direction.text) {
-            // Валидный контракт без prompt_en: второй вызов не делаем, в промт идёт ad.text.
-            addCost('art_direction', direction.cost);
-            log({ event: 'design_direction_incomplete', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, call_ms: direction.ms, retried: direction.retried, cost_usd: direction.cost ?? null });
-          } else if (ad?.text) {
-            artDirection = ad.text;
+          } else if (picked.branch === 'art_director') {
+            artDirection = picked.text;
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
             log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
+            if (direction) {
+              // Валидный контракт без prompt_en: второй вызов не делаем, в промт идёт ad.text.
+              addCost('art_direction', direction.cost);
+              log({ event: 'design_direction_incomplete', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, call_ms: direction.ms, retried: direction.retried, cost_usd: direction.cost ?? null });
+            }
           } else {
+            if (direction) addCost('art_direction', direction.cost);
             log({ event: 'art_direction_empty', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType });
           }
         } catch (e) {
@@ -609,7 +613,11 @@ export async function processRender(renderId) {
           if (archQaEnforce) {
             const qaTotalCost = sumCostBreakdown();
             await q.setRenderMeta(renderId, { ...meta, model, cost_usd: qaTotalCost, cost_breakdown: costBreakdown, architecture_qa: architectureQa });
-            await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id, 'architecture_qa');
+            const rejected = await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id, 'architecture_qa', claimedBy);
+            if (!rejected) {
+              log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'architecture_qa' });
+              return;
+            }
             await q.setRoomNotice(notice, room.id);
             const restored = await restoreCreditForRender(renderId, 'architecture_rejected');
             log({ event: 'architecture_rejected', room_id: room.id, render_id: renderId, checks: architectureQa.checks, issues: architectureQa.issues, cost_usd: qaTotalCost, credit_restored: restored, ms: Date.now() - t0 });
@@ -652,7 +660,11 @@ export async function processRender(renderId) {
           : `Товарная правка не прошла проверку${reason ? `: ${reason}` : '.'} Прежняя версия сохранена, кредит возвращён.`;
         const qaTotalCost = sumCostBreakdown();
         await q.setRenderMeta(renderId, { ...meta, model, cost_usd: qaTotalCost, cost_breakdown: costBreakdown, product_qa: productQa });
-        await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id);
+        const rejected = await q.setRenderRejected(notice, renderKey, qaTotalCost, model, render.id, 'product_qa', claimedBy);
+        if (!rejected) {
+          log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'product_qa' });
+          return;
+        }
         await q.setRoomNotice(notice, room.id);
         const restored = await restoreCreditForRender(renderId, 'product_qa_rejected');
         log({ event: 'product_qa_rejected', room_id: room.id, render_id: renderId, product_id: editProduct.id, status: productQa.status, checks: productQa.checks, cost_usd: qaTotalCost, credit_restored: restored, ms: Date.now() - t0 });
@@ -743,7 +755,11 @@ export async function processRender(renderId) {
       suggestion_targets: analysis.suggestions.map(s => s.target),
     });
 
-    await q.setRenderDone(renderKey, totalCost, model, render.id);
+    const done = await q.setRenderDone(renderKey, totalCost, model, render.id, claimedBy);
+    if (!done) {
+      log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'done' });
+      return;
+    }
     await q.setRoomStatus('done', room.id);
     log({ event: 'render_done', room_id: room.id, render_id: renderId, cost_usd: totalCost, cost_breakdown: costBreakdown, cost_image_usd: cost ?? null, cost_product_qa_usd: productQa?.cost ?? null, cost_vision_usd: visionCost ?? null, ms: Date.now() - t0 });
 
@@ -755,7 +771,11 @@ export async function processRender(renderId) {
     const msg = friendlyRenderError(rawMsg);
     addCost('failed', e.cost);
     const errorCost = sumCostBreakdown();
-    await q.setRenderError(msg, renderId, stage, errorCost);
+    const marked = await q.setRenderError(msg, renderId, stage, errorCost, claimedBy);
+    if (!marked) {
+      log({ event: 'render_lease_lost', room_id: room.id, render_id: renderId, stage: 'error' });
+      return;
+    }
     const hasDoneSibling = await q.roomHasDoneRender(room.id);
     if (shouldMarkRoomError(room.status, hasDoneSibling)) await q.setRoomError(msg, room.id);
     try {
@@ -828,7 +848,7 @@ export function startWorker() {
       const row = await q.claimNextRender();
       if (!row) return;
       running++;
-      try { await processRender(row.id); } finally { running--; }
+      try { await processRender(row.id, row.claimed_by); } finally { running--; }
     } catch (e) {
       log({ event: 'worker_error', error: String(e.message || e).slice(0, 300) });
     }

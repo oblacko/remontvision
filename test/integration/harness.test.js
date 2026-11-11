@@ -1,11 +1,12 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTestApp } from '../support/app.js';
+import { createTestApp, closeTestApp } from '../support/app.js';
 import { api } from '../support/helpers.js';
 
-test('test app boots and serves health', async t => {
+after(closeTestApp);
+
+test('test app boots and serves health', async () => {
   const app = await createTestApp();
-  t.after(() => app.close());
 
   const res = await api(app.url, '/api/health');
 

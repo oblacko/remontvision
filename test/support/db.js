@@ -11,14 +11,25 @@ if (!process.env[REQUIRED]) {
 }
 
 const base = new URL(process.env[REQUIRED]);
-const testName = `${base.pathname.replace(/^\//, '')}_test`;
+const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+const explicit = process.env.RV_TEST_DATABASE_URL;
+if (!explicit && !LOCAL_HOSTS.has(base.hostname)) {
+  throw new Error(
+    `Отказ: интеграционные тесты пишут в БД на ${base.hostname}. ` +
+    'Задайте RV_TEST_DATABASE_URL или используйте локальный Postgres.',
+  );
+}
+const source = explicit ? new URL(explicit) : base;
+const testName = explicit
+  ? source.pathname.replace(/^\//, '')
+  : `${source.pathname.replace(/^\//, '')}_test`;
 const testUrl = (() => {
-  const u = new URL(base);
+  const u = new URL(source);
   u.pathname = `/${testName}`;
   return u.toString();
 })();
 const adminUrl = (() => {
-  const u = new URL(base);
+  const u = new URL(source);
   u.pathname = '/postgres';
   return u.toString();
 })();
@@ -65,10 +76,15 @@ process.env.RV_DATABASE_URL = testUrl;
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 process.env.ADMIN_KEY = process.env.ADMIN_KEY || 'test-admin-key';
 process.env.APP_URL = process.env.APP_URL || 'http://127.0.0.1:3000';
-process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX || '0'; // middleware-лимит выключен; OTP-лимиты проверяем отдельно
+process.env.RATE_LIMIT_MAX = '0'; // middleware-лимит выключен; OTP-лимиты проверяем отдельно
 // Тестовые значения не наследуем из .env: resend-интервал и админ-ключ должны быть предсказуемы.
 process.env.OTP_RESEND_SECONDS = '60';
 process.env.ADMIN_KEY = 'test-admin-key';
+// Тесты никогда не пишут в реальные S3/диск: только временный каталог.
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-test-'));
+delete process.env.S3_BUCKET;
+delete process.env.S3_ACCESS_KEY;
+delete process.env.S3_SECRET_KEY;
 if (!process.env.DATA_DIR) {
   process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-test-'));
 }

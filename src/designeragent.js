@@ -6,11 +6,13 @@ import { callAgentJson } from './openrouteragent.js';
 import { validateDesignDirection } from './agentcontracts.js';
 import { styleById, conceptById, compatibilityOf, compatibilityNote } from './designdata.js';
 import { log } from './openrouter.js';
-import { cacheGet, cachePut, directionCacheKey, pickVariant } from './generationcache.js';
+import { cacheGet, cachePut, directionCacheKey, pickVariantByNovelty } from './generationcache.js';
 
 export const DESIGN_DIRECTION_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.DESIGN_DIRECTION_ENABLED ?? 'true'));
 
 const DIRECTION_MODEL = process.env.DIRECTION_MODEL || process.env.ART_DIRECTOR_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
+// Версия кода промта/схемы: меняется вместе с промтом и инвалидирует кэш direction.
+const DIRECTION_PROMPT_REVISION = 1;
 
 const DIRECTION_SCHEMA = `Обязательный контракт DesignDirection (не удалять при редактировании промта):
 {"style_id":"...","concept_id":"...","compatibility":"ok|weaken","concept":"...","main_move":{"target":"...","action":"...","effect":"..."},"supporting_moves":[{"target":"...","action":"...","effect":"..."}],"palette_hex":{"base":"#RRGGBB","support":"#RRGGBB","dark":"#RRGGBB","accent":"#RRGGBB"},"focal_point":"...","focal_zone":"window|wall|center|ceiling|floor|perimeter","quiet_areas":["..."],"materials_story":["..."],"prompt_en":"...","novelty_class":"novel|balance|safe","avoid":["..."]}
@@ -128,7 +130,8 @@ function directionCacheTtlDays() {
 function directionVariantCount() {
   const value = Number(process.env.DIRECTION_CACHE_VARIANTS || 3);
   if (!Number.isFinite(value)) return 3;
-  return Math.min(5, Math.max(1, Math.floor(value)));
+  // FOCAL_ROTATION содержит 3 набора; больше 3 вариантов повторяли бы подсказки.
+  return Math.min(3, Math.max(1, Math.floor(value)));
 }
 
 async function callDirection({ styleId, conceptId, compatibility, system, user, model, sessionId }) {
@@ -169,14 +172,20 @@ export async function buildDesignDirection({
   const seed = sessionId || `${styleId}:${conceptId}:${roomType}`;
   const cacheKey = directionCacheKey({
     styleId, conceptId, roomType, dimensions,
-    promptVersion: getArchitectPrompt('direction').version || 0,
+    promptVersion: `${DIRECTION_PROMPT_REVISION}.${getArchitectPrompt('direction').version || 0}`,
   });
 
   if (cacheOn) {
     try {
       const cached = await cacheGet('design_direction', cacheKey, directionCacheTtlDays());
+      // Негативный маркер (валидный ответ без prompt_en) живёт сутки, чтобы не платить
+      // за N вызовов на каждый рендер пары.
+      if (cached?.emptyAt && Date.now() - cached.emptyAt < 24 * 60 * 60 * 1000) {
+        log({ event: 'design_direction_cache_hit_empty', key: cacheKey });
+        return null;
+      }
       const variants = Array.isArray(cached?.variants) ? cached.variants.filter(item => item && item.text) : [];
-      const picked = pickVariant(variants, seed);
+      const picked = pickVariantByNovelty(variants, seed, usedDirections);
       if (picked) {
         log({ event: 'design_direction_cache_hit', variants: variants.length, key: cacheKey });
         return { ...picked, cached: true, ms: 0, retried: false, cost: null };
@@ -198,21 +207,15 @@ export async function buildDesignDirection({
     return callDirection({
       styleId, conceptId, compatibility: base.compatibility,
       system: prompt.system, user: prompt.user,
-      model: DIRECTION_MODEL, sessionId,
+      model: DIRECTION_MODEL,
+      // У вариантов разная сессия: SDK не должен смешивать их состояние.
+      sessionId: sessionId ? `${sessionId}:v${index}` : null,
     });
   }));
 
   const totalCost = calls.reduce((sum, call) => sum + (typeof call.cost === 'number' ? call.cost : 0), 0) || null;
   const usable = calls.map(call => call.result).filter(result => result && result.text);
   const ms = Date.now() - startedAt;
-
-  if (usable.length && cacheOn) {
-    try {
-      await cachePut('design_direction', cacheKey, { variants: usable.map(result => ({ ...result, cost: null })) });
-    } catch (e) {
-      log({ event: 'design_direction_cache_error', error: String(e.message || e).slice(0, 200) });
-    }
-  }
 
   // Ни один вариант не дал валидный JSON — один повтор дефолтной моделью.
   if (!usable.length && !calls.some(call => call.parsed)) {
@@ -223,6 +226,15 @@ export async function buildDesignDirection({
     });
     const result = retry.result;
     const cost = (totalCost || 0) + (retry.cost || 0);
+    if (cacheOn) {
+      try {
+        await cachePut('design_direction', cacheKey, result?.text
+          ? { variants: [{ ...result, cost: null }] }
+          : { variants: [], emptyAt: Date.now() });
+      } catch (e) {
+        log({ event: 'design_direction_cache_error', error: String(e.message || e).slice(0, 200) });
+      }
+    }
     if (!result) {
       log({ event: 'design_direction_empty', ms: Date.now() - startedAt, retried: true, cost_usd: cost || null });
       return null;
@@ -232,8 +244,19 @@ export async function buildDesignDirection({
     return out;
   }
 
+  if (cacheOn) {
+    try {
+      // Валидный ответ без prompt_en кэшируем как негативный маркер на сутки.
+      await cachePut('design_direction', cacheKey, usable.length
+        ? { variants: usable.map(result => ({ ...result, cost: null })) }
+        : { variants: [], emptyAt: Date.now() });
+    } catch (e) {
+      log({ event: 'design_direction_cache_error', error: String(e.message || e).slice(0, 200) });
+    }
+  }
+
   const pool = usable.length ? usable : calls.map(call => call.result).filter(Boolean);
-  const picked = pickVariant(pool, seed);
+  const picked = pickVariantByNovelty(pool, seed, usedDirections);
   if (!picked) {
     log({ event: 'design_direction_empty', ms, retried: false, cost_usd: totalCost });
     return null;

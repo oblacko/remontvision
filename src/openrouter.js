@@ -31,7 +31,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let imageChain = Promise.resolve();
 let lastImageStart = 0;
 
-function withImageSlot(fn) {
+export function withImageSlot(fn) {
   const run = imageChain.then(async () => {
     const wait = Math.max(0, getImageMinGapMs() - (Date.now() - lastImageStart));
     if (wait) await sleep(wait);
@@ -39,10 +39,11 @@ function withImageSlot(fn) {
     try {
       return await withGlobalImageSlot(fn);
     } catch (e) {
-      // Без БД (unit-тесты) или при сбое БД сохраняем внутрипроцессную сериализацию:
-      // глобальный слот нужен при нескольких воркерах, но не должен ломать рендер.
-      if (e?.code !== 'NO_DB') log({ event: 'image_slot_fallback', error: String(e.message || e).slice(0, 200) });
-      return fn();
+      // Только отсутствие БД откатывает на локальную сериализацию (unit-тесты).
+      // Ошибку самого image-вызова пробрасываем: повтор здесь удваивал бы платный вызов
+      // и обходил глобальный слот. Таймаут слота тоже не повторяем.
+      if (e?.code === 'NO_DB') return fn();
+      throw e;
     }
   });
   imageChain = run.catch(() => {});

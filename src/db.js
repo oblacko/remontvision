@@ -113,22 +113,28 @@ export const q = {
       .then(r => r.rows[0] || null),
   setRenderShellPath: (id, shellPath) =>
     pool.query(`UPDATE renders SET shell_path = $2 WHERE id = $1`, [id, shellPath]),
-  setRenderDone: (imagePath, costUsd, model, id) =>
+  setRenderDone: (imagePath, costUsd, model, id, claimedBy = null) =>
     pool.query(`UPDATE renders SET status='done', image_path = $1, cost_usd = $2, model = $3,
                 finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
-                WHERE id = $4`, [imagePath, costUsd, model, id]),
-  setRenderError: (error, id, stage = null, costUsd = null) =>
+                WHERE id = $4 AND status = 'processing'
+                  AND ($5::text IS NULL OR claimed_by = $5)`,
+      [imagePath, costUsd, model, id, claimedBy]).then(r => r.rowCount),
+  setRenderError: (error, id, stage = null, costUsd = null, claimedBy = null) =>
     pool.query(`UPDATE renders SET status='error', error = $1, error_stage = COALESCE($3, error_stage),
                 cost_usd = COALESCE($4, cost_usd),
                 finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
-                WHERE id = $2`, [error, id, stage, costUsd]),
-  setRenderRejected: (error, imagePath, costUsd, model, id, stage = 'product_qa') =>
+                WHERE id = $2 AND status = 'processing'
+                  AND ($5::text IS NULL OR claimed_by = $5)`,
+      [error, id, stage, costUsd, claimedBy]).then(r => r.rowCount),
+  setRenderRejected: (error, imagePath, costUsd, model, id, stage = 'product_qa', claimedBy = null) =>
     pool.query(`UPDATE renders SET status='rejected', error = $1, error_stage = $6, image_path = $2,
                 cost_usd = $3, model = $4, finished_at = now(),
                 duration_ms = FLOOR(EXTRACT(EPOCH FROM (now() - COALESCE(started_at, created_at))) * 1000)::int
-                WHERE id = $5`, [error, imagePath, costUsd, model, id, stage]),
+                WHERE id = $5 AND status = 'processing'
+                  AND ($7::text IS NULL OR claimed_by = $7)`,
+      [error, imagePath, costUsd, model, id, stage, claimedBy]).then(r => r.rowCount),
   failStaleRender: (id, error, stage = 'timeout') =>
     pool.query(`UPDATE renders SET status='error', error = $2, error_stage = $3,
                 finished_at = now(),
@@ -137,8 +143,9 @@ export const q = {
                 RETURNING id`, [id, error, stage]).then(r => r.rows[0] || null),
   staleRenders: minutes =>
     pool.query(`SELECT id, room_id FROM renders
-                WHERE status = 'queued'
-                  AND created_at < now() - ($1 || ' minutes')::interval`, [String(minutes)]).then(r => r.rows),
+                WHERE (status = 'queued' AND created_at < now() - ($1 || ' minutes')::interval)
+                   OR (status = 'processing' AND started_at IS NOT NULL
+                       AND started_at < now() - interval '60 minutes')`, [String(minutes)]).then(r => r.rows),
   setRenderPrompt: (id, prompt) =>
     pool.query(`UPDATE renders SET prompt = $2 WHERE id = $1`, [id, prompt]),
   setRenderRequestIp: (id, ip) =>
@@ -188,17 +195,21 @@ export const q = {
          ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`);
       const row = rows[0];
       if (!row) return null;
+      const claimedBy = crypto.randomUUID();
       const updated = await client.query(
         `UPDATE renders SET status = 'processing', started_at = now(),
-                            claimed_at = now(), lease_expires_at = now() + interval '5 minutes'
-         WHERE id = $1 RETURNING id`, [row.id]);
+                            claimed_at = now(), lease_expires_at = now() + interval '5 minutes',
+                            claimed_by = $2
+         WHERE id = $1 RETURNING id, claimed_by`, [row.id, claimedBy]);
       return updated.rows[0] || null;
     }),
-  heartbeatRender: (id, seconds = 300) =>
-    pool.query(`UPDATE renders SET claimed_at = now(), lease_expires_at = now() + ($2 || ' seconds')::interval
-                WHERE id = $1 AND status = 'processing'`, [id, String(seconds)]),
+  heartbeatRender: (id, claimedBy = null, seconds = 300) =>
+    pool.query(`UPDATE renders SET claimed_at = now(), lease_expires_at = now() + ($3 || ' seconds')::interval
+                WHERE id = $1 AND status = 'processing'
+                  AND ($2::text IS NULL OR claimed_by = $2)`,
+      [id, claimedBy, String(seconds)]).then(r => r.rowCount),
   requeueProcessing: () =>
-    pool.query(`UPDATE renders SET status = 'queued', claimed_at = NULL, lease_expires_at = NULL
+    pool.query(`UPDATE renders SET status = 'queued', claimed_at = NULL, lease_expires_at = NULL, claimed_by = NULL
                 WHERE status = 'processing'
                   AND (lease_expires_at IS NULL OR lease_expires_at < now())`).then(r => r.rowCount),
   saveItem: (renderId, productId, score, presentationStatus = score == null ? 'curated' : 'matched') =>

@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { createTestApp, closeTestApp } from '../support/app.js';
 import { createUser, seedRoom, insertRender } from '../support/helpers.js';
 import { q, pool } from '../../src/db.js';
-import { enqueueRenderWithCredit, grantCredits } from '../../src/payments.js';
+import { enqueueRenderWithCredit, grantCredits, restoreCreditForRender } from '../../src/payments.js';
 import { processRender } from '../../src/jobs.js';
 
 after(closeTestApp);
@@ -115,4 +115,48 @@ test('reaper does not fail a processing render with a live lease', async () => {
 
   const stale = await q.staleRenders(60);
   assert.deepEqual(stale, []);
+});
+
+test('a stuck processing render is failed and refunded once', async () => {
+  await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 3, 'test_grant');
+  const room = await seedRoom({ userId: user.id });
+  const renderId = id();
+  await enqueueRenderWithCredit({ id: renderId, roomId: room.id, chargedUserId: user.id, modelCredits: 1 });
+  await q.claimNextRender();
+  // Один attempt висит дольше 60 минут — heartbeat не спасает от вечного рендера.
+  await pool.query(`UPDATE renders SET started_at = now() - interval '2 hours' WHERE id = $1`, [renderId]);
+
+  const stale = await q.staleRenders(60);
+  assert.deepEqual(stale.map(row => row.id), [renderId]);
+
+  const failed = await q.failStaleRender(renderId, 'Генерация не завершилась', 'timeout');
+  assert.ok(failed);
+  assert.equal(await restoreCreditForRender(renderId, 'timeout'), true);
+  assert.equal(await q.creditBalance(user.id), 3);
+  assert.equal(await restoreCreditForRender(renderId, 'timeout'), false);
+  assert.equal(await q.creditBalance(user.id), 3);
+});
+
+test('a worker that lost its lease cannot complete the render', async () => {
+  await createTestApp();
+  const { renderId } = await seedQueuedRender();
+
+  const first = await q.claimNextRender();
+  assert.equal(first.id, renderId);
+  const staleToken = first.claimed_by;
+  assert.ok(staleToken);
+
+  await pool.query(`UPDATE renders SET lease_expires_at = now() - interval '1 minute' WHERE id = $1`, [renderId]);
+  assert.equal(await q.requeueProcessing(), 1);
+  const second = await q.claimNextRender();
+  assert.equal(second.id, renderId);
+  assert.notEqual(second.claimed_by, staleToken);
+
+  // Старый воркер не должен перезаписать результат нового.
+  assert.equal(await q.setRenderDone('renders/stale.png', 0, 'm', renderId, staleToken), 0);
+  assert.equal((await q.getRender(renderId)).status, 'processing');
+  assert.equal(await q.setRenderDone('renders/new.png', 0, 'm', renderId, second.claimed_by), 1);
+  assert.equal((await q.getRender(renderId)).status, 'done');
 });

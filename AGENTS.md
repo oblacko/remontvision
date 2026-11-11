@@ -28,10 +28,11 @@
 ```bash
 # Backend
 npm install
-npm test                                      # node:test, 56 тестов, Postgres не нужен
+npm test                                      # node:test, unit-тесты, Postgres не нужен
+npm run test:integration                      # интеграционные тесты: отдельная <db>_test, Postgres обязателен
 node --test test/prompt.test.js               # один файл
 node --test --test-name-pattern="base prompt" test/prompt.test.js   # один тест
-npm start                                     # Node 20.6+, .env через node --env-file
+npm start                                     # Node 20.19+, .env через node --env-file
 npm run dev                                   # watch-режим
 
 # Frontend
@@ -128,7 +129,8 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — 56 тестов: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm test` — unit-тесты: промт, размеры/кровать/радиаторы/scale plan, оценка размеров по фото, edit-промт, RAL, каталог, JSON-LD/OG импорт, размеры товаров, model caps, подписи Robokassa, Yandex Search XML, procurement templates, типы комнат.
+- `npm run test:integration` — HTTP/БД-инварианты (кредиты, очередь/lease, auth, комнаты, шаринг, платежи, файлы, image-слот); нужен локальный Postgres (`docker compose up -d db`) и `.env`; тесты пишут в отдельную `<db>_test` и не ходят в S3.
 - `cd web && npm run lint` — ESLint; `cd web && npm run build` — TypeScript + Vite.
 - Живой smoke лучше делать на VPS/canary, не на прод-пользователях.
 - При изменении модели проверяйте `/api/admin/settings/models` и `GET /api/health`.
