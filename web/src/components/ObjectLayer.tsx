@@ -7,6 +7,8 @@ type Props = {
   image: string
   ratio: number
   objects: VisibleObject[]
+  /** Стоимость/лимит правки: показываем до подтверждения, чтобы не списывать молча. */
+  costLabel?: string
   onCreateEdit: (index: number) => void
   onConfirmMove: (index: number, dx: number, dy: number) => void
 }
@@ -14,19 +16,24 @@ type Props = {
 type Popup = { index: number; dx: number; dy: number; moved: boolean }
 
 // Слой объектов: клик — подсветка и попап «создать правку», перетаскивание —
-// попап «переместить». Правка создаётся в существующей вкладке (3 на дизайн).
-export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove }: Props) {
+// попап «переместить». Предпросмотр и итог используют одну и ту же геометрию:
+// призрак рисуется в bbox со сдвигом (dx, dy), ровно как пунктирная рамка.
+export function ObjectLayer({ image, ratio, objects, costLabel, onCreateEdit, onConfirmMove }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef<{ index: number; startX: number; startY: number; moved: boolean } | null>(null)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [offset, setOffset] = useState<{ index: number; dx: number; dy: number } | null>(null)
   const [popup, setPopup] = useState<Popup | null>(null)
   const [dragImage, setDragImage] = useState<string | null>(null)
-  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
-  // Размер обёртки, снятый в обработчике события: в рендере ref читать нельзя.
-  const [wrapSize, setWrapSize] = useState<{ width: number; height: number } | null>(null)
+  // Соотношение сторон берём у самой картинки: prop может быть устаревшим при смене рендера.
+  const [measuredRatio, setMeasuredRatio] = useState<number | null>(null)
+  const safeRatio = measuredRatio
+    || (Number.isFinite(ratio) && ratio > 0 ? ratio : 1.5)
 
-  const safeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1.5
+  // Крупные области рисуем первыми, мелкие — поверх: иначе стену/пол не «пробить» на телефоне.
+  const stacked = objects
+    .map((object, index) => ({ object, index }))
+    .sort((a, b) => areaOf(b.object.bbox) - areaOf(a.object.bbox))
 
   const onPointerDown = (event: PointerEvent<HTMLButtonElement>, index: number) => {
     event.preventDefault()
@@ -35,13 +42,9 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     setActiveIndex(index)
     setOffset({ index, dx: 0, dy: 0 })
     setPopup(null)
+    setDragImage(null)
     const box = objects[index]?.bbox
     if (box) void cropObjectDataUrl(image, box).then(url => setDragImage(url))
-    const rect = wrapRef.current?.getBoundingClientRect()
-    if (rect) {
-      setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
-      setWrapSize({ width: rect.width, height: rect.height })
-    }
   }
 
   const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
@@ -51,11 +54,6 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     const dy = event.clientY - drag.startY
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true
     setOffset({ index: drag.index, dx, dy })
-    const rect = wrapRef.current?.getBoundingClientRect()
-    if (rect) {
-      setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top })
-      setWrapSize({ width: rect.width, height: rect.height })
-    }
   }
 
   const onPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
@@ -63,8 +61,6 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
     dragRef.current = null
     setOffset(null)
     setDragImage(null)
-    setPointer(null)
-    setWrapSize(null)
     if (!drag) return
     const rect = wrapRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return
@@ -89,9 +85,18 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
       style={{ aspectRatio: String(safeRatio), width: `min(100%, calc(62svh * ${safeRatio}))` }}
     >
       <div className="absolute inset-0 overflow-hidden bg-secondary">
-        <img src={image} alt="Сгенерированный дизайн интерьера" className="h-full w-full select-none object-cover" draggable={false} />
+        <img
+          src={image}
+          alt="Сгенерированный дизайн интерьера"
+          className="h-full w-full select-none object-cover"
+          draggable={false}
+          onLoad={event => {
+            const { naturalWidth, naturalHeight } = event.currentTarget
+            if (naturalWidth > 0 && naturalHeight > 0) setMeasuredRatio(naturalWidth / naturalHeight)
+          }}
+        />
       </div>
-      {objects.map((object, index) => {
+      {stacked.map(({ object, index }) => {
         const box = object.bbox
         if (!Array.isArray(box) || box.length !== 4) return null
         const [x = 0, y = 0, w = 0, h = 0] = box
@@ -106,7 +111,7 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
             onPointerDown={event => onPointerDown(event, index)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            onPointerCancel={() => { dragRef.current = null; setOffset(null); setPointer(null); setWrapSize(null) }}
+            onPointerCancel={() => { dragRef.current = null; setOffset(null); setDragImage(null) }}
             className={`absolute cursor-move touch-none border-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary ${selected ? 'border-primary bg-primary/15' : 'border-primary/70 bg-transparent hover:bg-primary/10'}`}
             style={{
               left: `${x * 100}%`,
@@ -122,16 +127,25 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
           </button>
         )
       })}
-      {offset && dragImage && pointer && wrapSize && (() => {
+      {offset && dragImage && (() => {
         const object = objects[offset.index]
         const box = object?.bbox
         if (!box) return null
         const [x = 0, y = 0, w = 0, h = 0] = box
+        // Тот же bbox и тот же сдвиг, что у рамки: что видно, то и уедет.
         return (
-          <>
-            <div className="pointer-events-none absolute z-10 border-2 border-dashed border-primary" style={{ left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`, transform: `translate(${offset.dx}px, ${offset.dy}px)` }} />
-            <img src={dragImage} alt="" className="pointer-events-none absolute z-10 border-2 border-primary object-cover opacity-90 shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ left: pointer.x - (w * wrapSize.width) / 2, top: pointer.y - (h * wrapSize.height) / 2, width: w * wrapSize.width, height: h * wrapSize.height }} />
-          </>
+          <img
+            src={dragImage}
+            alt=""
+            className="pointer-events-none absolute z-10 border-2 border-dashed border-primary object-cover opacity-95 shadow-[0_10px_28px_rgba(0,0,0,0.45)]"
+            style={{
+              left: `${x * 100}%`,
+              top: `${y * 100}%`,
+              width: `${w * 100}%`,
+              height: `${h * 100}%`,
+              transform: `translate(${offset.dx}px, ${offset.dy}px)`,
+            }}
+          />
         )
       })()}
       {popup && popupObject && popupBox && (
@@ -147,6 +161,7 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
           ) : (
             <p className="mt-1 text-xs leading-5 text-muted-foreground">Редактировать этот объект? Его можно и перетащить.</p>
           )}
+          {costLabel && <p className="mt-1 text-xs leading-5 text-primary-text">{costLabel}</p>}
           <div className="mt-2 flex flex-col gap-1">
             {popup.moved && (
               <button type="button" className="action-primary min-h-11 text-xs" onClick={() => { onConfirmMove(popup.index, popup.dx, popup.dy); closePopup() }}>Переместить</button>
@@ -158,4 +173,11 @@ export function ObjectLayer({ image, ratio, objects, onCreateEdit, onConfirmMove
       )}
     </div>
   )
+}
+
+function areaOf(box?: number[]): number {
+  if (!Array.isArray(box) || box.length !== 4) return 0
+  const w = Number(box[2])
+  const h = Number(box[3])
+  return Number.isFinite(w) && Number.isFinite(h) ? Math.max(0, w * h) : 0
 }

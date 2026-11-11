@@ -234,10 +234,6 @@ export function GenerationPanel({
   const [photoName, setPhotoName] = useState('')
   const [photoRatio, setPhotoRatio] = useState(4 / 3)
   const [photoError, setPhotoError] = useState('')
-  const [cleaned, setCleaned] = useState<{ file: File; url: string; model?: string } | null>(null)
-  const [cleanupRequested, setCleanupRequested] = useState(false)
-  const [cleanupBusy, setCleanupBusy] = useState(false)
-  const [cleanupError, setCleanupError] = useState('')
   const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
   const [stylePicks, setStylePicks] = useState<Array<{ style: string; concepts: string[] }>>([])
   const [toast, setToast] = useState('')
@@ -296,6 +292,14 @@ export function GenerationPanel({
     ? (Number(selectedModel.resolution_prices?.[effectiveResolution ?? '']) || Number(selectedModel.credits) || 1)
     : 1
   const styleKeyOf = (name: string) => stylePresets.find(item => item.name === name)?.key || null
+  // Пользователю не показываем названия моделей: три уровня по возрастанию цены.
+  const TIER_LABELS = ['Старт', 'Про', 'Студия']
+  const tierByModel = (() => {
+    const ranked = [...renderModels].sort((a, b) => a.credits - b.credits)
+    const map = new Map<string, string>()
+    ranked.forEach((model, index) => map.set(model.key, TIER_LABELS[index] || 'Дополнительно'))
+    return map
+  })()
   const variantItems = stylePicks.flatMap(pick => pick.concepts.length
     ? pick.concepts.map(concept => ({ style: pick.style, concept }))
     : [{ style: pick.style, concept: null as string | null }])
@@ -309,6 +313,22 @@ export function GenerationPanel({
     toastTimer.current = window.setTimeout(() => setToast(''), 2000)
   }
   const chargeText = (count: number) => `Спишется ${renderCredits * count} кр. за ${count} ${count === 1 ? 'дизайн' : count < 5 ? 'дизайна' : 'дизайнов'}`
+  // Быстрый выбор: добираем до N стилей, не трогая уже выбранные.
+  // Каждый стиль = один отдельный дизайн, поэтому N стилей = N дизайнов.
+  const pickStyles = (count: number) => {
+    if (stylePicks.length >= count) {
+      showToast(`Уже выбрано ${stylePicks.length} ${stylePicks.length < 5 ? 'стиля' : 'стилей'}`)
+      return
+    }
+    const limit = Math.min(count, 8)
+    const next = [...stylePicks]
+    for (const item of stylePresets) {
+      if (next.length >= limit) break
+      if (!next.some(pick => pick.style === item.name)) next.push({ style: item.name, concepts: [] })
+    }
+    setStylePicks(next)
+    showToast(chargeText(next.reduce((sum, pick) => sum + Math.max(1, pick.concepts.length), 0)))
+  }
   const toggleStyle = (name: string) => {
     const exists = stylePicks.some(pick => pick.style === name)
     let next = stylePicks
@@ -410,7 +430,9 @@ export function GenerationPanel({
             key: String(m.key),
             label: String(m.label),
             credits: Number(m.credits),
-            resolutions: Array.isArray(m.resolutions) ? m.resolutions.map(String) : [],
+            resolutions: Array.isArray(m.resolutions)
+              ? m.resolutions.map(String).filter(r => ['1K', '2K', '4K'].includes(r))
+              : [],
             resolution_prices: m.resolution_prices && typeof m.resolution_prices === 'object' ? m.resolution_prices : {},
           })))
           const defaultKey = typeof d?.default_key === 'string' ? d.default_key : String(list[0].key)
@@ -569,34 +591,9 @@ export function GenerationPanel({
     setPhotoRatio(4 / 3)
     setPhotoName(photoFile.name)
     setPhotoError(''); setGenError('')
-    setCleaned(null); setCleanupRequested(false); setCleanupError('')
     setRoomType(null)
     setRoomId(''); setIterations([]); setCurrentId(null); setOpenHistory(null)
     // Габариты и объектив оценивает архитектор по фото — пользователь их не вводит.
-  }
-
-  const cleanupRoom = async (): Promise<File | null> => {
-    if (!file || cleanupBusy) return null
-    setCleanupBusy(true); setCleanupError('')
-    try {
-      const fd = new FormData()
-      fd.append('photo', file)
-      fd.append('room_type', roomType || 'Другое')
-      const r = await fetch('/api/cleanup', { method: 'POST', body: fd })
-      const d = await r.json().catch(() => ({}))
-      if (r.status === 401) { onRequireLogin(); return null }
-      if (!r.ok || !d.image) throw new Error(d.error || 'Не удалось очистить комнату')
-      const blob = await (await fetch(d.image)).blob()
-      const shellFile = new File([blob], 'cleaned-room.jpg', { type: blob.type || 'image/jpeg' })
-      setCleaned({ file: shellFile, url: d.image, model: d.model })
-      setCleanupRequested(true)
-      return shellFile
-    } catch (e) {
-      setCleanupError(e instanceof Error ? e.message : 'Не удалось очистить комнату')
-      return null
-    } finally {
-      setCleanupBusy(false)
-    }
   }
 
   const clearEditRefs = () => {
@@ -714,7 +711,7 @@ export function GenerationPanel({
       total: room.total,
       budget: room.budget,
       priceTier: room.price_tier || priceTier,
-      keepFurniture: room.keep_furniture !== false,
+      keepFurniture: true,
       useCatalog: room.use_catalog !== false,
       productsEnabled: room.products_enabled !== false,
       roomId: id,
@@ -776,21 +773,13 @@ export function GenerationPanel({
       let id = roomId
       if (isBase) {
         if (!file) throw new Error('Для нового дизайна нужно фото комнаты')
-        let cleanupFile = cleaned?.file || null
-        if (cleanupRequested && !cleanupFile) {
-          setGenStage('cleanup')
-          cleanupFile = await cleanupRoom()
-        }
-        if (cleanupRequested && !cleanupFile) setGenError('Очистка не удалась — создаём дизайн по исходному фото. Можно выключить очистку и попробовать снова.')
-        const usingCleaned = Boolean(cleanupFile)
         const fd = new FormData()
         fd.append('photo', file)
         fd.append('items', JSON.stringify(variantItems.map(item => ({ style: item.style, concept: item.concept }))))
         fd.append('room_type', roomType)
-        if (cleanupFile) fd.append('cleanup_photo', cleanupFile)
         if (isBedRoom) fd.append('bed_length_m', '2')
         fd.append('price_tier', priceTier)
-        fd.append('keep_furniture', usingCleaned ? '0' : '1')
+        fd.append('keep_furniture', '1')
         fd.append('use_catalog', useCatalog ? '1' : '0')
         if (modelKey && modelChosen) fd.append('model', modelKey)
         if (effectiveResolution) fd.append('resolution', effectiveResolution)
@@ -864,7 +853,6 @@ export function GenerationPanel({
     setStep('photo')
     setPhoto(null); setFile(null); setPhotoName(''); setPhotoError(''); setRoomType(null)
     setStylePicks([]); setPriceTier('comfort')
-    setCleaned(null); setCleanupRequested(false); setCleanupError('')
     loadedRoomRef.current = ''
     clearEditRefs()
     setIterations([]); setCurrentId(null); setOpenHistory(null)
@@ -875,7 +863,6 @@ export function GenerationPanel({
   const activeStep = stepIndex(step)
   const genStages = genMode === 'edit' ? EDIT_GEN_STAGES : [
     ...BASE_GEN_STAGES.slice(0, 1),
-    ...(cleanupRequested ? [{ key: 'cleanup', label: 'Очистка', hint: 'Убираем мебель и готовим пустую комнату' }] : []),
     ...BASE_GEN_STAGES.slice(1, 3),
     ...BASE_GEN_STAGES.slice(3),
   ]
@@ -920,10 +907,10 @@ export function GenerationPanel({
               <input ref={photoInput} id="gen-photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="peer sr-only" onChange={(event: ChangeEvent<HTMLInputElement>) => acceptPhoto(event.target.files?.[0])} />
               {photo ? (
                 <div className="gen-photo-preview relative mx-auto border border-foreground bg-secondary" style={{ '--photo-ratio': photoRatio } as PanelStyle}>
-                  <img src={cleaned && cleanupRequested ? cleaned.url : photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
+                  <img src={photo} alt="Фото комнаты" className="h-full w-full object-contain" onLoad={(event) => setPhotoRatio(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-foreground/85 px-4 py-2 text-background">
                     <span className="truncate text-xs">{photoName}</span>
-                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); setCleaned(null); setCleanupRequested(false); setCleanupError(''); if (photoInput.current) photoInput.current.value = '' }} className="k-btn k-btn--ov k-btn--icon" aria-label="Удалить фото"><KitIcon name="x" /></button>
+                    <button type="button" onClick={() => { releaseUrl(photo); setPhoto(null); setPhotoName(''); if (photoInput.current) photoInput.current.value = '' }} className="k-btn k-btn--ov k-btn--icon" aria-label="Удалить фото"><KitIcon name="x" /></button>
                   </div>
                 </div>
               ) : (
@@ -934,23 +921,7 @@ export function GenerationPanel({
                   <span className="mt-1 text-sm leading-6 text-muted-foreground">или перетащите сюда<br />JPG, PNG, WebP или HEIC · до 15 МБ</span>
                 </label>
               )}
-              {photo && (
-                <div className="mt-5 border p-4">
-                  <button type="button" aria-pressed={cleanupRequested} onClick={() => setCleanupRequested(value => !value)} className={`flex w-full items-start gap-3 text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring ${cleanupRequested ? '' : 'opacity-90'}`}>
-                    <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center border ${cleanupRequested ? 'border-foreground bg-foreground text-background' : 'border-foreground/40'}`}>{cleanupRequested ? <KitIcon name="ok" className="size-4" /> : null}</span>
-                    <span>
-                      <span className="block text-sm font-medium">Очистить комнату перед созданием дизайна</span>
-                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{cleanupRequested ? 'Уберём мебель, технику, декор и свет. Оставим стены, окна, двери и пропорции.' : 'По умолчанию выключено: сохраняем вашу мебель и планировку.'}</span>
-                    </span>
-                  </button>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {cleanupBusy && <span>Очищаем комнату…</span>}
-                    {!cleanupBusy && cleaned && cleanupRequested && <span className="text-primary-text">Очищено · можно перегенерировать</span>}
-                    {!cleanupBusy && cleaned && !cleanupRequested && <span>Очищенная версия сохранена, но не выбрана</span>}
-                    {!cleanupBusy && cleanupError && <span className="text-destructive" role="alert">{cleanupError}</span>}
-                  </div>
-                </div>
-              )}
+              <p className="mt-4 text-xs leading-5 text-muted-foreground">Сохраняем вашу мебель и планировку: дизайн вписывается в комнату. Убрать мебель можно в редакторе после первого результата.</p>
               <div className="mt-5">
                 <p className="eyebrow">Тип комнаты</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{photo ? 'Чтобы в дизайне не появились предметы из другого помещения.' : 'Можно выбрать заранее — сначала загрузите фото.'}</p>
@@ -974,7 +945,21 @@ export function GenerationPanel({
             <p className="eyebrow">Шаг 02 / Стиль</p>
             <h3 className="display-title mt-6 text-4xl">Выберите направление</h3>
             {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите один или несколько стилей — каждый станет отдельным дизайном.</p>}
-            <div className="k-tiles mt-8">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              {[3, 5].map(count => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => pickStyles(count)}
+                  className="k-btn k-btn--ov k-btn--s"
+                >Подобрать {count} {count === 3 ? 'стиля' : 'стилей'}</button>
+              ))}
+              {stylePicks.length > 0 && (
+                <button type="button" onClick={() => setStylePicks([])} className="k-btn k-btn--s">Снять выбор</button>
+              )}
+            </div>
+
+            <div className="k-tiles mt-6">
               {stylePresets.map((item) => {
                 const selected = stylePicks.some(pick => pick.style === item.name)
                 return (
@@ -1022,8 +1007,8 @@ export function GenerationPanel({
             <div className="mt-10 border-t pt-6">
               {renderModels.length > 0 && (
                 <div>
-                  <p className="eyebrow">Модель</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{editing ? 'Модель — от родительского дизайна.' : 'Цена модели спишется за рендер в кредитах.'}</p>
+                  <p className="eyebrow">Качество</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{editing ? 'Уровень — от родительского дизайна.' : 'Три уровня: чем выше, тем детальнее результат и выше цена.'}</p>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {renderModels.map((m) => {
                       const selected = modelKey === m.key
@@ -1032,11 +1017,11 @@ export function GenerationPanel({
                         <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true); if (resolution && !m.resolutions.includes(resolution)) setResolution(null) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
                           <span className={`block ${highlighted ? '' : 'opacity-80'}`}>
                             <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                              {m.label}
+                              {tierByModel.get(m.key) || 'Уровень'}
                               {highlighted ? <KitIcon name="ok" className="size-4 shrink-0 text-primary-text" /> : null}
                             </span>
                             <span className="mt-1 block font-mono text-xs text-primary-text">{m.credits} кр.</span>
-                            {editing && <span className="mt-1 block text-xs leading-4 text-muted-foreground">Модель — от родительского дизайна</span>}
+                            {editing && <span className="mt-1 block text-xs leading-4 text-muted-foreground">Уровень — от родительского дизайна</span>}
                           </span>
                         </button>
                       )
@@ -1044,7 +1029,7 @@ export function GenerationPanel({
                   </div>
                   {!editing && selectedModel && selectedModel.resolutions.length > 1 && (
                     <div className="mt-4">
-                      <p className="eyebrow">Качество</p>
+                      <p className="eyebrow">Разрешение</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {selectedModel.resolutions.map(r => {
                           const active = effectiveResolution === r
@@ -1086,7 +1071,15 @@ export function GenerationPanel({
             )}
 
             {!editing && variantCount > 0 && (
-              <p className="mt-8 border-t pt-6 text-xs text-muted-foreground">{variantCount} × {renderCredits} = <b className="text-foreground">{totalCredits} кр.</b></p>
+              <div className="mt-8 border-t pt-6 text-xs leading-5 text-muted-foreground">
+                <p>
+                  Создам <b className="text-foreground">{variantCount}</b> {variantCount === 1 ? 'дизайн' : variantCount < 5 ? 'дизайна' : 'дизайнов'}
+                  {' · '}<b className="text-foreground">{modelKey ? (tierByModel.get(modelKey) || 'Уровень') : 'Уровень'}</b>
+                  {effectiveResolution ? <> · <b className="text-foreground">{effectiveResolution}</b></> : null}
+                  {' · '}<b className="text-foreground">{totalCredits} кр.</b>
+                </p>
+                <p className="mt-1 break-words">{variantItems.map(item => item.style + (item.concept ? ` + ${concepts.find(c => c.id === item.concept)?.name || ''}` : '')).join(' · ')}</p>
+              </div>
             )}
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

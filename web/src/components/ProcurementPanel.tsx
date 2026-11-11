@@ -23,6 +23,7 @@ export type ProductMatch = {
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
 const MARKETPLACES = [
+  { key: 'hoff', label: 'Hoff', url: (q: string) => `https://hoff.ru/search/?q=${encodeURIComponent(q)}` },
   { key: 'ozon', label: 'Ozon', url: (q: string) => `https://www.ozon.ru/search/?text=${encodeURIComponent(q)}` },
   { key: 'wb', label: 'WB', url: (q: string) => `https://www.wildberries.ru/catalog/0/search.aspx?search=${encodeURIComponent(q)}` },
   { key: 'ym', label: 'Я.Маркет', url: (q: string) => `https://market.yandex.ru/search?text=${encodeURIComponent(q)}` },

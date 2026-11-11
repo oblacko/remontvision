@@ -4,6 +4,14 @@ import { GuideIcon } from '@/components/GuideIcon'
 import { groupRoadmap, type RoadmapGroup, type RoadmapItem } from '@/lib/roadmap'
 import { cn } from '@/lib/utils'
 
+// Ссылки на поиск по позиции: это выдача магазина, а не подтверждённая карточка.
+const SHOPS = [
+  { key: 'hoff', label: 'Hoff', url: (q: string) => `https://hoff.ru/search/?q=${encodeURIComponent(q)}` },
+  { key: 'ozon', label: 'Ozon', url: (q: string) => `https://www.ozon.ru/search/?text=${encodeURIComponent(q)}` },
+  { key: 'wb', label: 'WB', url: (q: string) => `https://www.wildberries.ru/catalog/0/search.aspx?search=${encodeURIComponent(q)}` },
+  { key: 'ym', label: 'Я.Маркет', url: (q: string) => `https://market.yandex.ru/search?text=${encodeURIComponent(q)}` },
+] as const
+
 export type RoadmapActions = {
   onGenerate: () => void
   onRegenerate: () => void
@@ -164,6 +172,14 @@ export function RoadmapTab({ items, hasPurchased, busy, error, actions }: {
                         <div className="min-w-0 flex-1">
                           <p className={cn('text-sm leading-5', (item.done || !item.active) && 'text-muted-foreground line-through')}>{item.text}</p>
                           {item.comment && commentId !== item.id && <p className="mt-1 text-xs leading-5 text-muted-foreground">· {item.comment}</p>}
+                          <details className="mt-1">
+                            <summary className="cursor-pointer text-xs text-primary-text underline decoration-border underline-offset-2">Где купить</summary>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              {SHOPS.map(shop => (
+                                <a key={shop.key} href={shop.url(item.text)} target="_blank" rel="noopener nofollow sponsored" className="inline-flex min-h-9 items-center underline underline-offset-2 hover:text-foreground">{shop.label}</a>
+                              ))}
+                            </div>
+                          </details>
                           {commentId === item.id && (
                             <div className="mt-2">
                               <input

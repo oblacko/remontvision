@@ -11,7 +11,7 @@ type Me = { email: string; balance: number }
 // Согласие действием (вариант A): чекбоксов нет, флаги уходят при клике по кнопке.
 const CONSENTS = { offer: true, privacy: true, cross_border: true }
 type GenRow = {
-  id: string; room_id: string; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
+  id: string; room_id: string; batch_id?: string | null; parent_render_id?: string | null; style: string; room_type?: string | null; budget: number; price_tier?: string | null; status: string; error: string | null;
   created_at: string; finished_at: string | null; request_text: string | null;
   credits_spent: number; image_url: string | null; photo_url: string | null;
 }
@@ -27,7 +27,7 @@ type RoomData = {
   photo_url: string | null; render: { id: string; image: string | null; status: string; created_at?: string; request_text?: string | null; analysis?: RoomAnalysis } | null;
   items: GenItem[]; total: number; prices_as_of: string | null;
 }
-type RoomGroup = { roomId: string; style: string; versions: GenRow[]; latest: GenRow; image: string | null; credits: number }
+type RoomGroup = { roomId: string; batchId: string; style: string; versions: GenRow[]; designs: GenRow[]; latest: GenRow; image: string | null; credits: number }
 
 const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
@@ -167,19 +167,23 @@ export default function Cabinet() {
   }, [])
 
   const groups = useMemo<RoomGroup[]>(() => {
+    // Группируем по пакету: несколько стилей одного запуска — отдельные дизайны,
+    // а не «версии» одного. Старые записи без batch_id группируются по комнате.
     const map = new Map<string, GenRow[]>()
     for (const g of generations) {
-      const list = map.get(g.room_id) || []
+      const key = g.batch_id || g.room_id
+      const list = map.get(key) || []
       list.push(g)
-      map.set(g.room_id, list)
+      map.set(key, list)
     }
     const result: RoomGroup[] = []
-    for (const [roomId, versions] of map) {
+    for (const [batchId, versions] of map) {
       const sorted = [...versions].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
       const latest = sorted[0]
       const image = sorted.find(v => v.image_url)?.image_url || sorted.find(v => v.photo_url)?.photo_url || null
       const creditsTotal = sorted.reduce((sum, v) => sum + Number(v.credits_spent || 0), 0)
-      result.push({ roomId, style: latest.style, versions: sorted, latest, image, credits: creditsTotal })
+      const designs = sorted.filter(v => !v.parent_render_id)
+      result.push({ roomId: latest.room_id, batchId, style: latest.style, versions: sorted, designs, latest, image, credits: creditsTotal })
     }
     return result.sort((a, b) => +new Date(b.latest.created_at) - +new Date(a.latest.created_at))
   }, [generations])
@@ -434,9 +438,9 @@ export default function Cabinet() {
             </div>
             {filteredGroups.length ? (
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredGroups.map(group => <div key={group.roomId} className="k-card group relative min-w-0">
+                {filteredGroups.map(group => <div key={group.batchId} className="k-card group relative min-w-0">
                   <Link to={`/room/${encodeURIComponent(group.roomId)}`} className="block text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="k-badge absolute left-2 top-2">{group.versions.length} {plural(group.versions.length, 'версия', 'версии', 'версий')}</span></div>
+                  <div className="relative aspect-[4/3] overflow-hidden bg-foreground/10">{group.image ? <img src={group.image} alt={`Дизайн · ${group.style}`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет изображения</div>}<span className="k-badge absolute left-2 top-2">{group.designs.length > 1 ? `${group.designs.length} ${plural(group.designs.length, 'дизайн', 'дизайна', 'дизайнов')}` : `${group.versions.length} ${plural(group.versions.length, 'версия', 'версии', 'версий')}`}</span></div>
                   <div className="bo"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{group.style}{group.latest.room_type ? ` · ${group.latest.room_type}` : ''}</p><p className="mt-1 truncate text-xs text-muted-foreground">{editName(group.latest.request_text, 'Базовый дизайн')}</p></div><span className={`k-caption shrink-0 ${statusView(group.latest.status).className}`}>{statusView(group.latest.status).label}</span></div><div className="rw mt-4 border-t pt-3 text-xs text-muted-foreground"><span>{dateTime(group.latest.created_at)}</span><span>{group.credits} кр.</span></div></div>
                   </Link>
                   <button type="button" onClick={() => { setShareRenderId(group.latest.id); setShareOpen(true) }} className="k-btn k-btn--ov k-btn--icon absolute right-2 top-2" aria-label="Поделиться дизайном"><KitIcon name="sh" /></button>

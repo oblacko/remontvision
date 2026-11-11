@@ -336,14 +336,19 @@
   .k-ut button:focus-visible { outline: 3px solid oklch(var(--p-ink)); outline-offset: -3px; }
 
   /* Карточки */
+  /* Плитки стилей: на телефоне 2 колонки, на широком экране 3–5, чтобы карточка
+     не растягивалась на всю ширину и не превращалась в баннер. */
   .k-tiles { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .k-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } }
+  @media (min-width: 1024px) { .k-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (min-width: 1280px) { .k-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
   .k-tile {
     position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start;
     border: 1px solid oklch(var(--p-line-strong)); background: transparent;
     padding: 0; text-align: left; cursor: pointer; color: oklch(var(--p-ink)); font: inherit;
   }
   @media (hover: hover) { .k-tile:hover { border-color: oklch(var(--p-ink)); } }
-  .k-tile .im { height: 84px; flex: none; background: var(--c, #b9a88f); }
+  .k-tile .im { height: auto; aspect-ratio: 4 / 3; flex: none; background: var(--c, #b9a88f); }
   .k-tile .nm { display: block; padding: 12px 8px; font-size: 13px; font-weight: 500; hyphens: auto; overflow-wrap: break-word; }
   .k-tile[aria-checked='true'] { border: 2px solid oklch(var(--p-ink)); }
   .k-tile[aria-checked='true'] .nm { color: oklch(var(--p-orange-text)); }

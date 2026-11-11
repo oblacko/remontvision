@@ -34,6 +34,8 @@ type Render = {
   status: string
   request_text?: string | null
   created_at?: string
+  root_render_id?: string | null
+  edits_used?: number
   analysis?: {
     surfaces?: Surface[]
     electrical?: Electrical[]
@@ -65,9 +67,9 @@ export default function Room() {
   const [searchParams] = useSearchParams()
   const { refresh: refreshTasks } = useTasks()
   const [room, setRoom] = useState<RoomData | null>(null)
-  const [tab, setTab] = useState<'editor' | 'design' | 'roadmap'>(() => {
+  const [tab, setTab] = useState<'editor' | 'design' | 'roadmap' | 'passport'>(() => {
     const value = searchParams.get('tab')
-    return value === 'design' || value === 'roadmap' ? value : 'editor'
+    return value === 'design' || value === 'roadmap' || value === 'passport' ? value : 'editor'
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -78,6 +80,9 @@ export default function Room() {
   const [items, setItems] = useState<RoadmapItem[]>([])
   const [roadmapBusy, setRoadmapBusy] = useState(false)
   const [roadmapError, setRoadmapError] = useState('')
+  const [passport, setPassport] = useState<PassportDoc | null>(null)
+  const [passportBusy, setPassportBusy] = useState(false)
+  const [passportError, setPassportError] = useState('')
   const [objectsOn, setObjectsOn] = useState(false)
   const [selectedObject, setSelectedObject] = useState<number | null>(null)
   const [renderRatio, setRenderRatio] = useState(1.5)
@@ -142,12 +147,21 @@ export default function Room() {
   const storedBreakdown = render?.analysis?.breakdown || null
   const breakdown = storedBreakdown?.version === 4 ? storedBreakdown : null
   const selectedRenderId = render?.id || ''
+  const editsUsed = Number(render?.edits_used || 0)
+  const freeEditsLeft = Math.max(0, 3 - editsUsed)
+  const editCostLabel = freeEditsLeft > 0
+    ? `Бесплатно · редактирование ${editsUsed + 1} из 3`
+    : 'Спишется 1 кредит'
   const selectedRenderRef = useRef('')
 
   useEffect(() => {
     selectedRenderRef.current = selectedRenderId
     setBreakdownBusy(false)
     setBreakdownError('')
+    // Новый рендер = новый кадр: старые рамки и соотношение сторон к нему не подходят.
+    setObjectsOn(false)
+    setSelectedObject(null)
+    setRenderRatio(1.5)
   }, [selectedRenderId])
 
   const sendObjectMove = async (index: number, dx: number, dy: number) => {
@@ -190,6 +204,21 @@ export default function Room() {
       if (selectedRenderRef.current === targetId) setBreakdownError(e instanceof Error ? e.message : 'Не удалось собрать разбор')
     } finally {
       if (selectedRenderRef.current === targetId) setBreakdownBusy(false)
+    }
+  }
+
+  const loadPassport = async () => {
+    if (!render?.id || passportBusy) return
+    setPassportBusy(true); setPassportError('')
+    try {
+      const r = await fetch(`/api/renders/${render.id}/passport`, { method: 'POST' })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Не удалось собрать паспорт')
+      setPassport(d.passport || null)
+    } catch (e) {
+      setPassportError(e instanceof Error ? e.message : 'Не удалось собрать паспорт')
+    } finally {
+      setPassportBusy(false)
     }
   }
 
@@ -333,6 +362,7 @@ export default function Room() {
                     image={image}
                     ratio={renderRatio}
                     objects={visibleObjects}
+                    costLabel={editCostLabel}
                     onCreateEdit={(index) => { setSelectedObject(index); setTab('editor'); requestAnimationFrame(() => document.getElementById('room-editor')?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }}
                     onConfirmMove={(index, dx, dy) => { if (!objectBusy) void sendObjectMove(index, dx, dy) }}
                   />
@@ -351,7 +381,7 @@ export default function Room() {
             )}
 
             <nav className="k-ut mt-6" aria-label="Разделы комнаты">
-              {([['editor', 'Редактор'], ['design', 'Разбор интерьера'], ['roadmap', 'Закупка']] as const).map(([key, label]) => (
+              {([['editor', 'Редактор'], ['design', 'Разбор интерьера'], ['passport', 'Паспорт'], ['roadmap', 'Закупка']] as const).map(([key, label]) => (
                 <button key={key} type="button" aria-selected={tab === key} onClick={() => setTab(key)}>{label}</button>
               ))}
             </nav>
@@ -384,6 +414,18 @@ export default function Room() {
               />
             </div>
 
+            <div className={tab === 'passport' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
+              <PassportTab
+                render={render}
+                passport={passport}
+                busy={passportBusy}
+                error={passportError}
+                hasBreakdown={Boolean(breakdown)}
+                onRun={() => void loadPassport()}
+                onGoBreakdown={() => setTab('design')}
+              />
+            </div>
+
             <div className={tab === 'roadmap' ? 'mt-6 min-w-0' : 'mt-6 hidden min-w-0'}>
               <RoadmapTab
                 items={items}
@@ -411,6 +453,142 @@ export default function Room() {
       </KitLightbox>
 
       {render?.id && <ShareDialog renderId={render.id} open={shareOpen} onClose={() => setShareOpen(false)} />}
+    </div>
+  )
+}
+
+type PassportDoc = {
+  title: string
+  concept?: string
+  mood?: string
+  palette?: Array<{ hex: string; name?: string }>
+  surfaces?: Array<{ title: string; material?: string; look?: string }>
+  objects?: Array<{ label: string; description?: string; note?: string }>
+  lighting?: { plan?: string; temperature?: string; why?: string } | null
+  keep?: string[]
+  measure?: string[]
+  limitations?: string[]
+  render_id?: string | null
+}
+
+function PassportTab({ render, passport, busy, error, hasBreakdown, onRun, onGoBreakdown }: {
+  render: Render | null
+  passport: PassportDoc | null
+  busy: boolean
+  error: string
+  hasBreakdown: boolean
+  onRun: () => void
+  onGoBreakdown: () => void
+}) {
+  return (
+    <div className="space-y-6">
+      {!passport ? (
+        <div className="border border-foreground/25 p-5 sm:p-7">
+          <p className="eyebrow">Паспорт дизайна</p>
+          <h2 className="display-title mt-3 text-2xl sm:text-3xl">Что в этом интерьере</h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Документ для воплощения: палитра, отделка по поверхностям, ключевые предметы, освещение, что сохранить и что замерить. Его можно скачать в PDF и показать мастеру.</p>
+          {!hasBreakdown && (
+            <p className="mt-4 border border-foreground/25 p-3 text-xs leading-5 text-muted-foreground">Паспорт строится из разбора: сначала откройте вкладку «Разбор интерьера» и нажмите «Разобрать интерьер по предметам».</p>
+          )}
+          {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            {hasBreakdown ? (
+              <button type="button" onClick={onRun} disabled={busy} className="k-btn k-btn--primary">
+                {busy ? <><KitIcon name="sp" spin /> Собираем…</> : <>Получить паспорт <KitIcon name="r" /></>}
+              </button>
+            ) : (
+              <button type="button" onClick={onGoBreakdown} className="k-btn k-btn--primary">Перейти к разбору <KitIcon name="r" /></button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          <header className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="eyebrow">Паспорт дизайна</p>
+              <h2 className="display-title mt-2 text-2xl sm:text-3xl">{passport.title}</h2>
+              {passport.concept && <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{passport.concept}</p>}
+            </div>
+            <a href={`/api/renders/${render?.id}/passport.pdf`} className="k-btn k-btn--primary k-btn--s"><KitIcon name="dl" />Скачать PDF</a>
+          </header>
+
+          {!!passport.palette?.length && (
+            <section className="border border-foreground/25 p-4">
+              <p className="eyebrow">Палитра</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {passport.palette.map(item => (
+                  <span key={item.hex} className="inline-flex items-center gap-2 border border-foreground/25 px-2 py-1 text-xs">
+                    <span className="size-4 border border-foreground/20" style={{ background: item.hex }} aria-hidden="true" />
+                    {item.hex}{item.name ? ` · ${item.name}` : ''}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!!passport.surfaces?.length && (
+            <section className="border border-foreground/25 p-4">
+              <p className="eyebrow">Отделка по поверхностям</p>
+              <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                {passport.surfaces.map((surface, index) => (
+                  <div key={index} className="min-w-0">
+                    <dt className="text-sm font-medium">{surface.title}</dt>
+                    <dd className="text-xs leading-5 text-muted-foreground">{[surface.material, surface.look].filter(Boolean).join(' · ') || '—'}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          {!!passport.objects?.length && (
+            <section className="border border-foreground/25 p-4">
+              <p className="eyebrow">Что в интерьере</p>
+              <ul className="mt-3 space-y-2">
+                {passport.objects.map((object, index) => (
+                  <li key={index} className="text-sm leading-5">
+                    <b className="font-medium">{object.label}</b>
+                    {object.description ? ` — ${object.description}` : ''}
+                    {object.note && <span className="block text-xs leading-5 text-muted-foreground">Уточнить: {object.note}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {passport.lighting && (
+            <section className="border border-foreground/25 p-4">
+              <p className="eyebrow">Освещение</p>
+              <ul className="mt-3 space-y-1 text-sm leading-5">
+                {passport.lighting.plan && <li>{passport.lighting.plan}</li>}
+                {passport.lighting.temperature && <li className="text-muted-foreground">Температура: {passport.lighting.temperature}</li>}
+                {passport.lighting.why && <li className="text-muted-foreground">{passport.lighting.why}</li>}
+              </ul>
+            </section>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {!!passport.keep?.length && (
+              <section className="border border-foreground/25 p-4">
+                <p className="eyebrow">Что важно сохранить</p>
+                <ul className="mt-3 space-y-1 text-sm leading-5">{passport.keep.map((item, index) => <li key={index}>• {item}</li>)}</ul>
+              </section>
+            )}
+            {!!passport.measure?.length && (
+              <section className="border border-foreground/25 p-4">
+                <p className="eyebrow">Что замерить на объекте</p>
+                <ul className="mt-3 space-y-1 text-sm leading-5">{passport.measure.map((item, index) => <li key={index}>• {item}</li>)}</ul>
+              </section>
+            )}
+          </div>
+
+          {!!passport.limitations?.length && (
+            <section className="border border-dashed border-foreground/40 p-4">
+              <p className="eyebrow">Ограничения</p>
+              {passport.limitations.map((line, index) => <p key={index} className="mt-1 text-xs leading-5 text-muted-foreground">{line}</p>)}
+            </section>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -455,10 +633,10 @@ function DesignTab({ render, direction, breakdown, busy, error, onRun }: {
         <div className="border border-foreground/25 p-5 sm:p-7">
           <p className="eyebrow">Разбор интерьера</p>
           <h2 className="display-title mt-3 text-2xl sm:text-3xl">Что подобрать</h2>
-          <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Соберём главные позиции, которые нужно подобрать для этого интерьера: что сохранить и что уточнить до покупки.</p>
+          <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Соберём карту объектов и главные позиции: что сохранить, что уточнить до покупки и из чего состоит дизайн. После разбора можно двигать предметы на изображении.</p>
           {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
           <button type="button" onClick={onRun} disabled={busy} className="k-btn k-btn--primary mt-5 w-full sm:w-auto">
-            {busy ? <><KitIcon name="sp" spin /> Разбираем…</> : <>Запустить разбор <KitIcon name="r" /></>}
+            {busy ? <><KitIcon name="sp" spin /> Разбираем…</> : <>Разобрать интерьер по предметам <KitIcon name="r" /></>}
           </button>
         </div>
       ) : (
