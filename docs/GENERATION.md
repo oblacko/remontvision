@@ -19,9 +19,8 @@ flowchart LR
   A["Фото + items + тип + tier"] --> B["POST /api/rooms"]
   B --> C["N × renders(queued) + кредиты"]
   C --> W["Worker: claim + lease"]
-  W --> V["repair_scope ∥ art_direction"]
-  V --> D["design_direction (кэш)"]
-  D --> L["layout (пустая комната)"]
+  W --> V["repair_scope ∥ art_direction + direction"]
+  V --> L["layout (пустая комната)"]
   L --> P["buildPrompt (design-first)"]
   P --> C1["cleanup (если включён)"]
   C1 --> I["design: FLUX 3 Image"]
@@ -54,8 +53,7 @@ flowchart LR
 ### 4. Vision-этапы
 
 - `repair_scope` — объём ремонта (пол/потолок/стены/двери), параллельно с арт-директором.
-- `art_direction` — размеры, объектив, мебель, палитра.
-- `design_direction` — текст направления стиль×концепт; фото не использует.
+- `art_direction` — один vision-вызов: размеры, объектив, мебель, палитра и (при концепции) `direction` в том же JSON.
 - `layout` — только для пустой комнаты.
 
 ### 5. Direction и кэш
@@ -111,7 +109,7 @@ flowchart LR
 
 ## Логи и метрики
 
-- `render_start`, `repair_scope_ok`, `art_direction_ok`, `design_direction_call`, `design_direction_cache_hit`, `render_image_ok`, `render_done`, `render_error`, `render_lease_lost`.
+- `render_start`, `repair_scope_ok`, `art_direction_ok`, `design_direction_ok`, `room_analysis_cache_hit`, `render_image_ok`, `render_done`, `render_error`, `render_lease_lost`.
 - `renders.prompt`, `renders.meta`, `renders.cost_breakdown`.
 - Замеры ёмкости: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 

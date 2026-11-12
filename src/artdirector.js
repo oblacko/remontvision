@@ -5,7 +5,8 @@ import { visionJson } from './openrouter.js';
 import { roomTypeByName } from './roomtypes.js';
 import { getArchitectPrompt } from './architectprompts.js';
 import { callAgentJson } from './openrouteragent.js';
-import { validateRepairScope } from './agentcontracts.js';
+import { validateRepairScope, validateDesignDirection } from './agentcontracts.js';
+import { styleById, conceptById, compatibilityOf, compatibilityNote } from './designdata.js';
 import { isArtDirectionEnabled } from './modelconfig.js';
 
 // Категории, которые арт-директор может просить из каталога. Локальный список,
@@ -240,6 +241,102 @@ export async function buildRepairScope({
   }
 }
 
+const DIRECTION_SCHEMA = `{"style_id":"...","concept_id":"...","compatibility":"ok|weaken","concept":"...","main_move":{"target":"...","action":"...","effect":"..."},"supporting_moves":[{"target":"...","action":"...","effect":"..."}],"palette_hex":{"base":"#RRGGBB","support":"#RRGGBB","dark":"#RRGGBB","accent":"#RRGGBB"},"focal_point":"...","focal_zone":"window|wall|center|ceiling|floor|perimeter","quiet_areas":["..."],"materials_story":["..."],"prompt_en":"...","novelty_class":"novel|balance|safe","avoid":["..."]}`;
+
+function paletteToArtDirection(paletteHex = {}) {
+  const labels = { base: 'основной', support: 'поддерживающий', dark: 'тёмный', accent: 'акцент' };
+  return Object.entries(labels)
+    .map(([key, name]) => (paletteHex[key] ? { hex: paletteHex[key], name } : null))
+    .filter(Boolean);
+}
+
+export function normalizeDirection(parsed, { styleId = '', conceptId = '', compatibility = null } = {}) {
+  const validated = validateDesignDirection(parsed || {});
+  if (!validated) return null;
+  return {
+    styleId: styleId || validated.style_id,
+    conceptId: conceptId || validated.concept_id,
+    compatibility: compatibility || validated.compatibility || 'ok',
+    concept: validated.concept,
+    mainMove: validated.main_move,
+    supportingMoves: validated.supporting_moves,
+    focalPoint: validated.focal_point,
+    focalZone: validated.focal_zone,
+    quietAreas: validated.quiet_areas,
+    materialsStory: validated.materials_story,
+    noveltyClass: validated.novelty_class,
+    text: validated.prompt_en || '',
+    palette: paletteToArtDirection(validated.palette_hex),
+    materials: validated.materials_story.join(', '),
+    mood: validated.concept,
+    avoid: validated.avoid.join('; '),
+  };
+}
+
+// Один промт арт-директора: факты с фото + (при выбранной концепции) замысел.
+// Без концепции или при конфликтной паре — facts_only, чтобы простые рендеры не дорожали.
+export function composeArtDirectionPrompt({
+  roomType = 'Другое',
+  style = '',
+  styleDescription = '',
+  dimensions = null,
+  keepFurniture = true,
+  styleId = '',
+  conceptId = '',
+  usedDirections = [],
+} = {}) {
+  const room = roomTypeByName(roomType);
+  const roomName = room?.prompt || roomType || 'room';
+  const styleCard = styleById(styleId) || null;
+  const concept = conceptId ? conceptById(conceptId) : null;
+  const compatibility = styleCard && concept ? compatibilityOf(styleCard.id, concept.id) : null;
+  const factsOnly = !concept || compatibility === 'conflict';
+  const hasDimensions = dimensions
+    && Number(dimensions.width) > 0
+    && Number(dimensions.length) > 0
+    && Number(dimensions.height) > 0;
+  const dims = hasDimensions
+    ? `Реальные размеры комнаты переданы как опорные: ширина ${dimensions.width} м, длина ${dimensions.length} м, высота ${dimensions.height} м. Проверь их по перспективе и объективу.`
+    : 'Размеры не заданы: определи ширину, длину и высоту по фотографии с учётом объектива и перспективы.';
+  const note = !factsOnly ? compatibilityNote(styleCard.id, concept.id) : '';
+  const history = !factsOnly && Array.isArray(usedDirections) && usedDirections.length
+    ? `Последние проекты пользователя (не повторяй main_move и focal_zone): ${usedDirections.slice(-5).map(item => JSON.stringify(item)).join('; ')}.`
+    : '';
+  const cards = !factsOnly
+    ? [
+        styleCard ? `Карточка стиля: ${styleCard.name} (id: ${styleCard.id}). Палитра: base ${styleCard.palette.base}, support ${styleCard.palette.support}, dark ${styleCard.palette.dark}, accent ${styleCard.palette.accent}. Материалы: ${styleCard.materials}. Промпт стиля (EN): ${styleCard.prompt_en}.` : '',
+        `Карточка концепции: ${concept.name} (id: ${concept.id}). Главный ход: ${concept.main_move}. Спокойные зоны: ${concept.quiet_areas}.`,
+        `Совместимость пары: ${compatibility}.${note ? ` Ослабленная форма: ${note}.` : ''}`,
+        compatibility === 'weaken' ? 'Пара допустима только в ослабленной форме: сохрани главный ход концепции, но приглуши его.' : '',
+        history,
+      ].filter(Boolean)
+    : [];
+  const system = factsOnly
+    ? getArchitectPrompt('designer').system
+    : `${getArchitectPrompt('designer').system}
+
+ДОПОЛНИТЕЛЬНО — ЗАМЫСЕЛ В ПОЛЕ "direction"
+${getArchitectPrompt('direction').system}
+
+Верни замысел не отдельным ответом, а полем "direction" внутри общего JSON. Контракт поля:
+${DIRECTION_SCHEMA}
+Правила: HEX бери из палитры стиля (base/support/dark не меняй, accent можно сместить внутри hue-семьи); prompt_en — только позитивные формулировки, без "no"/"without"/"avoid"/"do not"; main_move и focal_zone не повторяй из истории.`;
+  const user = [
+    `Тип комнаты: ${roomName}.`,
+    `Выбранный стиль: ${style || 'подбери сам под комнату и свет'}.`,
+    styleDescription ? `Бриф стиля: ${styleDescription}` : '',
+    dims,
+    keepFurniture
+      ? 'Сохраняй существующую мебель, планировку и архитектуру; обновляй отделку, свет и текстиль.'
+      : 'Комната пустая: мебель убрана. Проектируй наполнение с нуля, сохраняя архитектуру, окна, двери, потолок и инженерные точки.',
+    ...cards,
+    factsOnly
+      ? 'Напиши авторское арт-направление для этой конкретной комнаты. Только JSON.'
+      : 'Одним ответом собери факты по фото и авторский замысел в поле "direction". Только JSON.',
+  ].filter(Boolean).join('\n');
+  return { system, user, factsOnly, compatibility, style: styleCard, concept };
+}
+
 export async function buildArtDirection({
   imageDataUrl,
   roomType = 'Другое',
@@ -249,27 +346,15 @@ export async function buildArtDirection({
   keepFurniture = true,
   sessionId = null,
   modelKey = null,
+  styleId = '',
+  conceptId = '',
+  usedDirections = [],
 } = {}) {
   if (!isArtDirectionEnabled(modelKey) || !imageDataUrl) return null;
-  const room = roomTypeByName(roomType);
-  const roomName = room?.prompt || roomType || 'room';
-  const hasDimensions = dimensions
-    && Number(dimensions.width) > 0
-    && Number(dimensions.length) > 0
-    && Number(dimensions.height) > 0;
-  const dims = hasDimensions
-    ? `Реальные размеры комнаты переданы как опорные: ширина ${dimensions.width} м, длина ${dimensions.length} м, высота ${dimensions.height} м. Проверь их по перспективе и объективу.`
-    : 'Размеры не заданы: определи ширину, длину и высоту по фотографии с учётом объектива и перспективы.';
-  const user = [
-    `Тип комнаты: ${roomName}.`,
-    `Выбранный стиль: ${style || 'подбери сам под комнату и свет'}.`,
-    styleDescription ? `Бриф стиля: ${styleDescription}` : '',
-    dims,
-    keepFurniture
-      ? 'Сохраняй существующую мебель, планировку и архитектуру; обновляй отделку, свет и текстиль.'
-      : 'Комната пустая: мебель убрана. Проектируй наполнение с нуля, сохраняя архитектуру, окна, двери, потолок и инженерные точки.',
-    'Напиши авторское арт-направление для этой конкретной комнаты.',
-  ].filter(Boolean).join('\n');
+  const prompt = composeArtDirectionPrompt({
+    roomType, style, styleDescription, dimensions, keepFurniture, styleId, conceptId, usedDirections,
+  });
+
   const buildFields = source => ({
     palette: normalizePalette(source.palette),
     existingFurniture: Array.isArray(source.existing_furniture)
@@ -307,22 +392,30 @@ export async function buildArtDirection({
     }
     return text;
   };
+  const apply = source => {
+    const fields = buildFields(source);
+    const direction = (!prompt.factsOnly && source?.direction && typeof source.direction === 'object')
+      ? normalizeDirection(source.direction, {
+          styleId: prompt.style?.id || styleId,
+          conceptId: prompt.concept?.id || conceptId,
+          compatibility: prompt.compatibility,
+        })
+      : null;
+    return { fields, direction, text: direction?.text || buildText(source, fields) };
+  };
 
-  let { parsed, cost } = await visionJson({ system: getArchitectPrompt('designer').system, user, images: [imageDataUrl], model: ART_DIRECTOR_MODEL, sessionId });
-  let fields = buildFields(parsed);
-  let text = buildText(parsed, fields);
+  let { parsed, cost } = await visionJson({ system: prompt.system, user: prompt.user, images: [imageDataUrl], model: ART_DIRECTOR_MODEL, sessionId });
+  let result = apply(parsed);
   // Страховка: если выбранная модель вернула пусто, пробуем основную vision-модель.
-  if (!text && ART_DIRECTOR_MODEL) {
-    const retry = await visionJson({ system: getArchitectPrompt('designer').system, user, images: [imageDataUrl], model: null, sessionId });
+  if (!result.text && ART_DIRECTOR_MODEL) {
+    const retry = await visionJson({ system: prompt.system, user: prompt.user, images: [imageDataUrl], model: null, sessionId });
     parsed = retry.parsed;
     cost = (cost || 0) + (retry.cost || 0);
-    fields = buildFields(parsed);
-    text = buildText(parsed, fields);
+    result = apply(parsed);
   }
-  if (!text) return null;
-  return { ...fields, text, cost: cost ?? null };
+  if (!result.text) return null;
+  return { ...result.fields, text: result.text, direction: result.direction, cost: cost ?? null };
 }
-
 const BRIEF_SYSTEM = `Ты арт-директор и эксперт по интерьерной фотографии. По одной фотографии комнаты оцени помещение и предложи направление дизайна.
 Опирайся на типовые размеры: дверь 2.0-2.1 м, длина кровати 2.0 м, глубина кухонных шкафов 0.6 м, высота стула 0.45 м, рост человека, плитка и панели. Учитывай перспективу и ширину объектива.
 Верни строго JSON без текста вокруг:

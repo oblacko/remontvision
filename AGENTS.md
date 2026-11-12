@@ -19,7 +19,7 @@
 4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации; не «чините» их вслепую — см. docs/redesign.
 5. **Design-first.** Базовый кадр получает исходник + один art ref и текстовые материалы, без product refs. Следствие: `render_items` у новых базовых рендеров **пуст**. Товарная правка использует один product ref и обязательный vision QA; при отказе версия отклоняется, кредит возвращается.
 6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — параллелизм; image-вызовы ограничиваются общим семафором (`src/imageslot.js`), а не advisory-lock.
-7. **Direction кэшируется.** `src/designeragent.js` + `src/generationcache.js`; 3 варианта, TTL 30 дней; пустой `prompt_en` — негативный маркер на 24 ч, чтобы не платить повторно. Не вызывайте direction дважды при пустом `prompt_en`.
+7. **Direction — часть арт-директора.** Один vision-вызов `src/artdirector.js` отдаёт факты по фото и (при выбранной концепции) поле `direction`; без концепции — `facts_only`. Повторные рендеры комнаты/стиля/концепта берутся из `room_analysis`. Отдельного direction-агента нет.
 8. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
 ## Команды
@@ -73,7 +73,7 @@ node --check src/openrouter.js
 | Промт, стиль, light/cleanup/Pinterest | `src/promptconfig.js`, `src/openrouter.js` |
 | Размеры, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js` |
 | Правила комнат, слоты | `src/roomtypes.js` |
-| Direction и кэш | `src/designeragent.js`, `src/generationcache.js`, `src/directionprompt.js` |
+| Direction и кэш | `src/artdirector.js`, `src/directionprompt.js`, `src/roomanalysis.js`, `src/variability.js` |
 | Очередь, lease, claim | `src/db.js`, `src/jobs.js`, `src/workerknobs.js` |
 | Глобальный image-слот | `src/imageslot.js`, `src/openrouter.js` |
 | Генерация/стадии | `src/jobs.js`, `src/openrouter.js` |

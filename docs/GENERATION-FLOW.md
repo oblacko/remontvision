@@ -1,6 +1,6 @@
 # Полный сценарий генерации: данные, источники и зависимости
 
-Как фото превращается в дизайн: запросы, данные, себестоимость. Код: `src/server.js`, `src/jobs.js`, `src/openrouter.js`, `src/designeragent.js`, `src/artdirector.js`.
+Как фото превращается в дизайн: запросы, данные, себестоимость. Код: `src/server.js`, `src/jobs.js`, `src/openrouter.js`, `src/artdirector.js`, `src/layoutagent.js`.
 
 ## 1. Пользовательский сценарий
 
@@ -25,13 +25,10 @@ flowchart TD
   MODE -->|"да"| EDIT["parent render + edit prompt"]
   MODE -->|"нет"| BASE["Базовый дизайн"]
   BASE --> RS["repair_scope (vision)"]
-  BASE --> AD["art_direction (vision)"]
-  RS --> PICK["pickArtDirection"]
-  AD --> DIR["design_direction (кэш)"]
-  DIR --> LAY["layout (пустая комната)"]
-  PICK --> PROMPT["buildPrompt"]
-  DIR --> PROMPT
-  LAY --> PROMPT
+  BASE --> AD["art_direction + direction (один vision)"]
+  RS --> LAY["layout (пустая комната)"]
+  AD --> LAY
+  LAY --> PROMPT["buildPrompt"]
   PROMPT --> CLEAN{"cleanup включён и keep_furniture=false?"}
   CLEAN -->|"да"| SHELL["FLUX 3 Klein → shell"]
   CLEAN -->|"нет"| DESIGN["FLUX 3 Image"]
@@ -57,7 +54,7 @@ flowchart TD
 | Режим стиля | `style.config.v1` | text/reference/swatches |
 | Класс материалов | `rooms.price_tier` | prompt, материалы |
 | Размеры | `rooms.room_width_m/...` + vision | prompt, scale plan |
-| Direction | `designeragent` + `generation_cache` | `ART DIRECTION` |
+| Direction | `artdirector.js` + `room_analysis` | `ART DIRECTION` / `direction` |
 | Промт-правила | `app_settings.prompt.rules.v1` | light/cleanup/window/… |
 | Модель | `app_settings.model.render` > env | `generateRender` |
 | Модель правок | `app_settings.model.edit` > env; пусто = render | iterate |
@@ -74,8 +71,7 @@ flowchart TD
 | Ключ | Запрос | Когда |
 |---|---|---|
 | `repair_scope` | vision: объём ремонта | базовый, если не MOCK |
-| `art_direction` | vision: направление/размеры | базовый |
-| `design_direction` | text: стиль×концепт | базовый, если включён |
+| `art_direction` | vision: факты по фото + direction (если есть концепция) | базовый |
 | `layout` | vision: расстановка | пустая комната |
 | `cleanup` | FLUX 3 Klein | `keep_furniture=false` + очистка |
 | `design` | FLUX 3 Image | всегда |

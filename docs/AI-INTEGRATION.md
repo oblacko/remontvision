@@ -1,6 +1,6 @@
 # AI-интеграция
 
-Провайдер генерации/vision изолирован в `src/openrouter.js`; direction — `src/designeragent.js` + `src/openrouteragent.js`. Актуальный пайплайн — [GENERATION.md](GENERATION.md).
+Провайдер генерации/vision изолирован в `src/openrouter.js`; direction — часть одного vision-вызова арт-директора (`src/artdirector.js`) с кэшем `room_analysis`. Актуальный пайплайн — [GENERATION.md](GENERATION.md).
 
 ## Текущая конфигурация
 

@@ -10,7 +10,6 @@ import { MOCK_MODE, buildPrompt, buildEditPrompt, buildMoveRemovalPrompt, genera
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
-import { buildDesignDirection, DESIGN_DIRECTION_ENABLED } from './designeragent.js';
 import { buildLayoutPlan } from './layoutagent.js';
 import { cacheGet, cachePut, dimensionsKey } from './generationcache.js';
 import { buildAnalysis } from './analysis.js';
@@ -30,7 +29,6 @@ import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolveRenderStyleConcept } from './variants.js';
 import { workerConcurrency } from './workerknobs.js';
-import { pickArtDirection } from './artdirectionpick.js';
 import { buildRoomVariability, variabilityPrompt } from './variability.js';
 import { roomAnalysisKey, shouldCacheRoomAnalysis } from './roomanalysis.js';
 
@@ -339,6 +337,9 @@ export async function processRender(renderId, claimedBy = null) {
             keepFurniture,
             sessionId: `render:${renderId}`,
             modelKey: render.model_key || getModelConfig().render,
+            styleId: styleInfo?.key || '',
+            conceptId: conceptKey || '',
+            usedDirections: usedDirections.map(item => ({ main_move: item.mainMove, focal_zone: item.focalZone })),
           });
           if (ad && keepFurniture && ad.existingFurniture === null) {
             // Старый промт дизайнера мог не вернуть existing_furniture — уточняем брифом.
@@ -362,61 +363,32 @@ export async function processRender(renderId, claimedBy = null) {
             meta.room_dimensions_estimate = ad.roomDimensions;
             meta.lens = ad.lens || null;
           }
-          let direction = null;
-          if (DESIGN_DIRECTION_ENABLED && conceptKey && styleInfo?.key) {
-            try {
-              const usedDirections = room.user_id
-                ? (await q.designRegistryForUser(room.user_id))
-                    .map(row => ({ main_move: row.main_move, focal_zone: row.focal_zone }))
-                    .filter(item => item.main_move || item.focal_zone)
-                : [];
-              direction = await buildDesignDirection({
-                styleId: styleInfo.key,
-                conceptId: conceptKey,
-                roomType,
-                dimensions: estimatedDimensions,
-                usedDirections,
-                sessionId: `render:${renderId}`,
-              });
-            } catch (e) {
-              log({ event: 'design_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-            }
-          }
-          const picked = pickArtDirection({ direction, ad });
-          if (picked.branch === 'direction') {
-            artDirection = picked.text;
-            artDirectionCost = (ad.cost || 0) + (direction.cost || 0);
-            addCost('art_direction', ad.cost);
-            addCost('art_direction', direction.cost);
-            meta.design_direction = { ...direction, ms: Date.now() - adStart, call_ms: direction.ms, retried: direction.retried };
-            meta.concept_key = conceptKey;
-            log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, focal_zone: direction.focalZone, cost_usd: direction.cost ?? null, ms: Date.now() - adStart, call_ms: direction.ms, retried: direction.retried });
-            if (room.user_id) {
-              await q.recordDesignDirection({
-                userId: room.user_id,
-                roomId: room.id,
-                roomType,
-                styleKey: styleInfo.key,
-                conceptKey,
-                focalZone: direction.focalZone,
-                mainMove: direction.mainMove?.action || direction.mainMove?.target || '',
-                accepted: true,
-              });
-            }
-            try { await q.setRoomDesign(room.id, room.concept_key, direction); } catch { /* метаданные не критичны */ }
-          } else if (picked.branch === 'art_director') {
-            artDirection = picked.text;
+          if (ad) {
+            artDirection = ad.text || '';
             artDirectionCost = ad.cost || 0;
             addCost('art_direction', ad.cost);
             meta.art_direction = { ...ad, ms: Date.now() - adStart };
-            log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
-            if (direction) {
-              // Валидный контракт без prompt_en: второй вызов не делаем, в промт идёт ad.text.
-              addCost('art_direction', direction.cost);
-              log({ event: 'design_direction_incomplete', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, call_ms: direction.ms, retried: direction.retried, cost_usd: direction.cost ?? null });
+            if (ad.direction) {
+              meta.design_direction = { ...ad.direction, ms: Date.now() - adStart };
+              meta.concept_key = conceptKey;
+              log({ event: 'design_direction_ok', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, focal_zone: ad.direction.focalZone, cost_usd: ad.cost ?? null, ms: Date.now() - adStart });
+              if (room.user_id) {
+                await q.recordDesignDirection({
+                  userId: room.user_id,
+                  roomId: room.id,
+                  roomType,
+                  styleKey: styleInfo?.key || null,
+                  conceptKey,
+                  focalZone: ad.direction.focalZone,
+                  mainMove: ad.direction.mainMove?.action || ad.direction.mainMove?.target || '',
+                  accepted: true,
+                });
+              }
+              try { await q.setRoomDesign(room.id, room.concept_key, ad.direction); } catch { /* метаданные не критичны */ }
+            } else {
+              log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart, facts_only: true });
             }
           } else {
-            if (direction) addCost('art_direction', direction.cost);
             log({ event: 'art_direction_empty', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType });
           }
         } catch (e) {

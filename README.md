@@ -114,8 +114,9 @@ app/
     jobs.js            воркер: claim/lease, processRender, stages
     openrouter.js      image/vision-провайдер, промт, image-слот
     db.js              pg pool, миграции, SQL-запросы
-    designeragent.js   direction-агент + кэш вариантов
-    generationcache.js кэш AI-шагов с TTL
+    artdirector.js     vision-арт-директор: факты + замысел одним вызовом
+    variability.js     акцент из палитры стиля + новизна комнаты
+    generationcache.js кэш AI-шагов с TTL (layout)
     imageslot.js       семафор image-вызовов (система/провайдер/пользователь)
     workerknobs.js     WORKER_CONCURRENCY
     payments.js        кредиты, Robokassa/ЮKassa, refund

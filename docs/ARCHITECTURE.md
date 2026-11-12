@@ -34,7 +34,7 @@ flowchart LR
 | Worker | claim/lease, `processRender`, стадии, refund | `src/jobs.js` |
 | Очередь | `renders` + lease/`claimed_by`, `WORKER_CONCURRENCY` | `src/db.js`, `src/jobs.js` |
 | Image-слот | глобальная сериализация image-вызовов | `src/imageslot.js` |
-| Direction | агент стиль×концепт + кэш вариантов | `src/designeragent.js`, `src/generationcache.js` |
+| Direction | один vision-вызов арт-директора + `room_analysis` | `src/artdirector.js`, `src/roomanalysis.js`, `src/variability.js` |
 | Postgres | пользователи, комнаты, рендеры, товары, стили, кредиты, платежи | `src/db.js`, `migrations/` |
 | Storage | фото, рендеры, картинки товаров/референсов | `src/storage.js` |
 | OpenRouter | image, vision, direction | `src/openrouter.js`, `src/openrouteragent.js` |
