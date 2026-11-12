@@ -89,10 +89,14 @@ export const q = {
   // Асинхронная очистка комнаты: один claim на комнату, shell переиспользуется рендерами.
   claimRoomCleanup: id =>
     pool.query(`UPDATE rooms SET cleanup_status = 'processing', cleanup_started_at = now(),
-                  cleanup_error = NULL, updated_at = now()
+                  cleanup_attempts = cleanup_attempts + 1, cleanup_error = NULL, updated_at = now()
                 WHERE id = $1 AND keep_furniture = false AND precleaned_shell_path IS NULL
-                  AND (cleanup_status IS NULL OR cleanup_status = 'queued')
+                  AND cleanup_attempts < 3
+                  AND (cleanup_status IS NULL OR cleanup_status IN ('queued', 'error'))
                 RETURNING id`, [id]).then(r => r.rows[0] || null),
+  touchRoomCleanup: id =>
+    pool.query(`UPDATE rooms SET cleanup_started_at = now(), updated_at = now()
+                WHERE id = $1 AND cleanup_status = 'processing'`, [id]).then(r => r.rowCount),
   finishRoomCleanup: (id, shellPath, costUsd = null) =>
     pool.query(`UPDATE rooms SET cleanup_status = 'done', precleaned_shell_path = $2,
                   cleanup_cost_usd = $3, cleanup_error = NULL, cleanup_finished_at = now(), updated_at = now()
@@ -408,7 +412,9 @@ export const q = {
       COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
       AVG(EXTRACT(EPOCH FROM (finished_at - created_at))) FILTER (WHERE status = 'done')::float AS avg_seconds,
       AVG(cost_usd) FILTER (WHERE status = 'done')::float AS avg_cost_usd,
-      SUM(cost_usd) FILTER (WHERE status = 'done')::float AS total_cost_usd
+      SUM(cost_usd) FILTER (WHERE status = 'done')::float
+        + (SELECT COALESCE(SUM(cleanup_cost_usd), 0)::float FROM rooms
+           WHERE cleanup_finished_at > now() - ($1 || ' days')::interval) AS total_cost_usd
     FROM renders
     WHERE created_at > now() - ($1 || ' days')::interval`, [String(Math.max(1, Math.min(365, Number(days) || 30)))])
     .then(r => r.rows[0] || null),

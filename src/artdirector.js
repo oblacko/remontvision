@@ -290,7 +290,7 @@ export function composeArtDirectionPrompt({
   const styleCard = styleById(styleId) || null;
   const concept = conceptId ? conceptById(conceptId) : null;
   const compatibility = styleCard && concept ? compatibilityOf(styleCard.id, concept.id) : null;
-  const factsOnly = !concept || compatibility === 'conflict';
+  const factsOnly = !concept || !styleCard || compatibility === 'conflict';
   const hasDimensions = dimensions
     && Number(dimensions.width) > 0
     && Number(dimensions.length) > 0
@@ -406,15 +406,22 @@ export async function buildArtDirection({
 
   let { parsed, cost } = await visionJson({ system: prompt.system, user: prompt.user, images: [imageDataUrl], model: ART_DIRECTOR_MODEL, sessionId });
   let result = apply(parsed);
-  // Страховка: если выбранная модель вернула пусто, пробуем основную vision-модель.
-  if (!result.text && ART_DIRECTOR_MODEL) {
+  // Страховка: пустой текст или запрошенный, но отсутствующий замысел — один повтор.
+  if ((!result.text || (!prompt.factsOnly && !result.direction)) && ART_DIRECTOR_MODEL) {
     const retry = await visionJson({ system: prompt.system, user: prompt.user, images: [imageDataUrl], model: null, sessionId });
     parsed = retry.parsed;
     cost = (cost || 0) + (retry.cost || 0);
     result = apply(parsed);
   }
   if (!result.text) return null;
-  return { ...result.fields, text: result.text, direction: result.direction, cost: cost ?? null };
+  return {
+    ...result.fields,
+    text: result.text,
+    direction: result.direction,
+    factsOnly: prompt.factsOnly,
+    directionRequested: !prompt.factsOnly,
+    cost: cost ?? null,
+  };
 }
 const BRIEF_SYSTEM = `Ты арт-директор и эксперт по интерьерной фотографии. По одной фотографии комнаты оцени помещение и предложи направление дизайна.
 Опирайся на типовые размеры: дверь 2.0-2.1 м, длина кровати 2.0 м, глубина кухонных шкафов 0.6 м, высота стула 0.45 м, рост человека, плитка и панели. Учитывай перспективу и ширину объектива.

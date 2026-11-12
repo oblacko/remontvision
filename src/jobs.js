@@ -86,6 +86,7 @@ export function startRoomCleanup(roomId) {
   if (MOCK_MODE) return;
   if (!getCleanupConfig().enabled) return;
   void (async () => {
+    let leaseTimer = null;
     try {
       const claimed = await q.claimRoomCleanup(roomId);
       if (!claimed) return;
@@ -94,6 +95,9 @@ export function startRoomCleanup(roomId) {
         await q.failRoomCleanup(roomId, 'Комната не найдена');
         return;
       }
+      // Продлеваем cleanup_started_at, чтобы sweeper не запустил второй платный вызов.
+      leaseTimer = setInterval(() => { q.touchRoomCleanup(room.id).catch(() => {}); }, 60_000);
+      if (leaseTimer.unref) leaseTimer.unref();
       const cfg = getCleanupConfig();
       const sourceBuf = await getBuffer(room.photo_path);
       const { width, height } = imageSize(sourceBuf);
@@ -130,6 +134,8 @@ export function startRoomCleanup(roomId) {
       const msg = String(e.message || e).slice(0, 500);
       await q.failRoomCleanup(roomId, msg).catch(() => {});
       log({ event: 'room_cleanup_error', room_id: roomId, error: msg });
+    } finally {
+      if (leaseTimer) clearInterval(leaseTimer);
     }
   })();
 }
@@ -336,6 +342,17 @@ export async function processRender(renderId, claimedBy = null) {
         ].filter(Boolean),
       })).filter(item => item.focalZone || item.mainMove || item.palette.length);
       const variability = buildRoomVariability({ seed: renderId, styleName, styleKey: styleInfo?.key, used: usedDirections, keepFurniture });
+      // История для direction — по пользователю (как раньше), а не только по комнате.
+      let directionHistory = usedDirections.map(item => ({ main_move: item.mainMove, focal_zone: item.focalZone }));
+      if (room.user_id) {
+        try {
+          const registry = await q.designRegistryForUser(room.user_id);
+          const registryHistory = registry
+            .map(row => ({ main_move: row.main_move, focal_zone: row.focal_zone }))
+            .filter(item => item.main_move || item.focal_zone);
+          if (registryHistory.length) directionHistory = registryHistory.slice(-5);
+        } catch { /* остаётся история комнаты */ }
+      }
 
       let styleUserRef = false;
       const styleRefUrls = [];
@@ -418,7 +435,7 @@ export async function processRender(renderId, claimedBy = null) {
             modelKey: render.model_key || getModelConfig().render,
             styleId: styleInfo?.key || '',
             conceptId: conceptKey || '',
-            usedDirections: usedDirections.map(item => ({ main_move: item.mainMove, focal_zone: item.focalZone })),
+            usedDirections: directionHistory,
           });
           if (ad && keepFurniture && ad.existingFurniture === null) {
             // Старый промт дизайнера мог не вернуть existing_furniture — уточняем брифом.
@@ -464,6 +481,10 @@ export async function processRender(renderId, claimedBy = null) {
                 });
               }
               try { await q.setRoomDesign(room.id, room.concept_key, ad.direction); } catch { /* метаданные не критичны */ }
+            } else if (ad.directionRequested) {
+              // Замысел запрошен, но контракт не пришёл: не кэшируем неполный анализ.
+              analysisFailed = true;
+              log({ event: 'direction_missing', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, cost_usd: ad.cost ?? null });
             } else {
               log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart, facts_only: true });
             }
@@ -623,8 +644,8 @@ export async function processRender(renderId, claimedBy = null) {
       const editModel = getModelConfig().edit || null;
       const activeModel = iteration && editModel ? editModel : getModelConfig().render;
       const aspectRatio = snapAspect(width, height, modelCaps(activeModel).aspects);
-      const designBuf = precleanedShell ? await getBuffer(precleanedShell) : originalBuf;
-      if (precleanedShell) {
+      const designBuf = originalBuf;
+      if (!iteration && precleanedShell) {
         meta.source_used = 'precleaned';
         meta.cleanup = { async: true, shell_path: precleanedShell, cost_usd: room.cleanup_cost_usd ?? null };
       }

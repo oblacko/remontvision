@@ -95,6 +95,12 @@ test('conflict pair stays facts-only and never asks for a direction', () => {
   assert.doesNotMatch(out.system, /полем "direction"/);
 });
 
+test('unknown/admin style with a concept stays facts-only instead of crashing', () => {
+  const out = composeArtDirectionPrompt({ styleId: 'custom_admin_style', conceptId: 'accent_block' });
+  assert.equal(out.factsOnly, true);
+  assert.equal(out.compatibility, null);
+});
+
 test('normalizeDirection maps the combined contract to art-direction fields', () => {
   const out = normalizeDirection({
     style_id: 'scandinavian',

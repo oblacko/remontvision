@@ -33,6 +33,18 @@ test('cleanup is never started when the owner keeps furniture', async () => {
   assert.equal(await q.claimRoomCleanup(room.id), null);
 });
 
+test('failed cleanup can be retried, but only up to three attempts', async () => {
+  await createTestApp();
+  const user = await createUser();
+  const room = await seedRoom({ userId: user.id, keepFurniture: false });
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    assert.ok(await q.claimRoomCleanup(room.id), `attempt ${attempt} must be claimable`);
+    await q.failRoomCleanup(room.id, `boom-${attempt}`);
+  }
+  assert.equal(await q.claimRoomCleanup(room.id), null, 'fourth attempt is blocked');
+});
+
 test('waiting_shell heartbeat extends started_at so the 60-minute sweeper does not kill the job', async () => {
   await createTestApp();
   const user = await createUser();
