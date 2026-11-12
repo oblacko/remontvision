@@ -9,7 +9,7 @@
 | Render | `black-forest-labs/flux-3-image` | `app_settings.model.render` / `RENDER_MODEL` / админка |
 | Edit | пусто = render | `app_settings.model.edit` / `EDIT_MODEL` |
 | Vision | `google/gemini-3.1-pro-preview` | `app_settings.model.vision` / `VISION_MODEL` |
-| Direction | `deepseek/deepseek-v4.1-flash-1017` | `DIRECTION_MODEL` / `ART_DIRECTOR_MODEL` |
+| Art direction + direction | `deepseek/deepseek-v4.1-flash-1017` | `ART_DIRECTOR_MODEL` / админка моделей |
 | Cleanup | `black-forest-labs/flux-3-image-klein` | `cleanup.config.v1` |
 | Layout | DeepSeek Flash | `LAYOUT_MODEL` / `DIRECTION_MODEL` |
 
@@ -27,7 +27,9 @@ export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabe
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio, resolution, model });
 export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect });
 export async function visionJson({ system, user, images, model });
-export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture });
+export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture, styleId, conceptId, usedDirections });
+export function composeArtDirectionPrompt({ roomType, style, styleDescription, dimensions, keepFurniture, styleId, conceptId, usedDirections });
+export function normalizeDirection(parsed, { styleId, conceptId, compatibility });
 export async function analyzeRoomBrief({ imageDataUrl, roomType });
 export async function parseRender(renderB64, mime);
 export function snapAspect(width, height, allowed);
@@ -45,8 +47,8 @@ export const MAX_REFERENCES; // 4
 
 - `buildArtDirection` — vision по фото: размеры, объектив, мебель, палитра, свет.
 - `buildRepairScope` — объём ремонта; запускается параллельно с арт-директором.
-- `buildLayoutPlan` — только пустая комната; `fitLayoutPlan` проверяет проходы.
-- Стоимость каждого вызова — в `renders.cost_breakdown`.
+- `buildLayoutPlan` — только пустая комната; `fitLayoutPlan` проверяет проходы; `x_cm/y_cm` в промт не передаются, кэш по комнате, ≤5 прошлых стратегий.
+- Стоимость vision/design — в `renders.cost_breakdown`; стоимость cleanup — в `rooms.cleanup_cost_usd`; авто-разбор `PARSE_AUTO` — ключ `render_analysis_auto`.
 
 ## Возможности моделей
 
@@ -67,6 +69,7 @@ export const MAX_REFERENCES; // 4
 - `withImageSlot` (семафор): не обходить слот и не повторять упавший вызов.
 - 429: до 4 попыток 10/20/40 с + `Retry-After`.
 - Прокси: OpenRouter WAF может блокировать IP VPS.
+- `PARSE_AUTO=1` включает авто-разбор после раннего done; по умолчанию off, стоимость пишется отдельно.
 
 ## Добавить провайдера
 

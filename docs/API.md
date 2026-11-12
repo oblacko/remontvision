@@ -16,6 +16,7 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/design` | стили и концепции (хардкод `designdata`) |
 | GET | `/api/room-types` | активные типы комнат |
 | GET | `/api/packs` | пакеты кредитов |
+| GET | `/api/referral/context` | `{invited}` по HttpOnly-куке `rv_ref`; rate limit, no-store |
 | POST | `/api/auth/request-code` | `{email}` → OTP |
 | POST | `/api/auth/verify` | `{email, code, consents}` → cookie |
 | POST | `/api/auth/logout` | выход |
@@ -37,13 +38,14 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/referral` | код, ссылка, приглашённые |
 | GET | `/api/my/rooms`, `/api/my/generations` | комнаты/рендеры |
 | GET | `/api/credits` | баланс и ledger |
+| GET | `/api/credits/refunds?after=<id>` | свежие `iterate_refund` для тоста (только свои) |
 | POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
 | POST | `/api/payments/sync` | синхронизация pending-платежа |
 | POST | `/api/cleanup` | очистка комнаты по фото → data URL |
 | POST | `/api/estimate-room` | vision-оценка размеров (фронтенд сейчас не использует) |
 | POST | `/api/rooms` | multipart: фото, `items` (1–8 пар), тип, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний done-рендер |
-| GET | `/api/rooms/:id/versions` | все версии |
+| GET | `/api/rooms/:id/versions` | все версии; `edits_used` для цены правки/переноса |
 | DELETE | `/api/rooms/:id` | удалить комнату (owner) |
 | POST | `/api/rooms/:id/retry` | повтор упавшего базового рендера |
 | POST | `/api/rooms/:id/iterate` | правка: `text`, `target`, `product_id`, `refs`/`ref_meta`, `ref`, `ref_url`, `parent_id`, `move` |
@@ -56,7 +58,7 @@ Admin: заголовок `X-Admin-Key`.
 
 ### `POST /api/rooms`
 
-`multipart/form-data`:
+`multipart/form-data`. При `keep_furniture=false` и включённой очистке сервер асинхронно запускает очистку комнаты; рендер ждёт shell ≤3 мин.
 
 | Поле | Обяз. | Значение |
 |---|---|---|
@@ -93,7 +95,7 @@ Admin: заголовок `X-Admin-Key`.
 - `parent_id` — версия для правки (по умолчанию последняя).
 - `move` — JSON `{bbox, dx, dy, label}` для переноса объекта.
 
-Первые 3 правки бесплатны, 4-я и далее — 1 кредит. Товарная правка проходит vision QA: при отказе `rejected`, родитель активен, кредит возвращается, причина — в `notice`.
+Первые 3 правки бесплатны, 4-я и далее — 1 кредит. Цена видна в UI до подтверждения (`edits_used` в `/versions`). Товарная правка проходит vision QA: при отказе `rejected`, родитель активен, кредит возвращается, причина — в `notice`.
 
 ## Админ (`X-Admin-Key`)
 

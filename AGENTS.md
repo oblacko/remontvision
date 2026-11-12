@@ -16,7 +16,7 @@
 1. **Каталог демонстрационный.** 100 активных товаров, 0 URL; реальных заказов нет. Не утверждайте в UI/доках, что товар можно купить.
 2. **Не хардкодьте модели.** Render/vision/edit/cleanup/direction — в `app_settings` и `.env`, меняются через админку. Перед выводами проверяйте фактическую конфигурацию (`GET /api/health`, `/api/admin/settings/models`).
 3. **FLUX.2 Pro не принимает `resolution`.** Отправка даёт 400. `supportsResolution()` в `src/modelcaps.js` — Seedream и FLUX 3 Image/Klein. У FLUX возможна content moderation на спальнях.
-4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации; не «чините» их вслепую — см. docs/redesign.
+4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `catalogOn`, `styling` не доходят до генерации; `furnitureOff` исправлен. Не «чините» оставшиеся вслепую — см. docs/redesign.
 5. **Design-first.** Базовый кадр получает исходник + один art ref и текстовые материалы, без product refs. Следствие: `render_items` у новых базовых рендеров **пуст**. Товарная правка использует один product ref и обязательный vision QA; при отказе версия отклоняется, кредит возвращается.
 6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — параллелизм; image-вызовы ограничиваются общим семафором (`src/imageslot.js`), а не advisory-lock.
 7. **Direction — часть арт-директора.** Один vision-вызов `src/artdirector.js` отдаёт факты по фото и (при выбранной концепции) поле `direction`; без концепции — `facts_only`. Повторные рендеры комнаты/стиля/концепта берутся из `room_analysis`. Отдельного direction-агента нет.
@@ -74,6 +74,8 @@ node --check src/openrouter.js
 | Размеры, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js` |
 | Правила комнат, слоты | `src/roomtypes.js` |
 | Direction и кэш | `src/artdirector.js`, `src/directionprompt.js`, `src/roomanalysis.js`, `src/variability.js` |
+| Черновик генерации | `web/src/lib/draft.ts`, `web/src/components/GenerationPanel.tsx` |
+| Очистка комнаты | `src/jobs.js` (`startRoomCleanup`), `src/cleanupconfig.js`, `src/db.js` |
 | Очередь, lease, claim | `src/db.js`, `src/jobs.js`, `src/workerknobs.js` |
 | Глобальный image-слот | `src/imageslot.js`, `src/openrouter.js` |
 | Генерация/стадии | `src/jobs.js`, `src/openrouter.js` |
@@ -125,8 +127,8 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — unit: промт, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, импорт, model caps, подписи Robokassa, procurement templates, типы комнат, direction, workerknobs.
-- `npm run test:integration` — кредиты/refund, очередь/lease/fencing, auth, комнаты, шаринг, платежи, файлы, image-слот, direction-кэш.
+- `npm test` — unit: промт, регрессия 20 конфигураций, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, импорт, model caps, подписи Robokassa, procurement templates, типы комнат, direction, workerknobs, variability, room-analysis key.
+- `npm run test:integration` — кредиты/refund, очередь/lease/fencing, auth, комнаты, шаринг, платежи, файлы, image-слот, room_analysis, referral, cleanup-async.
 - `cd web && npm run lint && npm run build`.
 - `cd catalog-service && pytest -q`.
 - Живой smoke — на VPS/canary, не на прод-пользователях.
@@ -137,7 +139,8 @@ node --check src/openrouter.js
 - Legacy procurement (Yandex) не подключён; текущий подбор — MCP/catalog-service (бесплатно, один проход).
 - Style-ref/hero-референсы выключены по умолчанию (`text`).
 - Очистка комнаты выключена по умолчанию.
-- `furnitureOff`/`catalogOn`/`styling` не доходят до промта.
+- `catalogOn`/`styling` не доходят до промта (`furnitureOff` исправлен).
+- Кнопка «Найти товары» скрыта в UI; MCP-эндпоинт работает.
 - Нет inpainting люстр/розеток.
 - Один провайдер (OpenRouter).
 - Бэкап/restore-скрипты есть, но расписание/off-site/алерты не настроены; диск прода 91%.
@@ -151,7 +154,8 @@ node --check src/openrouter.js
 3. `cd web && npm run lint && npm run build` проходит.
 4. `catalog-service pytest` зелёный (если менялся сервис).
 5. Обновлён `docs/HISTORY.md`; при изменении состояния — `docs/STATUS.md`.
-6. Обновлены relevant docs; `npm run docs:llms` при изменении документации.
-7. `npm run kit:build` при изменении UI-кита/классов.
-8. Нет секретов в diff.
-9. Деплой прошёл, smoke зелёный (после явного разрешения).
+6. `npm run test:regression` зелёный при изменениях промта.
+7. Обновлены relevant docs; `npm run docs:llms` при изменении документации.
+8. `npm run kit:build` при изменении UI-кита/классов.
+9. Нет секретов в diff.
+10. Деплой прошёл, smoke зелёный (после явного разрешения).

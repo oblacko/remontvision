@@ -13,7 +13,7 @@ URL: `/admin`
 | Стили | стили, prompt description, референсы, approve, товары стиля, комплект |
 | Промт | редактируемые правила промта |
 | Архитектор | версии промтов строителя/рецензента/критерия |
-| Логи | промты рендеров, модель, стоимость, референсы, отклонённые версии |
+| Логи | промты рендеров, модель, стоимость (включая cleanup), референсы, отклонённые версии |
 | Модели | render/edit/vision, resolution/aspect, проверка input refs |
 | Очистка | модель/промт/разрешение/aspect очистки, включение |
 | Генерация | `product_refs_enabled` (сейчас no-op), `max_products`, `image_min_gap_ms` |
@@ -38,9 +38,9 @@ URL: `/admin`
 
 ## Промт
 
-Правила в `app_settings.prompt.rules.v1`, дефолты — `src/promptconfig.js`. Поля: свет, размеры, план масштаба, кровать, радиаторы, уборка/техника, окна/текстиль, Pinterest, фотография, мебель, каталог, дополнительно, запреты.
+Правила в `app_settings.prompt.rules.v1`, дефолты — `src/promptconfig.js`. Поля: свет, размеры, геометрия (`GEOMETRY LOCK`), план масштаба, кровать, радиаторы, уборка/техника, окна/текстиль, Pinterest, фотография, мебель, каталог, дополнительно, запреты.
 
-**Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации; правки этих полей не влияют на промт. Остальные правила применяются. Подробно — [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md).
+**Известный баг:** `catalogOn`, `styling` не доходят до генерации; `furnitureOff` исправлен. Остальные правила применяются. Подробно — [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md).
 
 ## Стили
 
@@ -54,7 +54,9 @@ URL: `/admin`
 - Только при `keep_furniture=false`.
 - **Выключена по умолчанию**; модель `black-forest-labs/flux-3-image-klein`, 1K, auto.
 - Промт с `{room}`, `{keep}`, `{remove}`; для кухни/санузла сохраняются встроенные элементы и сантехника.
-- Shell хранится в `renders.shell_path`.
+- Очистка запускается асинхронно при первом enqueue комнаты; shell хранится в `rooms.precleaned_shell_path`.
+- Статус: `rooms.cleanup_status` (`processing/done/error`), стоимость — `rooms.cleanup_cost_usd`; до 3 попыток, lease-heartbeat.
+- Для кастомных admin-стилей без статической hex-палитры direction работает в `facts_only`, акцент — общий.
 
 ## Модели
 
@@ -68,6 +70,7 @@ URL: `/admin`
 |---|---|
 | `WORKER_CONCURRENCY` | 1–8, по умолчанию 6 |
 | `IMAGE_MIN_GAP_MS` | пауза между image-вызовами (админка «Генерация») |
+| `PARSE_AUTO` | `1` — авто-разбор после раннего done; по умолчанию off |
 
 ## Безопасность
 

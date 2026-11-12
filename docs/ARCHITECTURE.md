@@ -18,7 +18,7 @@ flowchart LR
   W --> O["OpenRouter"]
   O --> S["Image: FLUX 3 Image / Klein"]
   O --> G["Vision: Gemini 3.1 Pro"]
-  O --> D["Direction: DeepSeek Flash"]
+  O --> D["Art direction + direction: DeepSeek Flash"]
   E --> R["Resend"]
   E --> Y["Robokassa / ЮKassa"]
   E --> X["Прокси (опционально)"]
@@ -33,11 +33,11 @@ flowchart LR
 | Express API | auth, комнаты, рендеры, админка, шаринг, платежи, статика | `src/server.js` |
 | Worker | claim/lease, `processRender`, стадии, refund | `src/jobs.js` |
 | Очередь | `renders` + lease/`claimed_by`, `WORKER_CONCURRENCY` | `src/db.js`, `src/jobs.js` |
-| Image-слот | глобальная сериализация image-вызовов | `src/imageslot.js` |
+| Image-слот | семафор image-вызовов: система/провайдер/пользователь | `src/imageslot.js` |
 | Direction | один vision-вызов арт-директора + `room_analysis` | `src/artdirector.js`, `src/roomanalysis.js`, `src/variability.js` |
 | Postgres | пользователи, комнаты, рендеры, товары, стили, кредиты, платежи | `src/db.js`, `migrations/` |
 | Storage | фото, рендеры, картинки товаров/референсов | `src/storage.js` |
-| OpenRouter | image, vision, direction | `src/openrouter.js`, `src/openrouteragent.js` |
+| OpenRouter | image + vision (direction — часть vision-вызова арт-директора) | `src/openrouter.js`, `src/openrouteragent.js` |
 | Resend/SMTP | OTP и письма | `src/auth.js`, `src/mailer.js` |
 | Платежи | Robokassa/ЮKassa, вебхуки, возвраты | `src/payments.js`, `src/robokassa.js` |
 | Подбор товаров | MCP/catalog-service (текущий путь) | `src/visionagent.js`, `src/catalogclient.js`, `catalog-service/` |
@@ -53,13 +53,13 @@ flowchart LR
 2. Проверяются auth, кредиты, rate limit; модель/разрешение.
 3. В одной транзакции: `rooms` + N × `renders(status=queued)`, списание за каждый вариант.
 4. Воркер забирает рендер через `FOR UPDATE SKIP LOCKED`, ставит lease 5 минут и `claimed_by`.
-5. `processRender` собирает контекст (vision, direction из кэша, cleanup при необходимости) и вызывает OpenRouter.
-6. Результат — в Storage, анализ — в `renders.analysis`, стоимость — в `cost_usd`.
+5. При первом enqueue запускается асинхронная очистка (если нужно). `processRender` ждёт shell ≤3 мин, собирает контекст (vision из `room_analysis`, art direction + direction одним вызовом) и вызывает OpenRouter.
+6. Результат — в Storage, анализ — в `renders.analysis`, стоимость — в `cost_usd`; стоимость очистки — в `rooms.cleanup_cost_usd`.
 7. UI поллит `GET /api/rooms/:id` до `done`/`error`; прогресс «N из 8» по рендерам.
 
 ### Аренда и восстановление
 
-- Heartbeat продлевает lease каждые 30 секунд.
+- Heartbeat продлевает lease каждые 30 секунд; при ожидании shell (`waiting_shell`) продлевается и `started_at`.
 - `requeueProcessing` возвращает в очередь только истёкшие lease.
 - Reaper раз в 5 минут: queued старше 24 часов **или** processing дольше 60 минут → error + refund.
 - Завершение/heartbeat проверяют `claimed_by`: воркер, потерявший lease, не перезаписывает результат.
@@ -77,13 +77,14 @@ flowchart LR
 | Таблица | Назначение |
 |---|---|
 | `users`, `sessions`, `auth_identities` | аккаунты и вход |
-| `rooms` | фото, стиль, тип, tier, флаги, размеры, precleaned shell |
+| `rooms` | фото, стиль, тип, tier, флаги, размеры, precleaned shell, статус/стоимость async cleanup |
 | `renders` | версия: style/concept, prompt, model, cost, image, analysis, share_token, edit refs, **lease/claimed_by** |
 | `render_items` | смета конкретного рендера (у новых базовых рендеров пусто) |
 | `products`, `style_products` | каталог и избранные товары стиля |
 | `styles`, `style_references`, `concepts` | стили, референсы, концепции |
 | `credit_txn`, `payments`, `refunds`, `receipts` | кредиты и платежи |
-| `generation_cache` | кэш direction (kind/key/value, TTL) |
+| `room_analysis` | кэш анализа комнаты: размеры/мебель/ремонт/art direction/layout |
+| `generation_cache` | кэш layout-плана (kind/key/value, TTL) |
 | `render_likes`, `render_comments` | шаринг |
 | `product_clicks` | клики из сметы через `/go/:id` |
 | `app_settings` | модели, прокси, правила промта, настройки |
@@ -124,6 +125,7 @@ flowchart LR
 - Новая смета не заполняется; старый procurement не подключён.
 - Бэкап/restore-скрипты есть, но расписание/off-site/алерты не настроены; диск прода 91%.
 - Style-ref/hero-референсы выключены по умолчанию.
+- Direction и акцент для кастомных admin-стилей без статической палитры ограничены `facts_only`/общим акцентом.
 - Старый `/app` — 301.
 
 ## Связанные документы

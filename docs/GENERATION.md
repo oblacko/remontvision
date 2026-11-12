@@ -18,12 +18,13 @@
 flowchart LR
   A["Фото + items + тип + tier"] --> B["POST /api/rooms"]
   B --> C["N × renders(queued) + кредиты"]
+  C --> CL["cleanup при первом enqueue (async, если включён)"]
   C --> W["Worker: claim + lease"]
+  CL --> W
   W --> V["repair_scope ∥ art_direction + direction"]
   V --> L["layout (пустая комната)"]
   L --> P["buildPrompt (design-first)"]
-  P --> C1["cleanup (если включён)"]
-  C1 --> I["design: FLUX 3 Image"]
+  P --> I["design: FLUX 3 Image"]
   I --> S["fitAspect + storage"]
   S --> R["architect review (vision)"]
   R --> ANA["analysis: surfaces/RAL/electrical/suggestions"]
@@ -39,7 +40,7 @@ flowchart LR
 - В одной транзакции создаются `rooms` и N `renders(status=queued)`; кредит списывается за каждый вариант.
 - `claimNextRender` — `FOR UPDATE SKIP LOCKED` + lease 5 минут + `claimed_by`.
 - Heartbeat каждые 30 с; requeue/reaper — только истёкшие lease; processing старше 60 минут → error + refund.
-- `WORKER_CONCURRENCY` (1–8) — сколько рендеров в работе в процессе; image-вызовы сериализуются глобальным слотом.
+- `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — сколько рендеров в работе; image-вызовы идут параллельно в пределах семафора (система/провайдер/пользователь).
 
 ### 3. Стиль и референсы
 
@@ -69,24 +70,24 @@ flowchart LR
 `src/openrouter.js`:
 
 - карта изображений: исходник + необязательный art ref; product refs нет;
-- `ARCHITECTURE LOCK`, `ART DIRECTION`, `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`;
+- `ARCHITECTURE LOCK`, `GEOMETRY LOCK`, `ART DIRECTION`, `VARIABILITY`, `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`;
 - `KEEP EXACTLY`, `FURNITURE MODE`, `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`;
 - `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`;
 - `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
 
-Правила редактируются в админке «Промт» (`app_settings.prompt.rules.v1`), дефолты — `src/promptconfig.js`. Известный баг: `furnitureOff`, `catalogOn`, `styling` не доходят до генерации (см. [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md)).
+Правила редактируются в админке «Промт» (`app_settings.prompt.rules.v1`), дефолты — `src/promptconfig.js`. Известный баг: `catalogOn`, `styling` не доходят до генерации; `furnitureOff` исправлен. Регрессия промтов — `npm run test:regression`.
 
 ### 7. Очистка и image generation
 
-- При `keep_furniture=false` + включённой очистке: FLUX 3 Klein → `shell_path`, затем дизайн по shell.
+- При `keep_furniture=false` + включённой очистке: FLUX 3 Klein запускается асинхронно при первом enqueue, shell хранится в `rooms.precleaned_shell_path`; `processRender` ждёт его ≤3 мин, затем рисует по shell.
 - Основной вызов — FLUX 3 Image (модель/разрешение из админки), 1K/auto по умолчанию.
 - `resolution` не отправляется для моделей, которые его не поддерживают (FLUX 2 Pro).
-- Выход прогоняется через `fitAspect` к пропорции исходника; стоимость (`usage.cost`) — в `renders.cost_usd`.
+- Выход прогоняется через `fitAspect` к пропорции исходника; стоимость (`usage.cost`) — в `renders.cost_usd`. Стоимость cleanup — в `rooms.cleanup_cost_usd`.
 - Без `OPENROUTER_API_KEY` — mock-режим: демо-картинка, расходов нет.
 
 ### 8. Анализ
 
-`reviewDesign` (vision) возвращает items, surfaces, hints, electrical. Fallback — `parseRender`. RAL считается только для окрашиваемых поверхностей. Анализ — в `renders.analysis`.
+Разбор интерьера запускается кнопкой (`ARCHITECT_ON_DEMAND`) или автоматически при `PARSE_AUTO=1` (по умолчанию off) после раннего done. `parseRender` возвращает items, surfaces, visible, electrical; стоимость авто-разбора — отдельный ключ `render_analysis_auto`. RAL считается только для окрашиваемых поверхностей. Анализ — в `renders.analysis`.
 
 ### 9. Смета
 
@@ -109,7 +110,7 @@ flowchart LR
 
 ## Логи и метрики
 
-- `render_start`, `repair_scope_ok`, `art_direction_ok`, `design_direction_ok`, `room_analysis_cache_hit`, `render_image_ok`, `render_done`, `render_error`, `render_lease_lost`.
+- `render_start`, `repair_scope_ok`, `art_direction_ok`, `design_direction_ok`, `room_analysis_cache_hit`, `room_cleanup_done`, `room_cleanup_wait_timeout`, `render_analysis_auto`, `render_image_ok`, `render_done`, `render_error`, `render_lease_lost`.
 - `renders.prompt`, `renders.meta`, `renders.cost_breakdown`.
 - Замеры ёмкости: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 
@@ -119,7 +120,8 @@ flowchart LR
 - Нет inpainting люстр/розеток.
 - Один провайдер — OpenRouter.
 - Style-ref/hero-референсы выключены по умолчанию.
-- Часть правил админки не применяется (см. выше).
+- Часть правил админки не применяется: `catalogOn`, `styling` (см. выше).
+- Direction/акцент для кастомных admin-стилей без статической палитры — ограничены.
 
 ## Связанные документы
 

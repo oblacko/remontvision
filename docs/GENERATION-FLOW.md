@@ -13,7 +13,7 @@ flowchart TD
   Q --> W["Worker: claim + lease"]
   W --> DONE["renders.done + rooms.done"]
   DONE --> RESULT["Кадр, direction, разбор, правки"]
-  RESULT -->|"бесплатно"| PROC["Найти товары (MCP)"]
+  RESULT -.->|"UI скрыт до оживления"| PROC["Найти товары (MCP)"]
 ```
 
 ## 2. Пайплайн рендера
@@ -24,9 +24,10 @@ flowchart TD
   LOAD --> MODE{"iteration?"}
   MODE -->|"да"| EDIT["parent render + edit prompt"]
   MODE -->|"нет"| CLEAN{"cleanup включён и keep_furniture=false?"}
-  CLEAN -->|"да"| SHELL["FLUX 3 Klein → shell (async на комнату)"]
+  CLEAN -->|"да"| SHELL["FLUX 3 Klein → shell (async при enqueue)"]
   CLEAN -->|"нет"| BASE["Базовый дизайн"]
-  SHELL --> BASE
+  SHELL --> WAIT["wait shell ≤3 мин (waiting_shell)"]
+  WAIT --> BASE
   BASE --> RS["repair_scope (vision)"]
   BASE --> AD["art_direction + direction (один vision)"]
   RS --> LAY["layout (пустая комната)"]
@@ -34,9 +35,9 @@ flowchart TD
   LAY --> PROMPT["buildPrompt"]
   PROMPT --> DESIGN["FLUX 3 Image"]
   DESIGN --> STORE["fitAspect + putBuffer"]
-  STORE --> REVIEW["architect review (vision)"]
-  REVIEW --> ANALYZE["analysis: surfaces/RAL/electrical/suggestions"]
-  ANALYZE --> SAVE["renders.analysis + cost_breakdown + done"]
+  STORE --> DONE["ранний done"]
+  DONE --> ANALYZE["разбор по кнопке / PARSE_AUTO"]
+  ANALYZE --> SAVE["renders.analysis + cost_breakdown"]
   EDIT --> DESIGN
 ```
 
@@ -45,7 +46,7 @@ flowchart TD
 | Данные | Источник | Куда попадает |
 |---|---|---|
 | Фото комнаты | `rooms.photo_path` | art director, design, QA |
-| Пустой каркас | `rooms.precleaned_shell_path` / `renders.shell_path` | source для design |
+| Пустой каркас | `rooms.precleaned_shell_path` | source для design |
 | Родительский рендер | `renders.parent_render_id` | source и смета для правок |
 | Тип комнаты | `rooms.room_type`; `app_settings.roomtypes.config.v1` | prompt, слоты, электрика |
 | Стиль | `styles` (`name`, `key`, `prompt_description`) | style brief |
@@ -78,8 +79,8 @@ flowchart TD
 | `design_retry` | повтор дизайна | architecture QA |
 | `architecture_qa` | vision-QA | `ARCHITECTURE_QA_ENABLED=1` |
 | `product_qa` | vision-QA товара | правка с product ref |
-| `architect_review` | vision-разбор | после кадра |
-| `render_analysis` | fallback-разбор | если review упал |
+| `render_analysis_auto` | vision-разбор | `PARSE_AUTO=1`, после раннего done |
+| `render_analysis` | fallback-разбор | `ARCHITECT_ON_DEMAND=false` |
 | `failed` | стоимость упавшего запроса | ошибка |
 
 Смотреть: кабинет → «Себестоимость», `GET /api/rooms/:id` → `render.cost_usd/cost_breakdown`, админка «Логи», логи `render_done`/`render_error`.
@@ -95,7 +96,8 @@ flowchart TD
 | `style.config.mode=swatches` | material board |
 | `ART_DIRECTION_ENABLED=0` | отключает арт-директора |
 | `ARCHITECTURE_QA_ENABLED=0` | без QA архитектуры (default) |
-| `WORKER_CONCURRENCY` | параллелизм рендеров |
+| `PARSE_AUTO=1` | авто-разбор после раннего done (default off) |
+| `WORKER_CONCURRENCY` | параллелизм рендеров (1–8, default 6) |
 
 ## 6. Ошибки и кредиты
 

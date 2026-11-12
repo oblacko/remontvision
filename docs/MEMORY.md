@@ -1,6 +1,6 @@
 # Память проекта
 
-Состояние на 2026-11-11. Секреты сюда не писать. Рабочая память для следующих сессий.
+Состояние на 2026-11-12. Секреты сюда не писать. Рабочая память для следующих сессий.
 
 ## Продукт и главное требование
 
@@ -20,8 +20,8 @@
 ## Генерация
 
 - Render: FLUX 3 Image 1K (из `app_settings`/`.env`, код-дефолт `black-forest-labs/flux-3-image`).
-- Vision: `google/gemini-3.1-pro-preview`; direction: DeepSeek Flash.
-- Очистка: FLUX 3 Klein, **выключена по умолчанию**; работает только при `keep_furniture=false`.
+- Vision: `google/gemini-3.1-pro-preview`; art direction + direction: DeepSeek Flash, один vision-вызов (без концепции — `facts_only`).
+- Очистка: FLUX 3 Klein, **выключена по умолчанию**; работает только при `keep_furniture=false`, запускается асинхронно при первом enqueue, shell на комнате, ожидание ≤3 мин. Direction/вариативность: `src/artdirector.js`, `src/variability.js`; кэш анализа — `room_analysis`.
 - Design-first: исходник + один art ref, без product refs.
 - Мульти-стиль: до 8 пар, каждая — отдельный рендер и кредит.
 - QA архитектуры выключен по умолчанию (`ARCHITECTURE_QA_ENABLED=0`).
@@ -32,14 +32,15 @@
 - `claimNextRender`: `FOR UPDATE SKIP LOCKED` + lease 5 мин + `claimed_by`.
 - Heartbeat 30 с; requeue/reaper — только истёкшие lease; processing > 60 мин → error + refund.
 - `WORKER_CONCURRENCY` (1–8, default 6); image-вызовы — общий семафор (система/провайдер/пользователь).
-- Direction кэш: 3 варианта, TTL 30 дней, детерминированный выбор, негативный маркер на сутки.
-- `IMAGE_MIN_GAP_MS=10000`; 429 — до 4 попыток (10/20/40 с).
+- Анализ комнаты кэшируется в `room_analysis` по фото/shell/стилю/концепту/`keepFurniture`/размерам; отдельного direction-кэша нет.
+- `IMAGE_MIN_GAP_MS=0`; 429 — до 4 попыток (10/20/40 с).
 
 ## Промт и стиль
 
 - `buildPrompt()`: TASK → ARCHITECTURE LOCK → ART DIRECTION → SCALE → KEEP → FURNITURE → RADIATOR/WINDOW/LIGHTING → STYLE → MATERIALS → OUTPUT/AVOID.
 - Правила в `app_settings.prompt.rules.v1`, дефолты `src/promptconfig.js`.
-- **Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до промта.
+- **Известный баг:** `catalogOn`, `styling` не доходят до промта; `furnitureOff` исправлен.
+- Регрессия промтов: `npm run test:regression`, baseline в `docs/regression`.
 - Режимы стиля: `text` (default), `reference`, `swatches`.
 - 10 стилей × 10 концепций; 12 типов комнат.
 - Style-ref/hero-референсы при `text` не используются.
@@ -55,23 +56,23 @@
 
 - Прод: Robokassa, `ROBOKASSA_TEST=false`, `PAYMENT_PROVIDER=robokassa`.
 - Пакеты: 10/20/60 кредитов — 399/599/1499 ₽; первые 3 правки бесплатны.
-- Возвраты выключены; чеки вручную; ЮKassa — fallback.
+- Возвраты выключены; чеки автоматически через `src/receipts.js` при `RECEIPTS_WEBHOOK_URL`, иначе `pending`; ЮKassa — fallback.
 - `InvId` = `payments.id`; начисление идемпотентно.
 
 ## Инфраструктура
 
 - VPS: `/root/remontvision`, Docker Compose: app, db, catalog, catalog-db.
 - Публично: `https://www.remontvision.ru`; деплой — push в `main` → CI (test) → SSH → compose up.
-- Миграции: `001–053`, файла `048` нет.
-- Тесты: unit + integration (45) + catalog pytest (72); CI-гейт.
-- **Эксплуатация:** диск 91%, бэкап 45 ч без `db_dump`, внешнего монитора нет.
-- Прод-коммит на 2026-11-11: `092bdcd`.
+- Миграции: `001–061`, файла `048` нет.
+- Тесты: unit 393 + integration 69 + регрессия 20 + catalog pytest; CI-гейт.
+- **Эксплуатация:** по проверке 2026-11-11 диск 91%, бэкап 45 ч без `db_dump`, внешнего монитора нет — требует перепроверки.
+- Прод: `main` после деплоя 2026-11-12 (хеш — в GitHub Actions).
 
 ## Открытые вопросы и риски
 
 1. Реальный каталог (URL) — главный блокер запуска.
 2. Смета для новых рендеров не собирается.
-3. Часть правил админки не применяется.
+3. Часть правил админки не применяется (`catalogOn`, `styling`); direction/акцент кастомных стилей ограничены.
 4. Legacy procurement/статьи/Search Lab — что оставить.
 5. Бэкапы/диск/алерты.
 6. Inpainting и качество света/розеток.

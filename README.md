@@ -6,7 +6,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 ---
 
-## Статус на 2026-11-11
+## Статус на 2026-11-12
 
 | Блок | Состояние |
 |---|---|
@@ -16,7 +16,10 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Стили и комнаты | 10 стилей × 10 концепций, 12 типов комнат; редактируются в админке |
 | Очередь | Lease + `claimed_by` + `FOR UPDATE SKIP LOCKED`; `WORKER_CONCURRENCY`; семафор image-вызовов (система/провайдер/пользователь) |
 | Direction | Один vision-вызов арт-директора: факты + замысел; без концепции — `facts_only`; повторные рендеры комнаты — из `room_analysis` |
-| Правки | Точечные; первые 3 бесплатны, 4-я и далее — 1 кредит; товарный QA |
+| Правки | Точечные; первые 3 бесплатны, 4-я и далее — 1 кредит; товарный QA; цена видна до подтверждения |
+| Черновик | Параметры и сжатое фото переживают закрытие вкладки (localStorage + IndexedDB) |
+| Возврат кредита | Тост по свежему `credit_txn` с причиной отмены/ошибки |
+| ETA и пресеты | ETA по стадиям; 4 быстрых пресета правок |
 | Очистка комнаты | Работает при `keep_furniture=false`; **выключена по умолчанию**, запускается асинхронно при первом enqueue |
 | Подбор товаров | MCP/catalog-service: до 20 предметов, бесплатно, один проход |
 | Разбор / роадмап / move | Работают (вкладки комнаты) |
@@ -26,7 +29,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Админка | 15 вкладок: пользователи, пакеты, комнаты, стили, промт, архитектор, логи, модели, очистка, генерация, статьи, поиск, поиск-лаб, прокси, каталог |
 | Контент | Статьи (SEO) — есть; Search Lab — внутренний R&D-стенд |
 | Каталог | **Демо:** 100 товаров, 0 реальных URL; заказы невозможны |
-| Тесты | Unit + интеграционные (HTTP/БД) + pytest catalog-service; CI-гейт перед деплоем |
+| Тесты | 393 unit (1 skip), 69 integration, регрессия 20 промтов, web lint/build, pytest catalog-service; CI-гейт перед деплоем |
 
 Подробно, что именно работает и что нет: [docs/STATUS.md](docs/STATUS.md).
 
@@ -50,8 +53,8 @@ AI-сервис редизайна интерьера по фото: визуа�
 - **`/app` — 301 на `/`**; старый редактор остался только как fallback-файл `public/app.html`.
 - **`POST /api/estimate-room`** существует, но фронтенд его не вызывает; размеры приходят из vision-прохода.
 - **Style-ref и hero-референсы** выключены по умолчанию (режим `text`); включаются в админке.
-- **Часть правил админки «Промт» не доходит до генерации** (`furnitureOff`, `catalogOn`, `styling`) — известная проблема, зафиксирована в docs/redesign.
-- **Возвраты выключены** (`REFUNDS_ENABLED=false` по умолчанию); чеки — автоматически через `src/receipts.js` при заданном `RECEIPTS_WEBHOOK_URL`, иначе остаются `pending` в таблице `receipts`. В проде сейчас **диск 91%** и **бэкап старше 26 ч без `db_dump`** (см. OPERATIONS.md).
+- **Часть правил админки «Промт» не доходит до генерации** (`catalogOn`, `styling`); `furnitureOff` исправлен. Кнопка «Найти товары» скрыта до оживления procurement, эндпоинт MCP работает.
+- **Возвраты выключены** (`REFUNDS_ENABLED=false` по умолчанию); чеки — автоматически через `src/receipts.js` при заданном `RECEIPTS_WEBHOOK_URL`, иначе остаются `pending` в таблице `receipts`. По последней проверке 2026-11-11 в проде **диск 91%** и **бэкап старше 26 ч без `db_dump`** (требует перепроверки, см. OPERATIONS.md).
 - **Inpainting люстр/розеток** отсутствует; позиции могут плавать.
 - **Один основной провайдер** — OpenRouter.
 
@@ -82,7 +85,7 @@ npm run build                 # web/dist → раздаётся Express
 ## Тесты и проверка
 
 ```bash
-npm test                      # unit, без Postgres
+npm test                      # unit + регрессия промтов, без Postgres
 npm run test:integration      # HTTP/БД, отдельная <db>_test, нужен Postgres
 cd web && npm run lint && npm run build
 cd catalog-service && pytest -q
@@ -115,7 +118,9 @@ app/
     openrouter.js      image/vision-провайдер, промт, image-слот
     db.js              pg pool, миграции, SQL-запросы
     artdirector.js     vision-арт-директор: факты + замысел одним вызовом
+    roomanalysis.js    ключ/политика кэша анализа комнаты
     variability.js     акцент из палитры стиля + новизна комнаты
+    layoutagent.js     планировщик расстановки
     generationcache.js кэш AI-шагов с TTL (layout)
     imageslot.js       семафор image-вызовов (система/провайдер/пользователь)
     workerknobs.js     WORKER_CONCURRENCY
@@ -125,7 +130,7 @@ app/
     articles.js        контент-движок
   web/src/             React 19 + Vite + TS
   catalog-service/     FastAPI + pgvector + MCP
-  migrations/          SQL 001–053 (файла 048 нет — исторически)
+  migrations/          SQL 001–061 (файла 048 нет — исторически)
   test/                unit + integration
   docs/                документация
 ```
@@ -157,6 +162,7 @@ app/
 | [docs/GENERATION.md](docs/GENERATION.md) | Путь генерации, промт, очередь, кэш, правки |
 | [docs/GENERATION-FLOW.md](docs/GENERATION-FLOW.md) | Полная схема данных и себестоимости |
 | [docs/GENERATION-QUEUE.md](docs/GENERATION-QUEUE.md) | Ёмкость и инварианты очереди |
+| [docs/regression/README.md](docs/regression/README.md) | Регрессия 20 конфигураций промта, baseline и diff |
 | [docs/API.md](docs/API.md) | HTTP API |
 | [docs/PROCUREMENT.md](docs/PROCUREMENT.md) | Подбор товаров: текущий MCP-путь и legacy |
 | [docs/CATALOG.md](docs/CATALOG.md) | Каталог и catalog-service |

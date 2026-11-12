@@ -23,7 +23,8 @@ ADMIN_KEY=<admin-key>
 OPENROUTER_API_KEY=<key>
 RENDER_MODEL=black-forest-labs/flux-3-image
 VISION_MODEL=google/gemini-3.1-pro-preview
-DIRECTION_MODEL=deepseek/deepseek-v4.1-flash-1017
+ART_DIRECTOR_MODEL=deepseek/deepseek-v4.1-flash-1017
+LAYOUT_MODEL=deepseek/deepseek-v4.1-flash-1017
 RENDER_RESOLUTION=1K
 RENDER_ASPECT_RATIO=auto
 OPENROUTER_TIMEOUT_MS=120000
@@ -31,6 +32,7 @@ OPENROUTER_TIMEOUT_MS=120000
 # Очередь и скорость
 WORKER_CONCURRENCY=6              # 1–8
 IMAGE_MIN_GAP_MS=0                # пауза между image-вызовами
+PARSE_AUTO=0                      # 1 — авто-разбор после раннего done (платно)
 # Direction кэшируется в room_analysis; отдельного DIRECTION_CACHE_* нет
 
 # Auth/mail
@@ -74,7 +76,7 @@ S3_ENDPOINT=
 
 - `migrations/NNN_name.sql`, по порядку, учёт в `_migrations`.
 - Применённые не редактировать; только новые файлы.
-- Текущий диапазон: `001–053`; файла `048` нет (историческое переименование `046/047 → 048/049`).
+- Текущий диапазон: `001–061`; файла `048` нет (историческое переименование `046/047 → 048/049`).
 - Перед рискованными изменениями — `pg_dump` на VPS.
 
 ## Очередь рендеров
@@ -87,6 +89,7 @@ S3_ENDPOINT=
 | Reaper | queued > 24 ч или processing > 60 мин → error + refund |
 | Параллелизм | `WORKER_CONCURRENCY` (1–8) |
 | Image-слот | семафор в процессе: система/провайдер/пользователь (`imageslot.js`) |
+| Cleanup | асинхронно на первом enqueue; статус в `rooms.cleanup_status`, shell в `rooms.precleaned_shell_path`, до 3 попыток |
 
 Проверка очереди:
 
@@ -97,7 +100,15 @@ SELECT id, status, started_at, lease_expires_at FROM renders
 WHERE status='processing' ORDER BY started_at LIMIT 20;
 ```
 
-Метрики и canary: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
+Проверка cleanup:
+
+```sql
+SELECT cleanup_status, count(*) FROM rooms GROUP BY cleanup_status;
+SELECT id, cleanup_status, cleanup_attempts, cleanup_started_at, cleanup_error
+FROM rooms WHERE cleanup_status IN ('processing','error') ORDER BY cleanup_started_at LIMIT 20;
+```
+
+Кэш анализа комнаты можно сбросить вручную: `DELETE FROM room_analysis;` (только по команде владельца). Метрики и canary: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 
 ## Платежи (Robokassa)
 

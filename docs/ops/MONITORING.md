@@ -95,6 +95,21 @@ docker compose logs --since 24h app | grep -o '"stage":"[^"]*"' | sort | uniq -c
 или предупредить пользователя; при 400 — сверить `modelcaps`; при росте доли — P2,
 см. [RUNBOOK.md](RUNBOOK.md).
 
+## 4. Очистка комнат и кэш анализа
+
+```bash
+docker compose logs --since 24h app | grep -E '"event":"room_cleanup_(error|wait_timeout)"' | tail -20
+docker compose logs --since 24h app | grep -c '"event":"room_analysis_cache_hit"'
+```
+
+```sql
+SELECT cleanup_status, count(*) FROM rooms GROUP BY cleanup_status;
+SELECT id, cleanup_status, cleanup_attempts, cleanup_error FROM rooms
+WHERE cleanup_status = 'error' ORDER BY cleanup_finished_at DESC LIMIT 20;
+```
+
+Рост `cleanup_status=error` — смотреть OpenRouter/прокси; больше 3 попыток не будет, пока не изменить `cleanup_attempts` вручную или не добавить новую комнату. Кэш анализа сбрасывается `DELETE FROM room_analysis;` только по команде владельца.
+
 Ограничение: Docker logs хранят 10 MB × 3 на контейнер. При интенсивном трафике сутки
 могут не помещаться — тогда нужен внешний сбор логов (не настроен).
 

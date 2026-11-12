@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-12T08:20:28.116Z
+Generated: 2026-11-12T08:35:49.019Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -18,7 +18,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 ---
 
-## Статус на 2026-11-11
+## Статус на 2026-11-12
 
 | Блок | Состояние |
 |---|---|
@@ -28,7 +28,10 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Стили и комнаты | 10 стилей × 10 концепций, 12 типов комнат; редактируются в админке |
 | Очередь | Lease + `claimed_by` + `FOR UPDATE SKIP LOCKED`; `WORKER_CONCURRENCY`; семафор image-вызовов (система/провайдер/пользователь) |
 | Direction | Один vision-вызов арт-директора: факты + замысел; без концепции — `facts_only`; повторные рендеры комнаты — из `room_analysis` |
-| Правки | Точечные; первые 3 бесплатны, 4-я и далее — 1 кредит; товарный QA |
+| Правки | Точечные; первые 3 бесплатны, 4-я и далее — 1 кредит; товарный QA; цена видна до подтверждения |
+| Черновик | Параметры и сжатое фото переживают закрытие вкладки (localStorage + IndexedDB) |
+| Возврат кредита | Тост по свежему `credit_txn` с причиной отмены/ошибки |
+| ETA и пресеты | ETA по стадиям; 4 быстрых пресета правок |
 | Очистка комнаты | Работает при `keep_furniture=false`; **выключена по умолчанию**, запускается асинхронно при первом enqueue |
 | Подбор товаров | MCP/catalog-service: до 20 предметов, бесплатно, один проход |
 | Разбор / роадмап / move | Работают (вкладки комнаты) |
@@ -38,7 +41,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Админка | 15 вкладок: пользователи, пакеты, комнаты, стили, промт, архитектор, логи, модели, очистка, генерация, статьи, поиск, поиск-лаб, прокси, каталог |
 | Контент | Статьи (SEO) — есть; Search Lab — внутренний R&D-стенд |
 | Каталог | **Демо:** 100 товаров, 0 реальных URL; заказы невозможны |
-| Тесты | Unit + интеграционные (HTTP/БД) + pytest catalog-service; CI-гейт перед деплоем |
+| Тесты | 393 unit (1 skip), 69 integration, регрессия 20 промтов, web lint/build, pytest catalog-service; CI-гейт перед деплоем |
 
 Подробно, что именно работает и что нет: [docs/STATUS.md](docs/STATUS.md).
 
@@ -62,8 +65,8 @@ AI-сервис редизайна интерьера по фото: визуа�
 - **`/app` — 301 на `/`**; старый редактор остался только как fallback-файл `public/app.html`.
 - **`POST /api/estimate-room`** существует, но фронтенд его не вызывает; размеры приходят из vision-прохода.
 - **Style-ref и hero-референсы** выключены по умолчанию (режим `text`); включаются в админке.
-- **Часть правил админки «Промт» не доходит до генерации** (`furnitureOff`, `catalogOn`, `styling`) — известная проблема, зафиксирована в docs/redesign.
-- **Возвраты выключены** (`REFUNDS_ENABLED=false` по умолчанию); чеки — автоматически через `src/receipts.js` при заданном `RECEIPTS_WEBHOOK_URL`, иначе остаются `pending` в таблице `receipts`. В проде сейчас **диск 91%** и **бэкап старше 26 ч без `db_dump`** (см. OPERATIONS.md).
+- **Часть правил админки «Промт» не доходит до генерации** (`catalogOn`, `styling`); `furnitureOff` исправлен. Кнопка «Найти товары» скрыта до оживления procurement, эндпоинт MCP работает.
+- **Возвраты выключены** (`REFUNDS_ENABLED=false` по умолчанию); чеки — автоматически через `src/receipts.js` при заданном `RECEIPTS_WEBHOOK_URL`, иначе остаются `pending` в таблице `receipts`. По последней проверке 2026-11-11 в проде **диск 91%** и **бэкап старше 26 ч без `db_dump`** (требует перепроверки, см. OPERATIONS.md).
 - **Inpainting люстр/розеток** отсутствует; позиции могут плавать.
 - **Один основной провайдер** — OpenRouter.
 
@@ -94,7 +97,7 @@ npm run build                 # web/dist → раздаётся Express
 ## Тесты и проверка
 
 ```bash
-npm test                      # unit, без Postgres
+npm test                      # unit + регрессия промтов, без Postgres
 npm run test:integration      # HTTP/БД, отдельная <db>_test, нужен Postgres
 cd web && npm run lint && npm run build
 cd catalog-service && pytest -q
@@ -127,7 +130,9 @@ app/
     openrouter.js      image/vision-провайдер, промт, image-слот
     db.js              pg pool, миграции, SQL-запросы
     artdirector.js     vision-арт-директор: факты + замысел одним вызовом
+    roomanalysis.js    ключ/политика кэша анализа комнаты
     variability.js     акцент из палитры стиля + новизна комнаты
+    layoutagent.js     планировщик расстановки
     generationcache.js кэш AI-шагов с TTL (layout)
     imageslot.js       семафор image-вызовов (система/провайдер/пользователь)
     workerknobs.js     WORKER_CONCURRENCY
@@ -137,7 +142,7 @@ app/
     articles.js        контент-движок
   web/src/             React 19 + Vite + TS
   catalog-service/     FastAPI + pgvector + MCP
-  migrations/          SQL 001–053 (файла 048 нет — исторически)
+  migrations/          SQL 001–061 (файла 048 нет — исторически)
   test/                unit + integration
   docs/                документация
 ```
@@ -169,6 +174,7 @@ app/
 | [docs/GENERATION.md](docs/GENERATION.md) | Путь генерации, промт, очередь, кэш, правки |
 | [docs/GENERATION-FLOW.md](docs/GENERATION-FLOW.md) | Полная схема данных и себестоимости |
 | [docs/GENERATION-QUEUE.md](docs/GENERATION-QUEUE.md) | Ёмкость и инварианты очереди |
+| [docs/regression/README.md](docs/regression/README.md) | Регрессия 20 конфигураций промта, baseline и diff |
 | [docs/API.md](docs/API.md) | HTTP API |
 | [docs/PROCUREMENT.md](docs/PROCUREMENT.md) | Подбор товаров: текущий MCP-путь и legacy |
 | [docs/CATALOG.md](docs/CATALOG.md) | Каталог и catalog-service |
@@ -210,7 +216,7 @@ app/
 1. **Каталог демонстрационный.** 100 активных товаров, 0 URL; реальных заказов нет. Не утверждайте в UI/доках, что товар можно купить.
 2. **Не хардкодьте модели.** Render/vision/edit/cleanup/direction — в `app_settings` и `.env`, меняются через админку. Перед выводами проверяйте фактическую конфигурацию (`GET /api/health`, `/api/admin/settings/models`).
 3. **FLUX.2 Pro не принимает `resolution`.** Отправка даёт 400. `supportsResolution()` в `src/modelcaps.js` — Seedream и FLUX 3 Image/Klein. У FLUX возможна content moderation на спальнях.
-4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации; не «чините» их вслепую — см. docs/redesign.
+4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `catalogOn`, `styling` не доходят до генерации; `furnitureOff` исправлен. Не «чините» оставшиеся вслепую — см. docs/redesign.
 5. **Design-first.** Базовый кадр получает исходник + один art ref и текстовые материалы, без product refs. Следствие: `render_items` у новых базовых рендеров **пуст**. Товарная правка использует один product ref и обязательный vision QA; при отказе версия отклоняется, кредит возвращается.
 6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — параллелизм; image-вызовы ограничиваются общим семафором (`src/imageslot.js`), а не advisory-lock.
 7. **Direction — часть арт-директора.** Один vision-вызов `src/artdirector.js` отдаёт факты по фото и (при выбранной концепции) поле `direction`; без концепции — `facts_only`. Повторные рендеры комнаты/стиля/концепта берутся из `room_analysis`. Отдельного direction-агента нет.
@@ -268,6 +274,8 @@ node --check src/openrouter.js
 | Размеры, кровать, радиаторы | `src/promptconfig.js`, `src/openrouter.js`, `src/scaleplan.js` |
 | Правила комнат, слоты | `src/roomtypes.js` |
 | Direction и кэш | `src/artdirector.js`, `src/directionprompt.js`, `src/roomanalysis.js`, `src/variability.js` |
+| Черновик генерации | `web/src/lib/draft.ts`, `web/src/components/GenerationPanel.tsx` |
+| Очистка комнаты | `src/jobs.js` (`startRoomCleanup`), `src/cleanupconfig.js`, `src/db.js` |
 | Очередь, lease, claim | `src/db.js`, `src/jobs.js`, `src/workerknobs.js` |
 | Глобальный image-слот | `src/imageslot.js`, `src/openrouter.js` |
 | Генерация/стадии | `src/jobs.js`, `src/openrouter.js` |
@@ -319,8 +327,8 @@ node --check src/openrouter.js
 
 ## Тесты и проверка
 
-- `npm test` — unit: промт, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, импорт, model caps, подписи Robokassa, procurement templates, типы комнат, direction, workerknobs.
-- `npm run test:integration` — кредиты/refund, очередь/lease/fencing, auth, комнаты, шаринг, платежи, файлы, image-слот, direction-кэш.
+- `npm test` — unit: промт, регрессия 20 конфигураций, размеры/кровать/радиаторы/scale plan, edit-промт, RAL, каталог, импорт, model caps, подписи Robokassa, procurement templates, типы комнат, direction, workerknobs, variability, room-analysis key.
+- `npm run test:integration` — кредиты/refund, очередь/lease/fencing, auth, комнаты, шаринг, платежи, файлы, image-слот, room_analysis, referral, cleanup-async.
 - `cd web && npm run lint && npm run build`.
 - `cd catalog-service && pytest -q`.
 - Живой smoke — на VPS/canary, не на прод-пользователях.
@@ -331,7 +339,8 @@ node --check src/openrouter.js
 - Legacy procurement (Yandex) не подключён; текущий подбор — MCP/catalog-service (бесплатно, один проход).
 - Style-ref/hero-референсы выключены по умолчанию (`text`).
 - Очистка комнаты выключена по умолчанию.
-- `furnitureOff`/`catalogOn`/`styling` не доходят до промта.
+- `catalogOn`/`styling` не доходят до промта (`furnitureOff` исправлен).
+- Кнопка «Найти товары» скрыта в UI; MCP-эндпоинт работает.
 - Нет inpainting люстр/розеток.
 - Один провайдер (OpenRouter).
 - Бэкап/restore-скрипты есть, но расписание/off-site/алерты не настроены; диск прода 91%.
@@ -345,10 +354,11 @@ node --check src/openrouter.js
 3. `cd web && npm run lint && npm run build` проходит.
 4. `catalog-service pytest` зелёный (если менялся сервис).
 5. Обновлён `docs/HISTORY.md`; при изменении состояния — `docs/STATUS.md`.
-6. Обновлены relevant docs; `npm run docs:llms` при изменении документации.
-7. `npm run kit:build` при изменении UI-кита/классов.
-8. Нет секретов в diff.
-9. Деплой прошёл, smoke зелёный (после явного разрешения).
+6. `npm run test:regression` зелёный при изменениях промта.
+7. Обновлены relevant docs; `npm run docs:llms` при изменении документации.
+8. `npm run kit:build` при изменении UI-кита/классов.
+9. Нет секретов в diff.
+10. Деплой прошёл, smoke зелёный (после явного разрешения).
 
 
 ---
@@ -458,7 +468,7 @@ flowchart LR
   W --> O["OpenRouter"]
   O --> S["Image: FLUX 3 Image / Klein"]
   O --> G["Vision: Gemini 3.1 Pro"]
-  O --> D["Direction: DeepSeek Flash"]
+  O --> D["Art direction + direction: DeepSeek Flash"]
   E --> R["Resend"]
   E --> Y["Robokassa / ЮKassa"]
   E --> X["Прокси (опционально)"]
@@ -473,11 +483,11 @@ flowchart LR
 | Express API | auth, комнаты, рендеры, админка, шаринг, платежи, статика | `src/server.js` |
 | Worker | claim/lease, `processRender`, стадии, refund | `src/jobs.js` |
 | Очередь | `renders` + lease/`claimed_by`, `WORKER_CONCURRENCY` | `src/db.js`, `src/jobs.js` |
-| Image-слот | глобальная сериализация image-вызовов | `src/imageslot.js` |
+| Image-слот | семафор image-вызовов: система/провайдер/пользователь | `src/imageslot.js` |
 | Direction | один vision-вызов арт-директора + `room_analysis` | `src/artdirector.js`, `src/roomanalysis.js`, `src/variability.js` |
 | Postgres | пользователи, комнаты, рендеры, товары, стили, кредиты, платежи | `src/db.js`, `migrations/` |
 | Storage | фото, рендеры, картинки товаров/референсов | `src/storage.js` |
-| OpenRouter | image, vision, direction | `src/openrouter.js`, `src/openrouteragent.js` |
+| OpenRouter | image + vision (direction — часть vision-вызова арт-директора) | `src/openrouter.js`, `src/openrouteragent.js` |
 | Resend/SMTP | OTP и письма | `src/auth.js`, `src/mailer.js` |
 | Платежи | Robokassa/ЮKassa, вебхуки, возвраты | `src/payments.js`, `src/robokassa.js` |
 | Подбор товаров | MCP/catalog-service (текущий путь) | `src/visionagent.js`, `src/catalogclient.js`, `catalog-service/` |
@@ -493,13 +503,13 @@ flowchart LR
 2. Проверяются auth, кредиты, rate limit; модель/разрешение.
 3. В одной транзакции: `rooms` + N × `renders(status=queued)`, списание за каждый вариант.
 4. Воркер забирает рендер через `FOR UPDATE SKIP LOCKED`, ставит lease 5 минут и `claimed_by`.
-5. `processRender` собирает контекст (vision, direction из кэша, cleanup при необходимости) и вызывает OpenRouter.
-6. Результат — в Storage, анализ — в `renders.analysis`, стоимость — в `cost_usd`.
+5. При первом enqueue запускается асинхронная очистка (если нужно). `processRender` ждёт shell ≤3 мин, собирает контекст (vision из `room_analysis`, art direction + direction одним вызовом) и вызывает OpenRouter.
+6. Результат — в Storage, анализ — в `renders.analysis`, стоимость — в `cost_usd`; стоимость очистки — в `rooms.cleanup_cost_usd`.
 7. UI поллит `GET /api/rooms/:id` до `done`/`error`; прогресс «N из 8» по рендерам.
 
 ### Аренда и восстановление
 
-- Heartbeat продлевает lease каждые 30 секунд.
+- Heartbeat продлевает lease каждые 30 секунд; при ожидании shell (`waiting_shell`) продлевается и `started_at`.
 - `requeueProcessing` возвращает в очередь только истёкшие lease.
 - Reaper раз в 5 минут: queued старше 24 часов **или** processing дольше 60 минут → error + refund.
 - Завершение/heartbeat проверяют `claimed_by`: воркер, потерявший lease, не перезаписывает результат.
@@ -517,13 +527,14 @@ flowchart LR
 | Таблица | Назначение |
 |---|---|
 | `users`, `sessions`, `auth_identities` | аккаунты и вход |
-| `rooms` | фото, стиль, тип, tier, флаги, размеры, precleaned shell |
+| `rooms` | фото, стиль, тип, tier, флаги, размеры, precleaned shell, статус/стоимость async cleanup |
 | `renders` | версия: style/concept, prompt, model, cost, image, analysis, share_token, edit refs, **lease/claimed_by** |
 | `render_items` | смета конкретного рендера (у новых базовых рендеров пусто) |
 | `products`, `style_products` | каталог и избранные товары стиля |
 | `styles`, `style_references`, `concepts` | стили, референсы, концепции |
 | `credit_txn`, `payments`, `refunds`, `receipts` | кредиты и платежи |
-| `generation_cache` | кэш direction (kind/key/value, TTL) |
+| `room_analysis` | кэш анализа комнаты: размеры/мебель/ремонт/art direction/layout |
+| `generation_cache` | кэш layout-плана (kind/key/value, TTL) |
 | `render_likes`, `render_comments` | шаринг |
 | `product_clicks` | клики из сметы через `/go/:id` |
 | `app_settings` | модели, прокси, правила промта, настройки |
@@ -564,6 +575,7 @@ flowchart LR
 - Новая смета не заполняется; старый procurement не подключён.
 - Бэкап/restore-скрипты есть, но расписание/off-site/алерты не настроены; диск прода 91%.
 - Style-ref/hero-референсы выключены по умолчанию.
+- Direction и акцент для кастомных admin-стилей без статической палитры ограничены `facts_only`/общим акцентом.
 - Старый `/app` — 301.
 
 ## Связанные документы
@@ -599,12 +611,13 @@ flowchart LR
 flowchart LR
   A["Фото + items + тип + tier"] --> B["POST /api/rooms"]
   B --> C["N × renders(queued) + кредиты"]
+  C --> CL["cleanup при первом enqueue (async, если включён)"]
   C --> W["Worker: claim + lease"]
+  CL --> W
   W --> V["repair_scope ∥ art_direction + direction"]
   V --> L["layout (пустая комната)"]
   L --> P["buildPrompt (design-first)"]
-  P --> C1["cleanup (если включён)"]
-  C1 --> I["design: FLUX 3 Image"]
+  P --> I["design: FLUX 3 Image"]
   I --> S["fitAspect + storage"]
   S --> R["architect review (vision)"]
   R --> ANA["analysis: surfaces/RAL/electrical/suggestions"]
@@ -620,7 +633,7 @@ flowchart LR
 - В одной транзакции создаются `rooms` и N `renders(status=queued)`; кредит списывается за каждый вариант.
 - `claimNextRender` — `FOR UPDATE SKIP LOCKED` + lease 5 минут + `claimed_by`.
 - Heartbeat каждые 30 с; requeue/reaper — только истёкшие lease; processing старше 60 минут → error + refund.
-- `WORKER_CONCURRENCY` (1–8) — сколько рендеров в работе в процессе; image-вызовы сериализуются глобальным слотом.
+- `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — сколько рендеров в работе; image-вызовы идут параллельно в пределах семафора (система/провайдер/пользователь).
 
 ### 3. Стиль и референсы
 
@@ -650,24 +663,24 @@ flowchart LR
 `src/openrouter.js`:
 
 - карта изображений: исходник + необязательный art ref; product refs нет;
-- `ARCHITECTURE LOCK`, `ART DIRECTION`, `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`;
+- `ARCHITECTURE LOCK`, `GEOMETRY LOCK`, `ART DIRECTION`, `VARIABILITY`, `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`;
 - `KEEP EXACTLY`, `FURNITURE MODE`, `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`;
 - `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`;
 - `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
 
-Правила редактируются в админке «Промт» (`app_settings.prompt.rules.v1`), дефолты — `src/promptconfig.js`. Известный баг: `furnitureOff`, `catalogOn`, `styling` не доходят до генерации (см. [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md)).
+Правила редактируются в админке «Промт» (`app_settings.prompt.rules.v1`), дефолты — `src/promptconfig.js`. Известный баг: `catalogOn`, `styling` не доходят до генерации; `furnitureOff` исправлен. Регрессия промтов — `npm run test:regression`.
 
 ### 7. Очистка и image generation
 
-- При `keep_furniture=false` + включённой очистке: FLUX 3 Klein → `shell_path`, затем дизайн по shell.
+- При `keep_furniture=false` + включённой очистке: FLUX 3 Klein запускается асинхронно при первом enqueue, shell хранится в `rooms.precleaned_shell_path`; `processRender` ждёт его ≤3 мин, затем рисует по shell.
 - Основной вызов — FLUX 3 Image (модель/разрешение из админки), 1K/auto по умолчанию.
 - `resolution` не отправляется для моделей, которые его не поддерживают (FLUX 2 Pro).
-- Выход прогоняется через `fitAspect` к пропорции исходника; стоимость (`usage.cost`) — в `renders.cost_usd`.
+- Выход прогоняется через `fitAspect` к пропорции исходника; стоимость (`usage.cost`) — в `renders.cost_usd`. Стоимость cleanup — в `rooms.cleanup_cost_usd`.
 - Без `OPENROUTER_API_KEY` — mock-режим: демо-картинка, расходов нет.
 
 ### 8. Анализ
 
-`reviewDesign` (vision) возвращает items, surfaces, hints, electrical. Fallback — `parseRender`. RAL считается только для окрашиваемых поверхностей. Анализ — в `renders.analysis`.
+Разбор интерьера запускается кнопкой (`ARCHITECT_ON_DEMAND`) или автоматически при `PARSE_AUTO=1` (по умолчанию off) после раннего done. `parseRender` возвращает items, surfaces, visible, electrical; стоимость авто-разбора — отдельный ключ `render_analysis_auto`. RAL считается только для окрашиваемых поверхностей. Анализ — в `renders.analysis`.
 
 ### 9. Смета
 
@@ -690,7 +703,7 @@ flowchart LR
 
 ## Логи и метрики
 
-- `render_start`, `repair_scope_ok`, `art_direction_ok`, `design_direction_ok`, `room_analysis_cache_hit`, `render_image_ok`, `render_done`, `render_error`, `render_lease_lost`.
+- `render_start`, `repair_scope_ok`, `art_direction_ok`, `design_direction_ok`, `room_analysis_cache_hit`, `room_cleanup_done`, `room_cleanup_wait_timeout`, `render_analysis_auto`, `render_image_ok`, `render_done`, `render_error`, `render_lease_lost`.
 - `renders.prompt`, `renders.meta`, `renders.cost_breakdown`.
 - Замеры ёмкости: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 
@@ -700,7 +713,8 @@ flowchart LR
 - Нет inpainting люстр/розеток.
 - Один провайдер — OpenRouter.
 - Style-ref/hero-референсы выключены по умолчанию.
-- Часть правил админки не применяется (см. выше).
+- Часть правил админки не применяется: `catalogOn`, `styling` (см. выше).
+- Direction/акцент для кастомных admin-стилей без статической палитры — ограничены.
 
 ## Связанные документы
 
@@ -731,39 +745,41 @@ flowchart LR
 | `pinterest` | арт, полки, мелочи, техника, плюш, сцены | да |
 | `photo` | 24–35 мм, golden hour, film grain, grading, не CGI | да |
 | `dimensions` | блок размеров комнаты | да |
+| `geometryLock` | нерушимая геометрия: метры + запреты проёмов/высоты/перспективы | да |
 | `scalePlan` | план мебели/проходов | да |
 | `bed` | длина кровати (спальня/детская) | да |
 | `radiators` | вентилируемые экраны | да |
 | `furnitureOn` | «оставить мебель» | да |
-| `furnitureOff` | «мебель не учитывать» | **нет — известный баг** |
+| `furnitureOff` | «мебель не учитывать» | да |
 | `catalogOn` / `catalogOff` | товары/смета | **нет — известный баг** |
 | `styling` (room) | Pinterest-стайлинг комнаты | **нет — известный баг** |
 | `extra` | свободный текст | да |
 | `avoid` | негативный список | да |
 
-Баг зафиксирован в [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md); до фикса правки `furnitureOff`/`catalogOn`/`styling` не влияют на генерацию.
+Оставшийся баг (`catalogOn`/`styling`) зафиксирован в [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md); `furnitureOff` исправлен. Регрессия промтов — `npm run test:regression`.
 
 ## Структура base-промта
 
 1. `IMAGE ROLES` — исходник + максимум один art ref; product refs нет.
 2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум.
 3. `ARCHITECTURE LOCK` — архитектура/камера/пропорции.
-4. `ART DIRECTION` — из direction-агента (или fallback арт-директора).
-5. `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`.
-6. `KEEP EXACTLY`, `FURNITURE MODE`.
-7. `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`.
-8. `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`.
-9. `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
+4. `GEOMETRY LOCK` — дословные метры и запреты окон/дверей/высоты/перспективы.
+5. `ART DIRECTION` + `VARIABILITY` — замысел и новизна комнаты из одного vision-вызова.
+6. `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`.
+7. `KEEP EXACTLY`, `FURNITURE MODE`.
+8. `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`.
+9. `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`.
+10. `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
 
 ## Direction
 
-- `composeDirectionPrompt` (стиль, концепт, комната, размеры, история пользователя) → JSON `DesignDirection`.
-- `prompt_en` (60–120 слов) идёт в `ART DIRECTION`.
-- Кэш 3 варианта; новизна выбирается из вариантов. См. [GENERATION.md](GENERATION.md#5-direction-и-кэш).
+- Один vision-вызов `buildArtDirection`: факты по фото + поле `direction` (карточки стиля/концепции и история на входе).
+- Без концепции или при конфликтной паре — `facts_only`; `prompt_en` (60–120 слов) идёт в `ART DIRECTION`.
+- Повторные рендеры — из `room_analysis`; новизна — `src/variability.js`. См. [GENERATION.md](GENERATION.md#5-direction-и-кэш).
 
 ## Очистка комнаты
 
-Отдельный промт/модель (`cleanup.config.v1`, админка «Очистка»), не часть base. Только при `keep_furniture=false`. Плейсхолдеры `{room}`, `{keep}`, `{remove}`. Выключена по умолчанию.
+Отдельный промт/модель (`cleanup.config.v1`, админка «Очистка»), не часть base. Только при `keep_furniture=false`, запускается асинхронно при первом enqueue; shell хранится на комнате. Плейсхолдеры `{room}`, `{keep}`, `{remove}`. Выключена по умолчанию.
 
 ## Правки
 
@@ -774,7 +790,7 @@ Edit-промт короткий: «Image 1 — current render, Image 2 — refe
 1. Малые изменения — в админке «Промт», сохранить, тестовая генерация.
 2. Дефолт — обновить `DEFAULT_PROMPT_CONFIG` в `src/promptconfig.js`.
 3. Не дублировать текст в `openrouter.js` и `promptconfig.js`.
-4. После изменения — `npm test`, canary, `docs/HISTORY.md`.
+4. После изменения — `npm test`, `npm run test:regression`, canary, `docs/HISTORY.md`.
 
 ## Связанные документы
 
@@ -886,7 +902,7 @@ URL: `/admin`
 | Стили | стили, prompt description, референсы, approve, товары стиля, комплект |
 | Промт | редактируемые правила промта |
 | Архитектор | версии промтов строителя/рецензента/критерия |
-| Логи | промты рендеров, модель, стоимость, референсы, отклонённые версии |
+| Логи | промты рендеров, модель, стоимость (включая cleanup), референсы, отклонённые версии |
 | Модели | render/edit/vision, resolution/aspect, проверка input refs |
 | Очистка | модель/промт/разрешение/aspect очистки, включение |
 | Генерация | `product_refs_enabled` (сейчас no-op), `max_products`, `image_min_gap_ms` |
@@ -911,9 +927,9 @@ URL: `/admin`
 
 ## Промт
 
-Правила в `app_settings.prompt.rules.v1`, дефолты — `src/promptconfig.js`. Поля: свет, размеры, план масштаба, кровать, радиаторы, уборка/техника, окна/текстиль, Pinterest, фотография, мебель, каталог, дополнительно, запреты.
+Правила в `app_settings.prompt.rules.v1`, дефолты — `src/promptconfig.js`. Поля: свет, размеры, геометрия (`GEOMETRY LOCK`), план масштаба, кровать, радиаторы, уборка/техника, окна/текстиль, Pinterest, фотография, мебель, каталог, дополнительно, запреты.
 
-**Известный баг:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации; правки этих полей не влияют на промт. Остальные правила применяются. Подробно — [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md).
+**Известный баг:** `catalogOn`, `styling` не доходят до генерации; `furnitureOff` исправлен. Остальные правила применяются. Подробно — [docs/redesign](redesign/2026-11-11-redesign-codebase/redesign.md).
 
 ## Стили
 
@@ -927,7 +943,9 @@ URL: `/admin`
 - Только при `keep_furniture=false`.
 - **Выключена по умолчанию**; модель `black-forest-labs/flux-3-image-klein`, 1K, auto.
 - Промт с `{room}`, `{keep}`, `{remove}`; для кухни/санузла сохраняются встроенные элементы и сантехника.
-- Shell хранится в `renders.shell_path`.
+- Очистка запускается асинхронно при первом enqueue комнаты; shell хранится в `rooms.precleaned_shell_path`.
+- Статус: `rooms.cleanup_status` (`processing/done/error`), стоимость — `rooms.cleanup_cost_usd`; до 3 попыток, lease-heartbeat.
+- Для кастомных admin-стилей без статической hex-палитры direction работает в `facts_only`, акцент — общий.
 
 ## Модели
 
@@ -941,6 +959,7 @@ URL: `/admin`
 |---|---|
 | `WORKER_CONCURRENCY` | 1–8, по умолчанию 6 |
 | `IMAGE_MIN_GAP_MS` | пауза между image-вызовами (админка «Генерация») |
+| `PARSE_AUTO` | `1` — авто-разбор после раннего done; по умолчанию off |
 
 ## Безопасность
 
@@ -979,6 +998,7 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/design` | стили и концепции (хардкод `designdata`) |
 | GET | `/api/room-types` | активные типы комнат |
 | GET | `/api/packs` | пакеты кредитов |
+| GET | `/api/referral/context` | `{invited}` по HttpOnly-куке `rv_ref`; rate limit, no-store |
 | POST | `/api/auth/request-code` | `{email}` → OTP |
 | POST | `/api/auth/verify` | `{email, code, consents}` → cookie |
 | POST | `/api/auth/logout` | выход |
@@ -1000,13 +1020,14 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/referral` | код, ссылка, приглашённые |
 | GET | `/api/my/rooms`, `/api/my/generations` | комнаты/рендеры |
 | GET | `/api/credits` | баланс и ledger |
+| GET | `/api/credits/refunds?after=<id>` | свежие `iterate_refund` для тоста (только свои) |
 | POST | `/api/payments/create` | `{pack_id}` → `{confirmation_url, payment_id, provider}` |
 | POST | `/api/payments/sync` | синхронизация pending-платежа |
 | POST | `/api/cleanup` | очистка комнаты по фото → data URL |
 | POST | `/api/estimate-room` | vision-оценка размеров (фронтенд сейчас не использует) |
 | POST | `/api/rooms` | multipart: фото, `items` (1–8 пар), тип, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний done-рендер |
-| GET | `/api/rooms/:id/versions` | все версии |
+| GET | `/api/rooms/:id/versions` | все версии; `edits_used` для цены правки/переноса |
 | DELETE | `/api/rooms/:id` | удалить комнату (owner) |
 | POST | `/api/rooms/:id/retry` | повтор упавшего базового рендера |
 | POST | `/api/rooms/:id/iterate` | правка: `text`, `target`, `product_id`, `refs`/`ref_meta`, `ref`, `ref_url`, `parent_id`, `move` |
@@ -1019,7 +1040,7 @@ Admin: заголовок `X-Admin-Key`.
 
 ### `POST /api/rooms`
 
-`multipart/form-data`:
+`multipart/form-data`. При `keep_furniture=false` и включённой очистке сервер асинхронно запускает очистку комнаты; рендер ждёт shell ≤3 мин.
 
 | Поле | Обяз. | Значение |
 |---|---|---|
@@ -1056,7 +1077,7 @@ Admin: заголовок `X-Admin-Key`.
 - `parent_id` — версия для правки (по умолчанию последняя).
 - `move` — JSON `{bbox, dx, dy, label}` для переноса объекта.
 
-Первые 3 правки бесплатны, 4-я и далее — 1 кредит. Товарная правка проходит vision QA: при отказе `rejected`, родитель активен, кредит возвращается, причина — в `notice`.
+Первые 3 правки бесплатны, 4-я и далее — 1 кредит. Цена видна в UI до подтверждения (`edits_used` в `/versions`). Товарная правка проходит vision QA: при отказе `rejected`, родитель активен, кредит возвращается, причина — в `notice`.
 
 ## Админ (`X-Admin-Key`)
 
@@ -1129,7 +1150,8 @@ ADMIN_KEY=<admin-key>
 OPENROUTER_API_KEY=<key>
 RENDER_MODEL=black-forest-labs/flux-3-image
 VISION_MODEL=google/gemini-3.1-pro-preview
-DIRECTION_MODEL=deepseek/deepseek-v4.1-flash-1017
+ART_DIRECTOR_MODEL=deepseek/deepseek-v4.1-flash-1017
+LAYOUT_MODEL=deepseek/deepseek-v4.1-flash-1017
 RENDER_RESOLUTION=1K
 RENDER_ASPECT_RATIO=auto
 OPENROUTER_TIMEOUT_MS=120000
@@ -1137,6 +1159,7 @@ OPENROUTER_TIMEOUT_MS=120000
 # Очередь и скорость
 WORKER_CONCURRENCY=6              # 1–8
 IMAGE_MIN_GAP_MS=0                # пауза между image-вызовами
+PARSE_AUTO=0                      # 1 — авто-разбор после раннего done (платно)
 # Direction кэшируется в room_analysis; отдельного DIRECTION_CACHE_* нет
 
 # Auth/mail
@@ -1180,7 +1203,7 @@ S3_ENDPOINT=
 
 - `migrations/NNN_name.sql`, по порядку, учёт в `_migrations`.
 - Применённые не редактировать; только новые файлы.
-- Текущий диапазон: `001–053`; файла `048` нет (историческое переименование `046/047 → 048/049`).
+- Текущий диапазон: `001–061`; файла `048` нет (историческое переименование `046/047 → 048/049`).
 - Перед рискованными изменениями — `pg_dump` на VPS.
 
 ## Очередь рендеров
@@ -1193,6 +1216,7 @@ S3_ENDPOINT=
 | Reaper | queued > 24 ч или processing > 60 мин → error + refund |
 | Параллелизм | `WORKER_CONCURRENCY` (1–8) |
 | Image-слот | семафор в процессе: система/провайдер/пользователь (`imageslot.js`) |
+| Cleanup | асинхронно на первом enqueue; статус в `rooms.cleanup_status`, shell в `rooms.precleaned_shell_path`, до 3 попыток |
 
 Проверка очереди:
 
@@ -1203,7 +1227,15 @@ SELECT id, status, started_at, lease_expires_at FROM renders
 WHERE status='processing' ORDER BY started_at LIMIT 20;
 ```
 
-Метрики и canary: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
+Проверка cleanup:
+
+```sql
+SELECT cleanup_status, count(*) FROM rooms GROUP BY cleanup_status;
+SELECT id, cleanup_status, cleanup_attempts, cleanup_started_at, cleanup_error
+FROM rooms WHERE cleanup_status IN ('processing','error') ORDER BY cleanup_started_at LIMIT 20;
+```
+
+Кэш анализа комнаты можно сбросить вручную: `DELETE FROM room_analysis;` (только по команде владельца). Метрики и canary: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 
 ## Платежи (Robokassa)
 
@@ -1625,6 +1657,21 @@ docker compose logs --since 24h app | grep -o '"stage":"[^"]*"' | sort | uniq -c
 Действия: при 429 — проверить прокси/`IMAGE_MIN_GAP_MS`; при moderation — сменить модель
 или предупредить пользователя; при 400 — сверить `modelcaps`; при росте доли — P2,
 см. [RUNBOOK.md](RUNBOOK.md).
+
+## 4. Очистка комнат и кэш анализа
+
+```bash
+docker compose logs --since 24h app | grep -E '"event":"room_cleanup_(error|wait_timeout)"' | tail -20
+docker compose logs --since 24h app | grep -c '"event":"room_analysis_cache_hit"'
+```
+
+```sql
+SELECT cleanup_status, count(*) FROM rooms GROUP BY cleanup_status;
+SELECT id, cleanup_status, cleanup_attempts, cleanup_error FROM rooms
+WHERE cleanup_status = 'error' ORDER BY cleanup_finished_at DESC LIMIT 20;
+```
+
+Рост `cleanup_status=error` — смотреть OpenRouter/прокси; больше 3 попыток не будет, пока не изменить `cleanup_attempts` вручную или не добавить новую комнату. Кэш анализа сбрасывается `DELETE FROM room_analysis;` только по команде владельца.
 
 Ограничение: Docker logs хранят 10 MB × 3 на контейнер. При интенсивном трафике сутки
 могут не помещаться — тогда нужен внешний сбор логов (не настроен).
@@ -2107,16 +2154,17 @@ dig +short www.remontvision.ru
 
 # Планы и запуск
 
-**Статус на 2026-11-11:** сервис задеплоен (`092bdcd`), очередь и тесты обновлены. Публичный запуск блокируют реальный каталог и эксплуатация.
+**Статус на 2026-11-12:** сервис задеплоен после ночного прогона, очередь и тесты обновлены. Публичный запуск блокируют реальный каталог и эксплуатация.
 
 ## Где мы сейчас
 
 - Генерация, мульти-стиль, правки, шаринг, разбор, роадмап, платежи, админка, статьи — работают.
-- Очередь: lease/`claimed_by`/SKIP LOCKED, `WORKER_CONCURRENCY`, глобальный image-слот.
-- Direction кэшируется; CI-гейт перед деплоем.
+- Очередь: lease/`claimed_by`/SKIP LOCKED, `WORKER_CONCURRENCY`, семафор image-вызовов.
+- Direction слит с арт-директором, анализ комнаты кэшируется в `room_analysis`; регрессия промтов и CI-гейт перед деплоем.
+- Очистка комнаты — асинхронно при первом enqueue, shell переиспользуется.
 - **Каталог демо:** 100 товаров, 0 URL → заказов нет.
 - **Смета новых рендеров пуста** (design-first); старый procurement не подключён.
-- **Эксплуатация:** диск прода 91%, бэкап 45 ч без `db_dump`, внешнего монитора нет.
+- **Эксплуатация:** по проверке 2026-11-11 диск прода 91%, бэкап 45 ч без `db_dump`, внешнего монитора нет — требует перепроверки.
 
 ## P0 — до публичного запуска
 
@@ -2289,7 +2337,7 @@ Hero-товар внедряется отдельной правкой с обя
 
 ## ADR-003: правила промта — в БД (с оговоркой)
 
-Правила вынесены в `app_settings.prompt.rules.v1` и админку. **Оговорка:** `furnitureOff`, `catalogOn`, `styling` не доходят до генерации — известный баг (см. docs/redesign). Остальные правила применяются.
+Правила вынесены в `app_settings.prompt.rules.v1` и админку. **Оговорка:** `catalogOn`, `styling` всё ещё не доходят до генерации; `furnitureOff` исправлен в ночном прогоне 2026-11-12. Остальные правила применяются.
 
 ## ADR-004: свои hero-референсы, а не Pinterest-скрейпинг
 
@@ -2297,7 +2345,7 @@ Hero-сцены генерируются из наших товаров, про�
 
 ## ADR-005: очистка + дизайн при выключенной мебели
 
-При `keep_furniture=false` и включённой очистке — два прохода: FLUX 3 Klein → shell → FLUX 3 Image. **Очистка выключена по умолчанию** (`cleanupconfig.js`); при включённой мебели — один проход. Биллинг — 1 кредит, хотя вызовов два.
+При `keep_furniture=false` и включённой очистке — два прохода: FLUX 3 Klein → shell → FLUX 3 Image. **Очистка выключена по умолчанию** (`cleanupconfig.js`); shell строится асинхронно при первом enqueue и переиспользуется, `processRender` ждёт его ≤3 мин. Биллинг — 1 кредит, хотя вызовов два; стоимость cleanup — в `rooms.cleanup_cost_usd`.
 
 ## ADR-006: демо-каталог отделён от реального
 
@@ -2331,9 +2379,9 @@ OpenRouter WAF может блокировать IP VPS. Прокси в `app_se
 
 `claimNextRender` — `FOR UPDATE SKIP LOCKED` + lease 5 минут + `claimed_by`. Завершение/heartbeat проверяют владельца; вторая реплика не крадёт in-flight задачу, а потерявший lease воркер не перезаписывает результат. Reaper: queued > 24 ч или processing > 60 мин. `WORKER_CONCURRENCY` управляет параллелизмом.
 
-## ADR-015: direction кэшируется вариантами
+## ADR-015: direction — часть арт-директора, кэш анализа комнаты
 
-Direction — текстовый вызов без фото; на паре «стиль × концепт» он повторяется у пользователей. Кэш `generation_cache`: 3 варианта, TTL 30 дней, выбор по `sessionId`, новизна — при выборе. Первый промах платит за варианты, дальше — мгновенно и без cost. Пустой `prompt_en` — негативный маркер на сутки.
+Direction больше не отдельный текстовый вызов: один vision-вызов арт-директора отдаёт факты и поле `direction` (без концепции — `facts_only`). Повторные рендеры комнаты/стиля/концепта берут всё из `room_analysis`; отдельного direction-кэша и вариантов нет. Новизна — `src/variability.js` (акцент из палитры стиля, avoid последних рендеров).
 
 ## ADR-016: CI-гейт перед деплоем
 
@@ -2342,6 +2390,18 @@ Direction — текстовый вызов без фото; на паре «с�
 ## ADR-017: docs/STATUS.md — источник истины
 
 Верхнеуровневые документы часто отставали от кода. Введён `docs/STATUS.md`: что сделано, что работает, что нет. Остальные документы описывают механику и ссылаются на него.
+
+## ADR-018: асинхронная очистка комнаты
+
+Cleanup запускается при первом enqueue, а не внутри `processRender`: один shell на комнату, строго при `keep_furniture=false`, до 3 попыток, lease-heartbeat. `processRender` ждёт shell ≤3 мин; при ошибке/таймауте рисует по исходному фото. Так платный image-вызов не блокирует первый ответ и shell переиспользуется всеми вариантами.
+
+## ADR-019: регрессия промтов как гейт
+
+Любое изменение `buildPrompt`/правил проверяется 20 конфигурациями (5 комнат × 4 стиля) без платных вызовов: baseline и diff в `docs/regression`, `npm run test:regression` в CI. Это ловит невидимые изменения рецепта до live-генерации.
+
+## ADR-020: один вызов вместо двух агентов
+
+Арт-директор и direction слиты: карточки стиля/концепции и история идут на вход, факты и замысел возвращаются одним JSON. Простые рендеры без концепции получают `facts_only` и не платят за второй вызов. `designeragent` удалён.
 
 ## Связанные документы
 
@@ -2366,7 +2426,7 @@ Direction — текстовый вызов без фото; на паре «с�
 | Render | `black-forest-labs/flux-3-image` | `app_settings.model.render` / `RENDER_MODEL` / админка |
 | Edit | пусто = render | `app_settings.model.edit` / `EDIT_MODEL` |
 | Vision | `google/gemini-3.1-pro-preview` | `app_settings.model.vision` / `VISION_MODEL` |
-| Direction | `deepseek/deepseek-v4.1-flash-1017` | `DIRECTION_MODEL` / `ART_DIRECTOR_MODEL` |
+| Art direction + direction | `deepseek/deepseek-v4.1-flash-1017` | `ART_DIRECTOR_MODEL` / админка моделей |
 | Cleanup | `black-forest-labs/flux-3-image-klein` | `cleanup.config.v1` |
 | Layout | DeepSeek Flash | `LAYOUT_MODEL` / `DIRECTION_MODEL` |
 
@@ -2384,7 +2444,9 @@ export function buildEditPrompt({ roomType, target, instruction, hasRef, refLabe
 export async function generateRender({ prompt, sourceImageB64, referenceImagesB64, aspectRatio, resolution, model });
 export async function generateCleanupRender({ prompt, sourceImageB64, aspectRatio, model, resolution, aspect });
 export async function visionJson({ system, user, images, model });
-export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture });
+export async function buildArtDirection({ imageDataUrl, roomType, style, styleDescription, dimensions, keepFurniture, styleId, conceptId, usedDirections });
+export function composeArtDirectionPrompt({ roomType, style, styleDescription, dimensions, keepFurniture, styleId, conceptId, usedDirections });
+export function normalizeDirection(parsed, { styleId, conceptId, compatibility });
 export async function analyzeRoomBrief({ imageDataUrl, roomType });
 export async function parseRender(renderB64, mime);
 export function snapAspect(width, height, allowed);
@@ -2402,8 +2464,8 @@ export const MAX_REFERENCES; // 4
 
 - `buildArtDirection` — vision по фото: размеры, объектив, мебель, палитра, свет.
 - `buildRepairScope` — объём ремонта; запускается параллельно с арт-директором.
-- `buildLayoutPlan` — только пустая комната; `fitLayoutPlan` проверяет проходы.
-- Стоимость каждого вызова — в `renders.cost_breakdown`.
+- `buildLayoutPlan` — только пустая комната; `fitLayoutPlan` проверяет проходы; `x_cm/y_cm` в промт не передаются, кэш по комнате, ≤5 прошлых стратегий.
+- Стоимость vision/design — в `renders.cost_breakdown`; стоимость cleanup — в `rooms.cleanup_cost_usd`; авто-разбор `PARSE_AUTO` — ключ `render_analysis_auto`.
 
 ## Возможности моделей
 
@@ -2424,6 +2486,7 @@ export const MAX_REFERENCES; // 4
 - `withImageSlot` (семафор): не обходить слот и не повторять упавший вызов.
 - 429: до 4 попыток 10/20/40 с + `Retry-After`.
 - Прокси: OpenRouter WAF может блокировать IP VPS.
+- `PARSE_AUTO=1` включает авто-разбор после раннего done; по умолчанию off, стоимость пишется отдельно.
 
 ## Добавить провайдера
 
@@ -2455,7 +2518,16 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-11. Статус: приложение работает локально и на VPS, автодеплой настроен; прод на `4d9ce5c`.
+Дата обновления: 2026-11-12. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main` после ночного деплоя 2026-11-12.
+
+## 2026-11-12 — ночной прогон: доки, черновик, промт-регрессия, room_analysis, слияние агентов, async cleanup
+
+- **Доки и мёртвый код.** README/AGENTS/STATUS синхронизированы с кодом; удалены мёртвая `reviewDesign`-ветка в `jobs.js`, `spendCredit`, `estimateRoomDimensions`; ошибка возврата кредита при отмене логируется как `credit_restore_failed`.
+- **Фронт.** «Паспорт ремонта (PDF)» открывает `?tab=passport`; «Найти товары» скрыта до оживления procurement; реферальный баннер по HttpOnly-куке `rv_ref` через `GET /api/referral/context`; черновик генерации в localStorage + IndexedDB (JPEG ≤1 МБ, `created_at/saved_at`, «Продолжить/Начать заново», защита от гонки вкладок); цена переноса/правки до подтверждения; глобальный тост возврата кредита по `credit_txn`; ETA по стадиям; 4 пресета правок.
+- **Промт.** Добавлен `docs/regression` — 20 конфигураций (5 комнат × 4 стиля), скрипт `npm run test:regression`, baseline и diff-файлы, CI-гейт. Новая секция `GEOMETRY LOCK` с дословными метрами и запретами окон/дверей/высоты/перспективы. `src/variability.js` — новизна на уровне комнаты, акцент из hex-палитры стиля, seed-ротация, avoid последних 5 рендеров. `furnitureOff` теперь берётся из `promptconfig`.
+- **Пайплайн.** `room_analysis` (миграция `059`) кэширует размеры/мебель/ремонт/арт-направление/layout по фото/shell/стилю/концепту/`keepFurniture`/размерам. Арт-директор и direction слиты в один vision-вызов: без концепции — `facts_only`, с концепцией — поле `direction` в том же JSON; `designeragent.js` удалён. BBox-перенос: label+bbox в промте удаления, дифф `bbox±50%`, warn при силуэте >120%. `PARSE_AUTO` (по умолчанию off) — авто-`parseRender` после раннего done с отдельной стоимостью. Очистка комнаты вынесена на первый enqueue (асинхронно), `processRender` ждёт shell ≤3 мин, heartbeat `waiting_shell` продлевает `started_at`; миграции `060`/`061`, retry до 3 попыток. Layout без `x_cm/y_cm`, кэш по комнате, ≤5 прошлых стратегий.
+- **Ревью.** Исправлены: правки в пустой комнате больше не используют shell как source; null-openings не превращаются в «0 окон»; неполный анализ не кэшируется; стоимость `PARSE_AUTO` пишется в `renders.cost_usd`; черновик не перетирает более свежий из другой вкладки; cleanup получил lease/retry; direction-история снова общая по пользователю.
+- **Проверка.** `npm test` — 393 pass/1 skip; `npm run test:integration` — 69/69; web lint 0 errors + build; регрессия промтов 20/20.
 
 ## 2026-11-11 — аудит, параллельная генерация, перенос, разбор по кнопке, паспорт
 
