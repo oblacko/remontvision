@@ -23,16 +23,16 @@ flowchart TD
   START["processRender(render, claim)"] --> LOAD["room, render, style, concept, tier"]
   LOAD --> MODE{"iteration?"}
   MODE -->|"да"| EDIT["parent render + edit prompt"]
-  MODE -->|"нет"| BASE["Базовый дизайн"]
+  MODE -->|"нет"| CLEAN{"cleanup включён и keep_furniture=false?"}
+  CLEAN -->|"да"| SHELL["FLUX 3 Klein → shell (async на комнату)"]
+  CLEAN -->|"нет"| BASE["Базовый дизайн"]
+  SHELL --> BASE
   BASE --> RS["repair_scope (vision)"]
   BASE --> AD["art_direction + direction (один vision)"]
   RS --> LAY["layout (пустая комната)"]
   AD --> LAY
   LAY --> PROMPT["buildPrompt"]
-  PROMPT --> CLEAN{"cleanup включён и keep_furniture=false?"}
-  CLEAN -->|"да"| SHELL["FLUX 3 Klein → shell"]
-  CLEAN -->|"нет"| DESIGN["FLUX 3 Image"]
-  SHELL --> DESIGN
+  PROMPT --> DESIGN["FLUX 3 Image"]
   DESIGN --> STORE["fitAspect + putBuffer"]
   STORE --> REVIEW["architect review (vision)"]
   REVIEW --> ANALYZE["analysis: surfaces/RAL/electrical/suggestions"]
@@ -73,7 +73,7 @@ flowchart TD
 | `repair_scope` | vision: объём ремонта | базовый, если не MOCK |
 | `art_direction` | vision: факты по фото + direction (если есть концепция) | базовый |
 | `layout` | vision: расстановка | пустая комната |
-| `cleanup` | FLUX 3 Klein | `keep_furniture=false` + очистка |
+| `cleanup` (async) | FLUX 3 Klein | первый enqueue комнаты, `keep_furniture=false`; стоимость в `rooms.cleanup_cost_usd` |
 | `design` | FLUX 3 Image | всегда |
 | `design_retry` | повтор дизайна | architecture QA |
 | `architecture_qa` | vision-QA | `ARCHITECTURE_QA_ENABLED=1` |

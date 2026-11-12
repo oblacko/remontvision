@@ -80,6 +80,60 @@ async function styleReferenceBuffers(room, styleInfo, adminStyleRefs) {
   return { refs, user: false };
 }
 
+// Асинхронная очистка комнаты: запускается при первом enqueue, а не в processRender.
+// Strict condition: только keep_furniture=false и только если shell ещё нет.
+export function startRoomCleanup(roomId) {
+  if (MOCK_MODE) return;
+  if (!getCleanupConfig().enabled) return;
+  void (async () => {
+    try {
+      const claimed = await q.claimRoomCleanup(roomId);
+      if (!claimed) return;
+      const room = await q.getRoom(roomId);
+      if (!room) {
+        await q.failRoomCleanup(roomId, 'Комната не найдена');
+        return;
+      }
+      const cfg = getCleanupConfig();
+      const sourceBuf = await getBuffer(room.photo_path);
+      const { width, height } = imageSize(sourceBuf);
+      const targetRatio = width / height;
+      const cleanupPrompt = buildCleanupPrompt(room.room_type || 'Другое');
+      const cleanupAspect = cfg.aspect_ratio === 'auto'
+        ? snapAspect(width, height, modelCaps(cfg.model).aspects)
+        : cfg.aspect_ratio;
+      const out = await generateCleanupRender({
+        slotUser: room.user_id || null,
+        prompt: cleanupPrompt,
+        sourceImageB64: await bufferToDataUrl(sourceBuf),
+        aspectRatio: cleanupAspect,
+        model: cfg.model,
+        resolution: cfg.resolution,
+        aspect: cfg.aspect_ratio,
+      });
+      let shellBytes = Buffer.from(out.b64, 'base64');
+      shellBytes = await fitAspect(shellBytes, targetRatio);
+      const shellExt = detectImageExt(shellBytes);
+      const shellKey = `shells/room-${room.id}.${shellExt}`;
+      await putBuffer(shellKey, shellBytes, MIME_BY_EXT[shellExt] || 'image/png');
+      await q.finishRoomCleanup(room.id, shellKey, out.cost ?? null);
+      log({
+        event: 'room_cleanup_done',
+        room_id: room.id,
+        model: cfg.model,
+        resolution: cfg.resolution,
+        aspect_ratio: cleanupAspect,
+        cost_usd: out.cost ?? null,
+        shell_path: shellKey,
+      });
+    } catch (e) {
+      const msg = String(e.message || e).slice(0, 500);
+      await q.failRoomCleanup(roomId, msg).catch(() => {});
+      log({ event: 'room_cleanup_error', room_id: roomId, error: msg });
+    }
+  })();
+}
+
 export async function processRender(renderId, claimedBy = null) {
   const t0 = Date.now();
   const render = await q.getRender(renderId);
@@ -103,21 +157,46 @@ export async function processRender(renderId, claimedBy = null) {
       }
     : null;
   const cleanupCfg = getCleanupConfig();
-  const precleanedShell = room.precleaned_shell_path || null;
-  const useCleanup = !iteration && !keepFurniture && !precleanedShell && cleanupCfg.enabled;
+  const cleanupRequested = !iteration && !keepFurniture && cleanupCfg.enabled;
+  let precleanedShell = room.precleaned_shell_path || null;
+  let waitingShell = false;
   let stage = 'start';
 
   // Lease: пока рендер жив, воркер продлевает аренду; при падении lease истечёт,
   // и задача вернётся в очередь, не отбираясь у живой реплики.
-  const heartbeat = setInterval(() => { q.heartbeatRender(renderId, claimedBy).catch(() => {}); }, 30_000);
+  // waiting_shell продлевает started_at, иначе 60-минутный свипер убьёт ожидание.
+  const heartbeat = setInterval(() => { q.heartbeatRender(renderId, claimedBy, 300, waitingShell).catch(() => {}); }, 30_000);
   if (heartbeat.unref) heartbeat.unref();
+
+  // Cleanup запускается при enqueue. Здесь только ждём готовый shell до 3 минут.
+  if (cleanupRequested && !precleanedShell) {
+    waitingShell = true;
+    const deadline = Date.now() + 3 * 60 * 1000;
+    while (Date.now() < deadline) {
+      const state = await q.roomCleanupState(room.id).catch(() => null);
+      if (state?.precleaned_shell_path) {
+        precleanedShell = state.precleaned_shell_path;
+        room.precleaned_shell_path = precleanedShell;
+        room.cleanup_cost_usd = state.cleanup_cost_usd;
+        break;
+      }
+      if (state?.cleanup_status === 'error' || state?.cleanup_status === 'done') break;
+      if (!state?.cleanup_status) startRoomCleanup(room.id);
+      await sleep(2000);
+    }
+    waitingShell = false;
+    if (precleanedShell) log({ event: 'room_cleanup_ready', room_id: room.id, render_id: renderId });
+    else {
+      const state = await q.roomCleanupState(room.id).catch(() => null);
+      log({ event: 'room_cleanup_wait_timeout', room_id: room.id, render_id: renderId, status: state?.cleanup_status || null });
+    }
+  }
 
   // Себестоимость полной генерации: каждый внешний запрос пишется отдельно.
   const costBreakdown = {
     art_direction: null,
     layout: null,
     repair_scope: null,
-    cleanup: null,
     design: null,
     design_retry: null,
     architect_review: null,
@@ -153,9 +232,9 @@ export async function processRender(renderId, claimedBy = null) {
       price_tier: priceTier,
       keep_furniture: keepFurniture,
       use_catalog: useCatalog,
-      cleanup_enabled: useCleanup,
+      cleanup_enabled: cleanupRequested,
       precleaned_shell_path: precleanedShell,
-      source_used: precleanedShell ? 'precleaned' : useCleanup ? 'cleanup' : 'original',
+      source_used: precleanedShell ? 'precleaned' : 'original',
       style: styleName,
       target: render.edit_target || null,
       product_ids: [],
@@ -260,7 +339,7 @@ export async function processRender(renderId, claimedBy = null) {
 
       let styleUserRef = false;
       const styleRefUrls = [];
-      imageMap = [{ role: (useCleanup || precleanedShell) ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
+      imageMap = [{ role: precleanedShell ? 'source room or prepared empty shell' : 'source room', label: 'the only authority for architecture, camera and room proportions' }];
       if (styleMode === 'reference') {
         const adminStyleRefs = styleInfo ? await q.styleReferences(styleInfo.id, roomType) : [];
         const styleRefs = await styleReferenceBuffers(room, styleInfo, adminStyleRefs);
@@ -544,51 +623,10 @@ export async function processRender(renderId, claimedBy = null) {
       const editModel = getModelConfig().edit || null;
       const activeModel = iteration && editModel ? editModel : getModelConfig().render;
       const aspectRatio = snapAspect(width, height, modelCaps(activeModel).aspects);
-      let designBuf = originalBuf;
-      let cleanupCost = 0;
-
-      if (useCleanup) {
-        const cleanupStart = Date.now();
-        try {
-          const cleanupPrompt = buildCleanupPrompt(roomType);
-          const cleanupAspect = cleanupCfg.aspect_ratio === 'auto'
-            ? snapAspect(width, height, modelCaps(cleanupCfg.model).aspects)
-            : cleanupCfg.aspect_ratio;
-          const cleanupOut = await generateCleanupRender({
-          slotUser: room.user_id || null,
-            prompt: cleanupPrompt,
-            sourceImageB64: await bufferToDataUrl(originalBuf),
-            aspectRatio: cleanupAspect,
-            model: cleanupCfg.model,
-            resolution: cleanupCfg.resolution,
-            aspect: cleanupCfg.aspect_ratio,
-          });
-          let shellBytes = Buffer.from(cleanupOut.b64, 'base64');
-          shellBytes = await fitAspect(shellBytes, targetRatio);
-          const shellExt = detectImageExt(shellBytes);
-          const shellKey = `shells/${render.id}.${shellExt}`;
-          await putBuffer(shellKey, shellBytes, MIME_BY_EXT[shellExt] || 'image/png');
-          await q.setRenderShellPath(render.id, shellKey);
-          designBuf = shellBytes;
-          meta.source_used = 'cleanup';
-          cleanupCost = cleanupOut.cost || 0;
-          addCost('cleanup', cleanupOut.cost);
-          meta.cleanup = {
-            model: cleanupCfg.model,
-            resolution: cleanupCfg.resolution,
-            aspect_ratio: cleanupAspect,
-            cost_usd: cleanupOut.cost ?? null,
-            ms: Date.now() - cleanupStart,
-            shell_path: shellKey,
-            prompt: cleanupPrompt,
-          };
-          log({ event: 'cleanup_done', room_id: room.id, render_id: renderId, model: cleanupCfg.model, aspect: cleanupAspect, cost_usd: cleanupOut.cost ?? null, ms: Date.now() - cleanupStart });
-        } catch (e) {
-          addCost('cleanup', e.cost);
-          meta.source_used = 'original';
-          meta.cleanup = { model: cleanupCfg.model, error: String(e.message || e).slice(0, 500), ms: Date.now() - cleanupStart };
-          log({ event: 'cleanup_error', room_id: room.id, render_id: renderId, model: cleanupCfg.model, error: String(e.message || e).slice(0, 500) });
-        }
+      const designBuf = precleanedShell ? await getBuffer(precleanedShell) : originalBuf;
+      if (precleanedShell) {
+        meta.source_used = 'precleaned';
+        meta.cleanup = { async: true, shell_path: precleanedShell, cost_usd: room.cleanup_cost_usd ?? null };
       }
 
       const srcB64 = await bufferToDataUrl(designBuf);
@@ -597,7 +635,7 @@ export async function processRender(renderId, claimedBy = null) {
         // Старый клиент уже прислал готовый композит с перенесённым объектом:
         // отдаём его как результат, не позволяя модели вернуть объект назад.
         imageB64 = originalBuf.toString('base64');
-        cost = (cleanupCost || 0) + (artDirectionCost || 0);
+        cost = artDirectionCost || 0;
         model = 'prepared-source';
         meta.source_used = 'prepared_source';
         log({ event: 'render_prepared_source', room_id: room.id, render_id: renderId });
@@ -611,7 +649,7 @@ export async function processRender(renderId, claimedBy = null) {
         resolution: render.resolution || null,
         ...(iteration ? { aspect: aspectRatio, model: editModel } : {}),
       });
-      imageB64 = out.b64; cost = (cleanupCost || 0) + (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
+      imageB64 = out.b64; cost = (artDirectionCost || 0) + (out.cost || 0); model = out.model || null;
       addCost('design', out.cost);
       if (render.edit_move) {
         try {
@@ -635,7 +673,7 @@ export async function processRender(renderId, claimedBy = null) {
         }
       }
       }
-      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, cleanup: useCleanup, cleanup_cost_usd: cleanupCost || null, cost_usd: cost, ms: Date.now() - t0 });
+      log({ event: 'render_image_ok', room_id: room.id, render_id: renderId, model, aspect: aspectRatio, room_type: roomType, price_tier: priceTier, target: render.edit_target || null, refs: referenceImagesB64.length, cleanup: Boolean(precleanedShell), cleanup_shell: precleanedShell ? 'yes' : 'no', cost_usd: cost, ms: Date.now() - t0 });
     }
 
     const rawBytes = Buffer.from(imageB64, 'base64');
@@ -912,12 +950,19 @@ let running = 0;
 const MAX_RUNNING = workerConcurrency();
 export function startWorker() {
   q.requeueProcessing().then(n => { if (n) console.log(`[worker] вернул в очередь ${n} прерванных рендеров`); });
+  q.requeueStaleRoomCleanup().then(n => { if (n) console.log(`[worker] вернул в очередь очистку ${n} комнат`); });
+  q.pendingRoomCleanups(10).then(rows => rows.forEach(room => startRoomCleanup(room.id))).catch(() => {});
 
   setInterval(async () => {
     try {
       // Просроченные lease возвращаем в очередь; живые (вторая реплика) не трогаем.
       const requeued = await q.requeueProcessing();
       if (requeued) log({ event: 'render_lease_requeued', count: requeued });
+      // Очистка комнат: подхватываем queued после рестарта и упавшие processing.
+      const requeuedCleanup = await q.requeueStaleRoomCleanup();
+      if (requeuedCleanup) log({ event: 'room_cleanup_requeued', count: requeuedCleanup });
+      const pendingCleanup = await q.pendingRoomCleanups(3);
+      for (const room of pendingCleanup) startRoomCleanup(room.id);
       const stale = await q.staleRenders(24 * 60);
       for (const r of stale) {
         const msg = 'Генерация не завершилась за 24 часа';

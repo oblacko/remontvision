@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { q, migrate } from './db.js';
-import { startWorker, enqueueRender } from './jobs.js';
+import { startWorker, enqueueRender, startRoomCleanup } from './jobs.js';
 import { enqueueRenderWithCredit, restoreCreditForRender } from './payments.js';
 import { startBalanceMonitor, getBalanceSnapshot } from './openrouterbalance.js';
 import { imageSlotStats } from './imageslot.js';
@@ -1656,6 +1656,8 @@ app.post('/api/rooms', rateLimit, upload.fields([
     }
     throw e;
   }
+  // Очистка комнаты — асинхронно и только при keep_furniture=false; рендер дождётся shell.
+  startRoomCleanup(id);
   res.status(201).json({ id, status: 'queued', concept_key: resolvedVariants[0].concept, batch_id: batchId });
 }));
 
@@ -2621,6 +2623,7 @@ app.post('/api/renders/:id/variant', rateLimit, h(async (req, res) => {
       concept: null,
       batchId,
     });
+    startRoomCleanup(room.id);
     res.status(202).json({ id, batch_id: batchId, style: allowed, status: 'queued' });
   } catch (e) {
     await q.deleteBatch(batchId).catch(() => {});
@@ -2731,6 +2734,7 @@ app.post('/api/renders/:id/retry', rateLimit, h(async (req, res) => {
       concept: render.concept || null,
       batchId: render.batch_id || null,
     });
+    startRoomCleanup(render.room_id);
     res.status(202).json({ id, batch_id: render.batch_id || null, status: 'queued' });
   } catch (e) {
     if (e.status === 402) {

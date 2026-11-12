@@ -86,6 +86,34 @@ export const q = {
     pool.query(`UPDATE rooms SET status = $1, error = NULL, notice = NULL, updated_at = now() WHERE id = $2`, [status, id]),
   setRoomError: (error, id) =>
     pool.query(`UPDATE rooms SET status = 'error', error = $1, notice = NULL, updated_at = now() WHERE id = $2`, [error, id]),
+  // Асинхронная очистка комнаты: один claim на комнату, shell переиспользуется рендерами.
+  claimRoomCleanup: id =>
+    pool.query(`UPDATE rooms SET cleanup_status = 'processing', cleanup_started_at = now(),
+                  cleanup_error = NULL, updated_at = now()
+                WHERE id = $1 AND keep_furniture = false AND precleaned_shell_path IS NULL
+                  AND (cleanup_status IS NULL OR cleanup_status = 'queued')
+                RETURNING id`, [id]).then(r => r.rows[0] || null),
+  finishRoomCleanup: (id, shellPath, costUsd = null) =>
+    pool.query(`UPDATE rooms SET cleanup_status = 'done', precleaned_shell_path = $2,
+                  cleanup_cost_usd = $3, cleanup_error = NULL, cleanup_finished_at = now(), updated_at = now()
+                WHERE id = $1`, [id, shellPath, costUsd]),
+  failRoomCleanup: (id, error) =>
+    pool.query(`UPDATE rooms SET cleanup_status = 'error', cleanup_error = $2,
+                  cleanup_finished_at = now(), updated_at = now()
+                WHERE id = $1`, [id, String(error || '').slice(0, 500)]),
+  roomCleanupState: id =>
+    pool.query(`SELECT cleanup_status, cleanup_error, precleaned_shell_path, cleanup_cost_usd,
+                       cleanup_started_at, cleanup_finished_at
+                FROM rooms WHERE id = $1`, [id]).then(r => r.rows[0] || null),
+  pendingRoomCleanups: limit =>
+    pool.query(`SELECT id FROM rooms
+                WHERE cleanup_status = 'queued' AND precleaned_shell_path IS NULL AND keep_furniture = false
+                ORDER BY updated_at LIMIT $1`, [Math.max(1, Number(limit) || 1)]).then(r => r.rows),
+  requeueStaleRoomCleanup: () =>
+    pool.query(`UPDATE rooms SET cleanup_status = 'queued', updated_at = now()
+                WHERE cleanup_status = 'processing'
+                  AND cleanup_started_at < now() - interval '10 minutes'
+                  AND precleaned_shell_path IS NULL`).then(r => r.rowCount),
   setRoomNotice: (notice, id) =>
     pool.query(`UPDATE rooms SET status = 'done', error = NULL, notice = $1, updated_at = now() WHERE id = $2`, [notice, id]),
   setRoomDesign: (id, conceptKey, designDirection) =>
@@ -245,11 +273,12 @@ export const q = {
          WHERE id = $1 RETURNING id, claimed_by`, [row.id, claimedBy]);
       return updated.rows[0] || null;
     }),
-  heartbeatRender: (id, claimedBy = null, seconds = 300) =>
-    pool.query(`UPDATE renders SET claimed_at = now(), lease_expires_at = now() + ($3 || ' seconds')::interval
+  heartbeatRender: (id, claimedBy = null, seconds = 300, waitingShell = false) =>
+    pool.query(`UPDATE renders SET claimed_at = now(), lease_expires_at = now() + ($3 || ' seconds')::interval,
+                  started_at = CASE WHEN $4::boolean THEN now() ELSE started_at END
                 WHERE id = $1 AND status = 'processing'
                   AND ($2::text IS NULL OR claimed_by = $2)`,
-      [id, claimedBy, String(seconds)]).then(r => r.rowCount),
+      [id, claimedBy, String(seconds), Boolean(waitingShell)]).then(r => r.rowCount),
   requeueProcessing: () =>
     pool.query(`UPDATE renders SET status = 'queued', claimed_at = NULL, lease_expires_at = NULL, claimed_by = NULL
                 WHERE status = 'processing'

@@ -43,7 +43,7 @@
 | Генерация по фото | Работает (live/mock) | `POST /api/rooms` → `GET /api/rooms/:id` |
 | Мульти-стиль до 8 пар | Работает | `items: [{style, concept}]` |
 | Оценка размеров vision | Работает в воркере | `renders.meta.room_dimensions_estimate` |
-| Очистка комнаты | Работает при `keep_furniture=false`; выключена по умолчанию | админка «Очистка» |
+| Очистка комнаты | Работает при `keep_furniture=false`; выключена по умолчанию, асинхронно при первом enqueue, shell переиспользуется | админка «Очистка» |
 | Правки (3 бесплатные) | Работает | `POST /api/rooms/:id/iterate` |
 | Товарный QA | Работает для правки с `product_id` | `render.product_qa` |
 | Шаринг `/s/:token` | Работает | лайки/комментарии |
