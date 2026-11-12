@@ -36,11 +36,10 @@ export const MAX_REFERENCES; // 4
 
 ## Direction и кэш
 
-- `buildDesignDirection` — один шаг агента (`maxSteps: 1`); повтор только при нераспарсенном JSON.
-- `generation_cache`: 3 варианта на `стиль|концепт|комната|размеры|версия промта`, TTL 30 дней.
-- Выбор — `sessionId` hash; новизна — при выборе из вариантов.
-- Кэш-хит: `cached: true`, `cost: null`; пустой `prompt_en` — негативный маркер на сутки.
-- Настройки: `DIRECTION_CACHE_ENABLED/VARIANTS/TTL_DAYS`.
+- `buildArtDirection` (`src/artdirector.js`) — один vision-вызов: факты по фото + поле `direction` при выбранной концепции; без концепции или при конфликтной паре — `facts_only`.
+- `room_analysis` (миграция `059`): ключ по фото/shell/стилю/концепту/`keepFurniture`/размерам; повторный рендер той же пары не платит за vision.
+- `generation_cache` используется для layout-плана (TTL 30 дней), не для direction.
+- Отдельного direction-агента и `DIRECTION_CACHE_*` больше нет; история берётся из `design_registry` и последних рендеров комнаты.
 
 ## Арт-директор и repair scope
 
@@ -65,7 +64,7 @@ export const MAX_REFERENCES; // 4
 - FLUX 2 Pro: без resolution; BFL может блокировать спальни/кровати.
 - Формат выхода JPEG/WebP/PNG — определять по сигнатуре (`detectImageExt`).
 - Стоимость — `usage.cost`.
-- `withImageSlot` + глобальный advisory lock: не обходить слот и не повторять упавший вызов.
+- `withImageSlot` (семафор): не обходить слот и не повторять упавший вызов.
 - 429: до 4 попыток 10/20/40 с + `Retry-After`.
 - Прокси: OpenRouter WAF может блокировать IP VPS.
 

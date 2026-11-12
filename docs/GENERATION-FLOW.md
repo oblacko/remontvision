@@ -94,9 +94,7 @@ flowchart TD
 | `style.config.mode=reference` | 1 approved art ref |
 | `style.config.mode=swatches` | material board |
 | `ART_DIRECTION_ENABLED=0` | отключает арт-директора |
-| `DESIGN_DIRECTION_ENABLED=0` | отключает direction |
 | `ARCHITECTURE_QA_ENABLED=0` | без QA архитектуры (default) |
-| `DIRECTION_CACHE_ENABLED=0` | без кэша direction |
 | `WORKER_CONCURRENCY` | параллелизм рендеров |
 
 ## 6. Ошибки и кредиты

@@ -58,11 +58,11 @@ flowchart LR
 
 ### 5. Direction и кэш
 
-- Один вызов агента (`maxSteps: 1`); повтор только при нераспарсенном JSON.
-- Кэш `generation_cache`: 3 варианта на `стиль|концепт|комната|точные размеры|версия промта`, TTL 30 дней.
-- Выбор варианта — детерминированный хэш по `sessionId`; «не повторяй прошлые ходы» применяется при выборе.
-- Пустой `prompt_en` → fallback на art direction и негативный маркер на сутки.
-- Настройки: `DIRECTION_CACHE_ENABLED`, `DIRECTION_CACHE_VARIANTS` (1–3), `DIRECTION_CACHE_TTL_DAYS`.
+- Один vision-вызов арт-директора: факты по фото + поле `direction` при выбранной концепции; без концепции — `facts_only`.
+- Кэш `room_analysis` (миграция `059`): фото/shell, стиль, концепт, `keepFurniture`, размеры. Повторный рендер пары не платит за vision.
+- `generation_cache` — только layout-план (TTL 30 дней).
+- История для direction — `design_registry` пользователя + последние рендеры комнаты.
+- Отдельного `designeragent` и `DIRECTION_CACHE_*` больше нет.
 
 ### 6. Промт
 

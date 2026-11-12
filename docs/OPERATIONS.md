@@ -29,11 +29,9 @@ RENDER_ASPECT_RATIO=auto
 OPENROUTER_TIMEOUT_MS=120000
 
 # Очередь и скорость
-WORKER_CONCURRENCY=2              # 1–8
-IMAGE_MIN_GAP_MS=10000            # пауза между image-вызовами
-DIRECTION_CACHE_ENABLED=1
-DIRECTION_CACHE_VARIANTS=3        # 1–3
-DIRECTION_CACHE_TTL_DAYS=30
+WORKER_CONCURRENCY=6              # 1–8
+IMAGE_MIN_GAP_MS=0                # пауза между image-вызовами
+# Direction кэшируется в room_analysis; отдельного DIRECTION_CACHE_* нет
 
 # Auth/mail
 RESEND_API_KEY=<key>
@@ -88,7 +86,7 @@ S3_ENDPOINT=
 | Requeue | только истёкшие lease; раз в 5 мин |
 | Reaper | queued > 24 ч или processing > 60 мин → error + refund |
 | Параллелизм | `WORKER_CONCURRENCY` (1–8) |
-| Image-слот | Postgres advisory lock, ожидание ≤ 5 мин |
+| Image-слот | семафор в процессе: система/провайдер/пользователь (`imageslot.js`) |
 
 Проверка очереди:
 

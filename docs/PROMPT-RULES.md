@@ -2,7 +2,7 @@
 
 Промт = **код** + **редактируемые правила**.
 
-- Код: `src/openrouter.js` (структура, KEEP/CHANGE, output), `src/roomtypes.js` (комнаты, слоты), `src/designeragent.js` (direction).
+- Код: `src/openrouter.js` (структура, KEEP/CHANGE, output), `src/roomtypes.js` (комнаты, слоты), `src/artdirector.js` (факты + direction одним вызовом).
 - Правила: `src/promptconfig.js` (дефолты) + `app_settings.prompt.rules.v1` (админка «Промт»).
 
 ## Поля

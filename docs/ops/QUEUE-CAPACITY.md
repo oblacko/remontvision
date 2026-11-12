@@ -6,8 +6,8 @@
 
 | Метрика | Источник | Зачем |
 |---|---|---|
-| `ms`, `retried` | JSON-лог `design_direction_call` | задержка direction и доля повторных вызовов |
-| cache hit rate | `design_direction_cache_hit` vs `design_direction_call` | эффективность кэша |
+| `ms`, `cost_usd` | JSON-лог `art_direction_ok` / `design_direction_ok` | задержка арт-директора и стоимость |
+| cache hit rate | `room_analysis_cache_hit` vs `render_start` | эффективность кэша анализа комнаты |
 | `renders.duration_ms` | таблица `renders` (status='done') | полное время рендера, p50/p90 |
 | wait time | `started_at - created_at` | сколько задача ждала в очереди |
 | queue depth | `count(*) WHERE status='queued'` | накопление очереди |
@@ -43,27 +43,23 @@ FROM renders;
 ## Логи
 
 ```bash
-# Задержка direction и retry
-docker compose logs --since 24h app | grep '"event":"design_direction_call"' | tail -200
+# Арт-директор: задержка и повтор
+docker compose logs --since 24h app | grep '"event":"art_direction_ok"' | tail -200
 
-# Попадания в кэш
-docker compose logs --since 24h app | grep -c 'design_direction_cache_hit'
-docker compose logs --since 24h app | grep -c 'design_direction_call'
+# Попадания в кэш анализа комнаты
+docker compose logs --since 24h app | grep -c 'room_analysis_cache_hit'
 ```
 
 ## Ожидаемый эффект
 
-- `ms` p50: было ~34 с (двойной вызов) → ожидается ~15–20 с на промахе и 0 на попадании.
-- При прогретом кэше большинство рендеров не платят за direction вовсе.
-- `WORKER_CONCURRENCY` увеличивает число рендеров в работе, но не число одновременных image-вызовов (их держит глобальный advisory-слот).
+- `ms` p50 арт-директора: один vision-вызов вместо двух; на промахе room_analysis — полный проход, на попадании — 0.
+- При прогретом кэше анализа большинство повторных рендеров комнаты не платят за vision.
+- `WORKER_CONCURRENCY` увеличивает число рендеров в работе; одновременные image-вызовы ограничивает общий семафор (`imageslot.js`).
 
 ## Настройки и откат
 
 | Переменная | По умолчанию | Откат |
 |---|---|---|
-| `WORKER_CONCURRENCY` | 2 | вернуть `2` |
-| `DIRECTION_CACHE_ENABLED` | 1 | `0` — direction снова генерируется каждый раз |
-| `DIRECTION_CACHE_VARIANTS` | 3 | `1` — один вариант на пару |
-| `DIRECTION_CACHE_TTL_DAYS` | 30 | уменьшить TTL |
+| `WORKER_CONCURRENCY` | 6 | `1` — строго по одному рендеру |
 
-Кэш можно очистить вручную: `DELETE FROM generation_cache;` (только по команде владельца).
+Кэш анализа комнаты можно сбросить вручную: `DELETE FROM room_analysis;` (только по команде владельца).

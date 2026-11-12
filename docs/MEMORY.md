@@ -31,7 +31,7 @@
 
 - `claimNextRender`: `FOR UPDATE SKIP LOCKED` + lease 5 мин + `claimed_by`.
 - Heartbeat 30 с; requeue/reaper — только истёкшие lease; processing > 60 мин → error + refund.
-- `WORKER_CONCURRENCY` (1–8, default 2); image-вызовы — глобальный advisory-слот.
+- `WORKER_CONCURRENCY` (1–8, default 6); image-вызовы — общий семафор (система/провайдер/пользователь).
 - Direction кэш: 3 варианта, TTL 30 дней, детерминированный выбор, негативный маркер на сутки.
 - `IMAGE_MIN_GAP_MS=10000`; 429 — до 4 попыток (10/20/40 с).
 

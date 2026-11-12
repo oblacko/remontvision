@@ -15,7 +15,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Vision-разбор | Работает: Gemini 3.1 Pro (код-дефолт), модель из админки |
 | Стили и комнаты | 10 стилей × 10 концепций, 12 типов комнат; редактируются в админке |
 | Очередь | Lease + `claimed_by` + `FOR UPDATE SKIP LOCKED`; `WORKER_CONCURRENCY`; семафор image-вызовов (система/провайдер/пользователь) |
-| Direction | Кэш на 3 варианта, TTL 30 дней; пустой ответ — негативный маркер 24 ч; без двойного вызова модели |
+| Direction | Один vision-вызов арт-директора: факты + замысел; без концепции — `facts_only`; повторные рендеры комнаты — из `room_analysis` |
 | Правки | Точечные; первые 3 бесплатны, 4-я и далее — 1 кредит; товарный QA |
 | Очистка комнаты | Работает при `keep_furniture=false`; **выключена по умолчанию**, запускается асинхронно при первом enqueue |
 | Подбор товаров | MCP/catalog-service: до 20 предметов, бесплатно, один проход |
@@ -139,7 +139,7 @@ app/
 | БД | PostgreSQL 16 |
 | Очередь | Postgres + воркер (`jobs.js`), lease/`claimed_by` |
 | Файлы | диск или S3 (`storage.js`) |
-| AI | OpenRouter: FLUX 3 Image, FLUX 3 Klein (cleanup), Gemini 3.1 Pro (vision), DeepSeek Flash (direction) |
+| AI | OpenRouter: FLUX 3 Image, FLUX 3 Klein (cleanup), Gemini 3.1 Pro (vision), DeepSeek Flash (арт-директор + direction) |
 | Почта | Resend / SMTP |
 | Платежи | Robokassa / ЮKassa |
 | Инфраструктура | Docker Compose, Nginx, Let's Encrypt, GitHub Actions |

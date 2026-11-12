@@ -66,10 +66,7 @@ URL: `/admin`
 
 | Переменная | Значение |
 |---|---|
-| `WORKER_CONCURRENCY` | 1–8, по умолчанию 2 |
-| `DIRECTION_CACHE_ENABLED` | `1`/`0` |
-| `DIRECTION_CACHE_VARIANTS` | 1–3 |
-| `DIRECTION_CACHE_TTL_DAYS` | по умолчанию 30 |
+| `WORKER_CONCURRENCY` | 1–8, по умолчанию 6 |
 | `IMAGE_MIN_GAP_MS` | пауза между image-вызовами (админка «Генерация») |
 
 ## Безопасность

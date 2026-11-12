@@ -6,7 +6,7 @@ import { roomTypeByName } from './roomtypes.js';
 import { getArchitectPrompt } from './architectprompts.js';
 import { callAgentJson } from './openrouteragent.js';
 import { validateRepairScope, validateDesignDirection } from './agentcontracts.js';
-import { styleById, conceptById, compatibilityOf, compatibilityNote } from './designdata.js';
+import { DESIGN_STYLES, styleById, conceptById, compatibilityOf, compatibilityNote } from './designdata.js';
 import { isArtDirectionEnabled } from './modelconfig.js';
 
 // Категории, которые арт-директор может просить из каталога. Локальный список,
@@ -287,7 +287,7 @@ export function composeArtDirectionPrompt({
 } = {}) {
   const room = roomTypeByName(roomType);
   const roomName = room?.prompt || roomType || 'room';
-  const styleCard = styleById(styleId) || null;
+  const styleCard = styleById(styleId) || DESIGN_STYLES.find(item => item.name === style) || null;
   const concept = conceptId ? conceptById(conceptId) : null;
   const compatibility = styleCard && concept ? compatibilityOf(styleCard.id, concept.id) : null;
   const factsOnly = !concept || !styleCard || compatibility === 'conflict';
