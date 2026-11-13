@@ -60,6 +60,6 @@ docker compose logs --since 24h app | grep -c 'room_analysis_cache_hit'
 
 | Переменная | По умолчанию | Откат |
 |---|---|---|
-| `WORKER_CONCURRENCY` | 6 | `1` — строго по одному рендеру |
+| `WORKER_CONCURRENCY` | 100 | `1` — строго по одному рендеру |
 
 Кэш анализа комнаты можно сбросить вручную: `DELETE FROM room_analysis;` (только по команде владельца).

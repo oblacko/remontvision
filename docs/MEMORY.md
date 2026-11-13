@@ -12,7 +12,7 @@
 ## Текущий поток
 
 1. Загрузка фото.
-2. Выбор типа комнаты, до 8 пар «стиль × концепция», класс материалов.
+2. Выбор типа комнаты, до 10 пар «стиль × концепция», класс материалов.
 3. Генерация (design-first).
 4. Правки (первые 3 бесплатны), разбор, роадмап, шаринг.
 5. Подбор товаров (MCP, бесплатно).
@@ -23,7 +23,7 @@
 - Vision: `google/gemini-3.1-pro-preview`; art direction + direction: DeepSeek Flash, один vision-вызов (без концепции — `facts_only`).
 - Очистка: FLUX 3 Klein, **выключена по умолчанию**; работает только при `keep_furniture=false`, запускается асинхронно при первом enqueue, shell на комнате, ожидание ≤3 мин. Direction/вариативность: `src/artdirector.js`, `src/variability.js`; кэш анализа — `room_analysis`.
 - Design-first: исходник + один art ref, без product refs.
-- Мульти-стиль: до 8 пар, каждая — отдельный рендер и кредит.
+- Мульти-стиль: до 10 пар, каждая — отдельный рендер и кредит.
 - QA архитектуры выключен по умолчанию (`ARCHITECTURE_QA_ENABLED=0`).
 - Товарная правка: vision QA; при отказе `rejected` + refund.
 
@@ -31,7 +31,7 @@
 
 - `claimNextRender`: `FOR UPDATE SKIP LOCKED` + lease 5 мин + `claimed_by`.
 - Heartbeat 30 с; requeue/reaper — только истёкшие lease; processing > 60 мин → error + refund.
-- `WORKER_CONCURRENCY` (1–8, default 6); image-вызовы — общий семафор (система/провайдер/пользователь).
+- `WORKER_CONCURRENCY` (1–500, default 100); image-вызовы — общий семафор (`IMAGE_CONCURRENCY*`: система/провайдер 100, пользователь 12).
 - Анализ комнаты кэшируется в `room_analysis` по фото/shell/стилю/концепту/`keepFurniture`/размерам; отдельного direction-кэша нет.
 - `IMAGE_MIN_GAP_MS=0`; 429 — до 4 попыток (10/20/40 с).
 

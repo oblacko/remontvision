@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-13T20:14:16.644Z
+Generated: 2026-11-13T20:18:01.760Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -392,12 +392,12 @@ AI-редизайн интерьера по фото: генерация (FLUX 3
 - Мульти-стиль: `items: [{style, concept}]` (1–10), каждый — отдельный рендер и кредит.
 - Кредиты: 10/20/60 (399/599/1499 ₽); первые 3 правки бесплатны, 4-я+ — 1 кредит.
 - Очистка выключена по умолчанию; style-ref/hero-референсы — режим `text` по умолчанию.
-- Direction кэшируется: 3 варианта, TTL 30 дней (`generation_cache`).
+- Direction кэшируется в `room_analysis` (артефакт art); отдельного direction-кэша нет.
 - Очередь: lease 5 мин, heartbeat 30 с, reaper queued 24 ч / processing 60 мин, `WORKER_CONCURRENCY` 1–500 (default 100).
-- Image-вызовы сериализуются глобальным advisory-слотом.
+- Image-вызовы идут параллельно в пределах семафора (система/провайдер/пользователь, `IMAGE_CONCURRENCY*` 100/12).
 - Каталог демо: 100 товаров, 0 URL; заказов нет. Legacy Yandex procurement не подключён; текущий подбор — MCP/catalog-service (бесплатно).
 - Известный баг: `furnitureOff`, `catalogOn`, `styling` не доходят до промта.
-- Тесты: unit + integration (45) + catalog pytest (72); CI-гейт перед деплоем.
+- Тесты: unit + integration (75) + catalog pytest (72); CI-гейт перед деплоем.
 - Миграции: `001–053`, файла `048` нет.
 
 ## Ключевые файлы
@@ -409,7 +409,7 @@ src/openrouter.js      image/vision, buildPrompt, image-слот
 src/db.js              pg pool, migrations, SQL
 src/designeragent.js   direction + кэш вариантов
 src/generationcache.js кэш AI-шагов (TTL)
-src/imageslot.js       глобальный advisory-слот
+src/imageslot.js       семафор image-вызовов (система/провайдер/пользователь)
 src/workerknobs.js     WORKER_CONCURRENCY
 src/payments.js        кредиты, платежи, refund
 src/visionagent.js     MCP-подбор товаров
@@ -1945,7 +1945,7 @@ docker compose logs --since 1h app | grep -o '"stage":"[^"]*"' | sort | uniq -c
 ```
 
 - `429` → OpenRouter rate limit: проверить `HTTPS_PROXY`/IP, `IMAGE_MIN_GAP_MS`
-  (по умолчанию 10000 мс), повторы 10/20/40 с; при устойчивом 429 — сменить модель/прокси.
+  (по умолчанию 0 мс), повторы 10/20/40 с; при устойчивом 429 — сменить модель/прокси.
 - `content moderation` → FLUX/BFL блокирует фото (часто спальни/кровати); предложить
   другую модель или попросить другое фото.
 - `400` от `/images` → сверить `modelcaps`; FLUX.2 Pro не принимает `resolution`.

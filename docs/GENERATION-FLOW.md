@@ -7,7 +7,7 @@
 ```mermaid
 flowchart TD
   U["Пользователь"] -->|"JPG/PNG/WebP/HEIC ≤15 МБ"| UP["Загрузка фото"]
-  UP --> GEN["Выбор комнаты, до 8 пар стиль×концепт, tier"]
+  UP --> GEN["Выбор комнаты, до 10 пар стиль×концепт, tier"]
   GEN --> API["POST /api/rooms"]
   API --> Q["Очередь: rooms + N×renders(queued) + кредиты"]
   Q --> W["Worker: claim + lease"]
@@ -97,7 +97,7 @@ flowchart TD
 | `ART_DIRECTION_ENABLED=0` | отключает арт-директора |
 | `ARCHITECTURE_QA_ENABLED=0` | без QA архитектуры (default) |
 | `PARSE_AUTO=1` | авто-разбор после раннего done (default off) |
-| `WORKER_CONCURRENCY` | параллелизм рендеров (1–8, default 6) |
+| `WORKER_CONCURRENCY` | параллелизм рендеров (1–500, default 100) |
 
 ## 6. Ошибки и кредиты
 

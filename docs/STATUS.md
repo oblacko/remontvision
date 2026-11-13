@@ -37,7 +37,7 @@
 
 ### Тесты и CI
 - Интеграционный харнесс: отдельная `<db>_test`, приложение без `listen`/воркеров, временный `DATA_DIR`, запрет S3 и нелокальной БД.
-- 69 интеграционных тестов: кредиты/возвраты, очередь/lease/fencing, auth, комнаты, шаринг, платежи, файлы, image-слот, room_analysis, referral, cleanup-async.
+- 75 интеграционных тестов: кредиты/возвраты, очередь/lease/fencing, auth, комнаты, шаринг, платежи, файлы, image-слот, room_analysis, referral, cleanup-async.
 - CI: backend unit + integration (Postgres service), web lint/build, catalog pytest; деплой зависит от `test`.
 
 ## Что работает
@@ -82,8 +82,8 @@
 
 ## Проверка (свежие прогоны, 2026-11-12)
 
-- `npm test` — 393 pass, 1 skip (включая регрессию 20/20).
-- `npm run test:integration` — 69/69.
+- `npm test` — 417 pass, 1 skip (включая регрессию 20/20).
+- `npm run test:integration` — 75/75.
 - `cd web && npm run lint` — 0 errors; `npm run build` — зелёный.
 - `catalog-service` pytest — 72 passed (сервис не менялся, прогон 2026-11-11).
 - Прод-смоук 2026-11-12: `/api/health` → `ok:true`, `/` → 200, `/app` → 301, `/offer` → 200, `/api/referral/context` → `{invited:false}`, `/api/credits/refunds` без auth → 401 — PASS.
