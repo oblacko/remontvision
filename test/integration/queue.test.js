@@ -139,6 +139,44 @@ test('a stuck processing render is failed and refunded once', async () => {
   assert.equal(await q.creditBalance(user.id), 3);
 });
 
+test('edit queue is claimed before base queue and completes first', async () => {
+  await createTestApp();
+  const user = await createUser();
+  await grantCredits(user.id, 20, 'test_grant');
+
+  // Долгий базовый рендер уже обрабатывается (processing).
+  const roomLong = await seedRoom({ userId: user.id });
+  const baseLongId = id();
+  await enqueueRenderWithCredit({ id: baseLongId, roomId: roomLong.id, chargedUserId: user.id });
+  assert.equal((await q.getRender(baseLongId)).queue, 'base');
+  await q.claimNextRender();
+  assert.equal((await q.getRender(baseLongId)).status, 'processing');
+
+  // Ещё один базовый рендер в очереди — старее правки.
+  const roomBase = await seedRoom({ userId: user.id });
+  const baseQueuedId = id();
+  await enqueueRenderWithCredit({ id: baseQueuedId, roomId: roomBase.id, chargedUserId: user.id });
+  assert.equal((await q.getRender(baseQueuedId)).queue, 'base');
+  assert.equal((await q.getRender(baseQueuedId)).status, 'queued');
+
+  // Правка в очереди — создана позже базы, но должна выйти первой.
+  const roomEdit = await seedRoom({ userId: user.id, status: 'done' });
+  const parentId = await insertRender({ roomId: roomEdit.id, status: 'done', imagePath: 'renders/parent.png' });
+  const editId = id();
+  await enqueueRenderWithCredit({ id: editId, roomId: roomEdit.id, parentRenderId: parentId, chargedUserId: user.id });
+  assert.equal((await q.getRender(editId)).queue, 'edit');
+  assert.equal((await q.getRender(editId)).status, 'queued');
+
+  // Claim обязан взять правку, а не более раннюю базу.
+  const claimed = await q.claimNextRender();
+  assert.equal(claimed.id, editId);
+
+  await processRender(editId);
+  assert.equal((await q.getRender(editId)).status, 'done');
+  // База всё ещё в очереди — правка завершена первой.
+  assert.equal((await q.getRender(baseQueuedId)).status, 'queued');
+});
+
 test('a worker that lost its lease cannot complete the render', async () => {
   await createTestApp();
   const { renderId } = await seedQueuedRender();

@@ -278,11 +278,18 @@ export const q = {
       .then(r => r.rows[0]?.n || 0),
   // атомарный claim следующей queued-задачи с арендой: SKIP LOCKED не даёт двум
   // воркерам взять одну строку, lease защищает in-flight работу от чужого requeue.
+  // Приоритет очередей: сначала старейшая правка ('edit'), затем старейшая база
+  // ('base') — правка юзера не ждёт за чужим базовым рендером.
   claimNextRender: () =>
     withTransaction(async client => {
-      const { rows } = await client.query(
-        `SELECT id FROM renders WHERE status = 'queued'
+      let { rows } = await client.query(
+        `SELECT id FROM renders WHERE status = 'queued' AND queue = 'edit'
          ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`);
+      if (!rows.length) {
+        ({ rows } = await client.query(
+          `SELECT id FROM renders WHERE status = 'queued' AND queue = 'base'
+           ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`));
+      }
       const row = rows[0];
       if (!row) return null;
       const claimedBy = crypto.randomUUID();

@@ -430,9 +430,9 @@ export async function enqueueRenderWithCredit({
     }
 
     await client.query(
-      `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, model_key, model_credits, is_private, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, edit_source_path, edit_move, style, concept, resolution, status, batch_id, reserved_credits)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'queued', $19, $20)`,
-      [id, roomId, parentRenderId, rootRenderId, modelKey, modelCredits, finalIsPrivate, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null, editSourcePath, editMove ? JSON.stringify(editMove) : null, style, concept, resolution, batchId, delta < 0 ? Math.abs(delta) : 0]);
+      `INSERT INTO renders (id, room_id, parent_render_id, root_render_id, model_key, model_credits, is_private, request_text, request_ip, edit_target, ref_path, ref_product_id, edit_refs, edit_source_path, edit_move, style, concept, resolution, queue, status, batch_id, reserved_credits)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'queued', $20, $21)`,
+      [id, roomId, parentRenderId, rootRenderId, modelKey, modelCredits, finalIsPrivate, requestText, requestIp, editTarget, refPath, refProductId, editRefs?.length ? JSON.stringify(editRefs) : null, editSourcePath, editMove ? JSON.stringify(editMove) : null, style, concept, resolution, iteration ? 'edit' : 'base', batchId, delta < 0 ? Math.abs(delta) : 0]);
 
     if (chargedUserId && delta !== 0) {
       await client.query(
