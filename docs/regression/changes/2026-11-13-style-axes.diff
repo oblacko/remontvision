@@ -1,0 +1,264 @@
+baseline: 2026-11-11T23:09:06.080Z
+current:  2026-11-13T19:54:20.715Z
+config hash: 963e0638ce3dc832ac74dd37ff3c59e9712e6008583715970879517114ecfa37 → 963e0638ce3dc832ac74dd37ff3c59e9712e6008583715970879517114ecfa37
+
+
+=== Гостиная (зал) / Современный минимализм ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B7A99A. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: even
++ - texture: satin
++ - density: airy
+  
+  
+
+=== Гостиная (зал) / Скандинавский ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C26D5A. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: soft
++ - texture: matte
++ - contrast: low
+  
+  
+
+=== Гостиная (зал) / Джапанди ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B9B0A2. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: shadowed
++ - texture: tactile
++ - density: layered
+  
+  
+
+=== Гостиная (зал) / Лофт ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #6E6A63. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: dramatic
++ - texture: raw
++ - density: sparse
+  
+  
+
+=== Спальня / Современный минимализм ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C9C4BB. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: soft
++ - texture: matte
++ - density: tonal
+  
+  
+
+=== Спальня / Скандинавский ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #8A9A8B. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: airy
++ - texture: tactile
++ - contrast: tonal
+  
+  
+
+=== Спальня / Джапанди ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4A45. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: soft
++ - texture: matte
++ - density: layered
+  
+  
+
+=== Спальня / Лофт ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #A8563A. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: dramatic
++ - texture: raw
++ - density: layered
+  
+  
+
+=== Кухня / Современный минимализм ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C9C4BB. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: even
++ - texture: satin
++ - density: airy
+  
+  
+
+=== Кухня / Скандинавский ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C26D5A. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: airy
++ - texture: matte
++ - contrast: low
+  
+  
+
+=== Кухня / Джапанди ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4A45. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: shadowed
++ - texture: tactile
++ - density: minimal
+  
+  
+
+=== Кухня / Лофт ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4640. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: contrast
++ - texture: raw
++ - density: sparse
+  
+  
+
+=== Санузел / Современный минимализм ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #2E2E2C. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: soft
++ - texture: satin
++ - density: airy
+  
+  
+
+=== Санузел / Скандинавский ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #D8CFC2. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: airy
++ - texture: matte
++ - contrast: tonal
+  
+  
+
+=== Санузел / Джапанди ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B9B0A2. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: shadowed
++ - texture: tactile
++ - density: minimal
+  
+  
+
+=== Санузел / Лофт ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #A8563A. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: dramatic
++ - texture: refined
++ - density: sparse
+  
+  
+
+=== Кабинет / Современный минимализм ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #C9C4BB. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: even
++ - texture: matte
++ - density: tonal
+  
+  
+
+=== Кабинет / Скандинавский ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #8A9A8B. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: soft
++ - texture: tactile
++ - contrast: tonal
+  
+  
+
+=== Кабинет / Джапанди ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #B9B0A2. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: neutral
++ - light: shadowed
++ - texture: matte
++ - density: minimal
+  
+  
+
+=== Кабинет / Лофт ===
+@@ -38,4 +38,10 @@
+  This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.
+  Use exactly one accent colour from the style palette: #4A4640. Do not introduce any other accent hue.
++ STYLE AXES — SOFT VARIATION
++ These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.
++ - temperature: warm
++ - light: contrast
++ - texture: raw
++ - density: layered
+  
+  
