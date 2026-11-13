@@ -6,7 +6,7 @@
 
 ## 2026-11-13 — пайплайн: layout параллельно арт-директору, кэш-ключи по артефактам
 
-- **Кэш по артефактам.** `room_analysis` (миграция `062`) хранит три независимых артефакта с отдельными ключами: facts/repair — `hash(photo, shell)`, layout — `hash(roomId, dimensions, keepFurniture, briefHash)`, art direction — `hash(photo, shell, style, concept, keepFurniture, dimensions, briefHash)`. `briefHash` — производный хэш функционального брифа комнаты (`briefForRoom`), без новой колонки. Смена стиля даёт хит repair/layout и промах art direction.
+- **Кэш по артефактам.** `room_analysis` (миграция `062`) хранит три независимых артефакта с отдельными ключами: facts/repair — `hash(photo, shell, style, styleDescription)`, layout — `hash(roomId, dimensions, keepFurniture, briefHash)`, art direction — `hash(photo, shell, style, concept, keepFurniture, dimensions, briefHash)`. `briefHash` — производный хэш функционального брифа комнаты (`briefForRoom`), без новой колонки. Смена стиля даёт хит layout и промах repair/art direction. Кэшируется только полный layout-план (`proposed` + предметы), неполный не замораживается.
 - **Параллельность.** Layout стартует параллельно с арт-директором, когда пустота известна заранее (`keep_furniture=false`); при `keep_furniture=true` пустоту определяет арт-директор, и layout догоняет его последовательно (качество не ломаем). Контракт `buildLayoutPlan` принимает `{ photoPath, dimensions, brief, keepFurniture, usedStrategies }` — всегда по исходному фото, без стиля/концепта и без data URL арт-директора.
 - **Измерения.** События `room_analysis_cache_hit`, `layout_plan_cache_hit`, `ms` в `art_direction_ok`/`design_direction_ok`/`layout_plan_ok` сохранены.
 

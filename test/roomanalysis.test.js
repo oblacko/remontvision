@@ -6,17 +6,22 @@ const base = {
   photoPath: 'uploads/room.jpg',
   shellPath: '',
   style: 'Скандинавский',
+  styleDescription: 'светлое дерево, белый, текстиль',
   conceptId: 'accent_block',
   keepFurniture: true,
   dimensions: { width: 3.2, length: 4.4, height: 2.7, bedLength: 2, orientation: 'окно слева' },
 };
 const brief = briefHash('2 пользователя; отдых и просмотр ТВ; обязательны диван, ТВ/медиа и хранение.');
+const facts = () => factsKey({ photoPath: base.photoPath, shellPath: base.shellPath, style: base.style, styleDescription: base.styleDescription });
 
-test('facts/repair key depends only on photo and shell', () => {
-  const key = factsKey({ photoPath: base.photoPath, shellPath: base.shellPath });
-  assert.equal(key, factsKey({ photoPath: base.photoPath, shellPath: base.shellPath }));
-  assert.notEqual(key, factsKey({ photoPath: 'uploads/other.jpg', shellPath: '' }));
-  assert.notEqual(key, factsKey({ photoPath: base.photoPath, shellPath: 'uploads/shell.jpg' }));
+test('facts/repair key depends on photo, shell, style and style description', () => {
+  const key = facts();
+  assert.equal(key, facts());
+  assert.notEqual(key, factsKey({ photoPath: 'uploads/other.jpg', shellPath: base.shellPath, style: base.style, styleDescription: base.styleDescription }));
+  assert.notEqual(key, factsKey({ photoPath: base.photoPath, shellPath: 'uploads/shell.jpg', style: base.style, styleDescription: base.styleDescription }));
+  // buildRepairScope получает style/styleDescription и отдаёт style_dir — ключ несёт стиль.
+  assert.notEqual(key, factsKey({ photoPath: base.photoPath, shellPath: base.shellPath, style: 'Лофт', styleDescription: base.styleDescription }));
+  assert.notEqual(key, factsKey({ photoPath: base.photoPath, shellPath: base.shellPath, style: base.style, styleDescription: 'другой бриф стиля' }));
 });
 
 test('layout key depends on room, dimensions, keepFurniture and brief, not on style', () => {
@@ -32,19 +37,18 @@ test('layout key depends on room, dimensions, keepFurniture and brief, not on st
   }
 });
 
-test('changing style hits repair/layout but misses art direction', () => {
-  const factsA = factsKey({ photoPath: base.photoPath, shellPath: base.shellPath });
+test('changing style keeps layout key equal and invalidates facts/repair and art', () => {
+  const factsA = facts();
   const layoutA = layoutKey({ roomId: 'r1', dimensions: base.dimensions, keepFurniture: false, briefHash: brief });
   const artA = artDirectionKey({ ...base, briefHash: brief });
 
-  // Смена стиля/концепта: repair и layout — те же ключи (хит), art — другой (промах).
-  const factsB = factsKey({ photoPath: base.photoPath, shellPath: base.shellPath });
+  const factsB = factsKey({ photoPath: base.photoPath, shellPath: base.shellPath, style: 'Лофт', styleDescription: base.styleDescription });
   const layoutB = layoutKey({ roomId: 'r1', dimensions: base.dimensions, keepFurniture: false, briefHash: brief });
   const artB = artDirectionKey({ ...base, style: 'Лофт', conceptId: 'warm_minimal', briefHash: brief });
 
-  assert.equal(factsB, factsA);
-  assert.equal(layoutB, layoutA);
-  assert.notEqual(artB, artA);
+  assert.notEqual(factsB, factsA); // repair отдаёт style_dir — промах по стилю
+  assert.equal(layoutB, layoutA); // layout не зависит от стиля — хит
+  assert.notEqual(artB, artA); // art direction зависит от стиля — промах
 });
 
 test('art direction key invalidates on style, concept, photo, shell, keepFurniture and dimensions', () => {

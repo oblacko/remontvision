@@ -10,7 +10,7 @@ import { MOCK_MODE, buildPrompt, buildEditPrompt, buildMoveRemovalPrompt, genera
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
-import { buildLayoutPlan, briefForRoom } from './layoutagent.js';
+import { buildLayoutPlan, briefForRoom, isCompleteLayoutPlan } from './layoutagent.js';
 import { buildAnalysis } from './analysis.js';
 import { composeMove } from './moveobject.js';
 import { normalizeTier } from './pricing.js';
@@ -321,9 +321,15 @@ export async function processRender(renderId, claimedBy = null) {
       const roomBriefText = briefForRoom(roomType);
       const briefHashValue = briefHash(roomBriefText);
 
-      // Кэш-ключи по артефактам: facts/repair и layout не зависят от стиля,
-      // art direction — зависит. Смена стиля даёт хит repair/layout и промах art.
-      const factsCacheKey = factsKey({ photoPath: room.photo_path, shellPath: precleanedShell || '' });
+      // Кэш-ключи по артефактам: layout не зависит от стиля, facts/repair и
+      // art direction — зависят (repair отдаёт style_dir/doors.style). Смена
+      // стиля даёт хит layout и промах repair/art.
+      const factsCacheKey = factsKey({
+        photoPath: room.photo_path,
+        shellPath: precleanedShell || '',
+        style: styleName,
+        styleDescription: styleInfo?.prompt_description || '',
+      });
       const layoutCacheKey = layoutKey({
         roomId: room.id,
         dimensions: roomDimensions,
@@ -575,7 +581,7 @@ export async function processRender(renderId, claimedBy = null) {
           if (layoutPlan?.items?.length) {
             log({ event: 'layout_plan_cache_hit', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length });
           }
-        } else if (rawLayout?.status === 'proposed' && rawLayout.items?.length) {
+        } else if (isCompleteLayoutPlan(rawLayout)) {
           addCost('layout', rawLayout.cost);
           const fitted = fitLayoutPlan({ plan: rawLayout, dimensions: estimatedDimensions, roomType, artDirection });
           layoutPlan = fitted.plan;
@@ -620,7 +626,7 @@ export async function processRender(renderId, claimedBy = null) {
             meta: snapshotOf(['art_direction', 'design_direction', 'concept_key', 'room_dimensions_estimate', 'lens', 'empty_room_detected']),
           }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, artifact: 'art', error: String(e.message || e).slice(0, 300) }));
         }
-        if (emptyRoom && shouldCacheRoomAnalysis({ cached: Boolean(cachedLayout), failed: layoutFailed })) {
+        if (emptyRoom && isCompleteLayoutPlan(layoutPlan) && shouldCacheRoomAnalysis({ cached: Boolean(cachedLayout), failed: layoutFailed })) {
           await q.upsertRoomAnalysis(room.id, 'layout', layoutCacheKey, {
             layout_plan: layoutPlan,
             meta: snapshotOf(['layout_plan', 'layout_validation', 'layout_assumptions', 'layout_plan_skipped', 'layout_fit']),

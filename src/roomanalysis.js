@@ -1,6 +1,6 @@
-// Ключи кэша анализа комнаты, разнесённые по артефактам: facts/repair и layout
-// не зависят от стиля, art direction — зависит. Смена стиля не инвалидирует
-// style-независимые шаги (repair/layout) и платит за vision только за направление.
+// Ключи кэша анализа комнаты, разнесённые по артефактам: layout не зависит от
+// стиля, а facts/repair и art direction — зависят. Смена стиля не инвалидирует
+// layout (не платим за него повторно) и инвалидирует repair/art direction.
 import crypto from 'node:crypto';
 
 function normalizeDimensions(dimensions) {
@@ -27,11 +27,15 @@ export function briefHash(brief = '') {
   return text ? crypto.createHash('sha256').update(text).digest('hex').slice(0, 16) : 'none';
 }
 
-// facts/repair: только фото и shell — без стиля и концепта.
-export function factsKey({ photoPath = '', shellPath = '' } = {}) {
+// facts/repair: фото + shell + стиль/бриф стиля. `buildRepairScope` получает style
+// и styleDescription и отдаёт style-зависимые поля (style_dir, doors.style), поэтому
+// ключ несёт стиль — иначе смена стиля подставила бы в рендер чужой style_dir.
+export function factsKey({ photoPath = '', shellPath = '', style = '', styleDescription = '' } = {}) {
   return hashPayload({
     photo: String(photoPath || ''),
     shell: String(shellPath || ''),
+    style: String(style || ''),
+    styleDescription: String(styleDescription || ''),
   });
 }
 

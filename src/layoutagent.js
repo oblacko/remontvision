@@ -149,6 +149,13 @@ export function layoutPlanToText(plan) {
   ].filter(Boolean).join('\n');
 }
 
+// Полный план расстановки — только status=proposed с ненулевым списком предметов.
+// needs_input/infeasible/null не кэшируем и не считаем результатом: иначе
+// заморозим пустой/частичный план на все следующие рендеры комнаты.
+export function isCompleteLayoutPlan(plan) {
+  return Boolean(plan && plan.status === 'proposed' && Array.isArray(plan.items) && plan.items.length > 0);
+}
+
 export async function buildLayoutPlan({
   photoPath,
   roomType = 'Другое',
@@ -168,8 +175,10 @@ export async function buildLayoutPlan({
     const buf = await getBuffer(photoPath);
     const ext = detectImageExt(buf);
     imageDataUrl = `data:${MIME_BY_EXT[ext] || 'image/jpeg'};base64,${buf.toString('base64')}`;
-  } catch {
-    return null;
+  } catch (e) {
+    // Ошибку чтения фото не превращаем в «плана нет» (иначе layoutFailed не
+    // выставится и null заморозится в кэше): пробрасываем наружу.
+    throw e;
   }
   const { system, user } = composeLayoutPrompt({ roomType, dimensions, brief, usedStrategies, keepFurniture });
   let cost = null;

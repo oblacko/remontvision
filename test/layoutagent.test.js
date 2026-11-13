@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const { normalizeLayoutPlan } = await import('../src/agentcontracts.js');
-const { composeLayoutPrompt, layoutPlanToText, normalizeLayoutPlanV2, buildLayoutPlan } = await import('../src/layoutagent.js');
+const { composeLayoutPrompt, layoutPlanToText, normalizeLayoutPlanV2, buildLayoutPlan, isCompleteLayoutPlan } = await import('../src/layoutagent.js');
 
 test('layout plan keeps items, zones and circulation', () => {
   const plan = normalizeLayoutPlan({
@@ -56,6 +56,14 @@ test('layout prompt takes a brief and never a style/concept', () => {
 test('buildLayoutPlan takes a photoPath and returns null without it', async () => {
   assert.equal(await buildLayoutPlan({}), null);
   assert.equal(await buildLayoutPlan({ photoPath: null }), null);
+});
+
+test('only a complete proposed layout plan is cacheable (seam isCompleteLayoutPlan)', () => {
+  assert.equal(isCompleteLayoutPlan(null), false);
+  assert.equal(isCompleteLayoutPlan({ status: 'needs_input', items: [] }), false);
+  assert.equal(isCompleteLayoutPlan({ status: 'infeasible', items: [{ type: 'sofa' }] }), false);
+  assert.equal(isCompleteLayoutPlan({ status: 'proposed', items: [] }), false);
+  assert.equal(isCompleteLayoutPlan({ status: 'proposed', items: [{ type: 'sofa', label: 'Диван' }] }), true);
 });
 
 test('layout prompt does not ask for centimetre coordinates', () => {
