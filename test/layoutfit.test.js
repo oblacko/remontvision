@@ -59,6 +59,17 @@ test('no dimensions leaves the plan untouched', () => {
   assert.equal(result.plan.items.length, source.items.length);
 });
 
+test('re-fitting does not mutate the input plan (safe to reuse a cached plan on cache hit)', () => {
+  const source = plan();
+  const before = JSON.stringify(source);
+  const result = fitLayoutPlan({ plan: source, dimensions: { width: 2.9, length: 3.9 }, roomType: 'Гостиная (зал)' });
+  // Входной план не меняется: кэш-хит передаёт сохранённый план в fitLayoutPlan,
+  // и повторная подгонка не должна портить его для следующих хитов.
+  assert.equal(JSON.stringify(source), before);
+  assert.ok(source.items.some(item => item.type === 'coffee_table'));
+  assert.ok(!result.plan.items.some(item => item.type === 'coffee_table'));
+});
+
 test('under 4 m allows only two pieces and caps their total depth at 1.3 m', () => {
   const narrow = fitLayoutPlan({
     plan: { items: [

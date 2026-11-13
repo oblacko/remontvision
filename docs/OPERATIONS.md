@@ -30,8 +30,12 @@ RENDER_ASPECT_RATIO=auto
 OPENROUTER_TIMEOUT_MS=120000
 
 # Очередь и скорость
-WORKER_CONCURRENCY=6              # 1–8
+WORKER_CONCURRENCY=100            # 1–500, дефолт 100
+IMAGE_CONCURRENCY=100             # одновременные image-вызовы: система (макс 200)
+IMAGE_CONCURRENCY_PROVIDER=100    # на провайдера (макс 200)
+IMAGE_CONCURRENCY_USER=12         # на пользователя (макс 12)
 IMAGE_MIN_GAP_MS=0                # пауза между image-вызовами
+PG_POOL_MAX=150                   # размер пула Postgres
 PARSE_AUTO=0                      # 1 — авто-разбор после раннего done (платно)
 # Direction кэшируется в room_analysis; отдельного DIRECTION_CACHE_* нет
 
@@ -87,7 +91,7 @@ S3_ENDPOINT=
 | Heartbeat | каждые 30 с |
 | Requeue | только истёкшие lease; раз в 5 мин |
 | Reaper | queued > 24 ч или processing > 60 мин → error + refund |
-| Параллелизм | `WORKER_CONCURRENCY` (1–8) |
+| Параллелизм | `WORKER_CONCURRENCY` (env, 1–500, дефолт 100) |
 | Image-слот | семафор в процессе: система/провайдер/пользователь (`imageslot.js`) |
 | Cleanup | асинхронно на первом enqueue; статус в `rooms.cleanup_status`, shell в `rooms.precleaned_shell_path`, до 3 попыток |
 
@@ -180,7 +184,7 @@ Daily-check от 2026-11-11: здоровье/контейнеры OK; **дис�
 - `ADMIN_KEY` только в заголовке.
 - Owner-check на комнаты/файлы.
 - SSRF-защита в `remoteimage.js`; внешние картинки — только `fetchRemoteImage`.
-- Rate limit на OTP, комнаты, share.
+- Rate limit на OTP, share, правки; `POST /api/rooms` — без лимита.
 - Не включать возвраты без state machine.
 
 ## Связанные документы

@@ -68,8 +68,11 @@ URL: `/admin`
 
 | Переменная | Значение |
 |---|---|
-| `WORKER_CONCURRENCY` | 1–8, по умолчанию 6 |
+| `WORKER_CONCURRENCY` | 1–500, по умолчанию 100 |
+| `IMAGE_CONCURRENCY` / `IMAGE_CONCURRENCY_PROVIDER` | 100 (макс 200) |
+| `IMAGE_CONCURRENCY_USER` | 12 (макс 12) |
 | `IMAGE_MIN_GAP_MS` | пауза между image-вызовами (админка «Генерация») |
+| `PG_POOL_MAX` | размер пула Postgres, по умолчанию 150 |
 | `PARSE_AUTO` | `1` — авто-разбор после раннего done; по умолчанию off |
 
 ## Безопасность

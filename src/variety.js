@@ -25,7 +25,9 @@ const KEEP_FURNITURE_EMPHASIS = [
 function hashIndex(seed, size) {
   if (!size) return 0;
   const hash = crypto.createHash('sha256').update(String(seed || '')).digest();
-  return hash[0] % size;
+  // 32-битный индекс без смещения первого байта: hash[0] % size смещён в пользу
+  // младших значений, а readUInt32BE даёт равномерный слот.
+  return hash.readUInt32BE(0) % size;
 }
 
 export function resolveStylePalette({ styleName = '', styleKey = '' } = {}) {

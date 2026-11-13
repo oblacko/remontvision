@@ -4,7 +4,7 @@
 
 ## Что это
 
-AI-редизайн интерьера по фото: генерация (FLUX 3 Image), vision-разбор (Gemini 3.1 Pro), direction (DeepSeek Flash), до 8 пар «стиль × концепт», правки, разбор/роадмап, шаринг, платежи, админка, статьи, MCP-подбор товаров.
+AI-редизайн интерьера по фото: генерация (FLUX 3 Image), vision-разбор (Gemini 3.1 Pro), direction (DeepSeek Flash), до 10 пар «стиль × концепт», правки, разбор/роадмап, шаринг, платежи, админка, статьи, MCP-подбор товаров.
 
 Прод: https://www.remontvision.ru. Репозиторий private.
 
@@ -22,11 +22,11 @@ AI-редизайн интерьера по фото: генерация (FLUX 3
 ## Главные факты
 
 - Базовый рендер — design-first: исходник + один art ref, без product refs; `render_items` у новых рендеров пуст.
-- Мульти-стиль: `items: [{style, concept}]` (1–8), каждый — отдельный рендер и кредит.
+- Мульти-стиль: `items: [{style, concept}]` (1–10), каждый — отдельный рендер и кредит.
 - Кредиты: 10/20/60 (399/599/1499 ₽); первые 3 правки бесплатны, 4-я+ — 1 кредит.
 - Очистка выключена по умолчанию; style-ref/hero-референсы — режим `text` по умолчанию.
 - Direction кэшируется: 3 варианта, TTL 30 дней (`generation_cache`).
-- Очередь: lease 5 мин, heartbeat 30 с, reaper queued 24 ч / processing 60 мин, `WORKER_CONCURRENCY` 1–8.
+- Очередь: lease 5 мин, heartbeat 30 с, reaper queued 24 ч / processing 60 мин, `WORKER_CONCURRENCY` 1–500 (default 100).
 - Image-вызовы сериализуются глобальным advisory-слотом.
 - Каталог демо: 100 товаров, 0 URL; заказов нет. Legacy Yandex procurement не подключён; текущий подбор — MCP/catalog-service (бесплатно).
 - Известный баг: `furnitureOff`, `catalogOn`, `styling` не доходят до промта.

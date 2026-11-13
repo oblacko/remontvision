@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-12T08:43:01.109Z
+Generated: 2026-11-13T20:14:16.644Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -23,7 +23,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 | Блок | Состояние |
 |---|---|
 | Генерация по фото | Работает: FLUX 3 Image 1K (модель из админки/`.env`) |
-| Мульти-стиль | До 8 пар «стиль × концепция» на комнату, каждая — отдельный рендер и кредит |
+| Мульти-стиль | До 10 пар «стиль × концепция» на комнату, каждая — отдельный рендер и кредит |
 | Vision-разбор | Работает: Gemini 3.1 Pro (код-дефолт), модель из админки |
 | Стили и комнаты | 10 стилей × 10 концепций, 12 типов комнат; редактируются в админке |
 | Очередь | Lease + `claimed_by` + `FOR UPDATE SKIP LOCKED`; `WORKER_CONCURRENCY`; семафор image-вызовов (система/провайдер/пользователь) |
@@ -49,7 +49,7 @@ AI-сервис редизайна интерьера по фото: визуа�
 
 ## Что работает
 
-1. Пользователь загружает фото, выбирает тип комнаты, до 8 пар «стиль × концепция», класс материалов.
+1. Пользователь загружает фото, выбирает тип комнаты, до 10 пар «стиль × концепция», класс материалов.
 2. Базовый дизайн — design-first: исходник + один art reference (свет/палитра/материалы), без товарных референсов.
 3. Размеры комнаты оценивает vision; планировщик подбирает масштаб мебели и проходы.
 4. Vision-разбор достаёт материалы, поверхности, электрику и подсказки для правок.
@@ -204,7 +204,7 @@ app/
 
 ## Что это за проект
 
-`ремонтвижн` — AI-редизайн интерьера по фото: пользователь загружает фото, выбирает тип комнаты и до 8 пар «стиль × концепция», получает визуализацию, затем может делать правки, разбирать интерьер, строить план ремонта и искать реальные товары. Есть кабинет, публичный шаринг, админка, статьи, кредиты и платежи.
+`ремонтвижн` — AI-редизайн интерьера по фото: пользователь загружает фото, выбирает тип комнаты и до 10 пар «стиль × концепция», получает визуализацию, затем может делать правки, разбирать интерьер, строить план ремонта и искать реальные товары. Есть кабинет, публичный шаринг, админка, статьи, кредиты и платежи.
 
 - Короткая карта: [llms.txt](llms.txt). Полный контекст: [llms-full.txt](llms-full.txt).
 - **Что реально работает:** [docs/STATUS.md](docs/STATUS.md) — источник истины.
@@ -218,7 +218,7 @@ app/
 3. **FLUX.2 Pro не принимает `resolution`.** Отправка даёт 400. `supportsResolution()` в `src/modelcaps.js` — Seedream и FLUX 3 Image/Klein. У FLUX возможна content moderation на спальнях.
 4. **Промт — два слоя:** код (`src/openrouter.js`, `src/roomtypes.js`) и правила (`src/promptconfig.js` + `app_settings.prompt.rules.v1`). **Известный баг:** `catalogOn`, `styling` не доходят до генерации; `furnitureOff` исправлен. Не «чините» оставшиеся вслепую — см. docs/redesign.
 5. **Design-first.** Базовый кадр получает исходник + один art ref и текстовые материалы, без product refs. Следствие: `render_items` у новых базовых рендеров **пуст**. Товарная правка использует один product ref и обязательный vision QA; при отказе версия отклоняется, кредит возвращается.
-6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — параллелизм; image-вызовы ограничиваются общим семафором (`src/imageslot.js`), а не advisory-lock.
+6. **Очередь.** Claim — `FOR UPDATE SKIP LOCKED` + lease + `claimed_by`; завершение/heartbeat проверяют владельца. Не добавляйте второй claim-механизм и не делайте blanket-requeue. `WORKER_CONCURRENCY` (env, 1–500, по умолчанию 100) — параллелизм; image-вызовы ограничиваются общим семафором (`src/imageslot.js`, лимиты `IMAGE_CONCURRENCY*`), а не advisory-lock.
 7. **Direction — часть арт-директора.** Один vision-вызов `src/artdirector.js` отдаёт факты по фото и (при выбранной концепции) поле `direction`; без концепции — `facts_only`. Повторные рендеры комнаты/стиля/концепта берутся из `room_analysis`. Отдельного direction-агента нет.
 8. **Секреты не коммитить.** `.env`, `ADMIN_KEY`, ключи OpenRouter/Robokassa/ЮKassa/Resend, пароль прокси — только на сервере/локально.
 
@@ -371,7 +371,7 @@ node --check src/openrouter.js
 
 ## Что это
 
-AI-редизайн интерьера по фото: генерация (FLUX 3 Image), vision-разбор (Gemini 3.1 Pro), direction (DeepSeek Flash), до 8 пар «стиль × концепт», правки, разбор/роадмап, шаринг, платежи, админка, статьи, MCP-подбор товаров.
+AI-редизайн интерьера по фото: генерация (FLUX 3 Image), vision-разбор (Gemini 3.1 Pro), direction (DeepSeek Flash), до 10 пар «стиль × концепт», правки, разбор/роадмап, шаринг, платежи, админка, статьи, MCP-подбор товаров.
 
 Прод: https://www.remontvision.ru. Репозиторий private.
 
@@ -389,11 +389,11 @@ AI-редизайн интерьера по фото: генерация (FLUX 3
 ## Главные факты
 
 - Базовый рендер — design-first: исходник + один art ref, без product refs; `render_items` у новых рендеров пуст.
-- Мульти-стиль: `items: [{style, concept}]` (1–8), каждый — отдельный рендер и кредит.
+- Мульти-стиль: `items: [{style, concept}]` (1–10), каждый — отдельный рендер и кредит.
 - Кредиты: 10/20/60 (399/599/1499 ₽); первые 3 правки бесплатны, 4-я+ — 1 кредит.
 - Очистка выключена по умолчанию; style-ref/hero-референсы — режим `text` по умолчанию.
 - Direction кэшируется: 3 варианта, TTL 30 дней (`generation_cache`).
-- Очередь: lease 5 мин, heartbeat 30 с, reaper queued 24 ч / processing 60 мин, `WORKER_CONCURRENCY` 1–8.
+- Очередь: lease 5 мин, heartbeat 30 с, reaper queued 24 ч / processing 60 мин, `WORKER_CONCURRENCY` 1–500 (default 100).
 - Image-вызовы сериализуются глобальным advisory-слотом.
 - Каталог демо: 100 товаров, 0 URL; заказов нет. Legacy Yandex procurement не подключён; текущий подбор — MCP/catalog-service (бесплатно).
 - Известный баг: `furnitureOff`, `catalogOn`, `styling` не доходят до промта.
@@ -499,8 +499,8 @@ flowchart LR
 
 ### Создание генерации
 
-1. `POST /api/rooms` (multipart): фото, до 8 пар `{style, concept}`, тип комнаты, класс, флаги.
-2. Проверяются auth, кредиты, rate limit; модель/разрешение.
+1. `POST /api/rooms` (multipart): фото, до 10 пар `{style, concept}`, тип комнаты, класс, флаги.
+2. Проверяются auth и кредиты; модель/разрешение. (`POST /api/rooms` — без rate limit; прочие мутирующие роуты под лимитом.)
 3. В одной транзакции: `rooms` + N × `renders(status=queued)`, списание за каждый вариант.
 4. Воркер забирает рендер через `FOR UPDATE SKIP LOCKED`, ставит lease 5 минут и `claimed_by`.
 5. При первом enqueue запускается асинхронная очистка (если нужно). `processRender` ждёт shell ≤3 мин, собирает контекст (vision из `room_analysis`, art direction + direction одним вызовом) и вызывает OpenRouter.
@@ -601,7 +601,7 @@ flowchart LR
 |---|---|---|
 | Обычный редизайн | меняет отделку, свет, текстиль; мебель сохраняется/двигается | `keep_furniture=true` |
 | Свободный дизайн | очищает комнату до пустого каркаса, затем обставляет | `keep_furniture=false` + очистка включена |
-| Мульти-стиль | до 8 пар «стиль × концепция», каждая — отдельный рендер | `items: [{style, concept}]` |
+| Мульти-стиль | до 10 пар «стиль × концепция», каждая — отдельный рендер | `items: [{style, concept}]` |
 
 Очистка **выключена по умолчанию** (`cleanupconfig.js`). При `keep_furniture=false` и включённой очистке shell строится асинхронно при первом enqueue комнаты; `processRender` ждёт его до 3 минут (heartbeat `waiting_shell`), затем рисует дизайн.
 
@@ -626,14 +626,14 @@ flowchart LR
 
 ### 1. Ввод
 
-`POST /api/rooms` (multipart): фото, `items` (1–8 `{style, concept}`), тип комнаты, tier, флаги, размеры, разрешение, модель. Валидация: нет фото → 400, нет стиля/items → 400, размеры 1–30 м, высота 2–10 м, кровать 1–4 м.
+`POST /api/rooms` (multipart): фото, `items` (1–10 `{style, concept}`), тип комнаты, tier, флаги, размеры, разрешение, модель. Валидация: нет фото → 400, нет стиля/items → 400, размеры 1–30 м, высота 2–10 м, кровать 1–4 м.
 
 ### 2. Очередь и аренда
 
 - В одной транзакции создаются `rooms` и N `renders(status=queued)`; кредит списывается за каждый вариант.
 - `claimNextRender` — `FOR UPDATE SKIP LOCKED` + lease 5 минут + `claimed_by`.
 - Heartbeat каждые 30 с; requeue/reaper — только истёкшие lease; processing старше 60 минут → error + refund.
-- `WORKER_CONCURRENCY` (1–8, по умолчанию 6) — сколько рендеров в работе; image-вызовы идут параллельно в пределах семафора (система/провайдер/пользователь).
+- `WORKER_CONCURRENCY` (env, 1–500, по умолчанию 100) — сколько рендеров в работе; image-вызовы идут параллельно в пределах семафора (`IMAGE_CONCURRENCY*`: система/провайдер/пользователь).
 
 ### 3. Стиль и референсы
 
@@ -957,8 +957,11 @@ URL: `/admin`
 
 | Переменная | Значение |
 |---|---|
-| `WORKER_CONCURRENCY` | 1–8, по умолчанию 6 |
+| `WORKER_CONCURRENCY` | 1–500, по умолчанию 100 |
+| `IMAGE_CONCURRENCY` / `IMAGE_CONCURRENCY_PROVIDER` | 100 (макс 200) |
+| `IMAGE_CONCURRENCY_USER` | 12 (макс 12) |
 | `IMAGE_MIN_GAP_MS` | пауза между image-вызовами (админка «Генерация») |
+| `PG_POOL_MAX` | размер пула Postgres, по умолчанию 150 |
 | `PARSE_AUTO` | `1` — авто-разбор после раннего done; по умолчанию off |
 
 ## Безопасность
@@ -1025,7 +1028,7 @@ Admin: заголовок `X-Admin-Key`.
 | POST | `/api/payments/sync` | синхронизация pending-платежа |
 | POST | `/api/cleanup` | очистка комнаты по фото → data URL |
 | POST | `/api/estimate-room` | vision-оценка размеров (фронтенд сейчас не использует) |
-| POST | `/api/rooms` | multipart: фото, `items` (1–8 пар), тип, tier, флаги |
+| POST | `/api/rooms` | multipart: фото, `items` (1–10 пар), тип, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний done-рендер |
 | GET | `/api/rooms/:id/versions` | все версии; `edits_used` для цены правки/переноса |
 | DELETE | `/api/rooms/:id` | удалить комнату (owner) |
@@ -1045,10 +1048,10 @@ Admin: заголовок `X-Admin-Key`.
 | Поле | Обяз. | Значение |
 |---|---|---|
 | `photo` | да | JPG/PNG/WebP/HEIC ≤ 15 МБ |
-| `items` | да* | JSON-массив до 8 `{style, concept}` |
+| `items` | да* | JSON-массив до 10 `{style, concept}` |
 | `style` | legacy | один стиль, если нет `items` |
 | `concept` | нет | id концепции |
-| `variants` | legacy | 1–8 копий стиля |
+| `variants` | legacy | 1–10 копий стиля |
 | `room_type` | нет | активный тип, иначе `Другое` |
 | `price_tier` | нет | `start|comfort|premium|atelier` |
 | `keep_furniture` | нет | `1/0`, default `1` |
@@ -1157,8 +1160,12 @@ RENDER_ASPECT_RATIO=auto
 OPENROUTER_TIMEOUT_MS=120000
 
 # Очередь и скорость
-WORKER_CONCURRENCY=6              # 1–8
+WORKER_CONCURRENCY=100            # 1–500, дефолт 100
+IMAGE_CONCURRENCY=100             # одновременные image-вызовы: система (макс 200)
+IMAGE_CONCURRENCY_PROVIDER=100    # на провайдера (макс 200)
+IMAGE_CONCURRENCY_USER=12         # на пользователя (макс 12)
 IMAGE_MIN_GAP_MS=0                # пауза между image-вызовами
+PG_POOL_MAX=150                   # размер пула Postgres
 PARSE_AUTO=0                      # 1 — авто-разбор после раннего done (платно)
 # Direction кэшируется в room_analysis; отдельного DIRECTION_CACHE_* нет
 
@@ -1214,7 +1221,7 @@ S3_ENDPOINT=
 | Heartbeat | каждые 30 с |
 | Requeue | только истёкшие lease; раз в 5 мин |
 | Reaper | queued > 24 ч или processing > 60 мин → error + refund |
-| Параллелизм | `WORKER_CONCURRENCY` (1–8) |
+| Параллелизм | `WORKER_CONCURRENCY` (env, 1–500, дефолт 100) |
 | Image-слот | семафор в процессе: система/провайдер/пользователь (`imageslot.js`) |
 | Cleanup | асинхронно на первом enqueue; статус в `rooms.cleanup_status`, shell в `rooms.precleaned_shell_path`, до 3 попыток |
 
@@ -1307,7 +1314,7 @@ Daily-check от 2026-11-11: здоровье/контейнеры OK; **дис�
 - `ADMIN_KEY` только в заголовке.
 - Owner-check на комнаты/файлы.
 - SSRF-защита в `remoteimage.js`; внешние картинки — только `fetchRemoteImage`.
-- Rate limit на OTP, комнаты, share.
+- Rate limit на OTP, share, правки; `POST /api/rooms` — без лимита.
 - Не включать возвраты без state machine.
 
 ## Связанные документы
@@ -2518,7 +2525,49 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-12. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-12, smoke PASS.
+Дата обновления: 2026-11-13. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-12, smoke PASS.
+
+## 2026-11-13 — финальное ревью ветки: правки доков, re-fit layout на кэш-хите, равномерный hashIndex
+
+- **Доки.** Синхронизированы с кодом после снятия потолков: `WORKER_CONCURRENCY` 1–500 (default 100), `IMAGE_CONCURRENCY*` 100/12 (макс 200/12), `IMAGE_MIN_GAP_MS=0`, `PG_POOL_MAX=150`, мультивыбор до 10, `POST /api/rooms` без rate limit — в AGENTS/STATUS/OPERATIONS/GENERATION/ADMIN/API/GENERATION-QUEUE/ARCHITECTURE/README/llms.
+- **Layout на кэш-хите.** `jobs.js` пере-подгоняет закэшированный план через `fitLayoutPlan` под текущие `estimatedDimensions` (ключ `layoutKey` хранит сырые `roomDimensions`, часто null) — переоценка размеров не переиспользует устаревший масштаб.
+- **hashIndex.** `src/variety.js` берёт 32-битный слот `readUInt32BE(0) % size` вместо `hash[0] % size` (равномерный выбор без смещения первого байта). Значения акцента/emphasis/осей изменились — перегенерированы золотые выходы `test/variety.test.js` и `docs/regression/baseline.json` (diff в `changes/2026-11-13-hashindex-32bit.diff`).
+- **Комментарий.** `claimNextRender` документирует, что приоритет правок — best-effort под `SKIP LOCKED`, не строгая гарантия порядка.
+
+## 2026-11-13 — оси вариативности стиля
+
+- **Оси стиля.** В карточки стилей `designdata.js` добавлены `axes` (3–5 осей × 2–3 значения): `temperature`, `light`, `texture`, плюс `density`/`contrast`/`geometry` под идентичность каждого стиля — мягкие модификаторы без цветов. `pickVariety` выбирает значения детерминированно по seed (`hash(seed:axes:key)`): тот же seed → те же оси, разные seed → разные. Оси попадают в промт отдельным блоком `STYLE AXES — SOFT VARIATION` внутри `variabilityPrompt`; палитру, акцент, emphasis, avoid и `GEOMETRY LOCK` не перекрывают.
+- **Регрессия.** `docs/regression/baseline.json` перегенерирован (20/20 промтов изменились только добавлением блока осей), diff в `changes/2026-11-13-style-axes.diff`.
+- **Тесты.** `test/variety.test.js` — детерминизм осей по seed, вариативность между seed, оси без цветов палитры/акцента; `test/designdata.test.js` — валидация формы осей.
+
+## 2026-11-13 — консолидация вариативности в `src/variety.js`
+
+- **Единый интерфейс.** Новый модуль `src/variety.js` сводит вариативность комнаты в одну точку входа `pickVariety(room, style, seed, used)` → `{ accent, axes, emphasis, avoid, ... }`: акцент только из палитры стиля (seed-ротация `accent → support → dark`), композиционный emphasis по seed, avoid-список из последних 5 рендеров комнаты. Поле `axes` зарезервировано для стилевых осей (следующая задача), пока пусто.
+- **Поведение идентично.** `src/variability.js` остался реэкспортом с прежней сигнатурой `buildRoomVariability(options)` (для регрессии и старых тестов), `jobs.js` переведён на `pickVariety`. В `meta.variability` поле `accentHex` переименовано в `accent`; чтение истории направления читает оба (`accent` у новых, `accentHex` у старых рендеров).
+- **Тесты.** `test/variety.test.js` — детерминизм по seed и поведенческая регрессия на фиксированных входах (золотые выходы прежней реализации + текст промта). Промт-регрессия 20/20 без изменения baseline.
+
+## 2026-11-13 — две очереди рендеров: правки первыми
+
+- **Очередь.** Миграция `063` добавляет `renders.queue` (`'base'`/`'edit'`, дефолт `'base'`) и частичный индекс `idx_renders_queue_claim (queue, created_at) WHERE status = 'queued'`. Enqueue проставляет очередь: базовые рендеры — `'base'`, правки — `'edit'`. `claimNextRender` теперь забирает сначала старейшую правку (`queue = 'edit'`), затем старейшую базу (`queue = 'base'`), сохраняя lease/`claimed_by`/fencing. Правка юзера больше не ждёт за чужим базовым рендером.
+
+## 2026-11-13 — лёгкий опрос TaskDock (один поллер, без N+1)
+
+- **Бэкенд.** `userGenerations` больше не делает два коррелированных субзапроса `credit_txn` на каждую строку (до 201 запроса на опрос): `credits_spent` считается одним агрегатным запросом `WHERE render_id = ANY($1) GROUP BY render_id` и джойнится в JS. В ответ добавлено поле `room_status` (статус комнаты), чтобы фронт видел живой прогресс генерации. Индекс не понадобился — `idx_credit_txn_render` (003), `idx_rooms_user` и `idx_renders_room` (001) уже обслуживают запрос.
+- **Фронт.** Один поллер: `TaskDock` владеет опросом. Период 3 с, пока есть активные задачи моложе 60 с; 15 с — если активные старше; при отсутствии активных опрос выключен, данные обновляются при открытии дока и возврате фокуса на вкладку. `Room` (5 с) и `GenerationPanel` (2 с) больше не опрашивают сами — подписываются на общий контекст (`allTasks`/`room_status`) и один раз забирают полный результат комнаты по завершении. Прогресс, версии, флаги breakdown/roadmap, тост возврата кредита и черновик сохранены.
+
+## 2026-11-13 — пайплайн: layout параллельно арт-директору, кэш-ключи по артефактам
+
+- **Кэш по артефактам.** `room_analysis` (миграция `062`) хранит три независимых артефакта с отдельными ключами: facts/repair — `hash(photo, shell, style, styleDescription)`, layout — `hash(roomId, dimensions, keepFurniture, briefHash)`, art direction — `hash(photo, shell, style, concept, keepFurniture, dimensions, briefHash)`. `briefHash` — производный хэш функционального брифа комнаты (`briefForRoom`), без новой колонки. Смена стиля даёт хит layout и промах repair/art direction. Кэшируется только полный layout-план (`proposed` + предметы), неполный не замораживается.
+- **Параллельность.** Layout стартует параллельно с арт-директором, когда пустота известна заранее (`keep_furniture=false`); при `keep_furniture=true` пустоту определяет арт-директор, и layout догоняет его последовательно (качество не ломаем). Контракт `buildLayoutPlan` принимает `{ photoPath, dimensions, brief, keepFurniture, usedStrategies }` — всегда по исходному фото, без стиля/концепта и без data URL арт-директора.
+- **Измерения.** События `room_analysis_cache_hit`, `layout_plan_cache_hit`, `ms` в `art_direction_ok`/`design_direction_ok`/`layout_plan_ok` сохранены.
+
+## 2026-11-13 — снятие потолков конкурентности, мультивыбор до 10, GC комнат, метрики по моделям
+
+- **Конкурентность.** `WORKER_CONCURRENCY` — дефолт 100 (было 6), диапазон 1–500; `IMAGE_CONCURRENCY`/`IMAGE_CONCURRENCY_PROVIDER` — дефолт 100, `IMAGE_CONCURRENCY_USER` — 12, максимумы подняты до 200/12; пул Postgres `PG_POOL_MAX` — дефолт 150 (было 10). Реальный лимит провайдера меряем на проде.
+- **Мультивыбор до 10.** `MAX_VARIANTS=10`; фронт позволяет выбрать до 10 дизайнов, тост «Максимум 10 дизайнов».
+- **Рейт-лимит.** Снят только с `POST /api/rooms`; auth/likes/comments/iterate/retry остаются под лимитом.
+- **GC комнат.** Раз в сутки удаляются осиротевшие комнаты (без рендеров, старше `ROOM_GC_DAYS`=7, не в активной очистке): файлы `photo_path`/`precleaned_shell_path` и строка. Лог `room_gc_swept`.
+- **Метрики.** `/api/admin/metrics` возвращает `model_latency` — p50/p95 `duration_ms` по моделям за период (`percentile_cont`).
 
 ## 2026-11-12 — ночной прогон: доки, черновик, промт-регрессия, room_analysis, слияние агентов, async cleanup
 

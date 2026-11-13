@@ -49,8 +49,8 @@ flowchart LR
 
 ### Создание генерации
 
-1. `POST /api/rooms` (multipart): фото, до 8 пар `{style, concept}`, тип комнаты, класс, флаги.
-2. Проверяются auth, кредиты, rate limit; модель/разрешение.
+1. `POST /api/rooms` (multipart): фото, до 10 пар `{style, concept}`, тип комнаты, класс, флаги.
+2. Проверяются auth и кредиты; модель/разрешение. (`POST /api/rooms` — без rate limit; прочие мутирующие роуты под лимитом.)
 3. В одной транзакции: `rooms` + N × `renders(status=queued)`, списание за каждый вариант.
 4. Воркер забирает рендер через `FOR UPDATE SKIP LOCKED`, ставит lease 5 минут и `claimed_by`.
 5. При первом enqueue запускается асинхронная очистка (если нужно). `processRender` ждёт shell ≤3 мин, собирает контекст (vision из `room_analysis`, art direction + direction одним вызовом) и вызывает OpenRouter.

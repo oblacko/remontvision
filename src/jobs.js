@@ -577,9 +577,17 @@ export async function processRender(renderId, claimedBy = null) {
       const emptyRoom = !effectiveKeepFurniture;
       if (!MOCK_MODE && emptyRoom) {
         if (cachedLayout) {
-          layoutPlan = cachedLayout.layout_plan || null;
+          const cachedPlan = cachedLayout.layout_plan || null;
           meta = { ...meta, ...(cachedLayout.meta || {}) };
-          if (layoutPlan?.items?.length) {
+          if (cachedPlan?.items?.length) {
+            // Кэш хранит план, подогнанный под vision-размеры на момент сохранения.
+            // Ключ layoutKey берёт сырые roomDimensions (часто null), поэтому при
+            // переоценке размеров пере-подгоняем план под текущие estimatedDimensions,
+            // а не переиспользуем устаревший масштаб.
+            const fitted = fitLayoutPlan({ plan: cachedPlan, dimensions: estimatedDimensions, roomType, artDirection });
+            layoutPlan = fitted.plan;
+            if (fitted.artDirection) artDirection = fitted.artDirection;
+            meta.layout_fit = fitted.fit;
             log({ event: 'layout_plan_cache_hit', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length });
           }
         } else if (isCompleteLayoutPlan(rawLayout)) {

@@ -4,6 +4,13 @@
 
 Дата обновления: 2026-11-13. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-12, smoke PASS.
 
+## 2026-11-13 — финальное ревью ветки: правки доков, re-fit layout на кэш-хите, равномерный hashIndex
+
+- **Доки.** Синхронизированы с кодом после снятия потолков: `WORKER_CONCURRENCY` 1–500 (default 100), `IMAGE_CONCURRENCY*` 100/12 (макс 200/12), `IMAGE_MIN_GAP_MS=0`, `PG_POOL_MAX=150`, мультивыбор до 10, `POST /api/rooms` без rate limit — в AGENTS/STATUS/OPERATIONS/GENERATION/ADMIN/API/GENERATION-QUEUE/ARCHITECTURE/README/llms.
+- **Layout на кэш-хите.** `jobs.js` пере-подгоняет закэшированный план через `fitLayoutPlan` под текущие `estimatedDimensions` (ключ `layoutKey` хранит сырые `roomDimensions`, часто null) — переоценка размеров не переиспользует устаревший масштаб.
+- **hashIndex.** `src/variety.js` берёт 32-битный слот `readUInt32BE(0) % size` вместо `hash[0] % size` (равномерный выбор без смещения первого байта). Значения акцента/emphasis/осей изменились — перегенерированы золотые выходы `test/variety.test.js` и `docs/regression/baseline.json` (diff в `changes/2026-11-13-hashindex-32bit.diff`).
+- **Комментарий.** `claimNextRender` документирует, что приоритет правок — best-effort под `SKIP LOCKED`, не строгая гарантия порядка.
+
 ## 2026-11-13 — оси вариативности стиля
 
 - **Оси стиля.** В карточки стилей `designdata.js` добавлены `axes` (3–5 осей × 2–3 значения): `temperature`, `light`, `texture`, плюс `density`/`contrast`/`geometry` под идентичность каждого стиля — мягкие модификаторы без цветов. `pickVariety` выбирает значения детерминированно по seed (`hash(seed:axes:key)`): тот же seed → те же оси, разные seed → разные. Оси попадают в промт отдельным блоком `STYLE AXES — SOFT VARIATION` внутри `variabilityPrompt`; палитру, акцент, emphasis, avoid и `GEOMETRY LOCK` не перекрывают.

@@ -43,7 +43,7 @@ Admin: заголовок `X-Admin-Key`.
 | POST | `/api/payments/sync` | синхронизация pending-платежа |
 | POST | `/api/cleanup` | очистка комнаты по фото → data URL |
 | POST | `/api/estimate-room` | vision-оценка размеров (фронтенд сейчас не использует) |
-| POST | `/api/rooms` | multipart: фото, `items` (1–8 пар), тип, tier, флаги |
+| POST | `/api/rooms` | multipart: фото, `items` (1–10 пар), тип, tier, флаги |
 | GET | `/api/rooms/:id` | комната + последний done-рендер |
 | GET | `/api/rooms/:id/versions` | все версии; `edits_used` для цены правки/переноса |
 | DELETE | `/api/rooms/:id` | удалить комнату (owner) |
@@ -63,10 +63,10 @@ Admin: заголовок `X-Admin-Key`.
 | Поле | Обяз. | Значение |
 |---|---|---|
 | `photo` | да | JPG/PNG/WebP/HEIC ≤ 15 МБ |
-| `items` | да* | JSON-массив до 8 `{style, concept}` |
+| `items` | да* | JSON-массив до 10 `{style, concept}` |
 | `style` | legacy | один стиль, если нет `items` |
 | `concept` | нет | id концепции |
-| `variants` | legacy | 1–8 копий стиля |
+| `variants` | legacy | 1–10 копий стиля |
 | `room_type` | нет | активный тип, иначе `Другое` |
 | `price_tier` | нет | `start|comfort|premium|atelier` |
 | `keep_furniture` | нет | `1/0`, default `1` |
