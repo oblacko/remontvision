@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseVariantsCount, shouldMarkRoomError, roomStatusAfterFailure, pluralVariants, retryAllowed, parseVariantItems, isIterationRender, resolveRenderStyleConcept } from '../src/variants.js';
 
-test('parseVariantsCount clamps 1..8', () => {
+test('parseVariantsCount clamps 1..10', () => {
   assert.equal(parseVariantsCount(undefined), 1);
   assert.equal(parseVariantsCount('3'), 3);
-  assert.equal(parseVariantsCount('20'), 8);
+  assert.equal(parseVariantsCount('10'), 10);
+  assert.equal(parseVariantsCount('20'), 10);
   assert.equal(parseVariantsCount('0'), 1);
   assert.equal(parseVariantsCount('abc'), 1);
 });
@@ -49,9 +50,12 @@ test('parseVariantItems parses pairs and drops unknown concepts', () => {
   ]);
 });
 
-test('parseVariantItems rejects more than 8 items', () => {
-  const { error } = parseVariantItems(JSON.stringify(Array.from({ length: 9 }, (_, i) => ({ style: `s${i}` }))), {});
-  assert.equal(error, 'Некорректный список дизайнов');
+test('parseVariantItems accepts 10 items but rejects more', () => {
+  const ten = parseVariantItems(JSON.stringify(Array.from({ length: 10 }, (_, i) => ({ style: `s${i}` }))), {});
+  assert.equal(ten.error, null);
+  assert.equal(ten.items.length, 10);
+  const eleven = parseVariantItems(JSON.stringify(Array.from({ length: 11 }, (_, i) => ({ style: `s${i}` }))), {});
+  assert.equal(eleven.error, 'Некорректный список дизайнов');
 });
 
 test('parseVariantItems rejects empty array and broken json', () => {

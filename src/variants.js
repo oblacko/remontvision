@@ -1,6 +1,6 @@
-// Чистые хелперы вариантов генерации: до 8 рендеров на комнату,
+// Чистые хелперы вариантов генерации: до 10 рендеров на комнату,
 // каждый оплачивается как отдельный рендер.
-export const MAX_VARIANTS = 8;
+export const MAX_VARIANTS = 10;
 
 export function parseVariantsCount(raw) {
   const n = Number(raw);

@@ -34,24 +34,24 @@ test('image min gap defaults to zero: варианты идут параллел
   assert.equal(getImageMinGapMs(), 0);
 });
 
-test('image concurrency defaults: system 8, user 5, provider 6', () => {
-  assert.equal(getRenderDefaults().image_concurrency, 8);
-  assert.equal(getRenderDefaults().image_concurrency_user, 5);
-  assert.equal(getRenderDefaults().image_concurrency_provider, 6);
+test('image concurrency defaults: system 100, user 12, provider 100', () => {
+  assert.equal(getRenderDefaults().image_concurrency, 100);
+  assert.equal(getRenderDefaults().image_concurrency_user, 12);
+  assert.equal(getRenderDefaults().image_concurrency_provider, 100);
   setRenderConfigForTests({ image_concurrency_user: 0 });
   assert.equal(getImageConcurrencyUser(), 1);
   setRenderConfigForTests({ image_concurrency_user: 99 });
-  assert.equal(getImageConcurrencyUser(), 8);
+  assert.equal(getImageConcurrencyUser(), 12);
   setRenderConfigForTests({ image_concurrency_provider: 2 });
   assert.equal(getImageConcurrencyProvider(), 2);
 });
 
-test('image concurrency clamps 1..12', () => {
-  assert.equal(getImageConcurrency(), 8);
+test('image concurrency clamps 1..200', () => {
+  assert.equal(getImageConcurrency(), 100);
   setRenderConfigForTests({ image_concurrency: 0 });
   assert.equal(getImageConcurrency(), 1);
-  setRenderConfigForTests({ image_concurrency: 99 });
-  assert.equal(getImageConcurrency(), 12);
+  setRenderConfigForTests({ image_concurrency: 999 });
+  assert.equal(getImageConcurrency(), 200);
   setRenderConfigForTests({ image_concurrency: 5 });
   assert.equal(getImageConcurrency(), 5);
 });

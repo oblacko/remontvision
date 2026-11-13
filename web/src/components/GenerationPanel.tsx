@@ -331,7 +331,7 @@ export function GenerationPanel({
       showToast(`Уже выбрано ${stylePicks.length} ${stylePicks.length < 5 ? 'стиля' : 'стилей'}`)
       return
     }
-    const limit = Math.min(count, 8)
+    const limit = Math.min(count, 10)
     const next = [...stylePicks]
     for (const item of stylePresets) {
       if (next.length >= limit) break
@@ -346,7 +346,7 @@ export function GenerationPanel({
     if (exists) {
       next = stylePicks.filter(pick => pick.style !== name)
     } else {
-      if (variantCount >= 8) { showToast('Максимум 8 дизайнов'); return }
+      if (variantCount >= 10) { showToast('Максимум 10 дизайнов'); return }
       next = [...stylePicks, { style: name, concepts: [] }]
     }
     setStylePicks(next)
@@ -362,7 +362,7 @@ export function GenerationPanel({
     } else if (pick.concepts.includes(conceptId)) {
       next = stylePicks.map(item => item.style === styleName ? { ...item, concepts: item.concepts.filter(id => id !== conceptId) } : item)
     } else {
-      if (variantCount >= 8) { showToast('Максимум 8 дизайнов'); return }
+      if (variantCount >= 10) { showToast('Максимум 10 дизайнов'); return }
       next = stylePicks.map(item => item.style === styleName ? { ...item, concepts: [...item.concepts, conceptId] } : item)
     }
     setStylePicks(next)

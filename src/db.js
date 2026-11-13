@@ -15,9 +15,17 @@ if (!process.env.RV_DATABASE_URL) {
   process.exit(1);
 }
 
+// Размер пула соединений: дефолт 150 под ~100 одновременных рендеров (каждый рендер
+// держит до нескольких соединений). Меньше 1 — дефолт.
+function pgPoolMax() {
+  const n = Number(process.env.PG_POOL_MAX);
+  if (!Number.isFinite(n) || n < 1) return 150;
+  return Math.floor(n);
+}
+
 export const pool = new pg.Pool({
   connectionString: process.env.RV_DATABASE_URL,
-  max: 10,
+  max: pgPoolMax(),
 });
 
 export async function withTransaction(fn) {
@@ -128,6 +136,14 @@ export const q = {
     await client.query(`DELETE FROM renders WHERE room_id = $1`, [id]);
     await client.query(`DELETE FROM rooms WHERE id = $1`, [id]);
   }),
+  // Комнаты для GC: без единого рендера, старше N дней и не в активной очистке.
+  orphanRooms: (days = 7) =>
+    pool.query(`SELECT id, photo_path, precleaned_shell_path, cleanup_status, created_at
+                FROM rooms rm
+                WHERE NOT EXISTS (SELECT 1 FROM renders WHERE room_id = rm.id)
+                  AND created_at < now() - ($1 || ' days')::interval
+                  AND (cleanup_status IS NULL OR cleanup_status NOT IN ('queued', 'processing'))
+                ORDER BY created_at ASC`, [String(days)]).then(r => r.rows),
 
   // renders
   createRender: (id, roomId, parentRenderId, requestText, prompt) =>
@@ -414,7 +430,19 @@ export const q = {
       AVG(cost_usd) FILTER (WHERE status = 'done')::float AS avg_cost_usd,
       SUM(cost_usd) FILTER (WHERE status = 'done')::float
         + (SELECT COALESCE(SUM(cleanup_cost_usd), 0)::float FROM rooms
-           WHERE cleanup_finished_at > now() - ($1 || ' days')::interval) AS total_cost_usd
+           WHERE cleanup_finished_at > now() - ($1 || ' days')::interval) AS total_cost_usd,
+      COALESCE((
+        SELECT jsonb_agg(m ORDER BY m.model)
+        FROM (
+          SELECT model,
+                 percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms)::int AS p50,
+                 percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)::int AS p95
+          FROM renders
+          WHERE created_at > now() - ($1 || ' days')::interval
+            AND status = 'done' AND duration_ms IS NOT NULL AND model IS NOT NULL
+          GROUP BY model
+        ) m
+      ), '[]'::jsonb) AS model_latency
     FROM renders
     WHERE created_at > now() - ($1 || ' days')::interval`, [String(Math.max(1, Math.min(365, Number(days) || 30)))])
     .then(r => r.rows[0] || null),

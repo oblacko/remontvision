@@ -23,12 +23,13 @@ import { getStyleConfig } from './styleconfig.js';
 import { getStyleSwatchDataUrl } from './styleswatch.js';
 import { analyzeRoomBrief, buildArtDirection, buildRepairScope } from './artdirector.js';
 import { fitLayoutPlan } from './layoutfit.js';
-import { putBuffer, getBuffer } from './storage.js';
+import { putBuffer, getBuffer, remove } from './storage.js';
 import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolveRenderStyleConcept } from './variants.js';
 import { workerConcurrency } from './workerknobs.js';
+import { roomGcDays, shouldGcRoom } from './roomgc.js';
 import { buildRoomVariability, variabilityPrompt } from './variability.js';
 import { roomAnalysisKey, shouldCacheRoomAnalysis } from './roomanalysis.js';
 
@@ -969,6 +970,27 @@ function notifyOwner(room, render) {
 
 let running = 0;
 const MAX_RUNNING = workerConcurrency();
+
+// GC осиротевших комнат: комнаты без единого рендера старше ROOM_GC_DAYS.
+// Удаляем файлы (безопасно: remove логирует и не падает на отсутствующих) и строку.
+export async function sweepOrphanRooms() {
+  try {
+    const days = roomGcDays();
+    const rooms = await q.orphanRooms(days);
+    let deleted = 0;
+    for (const room of rooms) {
+      if (!shouldGcRoom(room, { days })) continue;
+      if (room.photo_path) await remove(room.photo_path);
+      if (room.precleaned_shell_path) await remove(room.precleaned_shell_path);
+      await q.deleteRoom(room.id);
+      deleted++;
+    }
+    if (deleted) log({ event: 'room_gc_swept', deleted });
+  } catch (e) {
+    log({ event: 'room_gc_error', error: String(e.message || e).slice(0, 300) });
+  }
+}
+
 export function startWorker() {
   q.requeueProcessing().then(n => { if (n) console.log(`[worker] вернул в очередь ${n} прерванных рендеров`); });
   q.requeueStaleRoomCleanup().then(n => { if (n) console.log(`[worker] вернул в очередь очистку ${n} комнат`); });
@@ -997,6 +1019,10 @@ export function startWorker() {
       log({ event: 'stale_sweep_error', error: String(e.message || e).slice(0, 300) });
     }
   }, 5 * 60 * 1000);
+
+  // GC осиротевших комнат: раз в сутки (плюс раз при старте, чтобы не ждать первый тик).
+  void sweepOrphanRooms();
+  setInterval(() => { void sweepOrphanRooms(); }, 24 * 60 * 60 * 1000);
 
   setInterval(async () => {
     if (running >= MAX_RUNNING) return;

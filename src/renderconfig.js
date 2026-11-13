@@ -13,12 +13,12 @@ export const IMAGE_MIN_GAP_MAX_MS = 120_000;
 // Сколько image-запросов может идти одновременно (варианты одного пакета — параллельно).
 // Пауза по умолчанию 0: раньше она была 10 с и вместе с глобальным локом
 // превращала пять вариантов в последовательную очередь.
-export const IMAGE_CONCURRENCY_MAX = 12;
-export const IMAGE_CONCURRENCY_USER_MAX = 8;
+export const IMAGE_CONCURRENCY_MAX = 200;
+export const IMAGE_CONCURRENCY_USER_MAX = 12;
 const ENV_IMAGE_MIN_GAP_MS = clampInt(process.env.IMAGE_MIN_GAP_MS, 0, IMAGE_MIN_GAP_MAX_MS, 0);
-const ENV_IMAGE_CONCURRENCY = clampInt(process.env.IMAGE_CONCURRENCY, 1, IMAGE_CONCURRENCY_MAX, 8);
-const ENV_IMAGE_CONCURRENCY_USER = clampInt(process.env.IMAGE_CONCURRENCY_USER, 1, IMAGE_CONCURRENCY_USER_MAX, 5);
-const ENV_IMAGE_CONCURRENCY_PROVIDER = clampInt(process.env.IMAGE_CONCURRENCY_PROVIDER, 1, IMAGE_CONCURRENCY_MAX, 6);
+const ENV_IMAGE_CONCURRENCY = clampInt(process.env.IMAGE_CONCURRENCY, 1, IMAGE_CONCURRENCY_MAX, 100);
+const ENV_IMAGE_CONCURRENCY_USER = clampInt(process.env.IMAGE_CONCURRENCY_USER, 1, IMAGE_CONCURRENCY_USER_MAX, 12);
+const ENV_IMAGE_CONCURRENCY_PROVIDER = clampInt(process.env.IMAGE_CONCURRENCY_PROVIDER, 1, IMAGE_CONCURRENCY_MAX, 100);
 
 export const DEFAULT_RENDER_CONFIG = {
   product_refs_enabled: false,

@@ -37,6 +37,7 @@ import { modelResolutions } from './openrouter.js';
 import { buildShopSearchLinks } from './shoplinks.js';
 import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
 import { pluralVariants, retryAllowed, parseVariantItems } from './variants.js';
+import { workerConcurrency } from './workerknobs.js';
 import { sharePageHtml } from './sharepage.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
@@ -638,7 +639,7 @@ app.get('/api/admin/metrics', h(async (req, res) => {
       system: getRenderConfig().image_concurrency,
       user: getRenderConfig().image_concurrency_user,
       provider: getRenderConfig().image_concurrency_provider,
-      workers: Number(process.env.WORKER_CONCURRENCY || 6),
+      workers: workerConcurrency(),
     },
   });
 }));
@@ -1509,7 +1510,7 @@ app.post('/api/estimate-room', rateLimit, upload.single('photo'), h(async (req, 
   res.json({ ...out, cost_usd: out?.cost ?? null });
 }));
 
-app.post('/api/rooms', rateLimit, upload.fields([
+app.post('/api/rooms', upload.fields([
   { name: 'photo', maxCount: 1 },
   { name: 'cleanup_photo', maxCount: 1 },
 ]), h(async (req, res) => {
