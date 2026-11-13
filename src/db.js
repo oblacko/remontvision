@@ -407,17 +407,27 @@ export const q = {
   myRooms: userId =>
     pool.query(`SELECT id, style, budget, price_tier, status, created_at FROM rooms WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [userId])
       .then(r => r.rows),
-  userGenerations: userId =>
-    pool.query(`SELECT r.id, r.room_id, r.batch_id, r.parent_render_id, r.is_favorite, r.status, r.error, r.error_stage, r.created_at, r.finished_at, r.request_text,
+  // Истории генераций пользователя без N+1: credits_spent считаем одним агрегатным
+  // запросом по набору id рендеров и джойним в JS (раньше — два коррелированных
+  // субзапроса credit_txn на каждую строку, до 201 запроса на опрос).
+  userGenerations: async userId => {
+    const { rows } = await pool.query(`SELECT r.id, r.room_id, r.batch_id, r.parent_render_id, r.is_favorite, r.status, r.error, r.error_stage, r.created_at, r.finished_at, r.request_text,
                        r.image_path, r.prompt, r.model, r.cost_usd, r.duration_ms, r.meta,
-                       rm.style, rm.budget, rm.price_tier, rm.photo_path, rm.room_type,
-                       GREATEST(0,
-                         COALESCE((SELECT SUM(-ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.delta < 0), 0)
-                         - COALESCE((SELECT SUM(ct.delta) FROM credit_txn ct WHERE ct.render_id = r.id AND ct.reason = 'iterate_refund'), 0)
-                       )::int AS credits_spent
+                       rm.style, rm.budget, rm.price_tier, rm.photo_path, rm.room_type, rm.status AS room_status
                 FROM renders r JOIN rooms rm ON rm.id = r.room_id
-                WHERE rm.user_id = $1 AND r.status <> 'rejected' ORDER BY r.created_at DESC LIMIT 100`, [userId])
-      .then(r => r.rows),
+                WHERE rm.user_id = $1 AND r.status <> 'rejected' ORDER BY r.created_at DESC LIMIT 100`, [userId]);
+    if (!rows.length) return rows;
+    const ids = rows.map(row => row.id);
+    const spent = await pool.query(`SELECT render_id,
+                       GREATEST(0,
+                         COALESCE(SUM(-ct.delta) FILTER (WHERE ct.delta < 0), 0)
+                         - COALESCE(SUM(ct.delta) FILTER (WHERE ct.reason = 'iterate_refund'), 0)
+                       )::int AS credits_spent
+                FROM credit_txn ct WHERE ct.render_id = ANY($1) GROUP BY render_id`, [ids]);
+    const byId = new Map(spent.rows.map(row => [row.render_id, row.credits_spent]));
+    for (const row of rows) row.credits_spent = byId.get(row.id) ?? 0;
+    return rows;
+  },
 
   // Минимальные метрики без отдельной аналитики: успех, время, себестоимость.
   adminMetrics: (days = 30) => pool.query(`

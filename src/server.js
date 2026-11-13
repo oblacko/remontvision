@@ -326,6 +326,7 @@ function generationDto(g) {
     finished_at: g.finished_at,
     request_text: g.request_text,
     credits_spent: g.credits_spent,
+    room_status: g.room_status || null,
     prompt: g.prompt || null,
     model: g.model || null,
     duration_ms: g.duration_ms ?? null,
