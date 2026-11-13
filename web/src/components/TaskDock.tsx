@@ -131,8 +131,9 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     if (!authed) return
     const active = all.filter(task => !isTerminal(task))
     if (!active.length) return
-    const youngest = Math.min(...active.map(task => new Date(task.created_at).getTime()))
-    const period = now - youngest < 60_000 ? 3000 : 15_000
+    // «Моложе всех» — задача с самым поздним created_at; 3 с, пока хотя бы одна моложе 60 с.
+    const youngestCreatedAt = Math.max(...active.map(task => new Date(task.created_at).getTime()))
+    const period = now - youngestCreatedAt < 60_000 ? 3000 : 15_000
     const tick = () => { if (document.visibilityState === 'visible') void refresh() }
     const id = window.setInterval(tick, period)
     return () => window.clearInterval(id)
