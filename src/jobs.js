@@ -29,7 +29,7 @@ import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolveRenderStyleConcept } from './variants.js';
 import { workerConcurrency } from './workerknobs.js';
 import { roomGcDays, shouldGcRoom } from './roomgc.js';
-import { buildRoomVariability, variabilityPrompt } from './variability.js';
+import { pickVariety, variabilityPrompt } from './variety.js';
 import { factsKey, layoutKey, artDirectionKey, briefHash, shouldCacheRoomAnalysis } from './roomanalysis.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
@@ -367,10 +367,11 @@ export async function processRender(renderId, claimedBy = null) {
         mainMove: row.meta?.design_direction?.mainMove?.action || row.meta?.design_direction?.mainMove?.target || '',
         palette: [
           ...(row.meta?.art_direction?.palette || []).map(color => color?.name || color?.hex).filter(Boolean),
-          row.meta?.variability?.accentHex || null,
+          // Новые рендеры хранят accent, старые — accentHex.
+          (row.meta?.variability?.accent ?? row.meta?.variability?.accentHex) || null,
         ].filter(Boolean),
       })).filter(item => item.focalZone || item.mainMove || item.palette.length);
-      const variability = buildRoomVariability({ seed: renderId, styleName, styleKey: styleInfo?.key, used: usedDirections, keepFurniture });
+      const variety = pickVariety(room, { name: styleName, key: styleInfo?.key || '' }, renderId, usedDirections);
       // История для direction — по пользователю (как раньше), а не только по комнате.
       let directionHistory = usedDirections.map(item => ({ main_move: item.mainMove, focal_zone: item.focalZone }));
       if (room.user_id) {
@@ -656,13 +657,13 @@ export async function processRender(renderId, claimedBy = null) {
         productRefs: false,
         layoutPlan,
         architectureFacts,
-        accentHex: variability?.accentHex || null,
-        novelty: variabilityPrompt(variability),
+        accentHex: variety?.accent || null,
+        novelty: variabilityPrompt(variety),
       });
 
       referenceImagesB64 = [...styleRefUrls];
       meta.style_id = styleInfo?.id || null;
-      meta.variability = variability || null;
+      meta.variability = variety || null;
       meta.style_reference_mode = styleMode;
       meta.user_style_ref_ignored = Boolean(room.style_ref_path && styleMode !== 'reference');
       meta.budget = room.budget;
