@@ -7,6 +7,8 @@ export const LAYOUT_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.LAY
 
 const LAYOUT_MODEL = process.env.LAYOUT_MODEL || process.env.DIRECTION_MODEL || process.env.ART_DIRECTOR_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
 
+const MIME_BY_EXT = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
+
 const cm = value => {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.round(number * 100) : null;
@@ -22,12 +24,14 @@ const BRIEFS = {
   'столовая': 'обеденный стол и посадочные места; проверять каждую занятую сторону и проходы.',
 };
 
-const briefForRoom = roomType => {
+// Функциональный бриф комнаты (не зависит от стиля): занятия, обязательные функции, хранение.
+// Используется и в промте, и в briefHash кэш-ключа layout.
+export const briefForRoom = roomType => {
   const key = Object.keys(BRIEFS).find(name => String(roomType || '').toLowerCase().includes(name));
   return key ? BRIEFS[key] : 'Обязательные функции — по типу помещения; без декора ради количества.';
 };
 
-export function composeLayoutPrompt({ roomType = 'Другое', dimensions = null, style = '', concept = '', usedStrategies = [], keepFurniture = false } = {}) {
+export function composeLayoutPrompt({ roomType = 'Другое', dimensions = null, brief = '', usedStrategies = [], keepFurniture = false } = {}) {
   const width = cm(dimensions?.width);
   const length = cm(dimensions?.length);
   const height = cm(dimensions?.height);
@@ -45,11 +49,9 @@ export function composeLayoutPrompt({ roomType = 'Другое', dimensions = nu
     'openings_and_obstacles: точные данные не предоставлены — распознай дверь, окно и радиатор по фото; отметь это в assumptions.',
     'utilities: положения розеток и ТВ-подключений неизвестны.',
     `existing_furniture: ${keepFurniture ? 'сохранить видимую мебель; если комната пустая — мебель отсутствует.' : 'комната пустая, мебель отсутствует.'}`,
-    `user_brief: ${briefForRoom(roomType)}`,
+    `user_brief: ${brief || briefForRoom(roomType)}`,
     'mounting_policy: новые отверстия в стенах и навесная мебель запрещены.',
     `previous_layouts: ${history}.`,
-    style ? `style_context: ${style} (не влияет на планировку).` : '',
-    concept ? `concept_context: ${concept} (не влияет на планировку).` : '',
     'Размеры и проёмы — рабочая оценка по фото. Не возвращай needs_input только из-за отсутствия обмерного плана: предложи расстановку и перечисли неподтверждённое в assumptions/validation.unverified.',
     'Верни JSON по схеме.',
   ].filter(Boolean).join('\n');
@@ -148,17 +150,28 @@ export function layoutPlanToText(plan) {
 }
 
 export async function buildLayoutPlan({
-  imageDataUrl,
+  photoPath,
   roomType = 'Другое',
   dimensions = null,
-  style = '',
-  concept = '',
+  brief = '',
   usedStrategies = [],
   keepFurniture = false,
   sessionId = null,
 } = {}) {
-  if (!LAYOUT_ENABLED || !imageDataUrl) return null;
-  const { system, user } = composeLayoutPrompt({ roomType, dimensions, style, concept, usedStrategies, keepFurniture });
+  if (!LAYOUT_ENABLED || !photoPath) return null;
+  // Layout всегда работает по исходному фото (комната с мебелью для масштаба),
+  // никогда по очищенному shell — поэтому в контракте путь к фото, а не data URL.
+  let imageDataUrl = null;
+  try {
+    const { getBuffer } = await import('./storage.js');
+    const { detectImageExt } = await import('./imagesize.js');
+    const buf = await getBuffer(photoPath);
+    const ext = detectImageExt(buf);
+    imageDataUrl = `data:${MIME_BY_EXT[ext] || 'image/jpeg'};base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  }
+  const { system, user } = composeLayoutPrompt({ roomType, dimensions, brief, usedStrategies, keepFurniture });
   let cost = null;
   try {
     const agent = await callAgentJson({

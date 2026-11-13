@@ -10,8 +10,7 @@ import { MOCK_MODE, buildPrompt, buildEditPrompt, buildMoveRemovalPrompt, genera
 import { imageSize, detectImageExt } from './imagesize.js';
 import { fitAspect } from './media.js';
 import { referenceImagesDetailed } from './curate.js';
-import { buildLayoutPlan } from './layoutagent.js';
-import { cacheGet, cachePut, dimensionsKey } from './generationcache.js';
+import { buildLayoutPlan, briefForRoom } from './layoutagent.js';
 import { buildAnalysis } from './analysis.js';
 import { composeMove } from './moveobject.js';
 import { normalizeTier } from './pricing.js';
@@ -31,7 +30,7 @@ import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolve
 import { workerConcurrency } from './workerknobs.js';
 import { roomGcDays, shouldGcRoom } from './roomgc.js';
 import { buildRoomVariability, variabilityPrompt } from './variability.js';
-import { roomAnalysisKey, shouldCacheRoomAnalysis } from './roomanalysis.js';
+import { factsKey, layoutKey, artDirectionKey, briefHash, shouldCacheRoomAnalysis } from './roomanalysis.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -317,21 +316,44 @@ export async function processRender(renderId, claimedBy = null) {
     } else {
       styleInfo = await q.styleByName(styleName);
       const styleMode = getStyleConfig().mode;
-      // Кэш анализа: повторный рендер той же комнаты/стиля/концепта не платит за vision.
-      const analysisKey = roomAnalysisKey({
+      // Бриф комнаты — функциональное назначение (не зависит от стиля/концепта).
+      // briefHash — производный хэш содержимого брифа, без новой колонки в БД.
+      const roomBriefText = briefForRoom(roomType);
+      const briefHashValue = briefHash(roomBriefText);
+
+      // Кэш-ключи по артефактам: facts/repair и layout не зависят от стиля,
+      // art direction — зависит. Смена стиля даёт хит repair/layout и промах art.
+      const factsCacheKey = factsKey({ photoPath: room.photo_path, shellPath: precleanedShell || '' });
+      const layoutCacheKey = layoutKey({
+        roomId: room.id,
+        dimensions: roomDimensions,
+        keepFurniture: false, // layout всегда для пустой комнаты
+        briefHash: briefHashValue,
+      });
+      const artCacheKey = artDirectionKey({
         photoPath: room.photo_path,
         shellPath: precleanedShell || '',
         style: styleName,
         conceptId: conceptKey,
         keepFurniture,
         dimensions: roomDimensions,
+        briefHash: briefHashValue,
       });
-      const cachedRow = await q.roomAnalysis(room.id).catch(() => null);
-      const cachedAnalysis = cachedRow?.cache_key === analysisKey ? cachedRow.data : null;
-      if (cachedAnalysis) {
-        meta = { ...meta, ...(cachedAnalysis.meta || {}) };
+
+      // Три независимых артефакта room_analysis, у каждого свой ключ.
+      const [factsRow, layoutRow, artRow] = await Promise.all([
+        q.roomAnalysis(room.id, 'facts').catch(() => null),
+        q.roomAnalysis(room.id, 'layout').catch(() => null),
+        q.roomAnalysis(room.id, 'art').catch(() => null),
+      ]);
+      const cachedFacts = factsRow?.cache_key === factsCacheKey ? factsRow.data : null;
+      const cachedLayout = layoutRow?.cache_key === layoutCacheKey ? layoutRow.data : null;
+      const cachedArt = artRow?.cache_key === artCacheKey ? artRow.data : null;
+      if (cachedArt) {
+        meta = { ...meta, ...(cachedArt.meta || {}) };
         log({ event: 'room_analysis_cache_hit', room_id: room.id, render_id: renderId, style: styleName });
       }
+      if (cachedFacts) meta = { ...meta, ...(cachedFacts.meta || {}) };
       // Новизна на уровне комнаты: что уже было в прошлых рендерах, без нового vision-вызова.
       const pastRenders = await q.rendersForRoom(room.id).catch(() => []);
       const usedDirections = pastRenders.slice(-5).map(row => ({
@@ -380,11 +402,11 @@ export async function processRender(renderId, claimedBy = null) {
         }
       }
 
-      // Проход A: строитель определяет объём ремонта по исходному фото и cleaned shell.
-      // Параллельно с арт-директором: оба читают одно фото и не зависят друг от друга.
-      let repairScope = cachedAnalysis?.repair_scope || null;
-      let analysisFailed = false;
-      const repairPromise = cachedAnalysis ? Promise.resolve(repairScope) : (async () => {
+      // Артефакт «facts/repair»: объём ремонта по исходному фото и cleaned shell.
+      // Не зависит от стиля; идёт параллельно с арт-директором и layout.
+      let repairScope = cachedFacts?.repair_scope || null;
+      let factsFailed = false;
+      const repairPromise = cachedFacts ? Promise.resolve(repairScope) : (async () => {
         if (MOCK_MODE) return null;
         try {
           const originalBuf = await getBuffer(room.photo_path || sourceStored);
@@ -408,20 +430,19 @@ export async function processRender(renderId, claimedBy = null) {
           return null;
         } catch (e) {
           log({ event: 'repair_scope_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-          analysisFailed = true;
+          factsFailed = true;
           return null;
         }
       })();
       meta.art_direction_input = precleanedShell ? 'cleaned_shell' : 'original';
 
-      // Фото-проход: оцениваем размеры и объектив как раньше. Для новой пары
-      // style×concept текст направления берём у direction-агента; свободный
-      // арт-директор остаётся fallback-ом для старых комнат (откат).
-      let artDirection = cachedAnalysis?.art_direction || '';
-      let architectureFacts = cachedAnalysis?.architecture_facts || null;
-      let estimatedDimensions = cachedAnalysis?.dimensions || roomDimensions;
-      let effectiveKeepFurniture = cachedAnalysis?.effective_keep_furniture ?? keepFurniture;
-      if (!MOCK_MODE && !cachedAnalysis) {
+      // Артефакт «art direction»: факты по фото + (при концепции) замысел — один vision-вызов.
+      let artDirection = cachedArt?.art_direction || '';
+      let architectureFacts = cachedArt?.architecture_facts || null;
+      let estimatedDimensions = cachedArt?.dimensions || roomDimensions;
+      let effectiveKeepFurniture = cachedArt?.effective_keep_furniture ?? keepFurniture;
+      let artFailed = false;
+      const artPromise = (MOCK_MODE || cachedArt) ? Promise.resolve(null) : (async () => {
         try {
           const adStart = Date.now();
           const adBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
@@ -483,8 +504,8 @@ export async function processRender(renderId, claimedBy = null) {
               }
               try { await q.setRoomDesign(room.id, room.concept_key, ad.direction); } catch { /* метаданные не критичны */ }
             } else if (ad.directionRequested) {
-              // Замысел запрошен, но контракт не пришёл: не кэшируем неполный анализ.
-              analysisFailed = true;
+              // Замысел запрошен, но контракт не пришёл: не кэшируем неполный артефакт.
+              artFailed = true;
               log({ event: 'direction_missing', room_id: room.id, render_id: renderId, style: styleName, concept: conceptKey, cost_usd: ad.cost ?? null });
             } else {
               log({ event: 'art_direction_ok', room_id: room.id, render_id: renderId, style: styleName, room_type: roomType, palette: ad.palette?.length || 0, cost_usd: ad.cost ?? null, ms: Date.now() - adStart, facts_only: true });
@@ -494,94 +515,117 @@ export async function processRender(renderId, claimedBy = null) {
           }
         } catch (e) {
           log({ event: 'art_direction_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-          analysisFailed = true;
+          artFailed = true;
         }
-      }
+      })();
 
-      // Дожидаемся ремонта перед планировщиком/промтом: оба используют repairScope.
-      repairScope = await repairPromise;
-
-      // Планировщик нужен только для пустой комнаты: он предлагает расстановку,
-      // чтобы модель не сводила кабинет к «стол + стул + шкаф».
-      let layoutPlan = cachedAnalysis?.layout_plan || null;
-      if (!MOCK_MODE && !cachedAnalysis && !effectiveKeepFurniture) {
+      // Артефакт «layout»: расстановка для пустой комнаты. Стартует параллельно
+      // с арт-директором, когда пустота известна заранее (keep_furniture=false).
+      // При keep_furniture=true пустоту определяет только арт-директор
+      // (existing_furniture) — тогда layout догоняем после него (редкий случай).
+      let layoutPlan = null;
+      let layoutFailed = false;
+      let layoutBuildMs = null;
+      const buildLayout = async (dimensions, keepFurnitureValue) => {
+        const layoutStart = Date.now();
         try {
-          const layoutStart = Date.now();
-          const usedStrategies = await q.rendersForRoom(room.id)
-            .then(rows => rows.map(row => row.meta?.layout_plan?.strategy).filter(Boolean).slice(-5))
-            .catch(() => []);
-          const layoutCacheKey = [
-            'layout', room.id, styleInfo?.key || styleName, conceptKey || '',
-            dimensionsKey(estimatedDimensions), effectiveKeepFurniture ? 'keep' : 'empty',
-            usedStrategies.join(';'),
-          ].join('|');
-          const cachedLayout = await cacheGet('layout_plan', layoutCacheKey, 30).catch(() => null);
-          if (cachedLayout?.plan?.status === 'proposed' && cachedLayout.plan.items?.length) {
-            layoutPlan = { ...cachedLayout.plan, cost: null };
-            if (cachedLayout.artDirection) artDirection = cachedLayout.artDirection;
-            meta.layout_plan = layoutPlan;
-            meta.layout_validation = layoutPlan.validation || null;
-            meta.layout_assumptions = layoutPlan.assumptions || [];
-            log({ event: 'layout_plan_cache_hit', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length });
-          } else {
-            const layoutBuf = await getBuffer(precleanedShell || room.photo_path || sourceStored);
-            layoutPlan = await buildLayoutPlan({
-              imageDataUrl: await bufferToDataUrl(layoutBuf),
-              roomType,
-              dimensions: estimatedDimensions,
-              style: styleInfo?.key || styleName,
-              concept: conceptKey || '',
-              usedStrategies,
-              keepFurniture: effectiveKeepFurniture,
-              sessionId: meta.render_session,
-            });
-            if (layoutPlan?.status === 'proposed' && layoutPlan.items?.length) {
-              addCost('layout', layoutPlan.cost);
-              const fitted = fitLayoutPlan({ plan: layoutPlan, dimensions: estimatedDimensions, roomType, artDirection });
-              layoutPlan = fitted.plan;
-              if (fitted.artDirection) artDirection = fitted.artDirection;
-              meta.layout_fit = fitted.fit;
-              if (fitted.dropped.length) log({ event: 'layout_fit_dropped', room_id: room.id, render_id: renderId, dropped: fitted.fit?.dropped, needed_cm: fitted.fit?.neededCm, width_m: fitted.fit?.widthM });
-              meta.layout_plan = layoutPlan;
-              meta.layout_validation = layoutPlan.validation || null;
-              meta.layout_assumptions = layoutPlan.assumptions || [];
-              log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, validation: layoutPlan.validation?.result || null, cost_usd: layoutPlan.cost ?? null, ms: Date.now() - layoutStart });
-              await cachePut('layout_plan', layoutCacheKey, { plan: { ...layoutPlan, cost: null }, artDirection })
-                .catch(e => log({ event: 'layout_cache_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 200) }));
-            } else {
-              if (layoutPlan) {
-                addCost('layout', layoutPlan.cost);
-                meta.layout_plan_skipped = { status: layoutPlan.status, strategy: layoutPlan.strategy, questions: layoutPlan.questions || [], missing_inputs: layoutPlan.missing_inputs || [] };
-              }
-              layoutPlan = null;
-              log({ event: 'layout_plan_empty', room_id: room.id, render_id: renderId, status: meta.layout_plan_skipped?.status || null });
-            }
-          }
+          const usedStrategies = pastRenders.map(row => row.meta?.layout_plan?.strategy).filter(Boolean).slice(-5);
+          const plan = await buildLayoutPlan({
+            photoPath: room.photo_path || sourceStored,
+            roomType,
+            dimensions,
+            brief: roomBriefText,
+            usedStrategies,
+            keepFurniture: keepFurnitureValue,
+            sessionId: meta.render_session,
+          });
+          return { plan, ms: Date.now() - layoutStart };
         } catch (e) {
           log({ event: 'layout_plan_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
-          analysisFailed = true;
+          layoutFailed = true;
+          return { plan: null, ms: Date.now() - layoutStart };
+        }
+      };
+      let layoutPromise = Promise.resolve(null);
+      if (!MOCK_MODE && !keepFurniture && !cachedLayout) {
+        layoutPromise = buildLayout(roomDimensions, false);
+      }
+
+      // Ждём три vision-этапа: repair и layout уже идут параллельно с арт-директором.
+      const [repairResult, , layoutResult] = await Promise.all([repairPromise, artPromise, layoutPromise]);
+      repairScope = repairResult;
+
+      // Если layout не стартовал параллельно (keep_furniture=true), но арт-директор
+      // увидел пустую комнату — запускаем планировщик последовательно.
+      let rawLayout = layoutResult?.plan ?? null;
+      if (layoutResult) layoutBuildMs = layoutResult.ms;
+      if (!MOCK_MODE && keepFurniture && !cachedLayout && !effectiveKeepFurniture) {
+        const res = await buildLayout(roomDimensions, false);
+        rawLayout = res.plan;
+        layoutBuildMs = res.ms;
+      }
+
+      // Финализация layout для пустой комнаты: подгонка под финальные размеры
+      // и направление арт-директора (они готовы после Promise.all).
+      const emptyRoom = !effectiveKeepFurniture;
+      if (!MOCK_MODE && emptyRoom) {
+        if (cachedLayout) {
+          layoutPlan = cachedLayout.layout_plan || null;
+          meta = { ...meta, ...(cachedLayout.meta || {}) };
+          if (layoutPlan?.items?.length) {
+            log({ event: 'layout_plan_cache_hit', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length });
+          }
+        } else if (rawLayout?.status === 'proposed' && rawLayout.items?.length) {
+          addCost('layout', rawLayout.cost);
+          const fitted = fitLayoutPlan({ plan: rawLayout, dimensions: estimatedDimensions, roomType, artDirection });
+          layoutPlan = fitted.plan;
+          if (fitted.artDirection) artDirection = fitted.artDirection;
+          meta.layout_fit = fitted.fit;
+          if (fitted.dropped.length) log({ event: 'layout_fit_dropped', room_id: room.id, render_id: renderId, dropped: fitted.fit?.dropped, needed_cm: fitted.fit?.neededCm, width_m: fitted.fit?.widthM });
+          meta.layout_plan = layoutPlan;
+          meta.layout_validation = layoutPlan.validation || null;
+          meta.layout_assumptions = layoutPlan.assumptions || [];
+          log({ event: 'layout_plan_ok', room_id: room.id, render_id: renderId, items: layoutPlan.items.length, zones: layoutPlan.zones.length, validation: layoutPlan.validation?.result || null, cost_usd: layoutPlan.cost ?? null, ms: layoutBuildMs });
+        } else {
+          if (rawLayout) {
+            addCost('layout', rawLayout.cost);
+            meta.layout_plan_skipped = { status: rawLayout.status, strategy: rawLayout.strategy, questions: rawLayout.questions || [], missing_inputs: rawLayout.missing_inputs || [] };
+          }
+          layoutPlan = null;
+          log({ event: 'layout_plan_empty', room_id: room.id, render_id: renderId, status: meta.layout_plan_skipped?.status || null });
         }
       }
 
-      // Сохраняем результат трёх vision-этапов до image-вызова: он не зависит от рендера.
-      // Неполный анализ (ошибка любого агента) не кэшируем: повторный рендер должен попробовать снова.
-      if (!MOCK_MODE && shouldCacheRoomAnalysis({ cached: Boolean(cachedAnalysis), failed: analysisFailed })) {
-        const snapshotKeys = [
-          'art_direction', 'design_direction', 'concept_key', 'repair_scope', 'repair_prompt_version',
-          'room_dimensions_estimate', 'lens', 'layout_fit', 'layout_plan', 'layout_validation',
-          'layout_assumptions', 'layout_plan_skipped', 'empty_room_detected',
-        ];
-        const snapshotMeta = {};
-        for (const key of snapshotKeys) if (meta[key] !== undefined) snapshotMeta[key] = meta[key];
-        await q.upsertRoomAnalysis(room.id, analysisKey, {
-          dimensions: estimatedDimensions,
-          effective_keep_furniture: effectiveKeepFurniture,
-          repair_scope: repairScope,
-          art_direction: artDirection,
-          architecture_facts: architectureFacts,
-          layout_plan: layoutPlan,
-          meta: snapshotMeta,
-        }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) }));
+      // Сохраняем каждый артефакт отдельно до image-вызова. Неполный артефакт
+      // (ошибка его агента) не кэшируем: повторный рендер должен попробовать снова.
+      if (!MOCK_MODE) {
+        const snapshotOf = keys => {
+          const snapshotMeta = {};
+          for (const key of keys) if (meta[key] !== undefined) snapshotMeta[key] = meta[key];
+          return snapshotMeta;
+        };
+        if (shouldCacheRoomAnalysis({ cached: Boolean(cachedFacts), failed: factsFailed })) {
+          await q.upsertRoomAnalysis(room.id, 'facts', factsCacheKey, {
+            repair_scope: repairScope,
+            repair_prompt_version: meta.repair_prompt_version ?? null,
+            meta: snapshotOf(['repair_scope', 'repair_prompt_version']),
+          }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, artifact: 'facts', error: String(e.message || e).slice(0, 300) }));
+        }
+        if (shouldCacheRoomAnalysis({ cached: Boolean(cachedArt), failed: artFailed })) {
+          await q.upsertRoomAnalysis(room.id, 'art', artCacheKey, {
+            dimensions: estimatedDimensions,
+            effective_keep_furniture: effectiveKeepFurniture,
+            art_direction: artDirection,
+            architecture_facts: architectureFacts,
+            meta: snapshotOf(['art_direction', 'design_direction', 'concept_key', 'room_dimensions_estimate', 'lens', 'empty_room_detected']),
+          }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, artifact: 'art', error: String(e.message || e).slice(0, 300) }));
+        }
+        if (emptyRoom && shouldCacheRoomAnalysis({ cached: Boolean(cachedLayout), failed: layoutFailed })) {
+          await q.upsertRoomAnalysis(room.id, 'layout', layoutCacheKey, {
+            layout_plan: layoutPlan,
+            meta: snapshotOf(['layout_plan', 'layout_validation', 'layout_assumptions', 'layout_plan_skipped', 'layout_fit']),
+          }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, artifact: 'layout', error: String(e.message || e).slice(0, 300) }));
+        }
       }
 
       prompt = buildPrompt({

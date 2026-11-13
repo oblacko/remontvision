@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const { normalizeLayoutPlan } = await import('../src/agentcontracts.js');
-const { composeLayoutPrompt, layoutPlanToText, normalizeLayoutPlanV2 } = await import('../src/layoutagent.js');
+const { composeLayoutPrompt, layoutPlanToText, normalizeLayoutPlanV2, buildLayoutPlan } = await import('../src/layoutagent.js');
 
 test('layout plan keeps items, zones and circulation', () => {
   const plan = normalizeLayoutPlan({
@@ -35,16 +35,27 @@ test('layout prompt asks for a non-template layout for the room', () => {
   const out = composeLayoutPrompt({
     roomType: 'Кабинет',
     dimensions: { width: 3, length: 4, height: 2.7 },
-    style: 'Неоклассика',
-    concept: 'accent_block',
+    brief: 'рабочее место и хранение',
   });
   assert.match(out.system, /планиров/i);
   assert.match(out.user, /Кабинет/);
-  assert.match(out.user, /Неоклассика/);
+  assert.match(out.user, /рабочее место и хранение/);
   assert.match(out.user, /ширина 300 см/);
   assert.match(out.user, /длина 400 см/);
   assert.match(out.user, /высота 270 см/);
   assert.match(out.system, /минимум|один основной вариант/i);
+});
+
+test('layout prompt takes a brief and never a style/concept', () => {
+  const out = composeLayoutPrompt({ roomType: 'Кабинет', brief: 'рабочее место' });
+  assert.match(out.user, /user_brief: рабочее место/);
+  assert.doesNotMatch(out.user, /style_context/);
+  assert.doesNotMatch(out.user, /concept_context/);
+});
+
+test('buildLayoutPlan takes a photoPath and returns null without it', async () => {
+  assert.equal(await buildLayoutPlan({}), null);
+  assert.equal(await buildLayoutPlan({ photoPath: null }), null);
 });
 
 test('layout prompt does not ask for centimetre coordinates', () => {

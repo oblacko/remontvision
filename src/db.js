@@ -568,15 +568,16 @@ export const q = {
                 ON CONFLICT (kind, key) DO UPDATE SET value = EXCLUDED.value, created_at = now()`,
       [kind, key, JSON.stringify(value)]),
 
-  // кэш анализа комнаты (размеры/мебель/ремонт/арт-направление/layout)
-  roomAnalysis: roomId =>
-    pool.query(`SELECT cache_key, data FROM room_analysis WHERE room_id = $1`, [roomId])
+  // кэш анализа комнаты по артефактам (facts/layout/art): у каждого свой cache_key,
+  // чтобы смена стиля не инвалидировала style-независимые шаги (repair/layout).
+  roomAnalysis: (roomId, artifact = 'all') =>
+    pool.query(`SELECT cache_key, data FROM room_analysis WHERE room_id = $1 AND artifact = $2`, [roomId, artifact])
       .then(r => r.rows[0] || null),
-  upsertRoomAnalysis: (roomId, cacheKey, data) =>
-    pool.query(`INSERT INTO room_analysis (room_id, cache_key, data, updated_at) VALUES ($1,$2,$3,now())
-                ON CONFLICT (room_id) DO UPDATE SET cache_key = EXCLUDED.cache_key,
+  upsertRoomAnalysis: (roomId, artifact, cacheKey, data) =>
+    pool.query(`INSERT INTO room_analysis (room_id, artifact, cache_key, data, updated_at) VALUES ($1,$2,$3,$4,now())
+                ON CONFLICT (room_id, artifact) DO UPDATE SET cache_key = EXCLUDED.cache_key,
                   data = EXCLUDED.data, updated_at = now()`,
-      [roomId, cacheKey, JSON.stringify(data)]),
+      [roomId, artifact, cacheKey, JSON.stringify(data)]),
 
   // пакеты кредитов
   creditPacks: activeOnly =>

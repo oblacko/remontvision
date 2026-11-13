@@ -4,6 +4,12 @@
 
 Дата обновления: 2026-11-13. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-12, smoke PASS.
 
+## 2026-11-13 — пайплайн: layout параллельно арт-директору, кэш-ключи по артефактам
+
+- **Кэш по артефактам.** `room_analysis` (миграция `062`) хранит три независимых артефакта с отдельными ключами: facts/repair — `hash(photo, shell)`, layout — `hash(roomId, dimensions, keepFurniture, briefHash)`, art direction — `hash(photo, shell, style, concept, keepFurniture, dimensions, briefHash)`. `briefHash` — производный хэш функционального брифа комнаты (`briefForRoom`), без новой колонки. Смена стиля даёт хит repair/layout и промах art direction.
+- **Параллельность.** Layout стартует параллельно с арт-директором, когда пустота известна заранее (`keep_furniture=false`); при `keep_furniture=true` пустоту определяет арт-директор, и layout догоняет его последовательно (качество не ломаем). Контракт `buildLayoutPlan` принимает `{ photoPath, dimensions, brief, keepFurniture, usedStrategies }` — всегда по исходному фото, без стиля/концепта и без data URL арт-директора.
+- **Измерения.** События `room_analysis_cache_hit`, `layout_plan_cache_hit`, `ms` в `art_direction_ok`/`design_direction_ok`/`layout_plan_ok` сохранены.
+
 ## 2026-11-13 — снятие потолков конкурентности, мультивыбор до 10, GC комнат, метрики по моделям
 
 - **Конкурентность.** `WORKER_CONCURRENCY` — дефолт 100 (было 6), диапазон 1–500; `IMAGE_CONCURRENCY`/`IMAGE_CONCURRENCY_PROVIDER` — дефолт 100, `IMAGE_CONCURRENCY_USER` — 12, максимумы подняты до 200/12; пул Postgres `PG_POOL_MAX` — дефолт 150 (было 10). Реальный лимит провайдера меряем на проде.
