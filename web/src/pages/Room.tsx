@@ -69,7 +69,7 @@ export default function Room() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { refresh: refreshTasks } = useTasks()
+  const { refresh: refreshTasks, allTasks } = useTasks()
   const [room, setRoom] = useState<RoomData | null>(null)
   const [tab, setTab] = useState<'editor' | 'design' | 'roadmap' | 'passport'>(() => {
     const value = searchParams.get('tab')
@@ -115,6 +115,7 @@ export default function Room() {
       const r = await fetch(`/api/renders/${variantId}/retry`, { method: 'POST' })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Не удалось повторить')
+      void refreshTasks()
       await loadRoom()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось повторить')
@@ -164,12 +165,19 @@ export default function Room() {
     return () => { cancelled = true }
   }, [loadRoom])
 
+  // Прогресс и завершение берём из общего поллера (TaskDock), собственного опроса нет.
+  const roomRenderTask = allTasks.find(task => task.kind === 'render' && task.room_id === id)
+  const liveStatus = roomRenderTask?.room_status ?? room?.status
   const busy = room ? room.status !== 'done' && room.status !== 'error' : false
+  const pendingQueued = room?.pending_render
+    ? (roomRenderTask?.status ?? room.pending_render.status) === 'queued'
+    : false
   useEffect(() => {
-    if (!busy) return
-    const timer = window.setInterval(() => { void loadRoom() }, 5000)
-    return () => window.clearInterval(timer)
-  }, [busy, loadRoom])
+    if (!room) return
+    if (room.status === 'done' || room.status === 'error') return
+    const status = roomRenderTask?.room_status
+    if (status === 'done' || status === 'error') void loadRoom()
+  }, [room, roomRenderTask?.room_status, loadRoom])
 
   const render = room?.render || null
   const image = render?.image || room?.photo_url || null
@@ -211,6 +219,7 @@ export default function Room() {
       if (!r.ok) throw new Error(d.error || 'Не удалось переместить объект')
       setObjectsOn(false)
       setSelectedObject(null)
+      void refreshTasks()
       await loadRoom()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось переместить объект')
@@ -256,6 +265,7 @@ export default function Room() {
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Не удалось запустить дизайн')
       setStylePanel(false)
+      void refreshTasks()
       await loadRoom()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось запустить дизайн')
@@ -389,10 +399,10 @@ export default function Room() {
           <div className="mx-auto max-w-xl py-16 text-center" role="status" aria-live="polite">
             {image && <img src={image} alt="Фото комнаты" className="mx-auto max-h-[40svh] w-auto border object-contain" />}
             <KitIcon name="sp" spin className="mx-auto mt-8 size-8 text-primary-text" />
-            <h1 className="display-title mt-4 text-3xl">{stageLabel(room.status)}</h1>
+            <h1 className="display-title mt-4 text-3xl">{stageLabel(liveStatus)}</h1>
             <p className="mt-2 text-sm text-muted-foreground">Дизайн создаётся. Функции комнаты откроются автоматически.</p>
             <div className="k-pb mt-6"><i style={{ width: '33%' }} className="rv-progress" /></div>
-            {room.pending_render?.status === 'queued' && (
+            {pendingQueued && (
               <button type="button" onClick={() => void cancelPending()} className="k-btn mt-5">Отменить запуск</button>
             )}
           </div>

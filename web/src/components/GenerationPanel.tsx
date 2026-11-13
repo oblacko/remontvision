@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, DragEvent } from 'react'
 import { KitIcon } from '@/components/KitIcon'
 import { KitLightbox, KitSheet } from '@/components/KitSheet'
@@ -150,7 +150,6 @@ type DesignConcept = { id: string; name: string; main_move: string; quiet_areas:
 type DesignCompatibility = Record<string, Record<string, 'ok' | 'weaken' | 'conflict'>>
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
 type StylePreset = { key: string; name: string; accent: string; image_url?: string }
@@ -232,7 +231,7 @@ export function GenerationPanel({
   objectTarget?: { label?: string; bbox: number[] } | null
   onClearObject?: () => void
 }) {
-  const { refresh: refreshTasks } = useTasks()
+  const { refresh: refreshTasks, allTasks } = useTasks()
   const [step, setStep] = useState<Step>(initialRoomId ? 'result' : 'photo')
   const [roomType, setRoomType] = useState<string | null>(null)
   const [roomTypes, setRoomTypes] = useState<string[]>(defaultRoomTypes)
@@ -781,35 +780,68 @@ export function GenerationPanel({
     }
   }
 
-  async function pollRoom(id: string): Promise<RoomResult | null> {
-    const started = Date.now()
-    while (true) {
-      if (Date.now() - started > 20 * 60 * 1000) {
-        setGenError('Дизайн создаётся дольше 20 минут. Проверьте кабинет — результат может появиться позже.')
-        setStep(iterations.length ? 'result' : 'style')
-        return null
-      }
-      await sleep(2000)
-      const r = await fetch('/api/rooms/' + id)
-      if (r.status === 401) { onRequireLogin(); return null }
-      const d = await r.json().catch(() => ({})) as RoomResult & { error?: string }
-      if (!r.ok) {
-        setGenError(d.error || 'Не удалось получить результат')
-        setStep(iterations.length ? 'result' : 'style')
-        return null
-      }
-      if (d.status) setGenStage(d.status)
-      if (d.status === 'done') return d
-      if (d.status === 'error') {
-        setGenError(d.error || 'Не удалось создать дизайн')
-        setStep(iterations.length ? 'result' : 'style')
-        return null
-      }
+  // Ожидание завершения генерации: поллер в TaskDock приносит room_status в allTasks,
+  // здесь дожидаемся терминального статуса и один раз забираем полный результат комнаты.
+  const waitRef = useRef<{ id: string; resolve: (room: RoomResult | null) => void } | null>(null)
+
+  const fetchRoomResult = useCallback(async (id: string): Promise<RoomResult | null> => {
+    const r = await fetch('/api/rooms/' + id)
+    if (r.status === 401) { onRequireLogin(); return null }
+    const d = await r.json().catch(() => ({})) as RoomResult & { error?: string }
+    if (!r.ok) {
+      setGenError(d.error || 'Не удалось получить результат')
+      setStep(iterations.length ? 'result' : 'style')
+      return null
     }
-  }
+    if (d.status === 'error') {
+      setGenError(d.error || 'Не удалось создать дизайн')
+      setStep(iterations.length ? 'result' : 'style')
+      return null
+    }
+    return d
+  }, [onRequireLogin, iterations])
+
+  useEffect(() => {
+    const wait = waitRef.current
+    if (!wait) return
+    const task = allTasks.find(t => t.kind === 'render' && t.room_id === wait.id)
+    const status = task?.room_status
+    if (status !== 'done' && status !== 'error') return
+    waitRef.current = null
+    const { id, resolve } = wait
+    void fetchRoomResult(id).then(resolve)
+  }, [allTasks, fetchRoomResult])
+
+  // Пока идёт генерация — двигаем стадии прогресса по live-статусу комнаты.
+  useEffect(() => {
+    if (step !== 'generating') return
+    const task = allTasks.find(t => t.kind === 'render' && t.room_id === roomId)
+    const status = task?.room_status
+    if (status && status !== 'done') setGenStage(status)
+  }, [allTasks, step, roomId])
+
+  const waitForRoomDone = useCallback((id: string): Promise<RoomResult | null> => new Promise(resolve => {
+    let settled = false
+    const timeout = window.setTimeout(() => {
+      settled = true
+      if (waitRef.current?.id === id) waitRef.current = null
+      setGenError('Дизайн создаётся дольше 20 минут. Проверьте кабинет — результат может появиться позже.')
+      setStep(iterations.length ? 'result' : 'style')
+      resolve(null)
+    }, 20 * 60 * 1000)
+    waitRef.current = {
+      id,
+      resolve: (room) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timeout)
+        resolve(room)
+      },
+    }
+  }), [iterations])
 
   async function applyRoomResult(id: string, request: string, styleName: string) {
-    const room = await pollRoom(id)
+    const room = await waitForRoomDone(id)
     if (!room) return
     if (room.notice) {
       setGenError(room.notice)
@@ -868,6 +900,7 @@ export function GenerationPanel({
       if (r.status === 402) { setCreditOpen(true); return }
       if (!r.ok) throw new Error(d.error || String(r.status))
       setGenStage('queued'); setStep('generating')
+      void refreshTasks()
       await applyRoomResult(params.roomId, params.request, params.styleName)
     } catch (e) {
       setGenError(e instanceof Error ? e.message : 'Не удалось повторить')
@@ -940,6 +973,7 @@ export function GenerationPanel({
         if (r.status === 402) { setGenError(''); setStep(iterations.length ? 'result' : 'style'); setCreditOpen(true); return }
         if (!r.ok) throw new Error(d.error || String(r.status))
         goal('edit_request', { target: edit?.target || 'custom' })
+        void refreshTasks()
       }
 
       if (isBase) retryRef.current = { roomId: id, request, styleName }

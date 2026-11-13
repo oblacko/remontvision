@@ -12,6 +12,7 @@ export type GenTask = {
   style: string
   room_type?: string | null
   status: string
+  room_status?: string | null
   error?: string | null
   error_stage?: string | null
   created_at: string
@@ -21,6 +22,7 @@ export type GenTask = {
 
 type TasksContextValue = {
   tasks: GenTask[]
+  allTasks: GenTask[]
   activeCount: number
   refresh: () => void
   dismiss: (id: string) => void
@@ -30,6 +32,7 @@ type TasksContextValue = {
 
 const TasksContext = createContext<TasksContextValue>({
   tasks: [],
+  allTasks: [],
   activeCount: 0,
   refresh: () => {},
   dismiss: () => {},
@@ -121,18 +124,31 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [refresh])
 
-  // пока залогинен — опрашиваем задачи: часто при активных, редко в простое
+  // Пока залогинен — опрос задач: 3 с, пока есть активные моложе 60 с; 15 с — если
+  // активные старше; при отсутствии активных интервал не создаём (данные берём по
+  // фокусу вкладки и открытию дока).
   useEffect(() => {
     if (!authed) return
-    const period = all.some(task => !isTerminal(task)) ? 6000 : 60000
+    const active = all.filter(task => !isTerminal(task))
+    if (!active.length) return
+    const youngest = Math.min(...active.map(task => new Date(task.created_at).getTime()))
+    const period = now - youngest < 60_000 ? 3000 : 15_000
     const tick = () => { if (document.visibilityState === 'visible') void refresh() }
     const id = window.setInterval(tick, period)
-    document.addEventListener('visibilitychange', tick)
+    return () => window.clearInterval(id)
+  }, [authed, all, now, refresh])
+
+  // Возврат на вкладку (focus/visibility) — разовый рефреш, в том числе когда опрос выключен.
+  useEffect(() => {
+    if (!authed) return
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
-      window.clearInterval(id)
-      document.removeEventListener('visibilitychange', tick)
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [authed, all, refresh])
+  }, [authed, refresh])
 
   // пока не залогинен — изредка проверяем, не вошёл ли пользователь
   useEffect(() => {
@@ -181,8 +197,8 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const activeCount = useMemo(() => tasks.filter(task => !isTerminal(task)).length, [tasks])
 
   const value = useMemo(
-    () => ({ tasks, activeCount, refresh, dismiss, setPanelOpen, panelOpen }),
-    [tasks, activeCount, refresh, dismiss, setPanelOpen, panelOpen],
+    () => ({ tasks, allTasks: all, activeCount, refresh, dismiss, setPanelOpen, panelOpen }),
+    [tasks, all, activeCount, refresh, dismiss, setPanelOpen, panelOpen],
   )
 
   return <TasksContext.Provider value={value}>{children}</TasksContext.Provider>
@@ -241,8 +257,13 @@ function TaskRow({ task, onDismiss }: { task: GenTask; onDismiss: () => void }) 
 }
 
 export function TaskDock() {
-  const { tasks, activeCount, dismiss, panelOpen } = useTasks()
+  const { tasks, activeCount, dismiss, panelOpen, refresh } = useTasks()
   const [collapsed, setCollapsed] = useState(false)
+  const prevCollapsed = useRef(collapsed)
+  useEffect(() => {
+    if (prevCollapsed.current && !collapsed) void refresh()
+    prevCollapsed.current = collapsed
+  }, [collapsed, refresh])
   if (panelOpen || !tasks.length) return null
   return (
     <aside className="fixed inset-x-3 bottom-3 z-[70] border border-foreground bg-card shadow-[4px_4px_0_oklch(var(--primary))] sm:bottom-4 sm:left-auto sm:right-4 sm:w-[24rem]" aria-label="Мои задачи">
