@@ -13,6 +13,12 @@ export const DESIGN_STYLES = [
     name: 'Современный минимализм',
     palette: { base: '#F5F3EF', support: '#C9C4BB', dark: '#2E2E2C', accent: '#B7A99A' },
     materials: 'матовые МДФ, микроцемент, стекло, скрытый профиль',
+    axes: [
+      { key: 'temperature', values: ['warm', 'neutral'] },
+      { key: 'light', values: ['soft', 'even'] },
+      { key: 'texture', values: ['matte', 'satin'] },
+      { key: 'density', values: ['airy', 'tonal'] },
+    ],
     prompt_en: 'modern minimalism interior, warm off-white and greige palette, matte MDF, microcement, glass, hidden profiles, calm neutral, soft diffuse daylight',
   },
   {
@@ -20,6 +26,12 @@ export const DESIGN_STYLES = [
     name: 'Скандинавский',
     palette: { base: '#FAF8F4', support: '#D8CFC2', dark: '#8A9A8B', accent: '#C26D5A' },
     materials: 'светлый дуб, белёный текстиль, шерсть, керамика',
+    axes: [
+      { key: 'temperature', values: ['warm', 'neutral'] },
+      { key: 'light', values: ['soft', 'airy'] },
+      { key: 'texture', values: ['tactile', 'matte'] },
+      { key: 'contrast', values: ['low', 'tonal'] },
+    ],
     prompt_en: 'scandinavian interior, light oak, white walls, natural linen, wool, ceramic, soft natural daylight, functional minimalism, warm and airy',
   },
   {
@@ -27,6 +39,12 @@ export const DESIGN_STYLES = [
     name: 'Джапанди',
     palette: { base: '#EDE8DF', support: '#B9B0A2', dark: '#4A4A45', accent: '#7A8377' },
     materials: 'дуб, тёмный орех, рисовая бумага, лён',
+    axes: [
+      { key: 'temperature', values: ['warm', 'neutral'] },
+      { key: 'light', values: ['soft', 'shadowed'] },
+      { key: 'texture', values: ['tactile', 'matte'] },
+      { key: 'density', values: ['minimal', 'layered'] },
+    ],
     prompt_en: 'japandi interior, warm minimalism, natural oak, dark walnut, rice paper, linen, wabi-sabi, calm earthy palette, tactile materials',
   },
   {
@@ -34,6 +52,12 @@ export const DESIGN_STYLES = [
     name: 'Лофт',
     palette: { base: '#B0A89A', support: '#6E6A63', dark: '#4A4640', accent: '#A8563A' },
     materials: 'кирпич, бетон, чёрный металл, кожа',
+    axes: [
+      { key: 'temperature', values: ['warm', 'neutral'] },
+      { key: 'light', values: ['contrast', 'dramatic'] },
+      { key: 'texture', values: ['raw', 'refined'] },
+      { key: 'density', values: ['sparse', 'layered'] },
+    ],
     prompt_en: 'industrial loft, exposed brick and concrete, black metal, warm wood, leather, large windows, raw tactile textures',
   },
   {
@@ -41,6 +65,12 @@ export const DESIGN_STYLES = [
     name: 'Неоклассика',
     palette: { base: '#F2EDE4', support: '#D6CCBA', dark: '#9A8F7D', accent: '#1F3A5F' },
     materials: 'паркет ёлочкой, лепной карниз, латунь, бархат',
+    axes: [
+      { key: 'temperature', values: ['warm', 'neutral'] },
+      { key: 'light', values: ['soft', 'formal'] },
+      { key: 'texture', values: ['satin', 'matte'] },
+      { key: 'contrast', values: ['low', 'tonal'] },
+    ],
     prompt_en: 'neoclassical interior, chevron parquet, wall moldings, warm neutrals, subtle brass, velvet, timeless proportions',
   },
   {
@@ -48,6 +78,12 @@ export const DESIGN_STYLES = [
     name: 'Эко / органический модерн',
     palette: { base: '#EAE4D8', support: '#C8B89A', dark: '#7C8A6E', accent: '#A4713E' },
     materials: 'лён, ратанг, натуральный камень, живая зелень',
+    axes: [
+      { key: 'temperature', values: ['warm', 'neutral'] },
+      { key: 'light', values: ['soft', 'dappled'] },
+      { key: 'texture', values: ['tactile', 'matte'] },
+      { key: 'density', values: ['airy', 'layered'] },
+    ],
     prompt_en: 'organic modern interior, linen, rattan, natural stone, living greenery, warm earthy palette, tactile materials, wellness mood',
   },
   {
@@ -55,6 +91,12 @@ export const DESIGN_STYLES = [
     name: 'Тёмный контемпорари',
     palette: { base: '#232323', support: '#3A3A38', dark: '#1A1A19', accent: '#C9A227' },
     materials: 'шпон дымчатого дуба, графит, латунь, тёмный камень',
+    axes: [
+      { key: 'temperature', values: ['warm', 'neutral'] },
+      { key: 'light', values: ['moody', 'dramatic'] },
+      { key: 'texture', values: ['matte', 'satin'] },
+      { key: 'contrast', values: ['high', 'tonal'] },
+    ],
     prompt_en: 'dark contemporary interior, smoked oak veneer, graphite, brass, dark stone, moody layered lighting, dramatic contrast',
   },
   {
@@ -62,6 +104,12 @@ export const DESIGN_STYLES = [
     name: 'Ар-деко',
     palette: { base: '#EFE8DB', support: '#C9A961', dark: '#1E2A38', accent: '#6E3B3B' },
     materials: 'геометричная интарсия, бархат, мрамор, золото',
+    axes: [
+      { key: 'temperature', values: ['warm', 'cool'] },
+      { key: 'light', values: ['glamorous', 'soft'] },
+      { key: 'texture', values: ['polished', 'satin'] },
+      { key: 'contrast', values: ['high', 'tonal'] },
+    ],
     prompt_en: 'art deco interior, geometric inlay, velvet, marble, gold, rich jewel tones, glamorous, symmetrical composition',
   },
   {
@@ -69,6 +117,12 @@ export const DESIGN_STYLES = [
     name: 'Средиземноморский',
     palette: { base: '#F7F3EA', support: '#E3D5B8', dark: '#A8B5A0', accent: '#3F6E8E' },
     materials: 'побелка, терракота, кованое железо, состаренное дерево',
+    axes: [
+      { key: 'temperature', values: ['warm', 'sunlit'] },
+      { key: 'light', values: ['soft', 'bright'] },
+      { key: 'texture', values: ['tactile', 'matte'] },
+      { key: 'contrast', values: ['low', 'tonal'] },
+    ],
     prompt_en: 'mediterranean interior, whitewashed plaster, terracotta, wrought iron, aged wood, warm sunlight, olive and dusty-blue accents',
   },
   {
@@ -76,6 +130,12 @@ export const DESIGN_STYLES = [
     name: 'Мемфис-акцент',
     palette: { base: '#F4F1EC', support: '#DAD4C8', dark: '#2E2E2C', accent: '#E4583E' },
     materials: 'глянцевый пластик, ламинат, хром',
+    axes: [
+      { key: 'temperature', values: ['neutral', 'warm'] },
+      { key: 'light', values: ['even', 'contrast'] },
+      { key: 'texture', values: ['glossy', 'matte'] },
+      { key: 'geometry', values: ['playful', 'graphic'] },
+    ],
     prompt_en: 'memphis accent interior, neutral shell, glossy plastic, laminate, chrome, one or two bold accent objects, playful geometry',
   },
 ];

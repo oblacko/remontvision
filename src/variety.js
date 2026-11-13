@@ -35,6 +35,27 @@ export function resolveStylePalette({ styleName = '', styleKey = '' } = {}) {
   return byKey?.palette || null;
 }
 
+// Карточка стиля по имени или id. Палитра резолвится через resolveStylePalette,
+// оси — из карточки напрямую (мягкие модификаторы, не трогают палитру/акцент).
+function resolveStyleCard({ styleName = '', styleKey = '' } = {}) {
+  return DESIGN_STYLES.find(style => style.name === styleName)
+    || DESIGN_STYLES.find(style => style.id === styleKey)
+    || null;
+}
+
+// Детерминированный выбор значений осей по seed: для каждой оси свой хэш-слот,
+// поэтому оси независимы и воспроизводимы при одном seed.
+function pickAxes(card, seed) {
+  const axes = Array.isArray(card?.axes) ? card.axes : [];
+  return axes
+    .map(axis => {
+      const values = Array.isArray(axis?.values) ? axis.values : [];
+      if (!axis?.key || !values.length) return null;
+      return { key: String(axis.key), value: values[hashIndex(`${seed}:axes:${axis.key}`, values.length)] };
+    })
+    .filter(Boolean);
+}
+
 // Ротация по seed: акцент берём только из палитры стиля (accent → support → dark).
 export function pickStyleAccent(palette, seed = '') {
   if (!palette) return null;
@@ -54,7 +75,8 @@ export function pickVariety(room = {}, style = null, seed = '', used = []) {
   const styleName = style?.name ?? room?.style ?? '';
   const styleKey = style?.key ?? '';
   const keepFurniture = room?.keep_furniture !== false;
-  const palette = resolveStylePalette({ styleName, styleKey });
+  const card = resolveStyleCard({ styleName, styleKey });
+  const palette = card?.palette || null;
   const accent = pickStyleAccent(palette, seed);
   const emphasisOptions = keepFurniture ? KEEP_FURNITURE_EMPHASIS : EMPHASIS;
   const emphasis = emphasisOptions[hashIndex(`${seed}:emphasis`, emphasisOptions.length)];
@@ -78,11 +100,23 @@ export function pickVariety(room = {}, style = null, seed = '', used = []) {
     styleName,
     keepFurniture: Boolean(keepFurniture),
     accent,
-    axes: [], // стилевые оси (заполняются в следующей задаче, см. HISTORY)
+    axes: pickAxes(card, seed),
     emphasis,
     avoid: avoid.slice(0, MAX_AVOID_ITEMS),
     previousCount: previous.length,
   };
+}
+
+// Оси как отдельный блок-модификатор: мягкая вариация внутри стиля, не спорит
+// с палитрой, акцентом и геометрией. Пусто, если у стиля нет осей или значений.
+export function axesPrompt(variety) {
+  const axes = Array.isArray(variety?.axes) ? variety.axes.filter(axis => axis?.key && axis?.value) : [];
+  if (!axes.length) return '';
+  return [
+    'STYLE AXES — SOFT VARIATION',
+    'These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.',
+    ...axes.map(axis => `- ${axis.key}: ${axis.value}`),
+  ].join('\n');
 }
 
 export function variabilityPrompt(variety) {
@@ -95,5 +129,7 @@ export function variabilityPrompt(variety) {
         : 'Choose a visibly different composition while keeping the geometry lock and the style palette.'}`
     : 'This is the first render of this room: there are no previous choices to avoid. Set a clear room-level idea.');
   if (variety.accent) lines.push(`Use exactly one accent colour from the style palette: ${variety.accent}. Do not introduce any other accent hue.`);
+  const axes = axesPrompt(variety);
+  if (axes) lines.push(axes);
   return lines.join('\n');
 }

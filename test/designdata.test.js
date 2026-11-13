@@ -21,6 +21,21 @@ test('design catalog has ten unique styles and ten unique concepts', () => {
   }
 });
 
+test('every style exposes 3–5 style axes with 2–3 values each', () => {
+  for (const style of DESIGN_STYLES) {
+    assert.ok(Array.isArray(style.axes), `${style.id} has axes`);
+    assert.ok(style.axes.length >= 3 && style.axes.length <= 5, `${style.id} has 3–5 axes`);
+    for (const axis of style.axes) {
+      assert.ok(typeof axis.key === 'string' && axis.key.length, `${style.id} axis has a key`);
+      assert.ok(Array.isArray(axis.values) && axis.values.length >= 2 && axis.values.length <= 3, `${style.id}/${axis.key} has 2–3 values`);
+      for (const value of axis.values) {
+        assert.ok(typeof value === 'string' && value.length, `${style.id}/${axis.key} value is non-empty`);
+        assert.doesNotMatch(value, /^#/, `${style.id}/${axis.key} value must not be a colour`);
+      }
+    }
+  }
+});
+
 test('compatibility follows the matrix', () => {
   assert.equal(compatibilityOf('scandinavian', 'accent_block'), 'ok');
   assert.equal(compatibilityOf('dark_contemporary', 'accent_block'), 'weaken');
