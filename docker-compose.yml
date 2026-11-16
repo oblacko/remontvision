@@ -21,6 +21,9 @@ services:
     # 5434 на хосте: 5432/5433 заняты другими postgres на этой машине
     ports:
       - "127.0.0.1:5434:5432"
+    # После перезагрузки VPS база обязана подняться сама: без этого app
+    # падает в crash-loop, пока БД лежит (инцидент 2026-11-15).
+    restart: unless-stopped
 
   app:
     build: .
@@ -67,6 +70,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    # Та же причина, что у db: после ребута VPS каталог не должен оставаться лежать.
+    restart: unless-stopped
 
   catalog:
     build:
