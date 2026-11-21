@@ -11,6 +11,7 @@ const {
   validateArticleForPublish,
   MIN_ARTICLE_WORDS,
   autoMetaTitle,
+  autoMetaDescription,
   hubPage,
   articlePage,
 } = await import('../src/articles.js');
@@ -142,6 +143,45 @@ test('articles: autoMetaTitle keeps brand suffix under 60 chars and trims by wor
   const long = autoMetaTitle('Очень длинный заголовок статьи про интерьер, который не влезает в лимит символов поиска');
   assert.ok(long.length <= 60);
   assert.ok(!long.endsWith(' '));
+});
+
+test('articles: autoMetaTitle never ends on a conjunction or preposition', () => {
+  // Полный заголовок с союзом в конце — союз срезается.
+  assert.equal(autoMetaTitle('Дизайн гостиной в стиле лофт и'), 'Дизайн гостиной в стиле лофт — ремонтвижн');
+  // Длинный заголовок: обрезка не должна давать «… светлый дуб и мягкий» (аудит REM-40).
+  const truncated = autoMetaTitle('Скандинавская комната: тёплый белый, светлый дуб и мягкий свет');
+  assert.ok(truncated.length <= 60);
+  assert.doesNotMatch(truncated, /\s(и|с|на|без|в|для|по|из|от|до|мягкий)$/);
+  assert.doesNotMatch(truncated, /-$/); // не обрывается на полуслове
+});
+
+test('articles: autoMetaDescription truncates at word/sentence boundary within 140–160', () => {
+  const words = ['интерьер', 'свет', 'дуб', 'лён', 'шерсть', 'керамика', 'фактура', 'пространство', 'зонирование', 'палитра', 'материал', 'текстиль', 'деталь', 'акцент', 'композиция', 'атмосфера', 'уют', 'практичность', 'гармония', 'баланс'];
+  const long = `Начинайте с базы и света: белые стены, светлый дуб и лён. ${words.join(' ')} — и всё сложится в цельную, спокойную комнату.`;
+  assert.ok(long.length > 160);
+  const desc = autoMetaDescription(long);
+  assert.ok(desc.length >= 140 && desc.length <= 160, `длина ${desc.length}`);
+  // Не рвём слово: символ исходника сразу за обрезкой — пробел или конец предложения.
+  const next = long.slice(desc.length, desc.length + 1);
+  assert.ok(next === '' || next === ' ', `обрыв внутри слова: «${desc}» → next=«${next}»`);
+});
+
+test('articles: autoMetaDescription keeps short text intact and handles empty input', () => {
+  assert.equal(autoMetaDescription(''), '');
+  assert.equal(autoMetaDescription('Короткое описание'), 'Короткое описание');
+});
+
+test('articles: articlePage renders no <img> without alt and declares favicon', () => {
+  const html = articlePage(makeArticle(), {
+    related: [{ slug: 'drugaya', title: 'Другая статья', cover_path: 'covers/drugaya.png', status: 'published' }],
+  });
+  const imgs = html.match(/<img[^>]*>/g) || [];
+  assert.ok(imgs.length > 0, 'ожидались изображения');
+  for (const img of imgs) {
+    assert.match(img, /alt="[^"]+"/, `изображение без alt: ${img}`);
+  }
+  assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+  assert.match(html, /<link rel="icon" href="\/favicon\.ico" sizes="32x32">/);
 });
 
 test('articles: render-based cover uses public /article-cover route', () => {

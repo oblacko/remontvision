@@ -68,21 +68,68 @@ const {
   validateArticleForPublish,
   countArticleWords,
   autoMetaTitle,
+  autoMetaDescription,
+  expandArticleBody,
+  MIN_ARTICLE_WORDS,
 } = await import('../src/articles.js');
 
-// Только починка meta_title у опубликованных (флаг --fix-meta).
-if (hasFlag('fix-meta')) {
-  const rows = (await q.listArticles()).filter(a => a.status === 'published');
-  let fixed = 0;
-  for (const a of rows) {
-    const mt = autoMetaTitle(a.title);
-    if (String(a.meta?.meta_title || '') !== mt) {
-      await q.updateArticleMeta(a.id, { meta_title: mt });
-      console.log(`FIX /${a.slug} → «${mt}»`);
-      fixed += 1;
+// Дожать черновики (флаг --publish-drafts): расширяем текст и публикуем через гейты.
+if (hasFlag('publish-drafts')) {
+  const drafts = (await q.listArticles()).filter(a => a.status === 'draft');
+  console.log(`черновиков: ${drafts.length}`);
+  let pub = 0;
+  for (const d of drafts) {
+    try {
+      let body = d.body || {};
+      let words = countArticleWords(body);
+      if (words < MIN_ARTICLE_WORDS) {
+        const ex = await expandArticleBody(body);
+        body = ex.body;
+        await q.updateArticleBody(d.id, body);
+        words = countArticleWords(body);
+      }
+      const fresh = { ...d, body };
+      const reasons = validateArticleForPublish(fresh, await q.listArticles(), { maxPerCluster: perCluster });
+      if (reasons.length) {
+        console.log(`DRAFT-KEEP /${d.slug}: ${words} слов; ${reasons.join('; ')}`);
+        continue;
+      }
+      await q.publishArticle(d.id);
+      console.log(`DRAFT-OK /${d.slug} ОПУБЛИКОВАНА, ${words} слов`);
+      pub += 1;
+    } catch (e) {
+      console.log(`DRAFT-FAIL /${d.slug}: ${String(e.message || e).slice(0, 160)}`);
     }
   }
-  console.log(`meta_title обновлён у ${fixed}/${rows.length} опубликованных`);
+  console.log(`дожато черновиков: ${pub}/${drafts.length}`);
+  process.exit(0);
+}
+
+// Починка meta_title/meta_description у опубликованных (флаг --fix-meta):
+// пересчитываем детерминированно (без вызовов модели) из title и body.intro.
+if (hasFlag('fix-meta')) {
+  const rows = (await q.listArticles()).filter(a => a.status === 'published');
+  let fixedTitle = 0;
+  let fixedDesc = 0;
+  for (const a of rows) {
+    const mt = autoMetaTitle(a.title);
+    const patch = {};
+    if (String(a.meta?.meta_title || '') !== mt) {
+      patch.meta_title = mt;
+      fixedTitle += 1;
+    }
+    const full = await q.articleById(a.id);
+    const md = autoMetaDescription(full?.body?.intro);
+    if (md && String(a.meta?.meta_description || '') !== md) {
+      patch.meta_description = md;
+      fixedDesc += 1;
+    }
+    if (Object.keys(patch).length) {
+      await q.updateArticleMeta(a.id, patch);
+      console.log(`FIX /${a.slug} → title «${patch.meta_title || a.meta?.meta_title}», desc «${patch.meta_description || a.meta?.meta_description}»`);
+    }
+  }
+  console.log(`meta_title обновлён у ${fixedTitle}, meta_description у ${fixedDesc} из ${rows.length} опубликованных`);
   process.exit(0);
 }
 

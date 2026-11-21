@@ -43,7 +43,8 @@ export function galleryPage(items, opts) {
     const cap = esc([r.roomType, r.style].filter(Boolean).join(' · ') || 'Дизайн интерьера');
     const img = `<img src="/gallery/img/${encodeURIComponent(r.id)}" alt="${cap}" width="400" height="300" loading="lazy">`;
     const href = r.shareToken ? `/s/${encodeURIComponent(r.shareToken)}` : `/gallery/img/${encodeURIComponent(r.id)}`;
-    return `<a class="item" href="${href}">${img}<span class="cap">${cap}</span></a>`;
+    const click = `ym(114132104,'reachGoal','gallery_click',{room:'${esc(r.roomType || '')}',style:'${esc(r.style || '')}'});`;
+    return `<a class="item" href="${href}" onclick="${click}">${img}<span class="cap">${cap}</span></a>`;
   }).join('');
 
   const empty = '<p class="empty">Публичных дизайнов пока нет — загляните позже.</p>';

@@ -38,7 +38,7 @@ import { buildShopSearchLinks } from './shoplinks.js';
 import { validateModelOptions, modelCaps, resolutionAllowed, priceForResolution } from './modelcaps.js';
 import { pluralVariants, retryAllowed, parseVariantItems } from './variants.js';
 import { workerConcurrency } from './workerknobs.js';
-import { sharePageHtml } from './sharepage.js';
+import { sharePageHtml, noindexHtml } from './sharepage.js';
 import { applyProxy, testProxy, loadProxyConfig, getProxyState } from './proxy.js';
 import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
@@ -46,6 +46,7 @@ import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupCo
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { generateArticle, generateArticleFromRender, articlePage, hubPage, validateArticleForPublish, findPublishedDuplicate, countArticleWords, slugify } from './articles.js';
 import { galleryPage, GALLERY_PAGE_SIZE } from './gallery.js';
+import { promptsPage } from './prompts.js';
 import { normalizeMove } from './moveobject.js';
 import { buildPassport, renderPassportPdf } from './passport.js';
 import { renderRoadmapPdf } from './roadmappdf.js';
@@ -105,7 +106,7 @@ app.use('/fonts', express.static(path.join(WEB_DIST, 'fonts'), { maxAge: '30d' }
 app.use('/web-assets', express.static(path.join(WEB_DIST, 'web-assets'), { maxAge: '1y', immutable: true }));
 // Приватные и служебные страницы не индексируем (дополнительно к robots.txt).
 app.use(['/admin', '/cabinet', '/room', '/s'], (_req, res, next) => {
-  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.set('X-Robots-Tag', 'noindex, follow');
   next();
 });
 app.get(['/app', '/app/'], (_req, res) => res.redirect(301, '/'));
@@ -120,8 +121,17 @@ app.use((req, res, next) => {
 app.get(['/admin', '/admin/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.all(['/cabinet', '/cabinet/', '/cabinet/paid', '/cabinet/paid/', '/cabinet/fail', '/cabinet/fail/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 
-app.get(['/room/:id', '/room/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
-app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
+// Приватные SPA-маршруты /room: в сыром HTML — noindex и без canonical на «/»
+// (аудит REM-40: раньше отдавали оболочку с «index,follow» и canonical «/»).
+// shareIndexHtml объявлена ниже, но function-декларация поднимается.
+function sendNoindexSpa(res) {
+  const html = noindexHtml(shareIndexHtml());
+  if (html) return res.type('html').send(html);
+  return res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
+}
+
+app.get(['/room/:id', '/room/:id/'], (_req, res) => sendNoindexSpa(res));
+app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => sendNoindexSpa(res));
 app.get('/', (_req, res) => {
   res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
 });
@@ -139,6 +149,10 @@ for (const [route, file] of Object.entries(LEGAL_PAGES)) {
 // SEO-лендинг под кластер «дизайн интерьера по фото» (аудит 09.11.2026, §7 L-01).
 app.get(['/ai-dizayn-interera-po-foto', '/ai-dizayn-interera-po-foto/'], (_req, res) =>
   res.sendFile(path.join(process.cwd(), 'public', 'ai-dizayn-interera-po-foto.html')));
+// Лендинг промт-кластера: реальные промты из опубликованных статей.
+app.get(['/promty/dizayn-interera', '/promty/dizayn-interera/'], h(async (_req, res) => {
+  res.type('html').send(promptsPage(await q.articlesWithPrompts()));
+}));
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const IMG_EXT = UPLOAD_MIME;

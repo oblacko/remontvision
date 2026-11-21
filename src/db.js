@@ -666,6 +666,10 @@ export const q = {
   updateArticleMeta: (id, metaPatch) =>
     pool.query(`UPDATE articles SET meta = meta || $2::jsonb, updated_at = now()
                 WHERE id = $1 RETURNING *`, [id, JSON.stringify(metaPatch || {})]).then(r => r.rows[0] || null),
+  // Частичное обновление body (расширение текста черновиков).
+  updateArticleBody: (id, body) =>
+    pool.query(`UPDATE articles SET body = $2::jsonb, updated_at = now()
+                WHERE id = $1 RETURNING *`, [id, JSON.stringify(body || {})]).then(r => r.rows[0] || null),
   deleteArticle: id =>
     pool.query(`DELETE FROM articles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
 
@@ -703,6 +707,13 @@ export const q = {
        WHERE r.status = 'done' AND r.image_path IS NOT NULL AND COALESCE(r.is_private, false) = false
          AND rm.room_type IS NOT NULL AND rm.room_type <> ''
        GROUP BY 1, 2 ORDER BY count DESC`).then(r => r.rows),
+  // Статьи с промтом рендера — для лендинга промт-кластера.
+  articlesWithPrompts: () =>
+    pool.query(
+      `SELECT slug, title, style, room_type, body->>'prompt' AS prompt, published_at
+       FROM articles
+       WHERE status = 'published' AND body->>'prompt' IS NOT NULL AND body->>'prompt' <> ''
+       ORDER BY published_at DESC LIMIT 48`).then(r => r.rows),
 
   // подбор товаров по рендеру
   renderOwnedByUser: (renderId, userId) =>

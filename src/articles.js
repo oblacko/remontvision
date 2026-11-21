@@ -117,15 +117,96 @@ const ARTICLE_EXPAND_SYSTEM = `Тебе дан JSON статьи об интер
 Ничего не выдумывай: цены, ссылки и товары не добавляй и не меняй.
 Верни строго JSON той же схемы: {"intro":"...","howto":[...],"palette_notes":"...","conclusion":"..."}. Только JSON.`;
 
-// Мета от автомата (пакетная генерация, решение владельца 21.11.2026):
-// суффикс бренда, если укладывается в лимит выдачи, иначе обрезка по слову.
+export async function expandArticleBody(body) {
+  const { parsed: ex, cost } = await visionJson({
+    system: ARTICLE_EXPAND_SYSTEM,
+    user: JSON.stringify({
+      intro: body?.intro, howto: body?.howto,
+      palette_notes: body?.palette_notes, conclusion: body?.conclusion,
+    }),
+    images: [],
+    model: ARTICLE_MODEL,
+  });
+  const next = { ...(body || {}) };
+  if (ex?.intro) next.intro = String(ex.intro).slice(0, 2000);
+  if (Array.isArray(ex?.howto) && ex.howto.length) next.howto = ex.howto.map(s => String(s).slice(0, 400)).slice(0, 6);
+  if (ex?.palette_notes) next.palette_notes = String(ex.palette_notes).slice(0, 1000);
+  if (ex?.conclusion) next.conclusion = String(ex.conclusion).slice(0, 800);
+  return { body: next, cost: cost ?? null };
+}
+
+// Союзы/предлоги/частицы, которыми заголовок не должен заканчиваться
+// (аудит REM-40: автомат обрезал title на «и», «с», «на», «без»).
+const TITLE_STOPWORDS = new Set([
+  'и', 'а', 'но', 'да', 'или', 'либо', 'то', 'же', 'ли', 'бы', 'не', 'ни', 'лишь', 'только',
+  'с', 'со', 'на', 'в', 'во', 'без', 'для', 'до', 'из', 'из-за', 'из-под', 'к', 'ко', 'о', 'об', 'обо',
+  'от', 'ото', 'по', 'под', 'подо', 'при', 'про', 'у', 'через', 'за', 'над', 'перед', 'между', 'около',
+  'чтобы', 'что', 'как', 'когда', 'где', 'куда', 'откуда', 'почему', 'зачем',
+  'который', 'которая', 'которое', 'которые',
+]);
+// Окончания прилагательных в именительном падеже — для отсечения оборванной
+// фразы вида «… дуб и мягкий» (прилагательное без существительного после союза).
+const ADJ_SUFFIX_RE = /(ый|ий|ой|ая|яя|ое|ее|ие|ые)$/i;
+
+function lastWord(text) {
+  const m = String(text || '').trim().match(/[А-Яа-яЁёA-Za-z0-9]+(?=\s*[,.;:!?…—]*)$/u);
+  return m ? m[0].toLowerCase() : '';
+}
+
+// Срезает «хвост» заголовка, если он обрывается на союзе/предлоге или на
+// прилагательном сразу после союза («… и мягкий»). Итеративно — чтобы убрать
+// цепочку служебных слов («… свет и», «… без»).
+function trimTrailingDangling(text) {
+  let out = String(text || '').replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < 8 && out; i += 1) {
+    const words = out.split(' ');
+    const last = (words[words.length - 1] || '').replace(/[,.;:!?…—]+$/u, '');
+    const key = last.toLowerCase();
+    let drop = 0;
+    if (TITLE_STOPWORDS.has(key)) {
+      drop = 1;
+    } else if (words.length >= 2 && ADJ_SUFFIX_RE.test(last)) {
+      const prev = (words[words.length - 2] || '').replace(/[,.;:!?…—]+$/u, '').toLowerCase();
+      if (TITLE_STOPWORDS.has(prev)) drop = 2;
+    }
+    if (!drop) break;
+    words.length = words.length - drop;
+    out = words.join(' ').replace(/\s+([,;:])/g, '$1').trim();
+  }
+  return out;
+}
+
+// Мета-заголовок автомата (пакетная генерация, решение владельца 21.11.2026):
+// суффикс бренда, если укладывается в лимит выдачи, иначе обрезка по слову
+// без разрыва слова и без обрыва фразы на союзе/предлоге.
 export function autoMetaTitle(title) {
   const suffix = ' — ремонтвижн';
-  const clean = String(title || '').replace(/\s+/g, ' ').trim();
+  const clean = trimTrailingDangling(String(title || '').replace(/\s+/g, ' ').trim());
   if (!clean) return 'Дизайн интерьера — ремонтвижн';
   if (clean.length + suffix.length <= 60) return clean + suffix;
   if (clean.length <= 60) return clean; // без суффикса, но и без обрезки слова
-  return clean.slice(0, 60).replace(/\s+\S*$/, '');
+  return trimTrailingDangling(clean.slice(0, 60).replace(/\s+\S*$/, '')) || 'Дизайн интерьера — ремонтвижн';
+}
+
+// Мета-описание автомата: обрезка по границе предложения или слова, без разрыва
+// внутри слова; целевая длина 140–160 (аудит REM-40: slice(0,155) рвал слова).
+export function autoMetaDescription(text, { min = 140, max = 160 } = {}) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  if (clean.length <= max) return clean;
+  const head = clean.slice(0, max);
+  // Предпочтительно — граница предложения: описание заканчивается законченной мыслью.
+  for (const mark of ['.', '!', '?', '…']) {
+    const at = head.lastIndexOf(`${mark} `);
+    if (at >= min - 1) return head.slice(0, at + 1).trim();
+  }
+  // Иначе — граница слова: отрезаем частичное слово в конце фрагмента.
+  const space = head.lastIndexOf(' ');
+  if (space >= min - 1) return head.slice(0, space).trim();
+  // Сверхдлинное слово пересекает лимит: отдаём по последней границе слова ДО min,
+  // чтобы не рвать слово (длина может быть < 140 — это лучше, чем обрыв).
+  const before = clean.lastIndexOf(' ', min - 1);
+  return (before > 0 ? clean.slice(0, before) : head).trim();
 }
 
 export async function generateArticle({ style = 'Скандинавский', roomType = 'Спальня', tier = 'comfort', title = '', targetQuery = '' } = {}) {
@@ -254,20 +335,9 @@ export async function generateArticleFromRender({ render, style, roomType, tier 
   let textCostTotal = textCost ?? null;
   if (countArticleWords(body) < 600) {
     try {
-      const { parsed: ex, cost: exCost } = await visionJson({
-        system: ARTICLE_EXPAND_SYSTEM,
-        user: JSON.stringify({
-          intro: body.intro, howto: body.howto,
-          palette_notes: body.palette_notes, conclusion: body.conclusion,
-        }),
-        images: [],
-        model: ARTICLE_MODEL,
-      });
-      if (ex?.intro) body.intro = String(ex.intro).slice(0, 2000);
-      if (Array.isArray(ex?.howto) && ex.howto.length) body.howto = ex.howto.map(s => String(s).slice(0, 400)).slice(0, 6);
-      if (ex?.palette_notes) body.palette_notes = String(ex.palette_notes).slice(0, 1000);
-      if (ex?.conclusion) body.conclusion = String(ex.conclusion).slice(0, 800);
-      textCostTotal = (textCost ?? 0) + (exCost ?? 0);
+      const ex = await expandArticleBody(body);
+      body = ex.body;
+      textCostTotal = (textCost ?? 0) + (ex.cost ?? 0);
     } catch (e) {
       log({ event: 'article_expand_error', error: String(e.message || e).slice(0, 200) });
     }
@@ -292,7 +362,7 @@ export async function generateArticleFromRender({ render, style, roomType, tier 
       source_render_id: render.id,
       target_query: kw[0] || null,
       meta_title: autoMetaTitle(finalTitle),
-      meta_description: String(parsed.intro || '').replace(/\s+/g, ' ').trim().slice(0, 155),
+      meta_description: autoMetaDescription(parsed.intro),
     },
   });
 }
@@ -382,7 +452,7 @@ const METRIKA_COUNTER = `<!-- Yandex.Metrika counter --><script type="text/javas
     (window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=114132104', 'ym');
     ym(114132104, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
 </script>
-<noscript><div><img src="https://mc.yandex.ru/watch/114132104" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<noscript><div><img src="https://mc.yandex.ru/watch/114132104" style="position:absolute; left:-9999px;" alt="Яндекс.Метрика" /></div></noscript>
 <!-- /Yandex.Metrika counter -->`;
 
 export function articlePage(article, { related = [] } = {}) {
@@ -396,7 +466,7 @@ export function articlePage(article, { related = [] } = {}) {
   const title = esc(rawTitle.length + BRAND_SUFFIX.length <= 60 ? rawTitle + BRAND_SUFFIX : rawTitle);
   const metaTitle = String(article.meta?.meta_title || '').trim();
   const pageTitle = metaTitle ? esc(metaTitle) : title;
-  const description = esc(String(article.meta?.meta_description || body.intro || '').slice(0, 160));
+  const description = esc(autoMetaDescription(article.meta?.meta_description || body.intro));
   const canonical = `https://www.remontvision.ru/articles/${encodeURIComponent(article.slug || '')}`;
 
   const productCards = products.map(p => {
@@ -451,6 +521,8 @@ export function articlePage(article, { related = [] } = {}) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
 <title>${pageTitle}</title>
 <meta name="description" content="${description}">
 <meta name="robots" content="index, follow">
@@ -562,6 +634,8 @@ export function hubPage(articles, { rooms = [] } = {}) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
 <title>Статьи об интерьерах — ремонтвижн</title>
 <meta name="description" content="Разборы интерьеров: стиль × комната. Палитры, материалы, свет и товары с ценами — каждую идею можно примерить на свою комнату по фото.">
 <meta name="robots" content="${robots}">

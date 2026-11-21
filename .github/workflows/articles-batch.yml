@@ -25,6 +25,10 @@ on:
         description: 'Сколько статей на кластер «стиль × комната» (по разным рендерам)'
         required: true
         default: '1'
+      drafts_fix:
+        description: 'Дожать черновики: расширить текст и опубликовать через гейты (true/false)'
+        required: true
+        default: 'false'
 
 jobs:
   batch:
@@ -50,8 +54,10 @@ jobs:
           if [ "${{ inputs.publish }}" = "true" ]; then PUBLISH_FLAG="--publish"; fi
           FIX_FLAG=""
           if [ "${{ inputs.fix_meta }}" = "true" ]; then FIX_FLAG="--fix-meta"; fi
+          DRAFTS_FLAG=""
+          if [ "${{ inputs.drafts_fix }}" = "true" ]; then DRAFTS_FLAG="--publish-drafts"; fi
 
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
             "docker compose -f /root/remontvision/docker-compose.yml cp /tmp/keywords.csv app:/tmp/keywords.csv && \
              docker compose -f /root/remontvision/docker-compose.yml exec -T app \
-               node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --limit ${{ inputs.limit }} --per-cluster ${{ inputs.per_cluster }} $PUBLISH_FLAG $FIX_FLAG"
+               node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --limit ${{ inputs.limit }} --per-cluster ${{ inputs.per_cluster }} $PUBLISH_FLAG $FIX_FLAG $DRAFTS_FLAG"
