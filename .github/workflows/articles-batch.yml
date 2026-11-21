@@ -42,15 +42,17 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -R "$DEPLOY_HOST" 2>/dev/null || true
 
-          # env приложения с VPS (в файл, без вывода в лог); порт БД — на туннель,
-          # catalog — на туннель. Дубликаты: последнее значение побеждает.
+          # Реальный env приложения ИЗ КОНТЕЙНЕРА (compose переопределяет .env —
+          # прошлый запуск взял устаревший пароль). Дамп в файл, в лог не выводим.
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "grep -E '^(RV_DATABASE_URL|OPENROUTER_API_KEY|CATALOG_SERVICE_URL|CATALOG_SERVICE_TOKEN|ARTICLE_MODEL)=' /root/remontvision/.env" > /tmp/prod.env
-          sed -i -E 's/127\.0\.0\.1:5434/127.0.0.1:15434/' /tmp/prod.env
+            "docker compose -f /root/remontvision/docker-compose.yml exec -T app env" > /tmp/appenv.txt
+          grep -E '^(RV_DATABASE_URL|OPENROUTER_API_KEY|CATALOG_SERVICE_URL|CATALOG_SERVICE_TOKEN|ARTICLE_MODEL)=' /tmp/appenv.txt > /tmp/prod.env
+          # хост:порт БД → на туннель
+          sed -i -E 's#@[^@/]+:[0-9]+/#@127.0.0.1:15434/#' /tmp/prod.env
           printf '%s\n' 'CATALOG_SERVICE_URL=http://127.0.0.1:18000' 'OPENROUTER_BASE=https://openrouter.ai/api/v1' >> /tmp/prod.env
           grep -c '=' /tmp/prod.env
-          grep '^RV_DATABASE_URL=' /tmp/prod.env | sed -E 's/:[^:@]+@/:***@/'
+          grep '^RV_DATABASE_URL=' /tmp/prod.env | sed -E 's#://[^@]+@#://***@#; s#:[^:@]+@#:***@#'
 
           # IP контейнера БД: туннель ведём НАПРЯМУЮ в контейнер (иначе подключение
           # идёт с 127.0.0.1 и попадает под другое правило pg_hba — пароль не принимается)
