@@ -670,15 +670,16 @@ export const q = {
     pool.query(`DELETE FROM articles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
 
   // Галерея публичных генераций: приватные рендеры (приватный режим после оплаты) не показываем.
-  publicRenders: (roomType, limit, offset) =>
+  publicRenders: (roomType, limit, offset, style = null) =>
     pool.query(
       `SELECT r.id, r.style, r.share_token, rm.room_type, r.created_at
        FROM renders r JOIN rooms rm ON rm.id = r.room_id
        WHERE r.status = 'done' AND r.image_path IS NOT NULL AND COALESCE(r.is_private, false) = false
          AND rm.room_type IS NOT NULL AND rm.room_type <> ''
          AND ($1::text IS NULL OR rm.room_type = $1)
+         AND ($4::text IS NULL OR r.style = $4)
        ORDER BY r.created_at DESC LIMIT $2 OFFSET $3`,
-      [roomType, limit, offset]).then(r => r.rows),
+      [roomType, limit, offset, style]).then(r => r.rows),
   publicRendersCount: (roomType = null) =>
     pool.query(
       `SELECT count(*) FROM renders r JOIN rooms rm ON rm.id = r.room_id
@@ -693,6 +694,15 @@ export const q = {
        WHERE r.status = 'done' AND r.image_path IS NOT NULL AND COALESCE(r.is_private, false) = false
          AND rm.room_type IS NOT NULL AND rm.room_type <> ''
        GROUP BY rm.room_type ORDER BY count DESC`).then(r => r.rows),
+  // Кластеры «стиль × комната» с публичными рендерами — план генерации строим по ним,
+  // а не по ключам (иначе объём диктуют фразы, а не имеющийся контент).
+  publicClusters: () =>
+    pool.query(
+      `SELECT COALESCE(NULLIF(r.style, ''), 'Скандинавский') AS style, rm.room_type AS room, count(*)::int AS count
+       FROM renders r JOIN rooms rm ON rm.id = r.room_id
+       WHERE r.status = 'done' AND r.image_path IS NOT NULL AND COALESCE(r.is_private, false) = false
+         AND rm.room_type IS NOT NULL AND rm.room_type <> ''
+       GROUP BY 1, 2 ORDER BY count DESC`).then(r => r.rows),
 
   // подбор товаров по рендеру
   renderOwnedByUser: (renderId, userId) =>

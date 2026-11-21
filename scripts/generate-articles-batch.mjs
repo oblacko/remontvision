@@ -129,6 +129,8 @@ function styleFromPhrase(phrase, styleNames) {
 }
 
 // Читаем CSV: phrase,monthly_count,cluster,seed
+// Ключи подбираем под каждый кластер (не наоборот — объём диктует
+// имеющийся контент, а не список фраз).
 const rows = fs.readFileSync(csvPath, 'utf8').split('\n').slice(1)
   .map(line => line.trim()).filter(Boolean)
   .map(line => {
@@ -138,27 +140,30 @@ const rows = fs.readFileSync(csvPath, 'utf8').split('\n').slice(1)
   .filter(r => r.phrase && r.count >= minCount && ['rooms', 'styles', 'tool'].includes(r.cluster))
   .sort((a, b) => b.count - a.count);
 
-const styles = await q.styleList?.() || [];
-const styleNames = styles.map(s => s.name).filter(Boolean);
-
-// Группируем фразы по seed — в одну статью берём головную + близкие хвосты.
-const bySeed = new Map();
-for (const r of rows) {
-  const key = r.seed || r.phrase;
-  if (!bySeed.has(key)) bySeed.set(key, []);
-  bySeed.get(key).push(r.phrase);
-}
-
 const planned = [];
-for (const [seed, phrases] of bySeed) {
-  const head = phrases[0];
-  const room = fixedRoom || roomFromPhrase(head);
-  const style = fixedStyle || styleFromPhrase(head, styleNames) || 'Скандинавский';
-  if (!room) continue;
-  const key = `${style} × ${room}`;
-  if (planned.some(p => p.key === key)) continue;
-  planned.push({ key, style, room, keywords: phrases.slice(0, 5), seed, head });
-  if (planned.length >= limit) break;
+if (!fixedRoom && !fixedStyle) {
+  // Основной режим: один проход по всем кластерам «стиль × комната» с публичными рендерами.
+  const clusters = await q.publicClusters();
+  for (const c of clusters) {
+    const roomPhrases = rows.filter(r => roomFromPhrase(r.phrase) === c.room);
+    const styled = roomPhrases.filter(r => styleFromPhrase(r.phrase, [c.style]) === c.style);
+    const pool = styled.length ? styled : roomPhrases;
+    planned.push({
+      key: `${c.style} × ${c.room}`,
+      style: c.style,
+      room: c.room,
+      keywords: pool.slice(0, 5).map(r => r.phrase),
+      renders: c.count,
+    });
+    if (planned.length >= limit) break;
+  }
+} else {
+  // Ручной режим: конкретная пара --room/--style.
+  const room = fixedRoom || roomFromPhrase(rows[0]?.phrase || '');
+  const style = fixedStyle || styleFromPhrase(rows[0]?.phrase || '', []) || 'Скандинавский';
+  if (room) {
+    planned.push({ key: `${style} × ${room}`, style, room, keywords: rows.slice(0, 5).map(r => r.phrase), renders: null });
+  }
 }
 
 if (!planned.length) {
@@ -167,6 +172,7 @@ if (!planned.length) {
 }
 
 console.log(`план: ${planned.length} кластеров`);
+for (const p of planned) console.log(` - ${p.key} (рендеров: ${p.renders ?? '—'}, ключей: ${p.keywords.length})`);
 const published = await q.listArticles();
 let done = 0;
 for (const item of planned) {
@@ -175,8 +181,8 @@ for (const item of planned) {
     console.log(`SKIP ${item.key}: уже опубликована /${dup.slug}`);
     continue;
   }
-  const render = (await q.publicRenders(item.room, 50, 0))
-    .find(r => (item.style ? r.style === item.style : true)) || (await q.publicRenders(item.room, 1, 0))[0];
+  const render = (await q.publicRenders(item.room, 1, 0, item.style))[0]
+    || (await q.publicRenders(item.room, 1, 0))[0];
   if (!render) {
     console.log(`SKIP ${item.key}: нет публичных рендеров комнаты`);
     continue;
