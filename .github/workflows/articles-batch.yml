@@ -21,6 +21,10 @@ on:
         description: 'Только починить meta_title у опубликованных (true/false)'
         required: true
         default: 'false'
+      per_cluster:
+        description: 'Сколько статей на кластер «стиль × комната» (по разным рендерам)'
+        required: true
+        default: '1'
 
 jobs:
   batch:
@@ -50,4 +54,4 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
             "docker compose -f /root/remontvision/docker-compose.yml cp /tmp/keywords.csv app:/tmp/keywords.csv && \
              docker compose -f /root/remontvision/docker-compose.yml exec -T app \
-               node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --limit ${{ inputs.limit }} $PUBLISH_FLAG $FIX_FLAG"
+               node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --limit ${{ inputs.limit }} --per-cluster ${{ inputs.per_cluster }} $PUBLISH_FLAG $FIX_FLAG"

@@ -19,6 +19,7 @@ const hasFlag = name => args.includes(`--${name}`);
 const csvPath = arg('csv');
 const limit = Math.max(1, Number(arg('limit', '8')));
 const minCount = Number(arg('min-count', '500'));
+const perCluster = Math.max(1, Math.floor(Number(arg('per-cluster', '1'))));
 const fixedRoom = arg('room');
 const fixedStyle = arg('style');
 const doPublish = hasFlag('publish');
@@ -64,7 +65,6 @@ console.log('proxy:', JSON.stringify(getProxyState({ masked: true })));
 const { q } = await import('../src/db.js');
 const {
   generateArticleFromRender,
-  findPublishedDuplicate,
   validateArticleForPublish,
   countArticleWords,
   autoMetaTitle,
@@ -171,51 +171,64 @@ if (!planned.length) {
   process.exit(0);
 }
 
-console.log(`план: ${planned.length} кластеров`);
+console.log(`план: ${planned.length} кластеров, до ${perCluster} статей на кластер`);
 for (const p of planned) console.log(` - ${p.key} (рендеров: ${p.renders ?? '—'}, ключей: ${p.keywords.length})`);
 const published = await q.listArticles();
+const isMate = (a, item) => a.status === 'published'
+  && String(a.style || '') === String(item.style)
+  && String(a.room_type || '') === String(item.room);
 let done = 0;
 for (const item of planned) {
-  const dup = findPublishedDuplicate({ style: item.style, roomType: item.room }, published);
-  if (dup) {
-    console.log(`SKIP ${item.key}: уже опубликована /${dup.slug}`);
+  const free = perCluster - published.filter(a => isMate(a, item)).length;
+  if (free <= 0) {
+    console.log(`SKIP ${item.key}: уже ${perCluster} (лимит)`);
     continue;
   }
-  const render = (await q.publicRenders(item.room, 1, 0, item.style))[0]
-    || (await q.publicRenders(item.room, 1, 0))[0];
-  if (!render) {
+  // Рендеры кластера: сначала точного стиля, добор любым; уже использованные
+  // в статьях обложки пропускаем — у каждой статьи своя картинка.
+  const used = new Set(published.map(a => a.meta?.source_render_id).filter(Boolean));
+  let renders = (await q.publicRenders(item.room, perCluster + 5, 0, item.style))
+    .filter(r => !used.has(r.id));
+  if (renders.length < free) {
+    const rest = (await q.publicRenders(item.room, perCluster + 5, 0))
+      .filter(r => !used.has(r.id) && !renders.some(x => x.id === r.id));
+    renders = renders.concat(rest);
+  }
+  if (!renders.length) {
     console.log(`SKIP ${item.key}: нет публичных рендеров комнаты`);
     continue;
   }
   if (dry) {
-    console.log(`DRY ${item.key} ← render ${render.id}, ключи: ${item.keywords.join('; ')}`);
-    done += 1;
+    for (const r of renders.slice(0, free)) console.log(`DRY ${item.key} ← render ${r.id}, ключи: ${item.keywords.join('; ')}`);
+    done += Math.min(free, renders.length);
     continue;
   }
-  try {
-    const article = await generateArticleFromRender({
-      render: await q.getRender(render.id),
-      style: item.style,
-      roomType: item.room,
-      keywords: item.keywords,
-    });
-    published.push(article);
-    const words = countArticleWords(article.body || {});
-    let suffix = `draft /${article.slug}, ${words} слов`;
-    if (doPublish) {
-      const reasons = validateArticleForPublish(article, published);
-      if (reasons.length) {
-        suffix = `НЕ ОПУБЛИКОВАНА, причины: ${reasons.join('; ')}`;
-      } else {
-        await q.publishArticle(article.id);
-        suffix = `ОПУБЛИКОВАНА /articles/${article.slug}, ${words} слов`;
+  for (const r of renders.slice(0, free)) {
+    try {
+      const article = await generateArticleFromRender({
+        render: await q.getRender(r.id),
+        style: item.style,
+        roomType: item.room,
+        keywords: item.keywords,
+      });
+      published.push(article);
+      const words = countArticleWords(article.body || {});
+      let suffix = `draft /${article.slug}, ${words} слов`;
+      if (doPublish) {
+        const reasons = validateArticleForPublish(article, published, { maxPerCluster: perCluster });
+        if (reasons.length) {
+          suffix = `НЕ ОПУБЛИКОВАНА, причины: ${reasons.join('; ')}`;
+        } else {
+          await q.publishArticle(article.id);
+          suffix = `ОПУБЛИКОВАНА /articles/${article.slug}, ${words} слов`;
+        }
       }
+      console.log(`OK ${item.key} ${suffix}`);
+      done += 1;
+    } catch (e) {
+      console.log(`FAIL ${item.key} (${r.id}): ${String(e.message || e).slice(0, 200)}`);
     }
-    console.log(`OK ${item.key} ${suffix}`);
-    done += 1;
-  } catch (e) {
-    console.log(`FAIL ${item.key}: ${String(e.message || e).slice(0, 200)}`);
   }
 }
-console.log(`готово: ${done}/${planned.length}`);
+console.log(`готово: ${done}`);
 process.exit(0);

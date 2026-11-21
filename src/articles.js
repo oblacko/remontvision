@@ -335,7 +335,9 @@ export function findPublishedDuplicate({ style, roomType }, publishedList) {
 }
 
 // Причины отказа в публикации; пустой массив — статья проходит.
-export function validateArticleForPublish(article, publishedList) {
+// maxPerCluster — сколько статей на кластер style×room разрешено (батч может >1,
+// админская публикация — 1).
+export function validateArticleForPublish(article, publishedList, { maxPerCluster = 1 } = {}) {
   const reasons = [];
   const words = countArticleWords(article?.body || {});
   if (words < MIN_ARTICLE_WORDS) {
@@ -349,8 +351,13 @@ export function validateArticleForPublish(article, publishedList) {
   const meta = article?.meta || {};
   if (!String(meta.meta_title || '').trim()) reasons.push('Не заполнен meta_title (редактор)');
   if (!String(meta.meta_description || '').trim()) reasons.push('Не заполнена meta_description (редактор)');
-  const dup = findPublishedDuplicate({ style: article?.style, roomType: article?.room_type }, publishedList || []);
-  if (dup && dup.id !== article?.id) reasons.push(`Дубль кластера: уже опубликована «${dup.title}» (/${dup.slug})`);
+  const mates = (publishedList || []).filter(a => a.status === 'published'
+    && String(a.style || '') === String(article?.style || '')
+    && String(a.room_type || '') === String(article?.room_type || '')
+    && a.id !== article?.id);
+  if (mates.length >= maxPerCluster) {
+    reasons.push(`Дубль кластера: уже опубликовано статей «${article?.style} × ${article?.room_type}» — ${mates.length}`);
+  }
   return reasons;
 }
 
