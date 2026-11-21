@@ -265,10 +265,12 @@ export default function Admin() {
   const [renderConfig, setRenderConfig] = useState<{ product_refs_enabled: boolean; max_products: number; product_matching_enabled: boolean; image_min_gap_ms: number } | null>(null)
   const [renderBusy, setRenderBusy] = useState(false)
   const [renderNotice, setRenderNotice] = useState('')
-  const [articles, setArticles] = useState<Array<{ id: number; slug: string; title: string; style?: string | null; room_type?: string | null; status: string; created_at: string }>>([])
+  const [articles, setArticles] = useState<Array<{ id: number; slug: string; title: string; style?: string | null; room_type?: string | null; status: string; created_at: string; meta?: { target_query?: string | null; meta_title?: string | null; meta_description?: string | null } | null }>>([])
   const [articleBusy, setArticleBusy] = useState(false)
   const [articleNotice, setArticleNotice] = useState('')
-  const [articleForm, setArticleForm] = useState({ style: 'Скандинавский', room_type: 'Спальня', tier: 'comfort', title: '' })
+  const [articleForm, setArticleForm] = useState({ style: 'Скандинавский', room_type: 'Спальня', tier: 'comfort', title: '', target_query: '' })
+  const [articleEdit, setArticleEdit] = useState<{ id: number; title: string; target_query: string; meta_title: string; meta_description: string } | null>(null)
+  const [articleChecks, setArticleChecks] = useState<{ words: number; checks: string[] } | null>(null)
   const [procurementConfig, setProcurementConfig] = useState<ProcurementConfig | null>(null)
   const [procurementBusy, setProcurementBusy] = useState(false)
   const [procurementNotice, setProcurementNotice] = useState('')
@@ -553,8 +555,33 @@ export default function Admin() {
     finally { setArticleBusy(false) }
   }
   const publishArticle = async (id: number) => {
-    try { await api('/api/admin/articles/' + id + '/publish', { method: 'POST' }); await loadArticles() }
-    catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+    try {
+      const r = await api('/api/admin/articles/' + id + '/publish', { method: 'POST' })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        const reasons = Array.isArray(data.reasons) ? data.reasons : []
+        throw new Error(reasons.length ? `${data.error || 'Публикация отклонена'}: ${reasons.join('; ')}` : (data.error || String(r.status)))
+      }
+      await loadArticles()
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const loadArticleDetail = async (id: number) => {
+    try {
+      const d = await readJson(await api('/api/admin/articles/' + id))
+      const a = d.article || {}
+      const m = a.meta || {}
+      setArticleEdit({ id: a.id, title: a.title || '', target_query: m.target_query || '', meta_title: m.meta_title || '', meta_description: m.meta_description || '' })
+      setArticleChecks({ words: d.words ?? 0, checks: Array.isArray(d.checks) ? d.checks : [] })
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
+  }
+  const saveArticleMeta = async () => {
+    if (!articleEdit) return
+    try {
+      await readJson(await api('/api/admin/articles/' + articleEdit.id, { method: 'PATCH', body: JSON.stringify({ meta: { target_query: articleEdit.target_query, meta_title: articleEdit.meta_title, meta_description: articleEdit.meta_description } }) }))
+      setArticleNotice('Мета сохранена')
+      await loadArticles()
+      await loadArticleDetail(articleEdit.id)
+    } catch (e) { setAdminError(e instanceof Error ? e.message : 'Ошибка') }
   }
   const deleteArticle = async (id: number) => {
     if (!confirm('Удалить статью?')) return
@@ -1610,7 +1637,7 @@ export default function Admin() {
           {tab === 'articles' && (
             <div className="mt-8 max-w-5xl">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><p className="eyebrow">Lookbook-статьи</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Генерирует статью: рендер-обложка + палитра + реальные товары Hoff + текст. Черновик можно опубликовать — страница появится на /articles/:slug.</p></div>
+                <div><p className="eyebrow">Lookbook-статьи</p><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Генерирует статью: рендер-обложка + палитра + товары Hoff + текст. Публикация с проверкой качества: от 500 слов, от 3 товаров со ссылкой, мета от редактора, один кластер «стиль × комната».</p></div>
                 <button type="button" disabled={articleBusy} onClick={() => void generateArticle()} className="action-primary">{articleBusy ? 'Генерируем…' : 'Сгенерировать статью'}</button>
               </div>
               {articleNotice && <p className="mt-4 border border-primary/40 bg-primary/5 px-3 py-2 text-sm">{articleNotice}</p>}
@@ -1619,11 +1646,30 @@ export default function Admin() {
                 <label><span className="eyebrow mb-2 block">Комната</span><select value={articleForm.room_type} onChange={e => setArticleForm({ ...articleForm, room_type: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm">{roomTypes.filter(r => r.active).map(r => <option key={r.name} value={r.name}>{r.name}</option>)}</select></label>
                 <label><span className="eyebrow mb-2 block">Класс</span><select value={articleForm.tier} onChange={e => setArticleForm({ ...articleForm, tier: e.target.value })} className="h-11 w-full border bg-background px-3 text-sm"><option value="start">Старт</option><option value="comfort">Комфорт</option><option value="premium">Премиум</option><option value="atelier">Ателье</option></select></label>
                 <label><span className="eyebrow mb-2 block">Заголовок (опц.)</span><input value={articleForm.title} onChange={e => setArticleForm({ ...articleForm, title: e.target.value })} placeholder="авто" className="h-11 w-full border bg-background px-3 text-sm" /></label>
+                <label className="sm:col-span-4"><span className="eyebrow mb-2 block">Целевой запрос (опц.)</span><input value={articleForm.target_query} onChange={e => setArticleForm({ ...articleForm, target_query: e.target.value })} placeholder="например: дизайн спальни" className="h-11 w-full border bg-background px-3 text-sm" /></label>
               </div>
               <div className="mt-8 divide-y border-y">
-                {articles.map(a => <div key={a.id} className="flex flex-wrap items-center gap-3 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.title}</p><p className="truncate text-xs text-muted-foreground">/{a.slug} · {a.style || '—'} · {a.room_type || '—'} · {a.status}</p></div>{a.status === 'published' ? <a href={`/articles/${a.slug}`} target="_blank" rel="noopener" className="text-xs underline">открыть</a> : <button type="button" onClick={() => void publishArticle(a.id)} className="text-xs underline">опубликовать</button>}<button type="button" onClick={() => void deleteArticle(a.id)} className="text-xs text-destructive underline">удалить</button></div>)}
+                {articles.map(a => <div key={a.id} className="flex flex-wrap items-center gap-3 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.title}</p><p className="truncate text-xs text-muted-foreground">/{a.slug} · {a.style || '—'} · {a.room_type || '—'} · {a.status}{a.meta?.meta_title ? ' · мета ✓' : ' · мета нет'}</p></div><button type="button" onClick={() => void loadArticleDetail(a.id)} className="text-xs underline">мета</button>{a.status === 'published' ? <a href={`/articles/${a.slug}`} target="_blank" rel="noopener" className="text-xs underline">открыть</a> : <button type="button" onClick={() => void publishArticle(a.id)} className="text-xs underline">опубликовать</button>}<button type="button" onClick={() => void deleteArticle(a.id)} className="text-xs text-destructive underline">удалить</button></div>)}
                 {!articles.length && <p className="py-6 text-sm text-muted-foreground">Статей пока нет.</p>}
               </div>
+              {articleEdit && (
+                <div className="mt-6 border p-4">
+                  <p className="eyebrow">Мета и SEO — {articleEdit.title}</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="sm:col-span-2"><span className="eyebrow mb-2 block">Целевой запрос</span><input value={articleEdit.target_query} onChange={e => setArticleEdit({ ...articleEdit, target_query: e.target.value })} placeholder="например: дизайн спальни" className="h-11 w-full border bg-background px-3 text-sm" /></label>
+                    <label className="sm:col-span-2"><span className="eyebrow mb-2 block">Meta title — {articleEdit.meta_title.length}/60</span><input value={articleEdit.meta_title} onChange={e => setArticleEdit({ ...articleEdit, meta_title: e.target.value })} placeholder="до 60 символов" className="h-11 w-full border bg-background px-3 text-sm" /></label>
+                    <label className="sm:col-span-2"><span className="eyebrow mb-2 block">Meta description — {articleEdit.meta_description.length}/160</span><textarea value={articleEdit.meta_description} onChange={e => setArticleEdit({ ...articleEdit, meta_description: e.target.value })} rows={2} placeholder="140–160 символов" className="w-full border bg-background px-3 py-2 text-sm" /></label>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button type="button" onClick={() => void saveArticleMeta()} className="action-primary">Сохранить мету</button>
+                    {articleChecks && <span className="text-xs text-muted-foreground">Слов: {articleChecks.words}</span>}
+                    <button type="button" onClick={() => { setArticleEdit(null); setArticleChecks(null) }} className="text-xs underline">закрыть</button>
+                  </div>
+                  {articleChecks && (articleChecks.checks.length
+                    ? <ul className="mt-3 list-disc pl-5 text-xs text-destructive">{articleChecks.checks.map(c => <li key={c}>{c}</li>)}</ul>
+                    : <p className="mt-3 text-xs text-green-700">Проверки пройдены — можно публиковать</p>)}
+                </div>
+              )}
             </div>
           )}
 

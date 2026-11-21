@@ -36,13 +36,19 @@ test('sitemap: includes static /offer entry', () => {
   assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/offer<\/loc>/);
 });
 
-test('sitemap: static entries use a fixed lastmod, not today', () => {
+test('sitemap: static entries use fixed lastmod values, not today', () => {
   const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles: [] });
   assert.ok(xml.includes('<lastmod>2026-11-09</lastmod>'));
   const today = new Date().toISOString().slice(0, 10);
-  if (today !== '2026-11-09') {
+  if (today !== '2026-11-09' && today !== '2026-11-21') {
     assert.ok(!xml.includes(`<lastmod>${today}</lastmod>`));
   }
+});
+
+test('sitemap: includes articles hub and AI-photo landing entries', () => {
+  const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles: [] });
+  assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/articles<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/ai-dizayn-interera-po-foto<\/loc>/);
 });
 
 test('sitemap: article lastmod prefers published_at over created_at', () => {

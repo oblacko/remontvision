@@ -44,7 +44,8 @@ import { importProductFromUrl } from './productimport.js';
 import { getPromptConfig, getPromptDefaults, savePromptConfig, resetPromptConfig, loadPromptConfig } from './promptconfig.js';
 import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupConfig, loadCleanupConfig, buildCleanupPrompt } from './cleanupconfig.js';
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
-import { generateArticle, articlePage } from './articles.js';
+import { generateArticle, generateArticleFromRender, articlePage, hubPage, validateArticleForPublish, findPublishedDuplicate, countArticleWords, slugify } from './articles.js';
+import { galleryPage, GALLERY_PAGE_SIZE } from './gallery.js';
 import { normalizeMove } from './moveobject.js';
 import { buildPassport, renderPassportPdf } from './passport.js';
 import { renderRoadmapPdf } from './roadmappdf.js';
@@ -135,6 +136,9 @@ const LEGAL_PAGES = {
 for (const [route, file] of Object.entries(LEGAL_PAGES)) {
   app.get([route, `${route}/`], (_req, res) => res.sendFile(path.join(process.cwd(), 'public', file)));
 }
+// SEO-лендинг под кластер «дизайн интерьера по фото» (аудит 09.11.2026, §7 L-01).
+app.get(['/ai-dizayn-interera-po-foto', '/ai-dizayn-interera-po-foto/'], (_req, res) =>
+  res.sendFile(path.join(process.cwd(), 'public', 'ai-dizayn-interera-po-foto.html')));
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const IMG_EXT = UPLOAD_MIME;
@@ -1068,14 +1072,50 @@ app.get('/api/admin/articles', h(async (req, res) => {
   res.json({ articles: await q.listArticles() });
 }));
 
+app.post('/api/admin/articles/generate-from-render', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const render = await q.getRender(String(req.body?.render_id || ''));
+    if (!render || !render.image_path) return res.status(404).json({ error: 'Рендер не найден или без изображения' });
+    const room = await q.getRoom(render.room_id);
+    const style = req.body?.style || render.style || 'Скандинавский';
+    const roomType = req.body?.room_type || room?.room_type || 'Другое';
+    // Один кластер style × room — одна опубликованная статья (аудит §6.2 #7).
+    const dup = findPublishedDuplicate({ style, roomType }, await q.listArticles());
+    if (dup) {
+      return res.status(409).json({ error: `Для пары «${style} × ${roomType}» уже опубликована статья`, slug: dup.slug });
+    }
+    const article = await generateArticleFromRender({
+      render,
+      style,
+      roomType,
+      tier: req.body?.tier || 'comfort',
+      keywords: Array.isArray(req.body?.keywords) ? req.body.keywords : [],
+      title: req.body?.title || '',
+    });
+    log({ event: 'article_generated_from_render', id: article.id, slug: article.slug, style: article.style, room_type: article.room_type, render_id: render.id });
+    res.json({ article });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e).slice(0, 300) });
+  }
+}));
+
 app.post('/api/admin/articles/generate', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
+    const style = req.body?.style || 'Скандинавский';
+    const roomType = req.body?.room_type || 'Спальня';
+    // Один кластер style × room — одна опубликованная статья (аудит §6.2 #7).
+    const dup = findPublishedDuplicate({ style, roomType }, await q.listArticles());
+    if (dup) {
+      return res.status(409).json({ error: `Для пары «${style} × ${roomType}» уже опубликована статья`, slug: dup.slug });
+    }
     const article = await generateArticle({
-      style: req.body?.style || 'Скандинавский',
-      roomType: req.body?.room_type || 'Спальня',
+      style,
+      roomType,
       tier: req.body?.tier || 'comfort',
       title: req.body?.title || '',
+      targetQuery: req.body?.target_query || '',
     });
     log({ event: 'article_generated', id: article.id, slug: article.slug, style: article.style, room_type: article.room_type });
     res.json({ article });
@@ -1084,12 +1124,45 @@ app.post('/api/admin/articles/generate', h(async (req, res) => {
   }
 }));
 
+app.get('/api/admin/articles/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const article = await q.articleById(Number(req.params.id));
+  if (!article) return res.status(404).json({ error: 'Статья не найдена' });
+  const published = await q.listArticles();
+  res.json({
+    article,
+    words: countArticleWords(article.body || {}),
+    checks: validateArticleForPublish(article, published),
+  });
+}));
+
+app.patch('/api/admin/articles/:id', h(async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const current = await q.articleById(Number(req.params.id));
+  if (!current) return res.status(404).json({ error: 'Статья не найдена' });
+  const patch = req.body?.meta || {};
+  const allowed = {};
+  for (const k of ['target_query', 'meta_title', 'meta_description']) {
+    if (typeof patch[k] === 'string') allowed[k] = patch[k].slice(0, 300);
+  }
+  const article = await q.updateArticleMeta(current.id, allowed);
+  log({ event: 'article_meta_updated', id: article.id, slug: article.slug, keys: Object.keys(allowed) });
+  res.json({ article });
+}));
+
 app.post('/api/admin/articles/:id/publish', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const article = await q.publishArticle(Number(req.params.id));
+  const article = await q.articleById(Number(req.params.id));
   if (!article) return res.status(404).json({ error: 'Статья не найдена' });
-  log({ event: 'article_published', id: article.id, slug: article.slug });
-  res.json({ article });
+  // Гейты качества (аудит §6.3 P0): без прохождения не публикуем.
+  const reasons = validateArticleForPublish(article, await q.listArticles());
+  if (reasons.length) {
+    log({ event: 'article_publish_blocked', id: article.id, slug: article.slug, reasons });
+    return res.status(422).json({ error: 'Статья не проходит проверку качества', reasons });
+  }
+  const updated = await q.publishArticle(article.id);
+  log({ event: 'article_published', id: updated.id, slug: updated.slug });
+  res.json({ article: updated });
 }));
 
 app.delete('/api/admin/articles/:id', h(async (req, res) => {
@@ -1921,17 +1994,57 @@ function notFoundPage(title, text) {
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} — ремонтвижн</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>body{margin:0;background:#f5f2ec;color:#1e1c19;font-family:Georgia,'Times New Roman',serif;display:flex;min-height:100vh;align-items:center;justify-content:center}.box{max-width:520px;padding:40px 24px;text-align:center}.logo{display:inline-block}.logo img{display:block;height:20px;width:auto;margin:0 auto}h1{font-size:clamp(32px,6vw,56px);line-height:1.05;margin:24px 0 12px}p{color:#6b645c;line-height:1.6}a.btn{display:inline-block;margin-top:24px;padding:14px 22px;background:#1e1c19;color:#f5f2ec;text-decoration:none;font-family:system-ui,sans-serif;font-size:14px}</style></head><body><div class="box"><a class="logo" href="/" aria-label="Ремонтвижн — на главную"><img src="/logo.svg" alt="Ремонтвижн"></a><h1>${title}</h1><p>${text}</p><a class="btn" href="/">На главную</a></div></body></html>`;
 }
 
+app.get(['/articles', '/articles/'], h(async (_req, res) => {
+  const rooms = (await q.galleryRooms()).map(r => ({ name: r.name, slug: slugify(r.name), count: r.count }));
+  res.type('html').send(hubPage(await q.listArticles(), { rooms }));
+}));
+// Галерея публичных генераций: первая страница и фильтры по комнатам — index,
+// глубокие листания (?page=N) — noindex (решение владельца 21.11.2026).
+const galleryRoomDto = r => ({ name: r.name, slug: slugify(r.name), count: r.count });
+const galleryItems = rows => rows.map(r => ({ id: r.id, style: r.style, roomType: r.room_type, shareToken: r.share_token }));
+
+app.get(['/gallery', '/gallery/'], h(async (req, res) => {
+  const page = Math.max(1, Math.floor(Number(req.query.page) || 1));
+  const rooms = await q.galleryRooms();
+  const total = await q.publicRendersCount(null);
+  const rows = await q.publicRenders(null, GALLERY_PAGE_SIZE, (page - 1) * GALLERY_PAGE_SIZE);
+  res.type('html').send(galleryPage(galleryItems(rows), { page, total, rooms: rooms.map(galleryRoomDto) }));
+}));
+
+app.get('/gallery/img/:id', h(async (req, res) => {
+  const render = await q.getRender(String(req.params.id || ''));
+  if (!render || render.status !== 'done' || !render.image_path || render.is_private) return res.status(404).end();
+  await serveStored(req, res, 'renders', path.basename(render.image_path));
+}));
+
+app.get('/gallery/:room', h(async (req, res) => {
+  const rooms = await q.galleryRooms();
+  const slug = String(req.params.room || '').toLowerCase();
+  const room = rooms.find(r => slugify(r.name) === slug);
+  if (!room) return res.status(404).type('html').send(notFoundPage('Раздел не найден', 'Такого раздела галереи нет.'));
+  const page = Math.max(1, Math.floor(Number(req.query.page) || 1));
+  const total = await q.publicRendersCount(room.name);
+  const rows = await q.publicRenders(room.name, GALLERY_PAGE_SIZE, (page - 1) * GALLERY_PAGE_SIZE);
+  res.type('html').send(galleryPage(galleryItems(rows), { room: room.name, roomSlug: slug, page, total, rooms: rooms.map(galleryRoomDto) }));
+}));
+
 app.get('/articles/:slug', h(async (req, res) => {
   const article = await q.articleBySlug(String(req.params.slug || ''));
   if (!article) return res.status(404).type('html').send(notFoundPage('Статья не найдена', 'Такой статьи нет или она снята с публикации.'));
-  res.type('html').send(articlePage(article));
+  // Перелинковка: 2–4 статьи того же стиля или комнаты (аудит §6.3).
+  const related = (await q.listArticles())
+    .filter(a => a.status === 'published' && a.slug !== article.slug
+      && (a.style === article.style || a.room_type === article.room_type))
+    .slice(0, 4);
+  res.type('html').send(articlePage(article, { related }));
 }));
 app.get('/sitemap.xml', h(async (_req, res) => {
   // Маршрут зарегистрирован после express.static('public'); статический
   // public/sitemap.xml удалён, чтобы он не «перекрывал» динамический вывод
   // (иначе опубликованные статьи не попадали бы в sitemap).
   const articles = await q.listArticles();
-  const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles, baseUrl: APP_URL });
+  const galleryEntries = ['/gallery', ...(await q.galleryRooms()).map(r => `/gallery/${slugify(r.name)}`)];
+  const xml = buildSitemapXml({ staticEntries: [...STATIC_ENTRIES, ...galleryEntries], articles, baseUrl: APP_URL });
   res.type('application/xml').send(xml);
 }));
 app.get('/search-lab/:file', h(async (req, res) => {

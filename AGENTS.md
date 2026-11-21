@@ -85,7 +85,9 @@ node --check src/openrouter.js
 | Подбор товаров (текущий) | `src/visionagent.js`, `src/catalogclient.js`, `catalog-service/` |
 | Legacy procurement (не подключён) | `src/procurement*.js` — не развивать, на удаление |
 | Search Lab | `src/search*.js`, `web/src/components/Search*.tsx` |
-| Статьи | `src/articles.js` |
+| Статьи | `src/articles.js` (публикация с гейтами качества: ≥500 слов, ≥3 товара со ссылкой, мета, один кластер style×room; `generateArticleFromRender` — статья на готовом рендере с промтом) |
+| Галерея | `src/gallery.js`, запросы `publicRenders*`/`galleryRooms` в `src/db.js` (только `done`, не `is_private`) |
+| Пакет генерации статей | `scripts/generate-articles-batch.mjs` (wordstat-CSV → кластеры style×room → гейты публикации) |
 | Платежи | `src/payments.js`, `src/robokassa.js` |
 | Каталог | `catalog/seed.json`, `src/productimport.js`, `src/remoteimage.js` |
 | Админка UI | `web/src/pages/Admin.tsx` |

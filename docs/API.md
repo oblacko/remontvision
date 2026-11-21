@@ -27,7 +27,9 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/share/:token` | стиль, комната, лайки, комментарии |
 | POST | `/api/share/:token/like` | toggle лайк |
 | POST | `/api/share/:token/comments` | `{name?, text}` |
-| GET | `/articles/:slug`, `/sitemap.xml` | статьи и sitemap |
+| GET | `/articles`, `/articles/:slug`, `/sitemap.xml` | хаб статей, статья, динамический sitemap |
+| GET | `/ai-dizayn-interera-po-foto` | SEO-лендинг «дизайн интерьера по фото» |
+| GET | `/gallery`, `/gallery/:room`, `/gallery/img/:id` | галерея публичных генераций: лента, фильтр по комнате, публичная картинка |
 | GET | `/go/:id?r=renderId` | 302 на товар/поиск, лог клика |
 
 ## Авторизованные
@@ -111,7 +113,7 @@ Admin: заголовок `X-Admin-Key`.
 | Модели | `GET/PUT /api/admin/settings/models`, `POST .../models/refresh`, `POST .../models/test` |
 | Очистка | `GET/PUT /api/admin/settings/cleanup`, reset |
 | Генерация | `GET/PUT /api/admin/settings/render`, reset |
-| Статьи | `GET/POST /api/admin/articles`, `POST .../generate`, публикация/удаление |
+| Статьи | `GET/POST /api/admin/articles`, `GET/PATCH .../:id`, `POST .../generate` (409 при дубле кластера), `POST .../publish` (422 + причины при нарушении гейтов), удаление |
 | Поиск | `GET/PUT /api/admin/settings/procurement`, reset |
 | Search Lab | `GET /api/admin/search/*`, промты, jobs, vision/grid/crops/objects |
 | Прокси | `GET/PUT /api/admin/settings/proxy`, `POST .../proxy/test` |

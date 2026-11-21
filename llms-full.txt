@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-13T20:18:01.760Z
+Generated: 2026-11-21T09:08:36.431Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -285,7 +285,9 @@ node --check src/openrouter.js
 | Подбор товаров (текущий) | `src/visionagent.js`, `src/catalogclient.js`, `catalog-service/` |
 | Legacy procurement (не подключён) | `src/procurement*.js` — не развивать, на удаление |
 | Search Lab | `src/search*.js`, `web/src/components/Search*.tsx` |
-| Статьи | `src/articles.js` |
+| Статьи | `src/articles.js` (публикация с гейтами качества: ≥500 слов, ≥3 товара со ссылкой, мета, один кластер style×room; `generateArticleFromRender` — статья на готовом рендере с промтом) |
+| Галерея | `src/gallery.js`, запросы `publicRenders*`/`galleryRooms` в `src/db.js` (только `done`, не `is_private`) |
+| Пакет генерации статей | `scripts/generate-articles-batch.mjs` (wordstat-CSV → кластеры style×room → гейты публикации) |
 | Платежи | `src/payments.js`, `src/robokassa.js` |
 | Каталог | `catalog/seed.json`, `src/productimport.js`, `src/remoteimage.js` |
 | Админка UI | `web/src/pages/Admin.tsx` |
@@ -603,7 +605,7 @@ flowchart LR
 | Свободный дизайн | очищает комнату до пустого каркаса, затем обставляет | `keep_furniture=false` + очистка включена |
 | Мульти-стиль | до 10 пар «стиль × концепция», каждая — отдельный рендер | `items: [{style, concept}]` |
 
-Очистка **выключена по умолчанию** (`cleanupconfig.js`). При `keep_furniture=false` и включённой очистке shell строится асинхронно при первом enqueue комнаты; `processRender` ждёт его до 3 минут (heartbeat `waiting_shell`), затем рисует дизайн.
+Очистка **выключена по умолчанию** (`cleanupconfig.js`). При `keep_furniture=false` и включённой очистке shell строится асинхронно при первом enqueue комнаты; `processRender` ждёт его до 30 с по умолчанию (`RENDER_SHELL_WAIT_MS`, максимум 300 с; heartbeat `waiting_shell`), затем рисует дизайн по оригинальному фото.
 
 ## Путь базового рендера
 
@@ -614,9 +616,8 @@ flowchart LR
   C --> CL["cleanup при первом enqueue (async, если включён)"]
   C --> W["Worker: claim + lease"]
   CL --> W
-  W --> V["repair_scope ∥ art_direction + direction"]
-  V --> L["layout (пустая комната)"]
-  L --> P["buildPrompt (design-first)"]
+  W --> V["repair_scope ∥ art_direction + direction ∥ layout"]
+  V --> P["buildPrompt (design-first)"]
   P --> I["design: FLUX 3 Image"]
   I --> S["fitAspect + storage"]
   S --> R["architect review (vision)"]
@@ -648,7 +649,7 @@ flowchart LR
 
 - `repair_scope` — объём ремонта (пол/потолок/стены/двери), параллельно с арт-директором.
 - `art_direction` — один vision-вызов: размеры, объектив, мебель, палитра и (при концепции) `direction` в том же JSON.
-- `layout` — только для пустой комнаты.
+- `layout` — планировщик стартует параллельно с арт-директором всегда; применяется только для пустой комнаты (план меблированной комнаты отбрасывается).
 
 ### 5. Direction и кэш
 
@@ -1012,7 +1013,9 @@ Admin: заголовок `X-Admin-Key`.
 | GET | `/api/share/:token` | стиль, комната, лайки, комментарии |
 | POST | `/api/share/:token/like` | toggle лайк |
 | POST | `/api/share/:token/comments` | `{name?, text}` |
-| GET | `/articles/:slug`, `/sitemap.xml` | статьи и sitemap |
+| GET | `/articles`, `/articles/:slug`, `/sitemap.xml` | хаб статей, статья, динамический sitemap |
+| GET | `/ai-dizayn-interera-po-foto` | SEO-лендинг «дизайн интерьера по фото» |
+| GET | `/gallery`, `/gallery/:room`, `/gallery/img/:id` | галерея публичных генераций: лента, фильтр по комнате, публичная картинка |
 | GET | `/go/:id?r=renderId` | 302 на товар/поиск, лог клика |
 
 ## Авторизованные
@@ -1096,7 +1099,7 @@ Admin: заголовок `X-Admin-Key`.
 | Модели | `GET/PUT /api/admin/settings/models`, `POST .../models/refresh`, `POST .../models/test` |
 | Очистка | `GET/PUT /api/admin/settings/cleanup`, reset |
 | Генерация | `GET/PUT /api/admin/settings/render`, reset |
-| Статьи | `GET/POST /api/admin/articles`, `POST .../generate`, публикация/удаление |
+| Статьи | `GET/POST /api/admin/articles`, `GET/PATCH .../:id`, `POST .../generate` (409 при дубле кластера), `POST .../publish` (422 + причины при нарушении гейтов), удаление |
 | Поиск | `GET/PUT /api/admin/settings/procurement`, reset |
 | Search Lab | `GET /api/admin/search/*`, промты, jobs, vision/grid/crops/objects |
 | Прокси | `GET/PUT /api/admin/settings/proxy`, `POST .../proxy/test` |
@@ -2525,7 +2528,46 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-13. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-12, smoke PASS.
+Дата обновления: 2026-11-21. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
+
+## 2026-11-21 — ускорение генерации: параллельный layout/бриф, настраиваемые тики и таймауты
+
+- **Layout всегда параллельно.** `jobs.js` запускает `buildLayoutPlan` одновременно с арт-директором независимо от `keep_furniture` — раньше при `keep_furniture=true` планировщик ждал арт-директора и шёл последовательно (+20–40 с на критическом пути). Комнаты `keep_furniture=true`, оказавшиеся меблированными, тратят один vision-вызов планировщика впустую (план не применяется) — осознанный обмен скорость/стоимость.
+- **Fallback-бриф мебели параллельно.** `analyzeRoomBrief` при `existing_furniture === null` стартует как `briefPromise` и догоняется после `Promise.all` — больше не последовательный шаг арт-директора.
+- **Новые кнобы `src/workerknobs.js`** (unit-тесты в `test/workerknobs.test.js`): `WORKER_TICK_MS` — тик воркера, default 500 мс (было 2 с), clamp 100–5000; `RENDER_SHELL_WAIT_MS` — ожидание cleaned-shell, default 30 с (было фиксированные 3 мин), clamp 0–300 с. Обе функции, как и `workerConcurrency`, пустую строку трактуют как «не задано».
+- **Image-таймаут 150 с.** Дефолт `OPENROUTER_IMAGE_TIMEOUT_MS` снижен 300 → 150 с: зависший вызов до 5 минут держал image-слот и lease, удерживая очередь. Смена принята осознанно, несмотря на инцидент 2026-11-05 (на 150 с обрывался живой FLUX-рендер с 4 product refs, см. запись ниже): retry на таймаут есть (`render_timeout_retry`), но провайдер может засчитать первый вызов — следим за `render_timeout_retry` в логах.
+- **Доки.** `GENERATION-QUEUE.md`/`GENERATION.md` приведены к новым значениям (тик 500 мс, shell-wait 30 с).
+
+## 2026-11-21 — статьи-рендеры, галерея публичных генераций, перелинковка хаба
+
+По команде владельца 21.11.2026 (пауза на публикации снята): статьи генерируются на имеющиеся рендеры, продвижение по запросам «промты для дизайна», галерея всех публичных генераций.
+
+- **`generateArticleFromRender`** (`src/articles.js`): статья строится на готовом рендере из продукта — обложка = изображение рендера, в тело кладётся `prompt` рендера (блок «Промт дизайна» в шаблоне, `<details>`), текст DeepSeek пишется под ключевые запросы Wordstat (жёсткое требование ≥600 слов в системном промте). Мета автоматическая (`autoMetaTitle`: суффикс бренда в пределах 60 симв., description из intro) — пакетная генерация без редактора, решение владельца. Эндпоинт `POST /api/admin/articles/generate-from-render` (409 при дубле кластера).
+- **`scripts/generate-articles-batch.mjs`**: пакетный прогон по wordstat-CSV (`--csv --limit --min-count --room --style --publish --dry`). Кластеры rooms/styles/tool мэппятся на «стиль × комната», для незанятого кластера берётся лучший публичный рендер; публикация только через гейты (`validateArticleForPublish`).
+- **Галерея** (`src/gallery.js`): `GET /gallery` (пагинация по 24) и `/gallery/:room` (транслит-slug комнаты), `GET /gallery/img/:id` — публичная отдача изображения (только `done`, не `is_private`). Индексация по решению владельца: первая страница и фильтры — index, `?page=N` — noindex + canonical на базу. Карточки ведут на страницу шаринга `/s/:token`, если токен есть. Комнаты с пустым `room_type` отсекаются.
+- **Хаб `/articles`**: секции «Комнаты» (→ фильтры галереи со счётчиками) и «Стили» (→ статьи кластера) — перелинковка по двум осям.
+- **Sitemap**: `/gallery` + `/gallery/<комната>` подмешиваются в статические записи на лету.
+- **Тесты**: `test/gallery.test.js` (5), `test/articles.test.js` +3 (хаб-секции, блок промта, autoMetaTitle). Итог `npm test` 438/438, `check-copy` чисто.
+
+## 2026-11-21 — SEO-волна 0 (остаток): хаб статей, гейты публикации, лендинг «дизайн по фото»
+
+По SEO-аудиту от 09.11.2026 (ред. 6). Часть аудита уже была внедрена ранее (динамический sitemap, честные формулировки, `X-Robots-Tag` noindex для /admin, /cabinet, /room, /s). Этот блок закрывает остаток §5–§7: T-02, доработку шаблона статьи, гейты качества §6.3 P0 и лендинг L-01. Статьи не генерировались и не публиковались — пауза владельца в силе.
+
+- **Хаб `/articles`** (`hubPage` в `src/articles.js`, роут `GET /articles`): SSR-страница с карточками опубликованных статей и ссылками на лендинг L-01. Пустое состояние (сейчас) отдаёт 200 + `noindex` — пустышку в индекс не отдаём; при ≥1 published — `index, follow`. В шапке/футере статей и хаба — взаимные ссылки.
+- **Шаблон статьи** (`articlePage`): `og:url`, `BreadcrumbList` + `Article` с `dateModified`/`mainEntityOfPage` в JSON-LD (миграция `064_articles_updated_at.sql`, `updated_at` трогается при публикации и правке меты), блок «Читать ещё» (2–4 статьи того же стиля/комнаты), CTA с UTM (`utm_source=article`) и событием Метрики `article_cta_click{slug,position}`, `width/height` у обложки (1200×800) и товаров (600×600), строка «Цены и наличие указаны на <дата>», суффикс «— ремонтвижн» в title только если ≤60 символов, meta-поля редактора (`meta.meta_title`/`meta_description`) имеют приоритет над авто.
+- **Гейты качества** (`countArticleWords`, `validateArticleForPublish`, `findPublishedDuplicate` в `src/articles.js`): публикация (`POST /api/admin/articles/:id/publish`) отдаёт 422 с причинами, если <500 слов, <3 товаров со ссылкой, не заполнены meta_title/meta_description, либо кластер style×room уже опубликован. Генерация отдаёт 409 при дубле кластера; принимает `target_query` (в `meta`), товары получают `price_date`. Новые эндпоинты: `GET /api/admin/articles/:id` (черновик + проверки + счётчик слов), `PATCH /api/admin/articles/:id` (мета через jsonb-merge).
+- **Админка «Статьи»** (`Admin.tsx`): поле «целевой запрос» в форме генерации, кнопка «мета» у каждой статьи (редактирование target_query/meta_title/meta_description со счётчиками 60/160, счётчик слов и список причин блока; 422 при публикации показывает причины).
+- **Лендинг L-01** `public/ai-dizayn-interera-po-foto.html` + роут: статическая страница под кластер «дизайн комнаты по фото / нейросеть для дизайна интерьера» (~700 слов, Service + FAQPage JSON-LD, честные ограничения, CTA на генератор). Прошла `check-copy` (без «сметы»/«генераций»/«правок»).
+- **Sitemap**: статические записи `/articles` и `/ai-dizayn-interera-po-foto`.
+- Тесты: `test/articles.test.js` (8 тестов: слова, дубль, гейты, hubPage, шаблон), `test/sitemap.test.js` +2. Итог `npm test` — зелёный.
+
+## 2026-11-16 — инцидент: прод лежал после перезагрузки VPS (restart-политика БД)
+
+- **Симптом.** Все маршруты `https://www.remontvision.ru` отдавали 502; `app` и `catalog` в crash-loop, `db` и `catalog-db` — `Exited (255)` 31 час.
+- **Причина.** VPS перезагрузился 2026-11-15 05:09; у `db` и `catalog-db` в `docker-compose.yml` не было `restart`, поэтому контейнеры не поднялись. `app` не резолвил `db` (`EAI_AGAIN`) и падал. Данные целы, логи Postgres чистые, диск 30%, OOM не было.
+- **Восстановление.** Подняты `db` и `catalog-db` (`docker compose up -d`), app и catalog восстановились сами; прод-смоук зелёный. На работающие контейнеры БД сразу навешена restart-политика `docker update --restart unless-stopped`.
+- **Постоянный фикс.** `restart: unless-stopped` добавлен сервисам `db` и `catalog-db` в `docker-compose.yml` — после ребута VPS БД поднимаются сами.
+- **Вывод.** Внешнего монитора/алертов нет; 31 час простоя заметили только вручную. Нужен `scripts/ops/daily-check.sh` по расписанию + алерт.
 
 ## 2026-11-13 — финальное ревью ветки: правки доков, re-fit layout на кэш-хите, равномерный hashIndex
 

@@ -653,17 +653,46 @@ export const q = {
        JSON.stringify(f.palette || []), JSON.stringify(f.body || {}), JSON.stringify(f.products || []),
        f.status || 'draft', JSON.stringify(f.meta || {})]).then(r => r.rows[0]),
   listArticles: () =>
-    pool.query(`SELECT id, slug, title, style, room_type, tier, cover_path, status, created_at, published_at
+    pool.query(`SELECT id, slug, title, style, room_type, tier, cover_path, status, meta, created_at, published_at, updated_at
                 FROM articles ORDER BY created_at DESC`).then(r => r.rows),
   articleById: id =>
     pool.query(`SELECT * FROM articles WHERE id = $1`, [id]).then(r => r.rows[0] || null),
   articleBySlug: slug =>
     pool.query(`SELECT * FROM articles WHERE slug = $1 AND status = 'published'`, [slug]).then(r => r.rows[0] || null),
   publishArticle: id =>
-    pool.query(`UPDATE articles SET status = 'published', published_at = COALESCE(published_at, now())
+    pool.query(`UPDATE articles SET status = 'published', published_at = COALESCE(published_at, now()), updated_at = now()
                 WHERE id = $1 RETURNING *`, [id]).then(r => r.rows[0] || null),
+  // Частичное обновление meta (jsonb-merge верхнего уровня): target_query, meta_title и т.п.
+  updateArticleMeta: (id, metaPatch) =>
+    pool.query(`UPDATE articles SET meta = meta || $2::jsonb, updated_at = now()
+                WHERE id = $1 RETURNING *`, [id, JSON.stringify(metaPatch || {})]).then(r => r.rows[0] || null),
   deleteArticle: id =>
     pool.query(`DELETE FROM articles WHERE id = $1`, [id]).then(r => r.rowCount > 0),
+
+  // Галерея публичных генераций: приватные рендеры (приватный режим после оплаты) не показываем.
+  publicRenders: (roomType, limit, offset) =>
+    pool.query(
+      `SELECT r.id, r.style, r.share_token, rm.room_type, r.created_at
+       FROM renders r JOIN rooms rm ON rm.id = r.room_id
+       WHERE r.status = 'done' AND r.image_path IS NOT NULL AND COALESCE(r.is_private, false) = false
+         AND rm.room_type IS NOT NULL AND rm.room_type <> ''
+         AND ($1::text IS NULL OR rm.room_type = $1)
+       ORDER BY r.created_at DESC LIMIT $2 OFFSET $3`,
+      [roomType, limit, offset]).then(r => r.rows),
+  publicRendersCount: (roomType = null) =>
+    pool.query(
+      `SELECT count(*) FROM renders r JOIN rooms rm ON rm.id = r.room_id
+       WHERE r.status = 'done' AND r.image_path IS NOT NULL AND COALESCE(r.is_private, false) = false
+         AND rm.room_type IS NOT NULL AND rm.room_type <> ''
+         AND ($1::text IS NULL OR rm.room_type = $1)`,
+      [roomType]).then(r => Number(r.rows[0].count)),
+  galleryRooms: () =>
+    pool.query(
+      `SELECT rm.room_type AS name, count(*)::int AS count
+       FROM renders r JOIN rooms rm ON rm.id = r.room_id
+       WHERE r.status = 'done' AND r.image_path IS NOT NULL AND COALESCE(r.is_private, false) = false
+         AND rm.room_type IS NOT NULL AND rm.room_type <> ''
+       GROUP BY rm.room_type ORDER BY count DESC`).then(r => r.rows),
 
   // подбор товаров по рендеру
   renderOwnedByUser: (renderId, userId) =>
