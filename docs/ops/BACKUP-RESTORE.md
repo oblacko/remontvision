@@ -7,8 +7,8 @@
 
 | Объект | Где | Размер (2026-11-09) | Частота |
 |---|---|---|---|
-| БД `remontvision` | том `remontvision_pgdata` | 16 MB (дамп 1.3 MB) | daily |
-| Файлы `appdata` | том `remontvision_appdata` | 258 MB (архив 254 MB) | daily |
+| БД `remontvision` | том `remontvision_pgdata` | 16 MB (дамп 1.9 MB) | daily |
+| Файлы `appdata` | том `remontvision_appdata` | ≈360 MB (архив 341 MB) | daily |
 | БД `catalog` | том `remontvision_catalogdata` | 898 MB | weekly |
 | `.env`, TLS-ключи | `/root/remontvision/.env`, `/etc/letsencrypt` | — | отдельно, у владельца |
 
@@ -59,26 +59,29 @@ RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1 \
 rclone lsf rv-s3:remontvision-backups/daily
 ```
 
-## Расписание (после разрешения владельца)
+## Расписание (установлено 2026-11-21)
 
-Cron root на VPS (`crontab -e`). Часовой пояс VPS — MSK.
+Cron root на VPS (`crontab -l`). Часовой пояс VPS — MSK.
 
 ```cron
-# ежедневно: БД + файлы, обязательно с копией вне VPS
-30 3 * * * cd /root/remontvision && RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1 RV_BACKUP_LOCAL_KEEP=1 ./scripts/ops/backup.sh >> /var/log/remontvision-backup.log 2>&1
+# ежедневно: БД + файлы; локально храним 7 копий
+15 3 * * * cd /root/remontvision && RV_BACKUP_LOCAL_KEEP=7 ./scripts/ops/backup.sh >> /root/rv-backups/backup.log 2>&1
 
-# еженедельно: + каталог catalog-db
-0 3 * * 0 cd /root/remontvision && RV_BACKUP_REMOTE=rv-s3:remontvision-backups/weekly RV_BACKUP_REQUIRE_REMOTE=1 RV_BACKUP_LOCAL_KEEP=1 ./scripts/ops/backup.sh --weekly >> /var/log/remontvision-backup.log 2>&1
-
-# ежедневная проверка эксплуатации
-15 9 * * * cd /root/remontvision && ./scripts/ops/daily-check.sh --strict >> /var/log/remontvision-daily.log 2>&1
+# проверка эксплуатации каждый час (CRIT → код 1)
+7 * * * * cd /root/remontvision && ./scripts/ops/daily-check.sh --strict >> /root/rv-backups/check.log 2>&1
 ```
 
-`flock` внутри скрипта не даёт двум бэкапам пересечься. Логи ротировать:
+Целевая конфигурация после появления remote (требует разрешения владельца): добавить
+`RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1` к
+ежедневной строке, weekly-строку для `catalog-db` и уменьшить `RV_BACKUP_LOCAL_KEEP`
+до 1–2.
+
+`flock` внутри скрипта не даёт двум бэкапам пересечься. Сейчас logrotate **не**
+настроен: логи растут в `/root/rv-backups/*.log`. Добавить:
 
 ```bash
 # /etc/logrotate.d/remontvision
-/var/log/remontvision-*.log {
+/root/rv-backups/*.log {
   weekly
   rotate 8
   compress
@@ -87,8 +90,8 @@ Cron root на VPS (`crontab -e`). Часовой пояс VPS — MSK.
 }
 ```
 
-Хранение на remote: 14 daily + 8 weekly (bucket lifecycle). Локально — 1 каталог:
-на VPS свободно ~1.4 GB, полный архив 254 MB.
+Хранение на remote (после настройки): 14 daily + 8 weekly (bucket lifecycle).
+Локально — 7 каталогов (2.3 GB при диске 39%).
 
 ## Проверка восстановления (обязательно раз в месяц и после смены схемы)
 
@@ -131,13 +134,30 @@ cd /root/remontvision
 `/root/rv-backups/restore-drill-files-20261109.md`. Копии — в
 [docs/ops/drills/2026-11-09.md](drills/2026-11-09.md).
 
+### Протокол от 2026-11-21 (прод, cron-бэкап)
+
+| Проверка | Результат |
+|---|---|
+| Дамп | `db-remontvision-20261121-031501.dump` (cron 03:15 MSK), sha256 = manifest |
+| Временная БД | `postgres:16-alpine`, `--network none`, удалена |
+| `pg_restore` | OK |
+| Таблиц в `public` | 49 |
+| `users` / `rooms` / `renders` / `payments` / `products` | 6 / 132 / 204 / 16 / 110 |
+| `_migrations` | 64, последняя `063_render_queue.sql` |
+| Архив файлов | 341 MB, 1048 записей, gzip/sha256 OK, `.env` не входит |
+| **Итог** | **PASS** |
+
+Отчёт на VPS: `/root/rv-backups/restore-drill-20261121.md`. Копия —
+[docs/ops/drills/2026-11-21.md](drills/2026-11-21.md).
+
 ### Перепроверка инструментов 2026-11-21 (dev, не прод)
 
-На текущей схеме (66 миграций) локально прогнаны `backup.sh --db-only` и
+На текущей схеме локально прогнаны `backup.sh --db-only` и
 `restore-verify.sh --latest`: дамп снят, sha256 совпал, `pg_restore` в чистый
 `postgres:16-alpine` без ошибок, 49 таблиц, счётчики совпали с manifest, последняя
 миграция `064_articles_updated_at.sql`. Это подтверждает, что скрипты не устарели;
-приёмка G4 по-прежнему требует бэкап **с прода** и копию **вне VPS**.
+приёмка G4 по-прежнему требует бэкап **с прода** и копию **вне VPS** (первое уже
+подтверждено протоколом выше).
 
 ## Полное восстановление на новом сервере
 
@@ -165,7 +185,8 @@ cd /root/remontvision
 
 ## Риски и ограничения
 
-- Диск 86%: до расширения держим локально 1 полную копию; следить за `daily-check`.
+- Диск на 2026-11-21 — 39% (свободно ~23 GB), локально 7 копий (2.3 GB); следить за
+  `daily-check`. Глубокое хранение — только на remote.
 - Нет шифрования client-side: защита — приватный bucket + SSE + TLS. Для PII можно
   добавить `gpg --symmetric` перед upload (ключ хранить отдельно у владельца).
 - Нет проверки «бэкап за вчера есть на remote» отдельным алертом: `daily-check` проверяет

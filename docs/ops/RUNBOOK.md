@@ -78,7 +78,9 @@ df -h /var/lib/docker
 
 ## 4. Диск заполнен
 
-На 2026-11-09 занято 86% (свободно ~1.4 GB). Полный бэкап — 254 MB.
+На 2026-11-21 занято 39% (свободно ~23 GB); 2026-11-09 было 86% — диск расширен.
+Полный бэкап — 341 MB, локально 7 копий. Если `daily-check` даёт WARN ≥ 80% или
+CRIT ≥ 90%, действовать сразу.
 
 ```bash
 df -h /
@@ -149,7 +151,7 @@ docker compose exec -T db psql -U remont -d remontvision -c \
 
 ```bash
 cd /root/remontvision
-tail -100 /var/log/remontvision-backup.log
+tail -100 /root/rv-backups/backup.log
 ls -la /root/rv-backups | tail
 ./scripts/ops/backup.sh
 ```

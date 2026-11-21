@@ -76,17 +76,18 @@
 6. **Style-ref/hero-референсы** выключены по умолчанию (`text`).
 7. **Правила промта `catalogOn`, `styling`** не доходят до генерации; `furnitureOff` исправлен. Кнопка «Найти товары» скрыта до оживления procurement.
 8. **Возвраты выключены** (`REFUNDS_ENABLED=false`); чеки автоматические через `src/receipts.js` при `RECEIPTS_WEBHOOK_URL`, без него — `pending` в `receipts`.
-9. **Диск прода 91%**, бэкап 45 ч без `db_dump` — по проверке 2026-11-11, требует перепроверки; эксплуатационный CRIT.
+9. **Эксплуатация:** диск прода 39% (был 91%), cron-бэкап БД+файлов работает, restore проверен 2026-11-21 (PASS); копии **вне VPS** и внешнего uptime-алерта нет — G4/G8 не закрыты (см. `docs/ops/CHECKLIST-G4-G8.md`).
 10. **Inpainting** люстр/розеток отсутствует.
 11. **Один провайдер** — OpenRouter.
 
 ## Проверка (свежие прогоны, 2026-11-12)
 
-- `npm test` — 417 pass, 1 skip (включая регрессию 20/20).
-- `npm run test:integration` — 75/75.
+- `npm test` — 421 pass, 1 skip (прогон 2026-11-21, включая регрессию 20/20).
+- `npm run test:integration` — 75/75 (прогон 2026-11-21).
 - `cd web && npm run lint` — 0 errors; `npm run build` — зелёный.
 - `catalog-service` pytest — 72 passed (сервис не менялся, прогон 2026-11-11).
 - Прод-смоук 2026-11-12: `/api/health` → `ok:true`, `/` → 200, `/app` → 301, `/offer` → 200, `/api/referral/context` → `{invited:false}`, `/api/credits/refunds` без auth → 401 — PASS.
+- Ops 2026-11-21: `smoke.sh` — PASS; `restore-verify.sh --latest` с прод-бэкапа — PASS (49 таблиц, migrations=64); `daily-check` — WARN только «off-site копия не отмечена».
 - Миграции на проде: `059`, `060`, `061` (после деплоя 2026-11-12).
 
 ## Отложено (осознанно)
