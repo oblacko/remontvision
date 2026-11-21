@@ -1,10 +1,9 @@
 name: articles-batch
 
-# Пакетная генерация статей-рендеров. OpenRouter блокирует chat/completions
-# с IP VPS ("Access denied by security policy"), поэтому батч исполняется на
-# раннере GitHub (другой egress), а к прод-БД и catalog-service доступ — через
-# SSH-туннели (те же ключи, что у деплоя). Ключи Wordstat — секрет
-# KEYWORDS_CSV_B64 (gzip+base64; репозиторий публичный).
+# Пакетная генерация статей-рендеров на VPS. OpenRouter доступен с VPS только
+# через настроенный прокси (app_settings proxy.url / HTTPS_PROXY): скрипт сам
+# подгружает конфиг (loadProxyConfig), туннели и раннер не нужны.
+# Ключи Wordstat — секрет KEYWORDS_CSV_B64 (gzip+base64; репозиторий публичный).
 # Запуск: Actions → articles-batch → Run workflow.
 
 on:
@@ -27,13 +26,7 @@ jobs:
   batch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Туннели к прод-БД и catalog-service, затем батч на раннере
+      - name: CSV на VPS и батч в контейнере приложения
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -45,40 +38,16 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -R "$DEPLOY_HOST" 2>/dev/null || true
-
-          # Реальный env приложения ИЗ КОНТЕЙНЕРА (compose переопределяет .env —
-          # прошлый запуск взял устаревший пароль). Дамп в файл, в лог не выводим.
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            "docker compose -f /root/remontvision/docker-compose.yml exec -T app env" > /tmp/appenv.txt
-          grep -E '^(RV_DATABASE_URL|OPENROUTER_API_KEY|CATALOG_SERVICE_URL|CATALOG_SERVICE_TOKEN|ARTICLE_MODEL)=' /tmp/appenv.txt > /tmp/prod.env
-          # хост:порт БД → на туннель
-          sed -i -E 's#@[^@/]+:[0-9]+/#@127.0.0.1:15434/#' /tmp/prod.env
-          printf '%s\n' 'CATALOG_SERVICE_URL=http://127.0.0.1:18000' 'OPENROUTER_BASE=https://openrouter.ai/api/v1' >> /tmp/prod.env
-          grep -c '=' /tmp/prod.env
-          grep '^RV_DATABASE_URL=' /tmp/prod.env | sed -E 's#://[^@]+@#://***@#; s#:[^:@]+@#:***@#'
-
-          # IP контейнера БД: туннель ведём НАПРЯМУЮ в контейнер (иначе подключение
-          # идёт с 127.0.0.1 и попадает под другое правило pg_hba — пароль не принимается)
-          DB_IP="$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \$(docker compose -f /root/remontvision/docker-compose.yml ps -q db)")"
-          echo "db_ip=${DB_IP:-empty}"
-          TARGET="${DB_IP:-127.0.0.1}"
-          TPORT="5432"
-          if [ -z "$DB_IP" ]; then TARGET="127.0.0.1"; TPORT="5434"; fi
-
-          # туннели: 15434 → postgres (контейнер), 18000 → catalog-service VPS
-          ssh -f -N -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-            -L 15434:"$TARGET":"$TPORT" -L 18000:127.0.0.1:8000 "$DEPLOY_USER@$DEPLOY_HOST"
-          sleep 3
-
           printf '%s' "$KEYWORDS_CSV_B64" | base64 -d | gunzip > /tmp/keywords.csv
           wc -l /tmp/keywords.csv
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new /tmp/keywords.csv "$DEPLOY_USER@$DEPLOY_HOST:/tmp/keywords.csv"
 
           PUBLISH_FLAG=""
           if [ "${{ inputs.publish }}" = "true" ]; then PUBLISH_FLAG="--publish"; fi
           FIX_FLAG=""
           if [ "${{ inputs.fix_meta }}" = "true" ]; then FIX_FLAG="--fix-meta"; fi
 
-          node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --env-file /tmp/prod.env --limit "${{ inputs.limit }}" $PUBLISH_FLAG $FIX_FLAG 2>&1 | grep -vE '^\{"ts"'
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker compose -f /root/remontvision/docker-compose.yml cp /tmp/keywords.csv app:/tmp/keywords.csv && \
+             docker compose -f /root/remontvision/docker-compose.yml exec -T app \
+               node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --limit ${{ inputs.limit }} $PUBLISH_FLAG $FIX_FLAG"

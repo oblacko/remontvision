@@ -53,6 +53,14 @@ if (envFileArg && fs.existsSync(envFileArg)) {
 }
 
 process.env.RV_DATABASE_URL = process.env.RV_DATABASE_URL || '';
+
+// Прокси для OpenRouter: в отдельном процессе (не app) конфиг никто не применяет —
+// подгружаем сами из app_settings (proxy.url) или HTTPS_PROXY, иначе direct-egress
+// VPS получает 403 от OpenRouter.
+const { loadProxyConfig, getProxyState } = await import('../src/proxy.js');
+await loadProxyConfig();
+console.log('proxy:', JSON.stringify(getProxyState({ masked: true })));
+
 const { q } = await import('../src/db.js');
 const {
   generateArticleFromRender,
