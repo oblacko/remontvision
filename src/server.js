@@ -149,10 +149,6 @@ for (const [route, file] of Object.entries(LEGAL_PAGES)) {
 // SEO-лендинг под кластер «дизайн интерьера по фото» (аудит 09.11.2026, §7 L-01).
 app.get(['/ai-dizayn-interera-po-foto', '/ai-dizayn-interera-po-foto/'], (_req, res) =>
   res.sendFile(path.join(process.cwd(), 'public', 'ai-dizayn-interera-po-foto.html')));
-// Лендинг промт-кластера: реальные промты из опубликованных статей.
-app.get(['/promty/dizayn-interera', '/promty/dizayn-interera/'], h(async (_req, res) => {
-  res.type('html').send(promptsPage(await q.articlesWithPrompts()));
-}));
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const IMG_EXT = UPLOAD_MIME;
@@ -2014,6 +2010,10 @@ function notFoundPage(title, text) {
 app.get(['/articles', '/articles/'], h(async (_req, res) => {
   const rooms = (await q.galleryRooms()).map(r => ({ name: r.name, slug: slugify(r.name), count: r.count }));
   res.type('html').send(hubPage(await q.listArticles(), { rooms }));
+}));
+// Лендинг промт-кластера: реальные промты из опубликованных статей.
+app.get(['/promty/dizayn-interera', '/promty/dizayn-interera/'], h(async (_req, res) => {
+  res.type('html').send(promptsPage(await q.articlesWithPrompts()));
 }));
 // Галерея публичных генераций: первая страница и фильтры по комнатам — index,
 // глубокие листания (?page=N) — noindex (решение владельца 21.11.2026).
