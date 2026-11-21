@@ -131,6 +131,14 @@ cd /root/remontvision
 `/root/rv-backups/restore-drill-files-20261109.md`. Копии — в
 [docs/ops/drills/2026-11-09.md](drills/2026-11-09.md).
 
+### Перепроверка инструментов 2026-11-21 (dev, не прод)
+
+На текущей схеме (66 миграций) локально прогнаны `backup.sh --db-only` и
+`restore-verify.sh --latest`: дамп снят, sha256 совпал, `pg_restore` в чистый
+`postgres:16-alpine` без ошибок, 49 таблиц, счётчики совпали с manifest, последняя
+миграция `064_articles_updated_at.sql`. Это подтверждает, что скрипты не устарели;
+приёмка G4 по-прежнему требует бэкап **с прода** и копию **вне VPS**.
+
 ## Полное восстановление на новом сервере
 
 1. Установить Docker + Compose, клонировать репозиторий в `/root/remontvision`.

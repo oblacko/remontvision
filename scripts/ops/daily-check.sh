@@ -167,11 +167,17 @@ if logs="$(compose logs --since "$SINCE" --no-color app 2>/dev/null)"; then
   timeout_n="$(ev render_timeout)"
   webhook_err="$(ev webhook_error)"
   payment_n="$(ev payment_created)"
+  paid_n="$(ev payment_succeeded)"
+  amount_mismatch="$(ev payment_amount_mismatch)"
+  receipt_err="$(ev receipt_hook_error)"
+  robokassa_err="$(ev robokassa_state_error)"
+  refund_err="$(ev refund_receipt_error)"
   credit_back="$(ev credit_restored)"
   n429="$(grep -cE '("status"[[:space:]]*:[[:space:]]*429|HTTP[ /]429|429 Too Many|rate.?limit)' <<< "$logs" || true)"
 
   info "render_done=$done_n render_error=$err_n render_timeout=$timeout_n credit_restored=$credit_back"
-  info "payments_created=$payment_n webhook_error=$webhook_err 429_lines=$n429"
+  info "payments_created=$payment_n payment_succeeded=$paid_n webhook_error=$webhook_err 429_lines=$n429"
+  info "payment_amount_mismatch=$amount_mismatch receipt_hook_error=$receipt_err robokassa_state_error=$robokassa_err refund_receipt_error=$refund_err"
 
   total=$((done_n + err_n))
   if ((total >= 10)); then
@@ -185,6 +191,10 @@ if logs="$(compose logs --since "$SINCE" --no-color app 2>/dev/null)"; then
   fi
 
   ((webhook_err > 0)) && warn "webhook_error за ${SINCE}: $webhook_err" || ok "webhook_error нет"
+  ((amount_mismatch > 0)) && crit "payment_amount_mismatch за ${SINCE}: $amount_mismatch (сверить сумму платежа)" || true
+  ((receipt_err > 0)) && warn "receipt_hook_error за ${SINCE}: $receipt_err (чек 54-ФЗ)" || true
+  ((robokassa_err > 0)) && warn "robokassa_state_error за ${SINCE}: $robokassa_err" || true
+  ((refund_err > 0)) && warn "refund_receipt_error за ${SINCE}: $refund_err" || true
   ((n429 > 0)) && warn "строк с 429 за ${SINCE}: $n429" || ok "429 не встречался"
 
   if ((err_n > 0)); then

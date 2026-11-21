@@ -58,7 +58,9 @@ Workflow должен попасть в `main`, а пуш в `main` запуск
 - свежесть бэкапа (`> 26 ч` — CRIT), наличие `db_dump`, `files_archive`, `remote=`;
 - TLS-сертификат (`< 14 дн` — WARN, `< 7` — CRIT);
 - логи за 24 ч: `render_done`, `render_error`, `render_timeout`, `credit_restored`,
-  `payment_created`, `webhook_error`, строки с `429`;
+  `payment_created`, `payment_succeeded`, `webhook_error`, `payment_amount_mismatch`,
+  `receipt_hook_error`, `robokassa_state_error`, `refund_receipt_error`,
+  строки с `429`;
 - доля `render_error` от `done+error`: WARN ≥ 10%, CRIT ≥ 25%;
 - топ `stage` ошибок и последние 5 ошибок (обрезаны до 300 символов).
 
@@ -118,11 +120,16 @@ WHERE cleanup_status = 'error' ORDER BY cleanup_finished_at DESC LIMIT 20;
 Смотреть ежедневно:
 
 ```bash
-docker compose logs --since 24h app | grep -E '"event":"(payment_created|webhook_error|refund_error)"'
+docker compose logs --since 24h app | grep -E '"event":"(payment_created|payment_succeeded|webhook_error|payment_amount_mismatch|receipt_hook_error|robokassa_state_error|refund_receipt_error)"'
 ```
 
+- `payment_amount_mismatch` > 0 — **CRIT в daily-check**: сумма от провайдера не совпала
+  с локальной; сверить `payments`, не начислять вручную до разбора;
 - `webhook_error` > 0 — проверить подпись/URL Robokassa и повторно синхронизировать платёж;
-- `payment_created` без начисления — сверить `payments` и `credit_txn` в БД;
+- `payment_created` без `payment_succeeded` — сверить `payments` и `credit_txn` в БД;
+  часть брошенных оплат нормальна, важен рост доли;
+- `receipt_hook_error` / `robokassa_state_error` / `refund_receipt_error` — ошибки чека
+  54-ФЗ, опроса состояния или чека возврата; проверить настройки Robokassa;
 - возвраты выключены (`REFUNDS_ENABLED=false`) — делать вручную.
 
 Автоматического алерта на «платёж не начислился» нет: это ручная сверка.
