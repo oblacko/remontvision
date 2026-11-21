@@ -39,6 +39,19 @@ try {
   }
 } catch { /* .env необязателен: env могут быть заданы процессом (контейнер) */ }
 
+// Явные значения из --env-file перекрывают всё (важно: без интерполяции shell —
+// пароли с $/#/пробелами не ломаются, в отличие от source).
+const envFileArg = arg('env-file');
+if (envFileArg && fs.existsSync(envFileArg)) {
+  for (const line of fs.readFileSync(envFileArg, 'utf8').split('\n')) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (!m) continue;
+    let v = m[2];
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    process.env[m[1]] = v;
+  }
+}
+
 process.env.RV_DATABASE_URL = process.env.RV_DATABASE_URL || '';
 const { q } = await import('../src/db.js');
 const {
