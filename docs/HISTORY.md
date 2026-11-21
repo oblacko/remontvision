@@ -23,6 +23,14 @@
 - **Sitemap**: `/gallery` + `/gallery/<комната>` подмешиваются в статические записи на лету.
 - **Тесты**: `test/gallery.test.js` (5), `test/articles.test.js` +3 (хаб-секции, блок промта, autoMetaTitle). Итог `npm test` 438/438, `check-copy` чисто.
 
+### Первая партия на проде (21.11, вечер)
+
+- Опубликованы 5 статей-рендеров через гейты (680–766 слов, 3 товара Hoff, промт-блок, обложка-рендер): `/articles/skandinavskiy-kuhnya-a7c859`, `-sanuzel-229c72`, `-gostinaya-zal-f910da`, `-detskaya-897f63`, `-kabinet-1dbe23`. Плюс 2 ручные (владелец): `skandinavskiy-spalnya-c240e2`, `dzhapandi-kabinet-40f90c`. Итого 7 статей в индексной очереди.
+- **OpenRouter блокирует chat/completions с IP VPS** (`403 Access denied by security policy`, рендеры при этом работают). Батч перенесён на раннер GitHub Actions: SSH-туннели к БД и catalog-service, генерация с egress раннера. Workflow `.github/workflows/articles-batch.yml` (`workflow_dispatch`: limit, publish, fix_meta).
+- **Ловушка окружения:** `docker-compose.yml` переопределяет `RV_DATABASE_URL` из `.env` — для фоновых скриптов реальный env только из контейнера (`docker compose exec app env`), иначе «password authentication failed».
+- `autoMetaTitle` фикс: на границе 60 символов срезал последнее слово; `--fix-meta` перезаписал meta_title у 3 статей.
+- Публичная раздача обложек рендеров: `GET /article-cover/:file` (renders-dir; имена UUID).
+
 ## 2026-11-21 — SEO-волна 0 (остаток): хаб статей, гейты публикации, лендинг «дизайн по фото»
 
 По SEO-аудиту от 09.11.2026 (ред. 6). Часть аудита уже была внедрена ранее (динамический sitemap, честные формулировки, `X-Robots-Tag` noindex для /admin, /cabinet, /room, /s). Этот блок закрывает остаток §5–§7: T-02, доработку шаблона статьи, гейты качества §6.3 P0 и лендинг L-01. Статьи не генерировались и не публиковались — пауза владельца в силе.
