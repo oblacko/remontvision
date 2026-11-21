@@ -52,9 +52,19 @@ jobs:
           grep -c '=' /tmp/prod.env
           grep '^RV_DATABASE_URL=' /tmp/prod.env | sed -E 's/:[^:@]+@/:***@/'
 
-          # туннели: 15434 → postgres VPS, 18000 → catalog-service VPS
+          # IP контейнера БД: туннель ведём НАПРЯМУЮ в контейнер (иначе подключение
+          # идёт с 127.0.0.1 и попадает под другое правило pg_hba — пароль не принимается)
+          DB_IP="$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \$(docker compose -f /root/remontvision/docker-compose.yml ps -q db)")"
+          echo "db_ip=${DB_IP:-empty}"
+          TARGET="${DB_IP:-127.0.0.1}"
+          TPORT="5432"
+          if [ -z "$DB_IP" ]; then TARGET="127.0.0.1"; TPORT="5434"; fi
+
+          # туннели: 15434 → postgres (контейнер), 18000 → catalog-service VPS
           ssh -f -N -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
-            -L 15434:127.0.0.1:5434 -L 18000:127.0.0.1:8000 "$DEPLOY_USER@$DEPLOY_HOST"
+            -L 15434:"$TARGET":"$TPORT" -L 18000:127.0.0.1:8000 "$DEPLOY_USER@$DEPLOY_HOST"
           sleep 3
 
           printf '%s' "$KEYWORDS_CSV_B64" | base64 -d | gunzip > /tmp/keywords.csv
