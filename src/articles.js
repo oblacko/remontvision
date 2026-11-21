@@ -362,8 +362,12 @@ function formatRuDate(value) {
   return `${d.getDate()} ${RU_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-const METRIKA_COUNTER = `<!-- Yandex.Metrika counter -->
-<script type="text/javascript">
+// Рекламная сеть Яндекса (Autoplacement) — внутри контента статьи.
+const YANDEX_ADS = `<!-- Yandex Autoplacement 20466972 -->
+<script src="https://yandex.ru/ads/system/context.js" async></script>
+<script data-page-id="20466972" src="https://yandex.ru/ads/system/ap-loader.js" async></script>`;
+
+const METRIKA_COUNTER = `<!-- Yandex.Metrika counter --><script type="text/javascript">
     (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
     m[i].l=1*new Date();
     for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
@@ -500,6 +504,7 @@ footer{max-width:1000px;margin:0 auto;padding:24px 20px 48px;border-top:1px soli
 <h1>${title}</h1>
 ${cover ? `<img class="cover" src="${cover}" alt="${title}" width="1200" height="800">` : ''}
 <p class="intro">${esc(body.intro || '')}</p>
+${YANDEX_ADS}
 ${palette.length ? `<h2>Палитра и материалы</h2><div class="swatches">${paletteHtml}</div><p>${esc(body.palette_notes || '')}</p>` : ''}
 ${howto ? `<h2>Как собрать интерьер</h2><ul class="howto">${howto}</ul>` : ''}
 ${productCards ? `<h2>Товары из каталога Hoff</h2><div class="grid">${productCards}</div>${priceDateText ? `<p class="pricedate">Цены и наличие указаны на ${priceDateText} — проверяйте перед покупкой.</p>` : ''}` : ''}
