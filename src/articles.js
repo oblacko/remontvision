@@ -124,6 +124,7 @@ export function autoMetaTitle(title) {
   const clean = String(title || '').replace(/\s+/g, ' ').trim();
   if (!clean) return 'Дизайн интерьера — ремонтвижн';
   if (clean.length + suffix.length <= 60) return clean + suffix;
+  if (clean.length <= 60) return clean; // без суффикса, но и без обрезки слова
   return clean.slice(0, 60).replace(/\s+\S*$/, '');
 }
 

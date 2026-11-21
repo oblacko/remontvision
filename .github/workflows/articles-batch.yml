@@ -18,6 +18,10 @@ on:
         description: 'Публиковать после гейтов (true/false)'
         required: true
         default: 'true'
+      fix_meta:
+        description: 'Только починить meta_title у опубликованных (true/false)'
+        required: true
+        default: 'false'
 
 jobs:
   batch:
@@ -74,5 +78,7 @@ jobs:
 
           PUBLISH_FLAG=""
           if [ "${{ inputs.publish }}" = "true" ]; then PUBLISH_FLAG="--publish"; fi
+          FIX_FLAG=""
+          if [ "${{ inputs.fix_meta }}" = "true" ]; then FIX_FLAG="--fix-meta"; fi
 
-          node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --env-file /tmp/prod.env --limit "${{ inputs.limit }}" $PUBLISH_FLAG 2>&1 | grep -vE '^\{"ts"'
+          node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --env-file /tmp/prod.env --limit "${{ inputs.limit }}" $PUBLISH_FLAG $FIX_FLAG 2>&1 | grep -vE '^\{"ts"'

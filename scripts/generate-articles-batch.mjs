@@ -59,7 +59,24 @@ const {
   findPublishedDuplicate,
   validateArticleForPublish,
   countArticleWords,
+  autoMetaTitle,
 } = await import('../src/articles.js');
+
+// Только починка meta_title у опубликованных (флаг --fix-meta).
+if (hasFlag('fix-meta')) {
+  const rows = (await q.listArticles()).filter(a => a.status === 'published');
+  let fixed = 0;
+  for (const a of rows) {
+    const mt = autoMetaTitle(a.title);
+    if (String(a.meta?.meta_title || '') !== mt) {
+      await q.updateArticleMeta(a.id, { meta_title: mt });
+      console.log(`FIX /${a.slug} → «${mt}»`);
+      fixed += 1;
+    }
+  }
+  console.log(`meta_title обновлён у ${fixed}/${rows.length} опубликованных`);
+  process.exit(0);
+}
 
 // Мэппинг фраз на комнаты: первое вхождение маркера определяет комнату.
 const ROOM_MARKERS = [

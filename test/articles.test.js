@@ -136,6 +136,9 @@ test('articles: articlePage shows the render prompt block when present', () => {
 
 test('articles: autoMetaTitle keeps brand suffix under 60 chars and trims by word', () => {
   assert.equal(autoMetaTitle('Скандинавская спальня'), 'Скандинавская спальня — ремонтвижн');
+  // 56 символов: с суффиксом >60 — отдаём чистый заголовок БЕЗ срезки последнего слова
+  const mid = autoMetaTitle('Скандинавская кухня: свет, дуб и спокойная практичность');
+  assert.equal(mid, 'Скандинавская кухня: свет, дуб и спокойная практичность');
   const long = autoMetaTitle('Очень длинный заголовок статьи про интерьер, который не влезает в лимит символов поиска');
   assert.ok(long.length <= 60);
   assert.ok(!long.endsWith(' '));
