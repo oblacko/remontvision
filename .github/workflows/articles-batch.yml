@@ -1,0 +1,45 @@
+name: articles-batch
+
+# Пакетная генерация статей-рендеров на VPS (scripts/generate-articles-batch.mjs).
+# Ключи Wordstat передаются через секрет KEYWORDS_CSV (не коммитим: репозиторий публичный).
+# Запуск: Actions → articles-batch → Run workflow (limit, publish).
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Максимум кластеров style×room'
+        required: true
+        default: '8'
+      publish:
+        description: 'Публиковать после гейтов (true/false)'
+        required: true
+        default: 'true'
+
+jobs:
+  batch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Копируем CSV на VPS и запускаем батч
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          # CSV с ключами, gzip+base64 (лимит секрета 48 КБ; всё ниже ~400 показов отсечено на источнике)
+          KEYWORDS_CSV_B64: ${{ secrets.KEYWORDS_CSV_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s' "$KEYWORDS_CSV_B64" | base64 -d | gunzip > /tmp/keywords.csv
+          wc -l /tmp/keywords.csv
+          PUBLISH_FLAG=""
+          if [ "${{ inputs.publish }}" = "true" ]; then PUBLISH_FLAG="--publish"; fi
+          ssh-keygen -R "$DEPLOY_HOST" 2>/dev/null || true
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new /tmp/keywords.csv "$DEPLOY_USER@$DEPLOY_HOST:/tmp/keywords.csv"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker compose -f /root/remontvision/docker-compose.yml cp /tmp/keywords.csv app:/tmp/keywords.csv && \
+             docker compose -f /root/remontvision/docker-compose.yml exec -T app \
+               node scripts/generate-articles-batch.mjs --csv /tmp/keywords.csv --limit ${{ inputs.limit }} $PUBLISH_FLAG"
