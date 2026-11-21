@@ -39,6 +39,10 @@ jobs:
           if [ "${{ inputs.publish }}" = "true" ]; then PUBLISH_FLAG="--publish"; fi
           ssh-keygen -R "$DEPLOY_HOST" 2>/dev/null || true
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new /tmp/keywords.csv "$DEPLOY_USER@$DEPLOY_HOST:/tmp/keywords.csv"
+          echo "---openrouter probe---"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker compose -f /root/remontvision/docker-compose.yml exec -T app node -e 'const k=process.env.OPENROUTER_API_KEY;fetch(\"https://openrouter.ai/api/v1/chat/completions\",{method:\"POST\",headers:{Authorization:\"Bearer \"+k,\"Content-Type\":\"application/json\"},body:JSON.stringify({model:process.env.ARTICLE_MODEL||\"deepseek/deepseek-v4.1-flash-1017\",messages:[{role:\"user\",content:\"Say OK\"}],max_tokens:5})}).then(r=>r.text().then(t=>console.log(\"probe:\",r.status,t.slice(0,160))))'"
+          echo "---batch---"
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
             "docker compose -f /root/remontvision/docker-compose.yml cp /tmp/keywords.csv app:/tmp/keywords.csv && \
              docker compose -f /root/remontvision/docker-compose.yml exec -T app \

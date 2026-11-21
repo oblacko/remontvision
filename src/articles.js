@@ -108,6 +108,15 @@ const ARTICLE_RENDER_SYSTEM = `Ты редактор интерьерного ж
 - howto — практичные шаги (свет, фактуры, зонирование, декор).
 Только JSON.`;
 
+// Второй проход, если модель недописала объём: расширяем разделы без добавления фактов.
+const ARTICLE_EXPAND_SYSTEM = `Тебе дан JSON статьи об интерьере. Расширь текст, сохранив смысл и структуру:
+- intro — 120–180 слов;
+- каждый пункт howto — 50–90 слов;
+- palette_notes — 70–120 слов;
+- conclusion — 50–90 слов.
+Ничего не выдумывай: цены, ссылки и товары не добавляй и не меняй.
+Верни строго JSON той же схемы: {"intro":"...","howto":[...],"palette_notes":"...","conclusion":"..."}. Только JSON.`;
+
 // Мета от автомата (пакетная генерация, решение владельца 21.11.2026):
 // суффикс бренда, если укладывается в лимит выдачи, иначе обрезка по слову.
 export function autoMetaTitle(title) {
@@ -240,6 +249,28 @@ export async function generateArticleFromRender({ render, style, roomType, tier 
     conclusion: String(parsed.conclusion || '').slice(0, 600),
     prompt: String(render.prompt || '').slice(0, 1500) || null,
   };
+  // Модель часто недописывает объём: один расширяющий проход, чтобы гейт ≥500 слов проходился честно.
+  let textCostTotal = textCost ?? null;
+  if (countArticleWords(body) < 600) {
+    try {
+      const { parsed: ex, cost: exCost } = await visionJson({
+        system: ARTICLE_EXPAND_SYSTEM,
+        user: JSON.stringify({
+          intro: body.intro, howto: body.howto,
+          palette_notes: body.palette_notes, conclusion: body.conclusion,
+        }),
+        images: [],
+        model: ARTICLE_MODEL,
+      });
+      if (ex?.intro) body.intro = String(ex.intro).slice(0, 2000);
+      if (Array.isArray(ex?.howto) && ex.howto.length) body.howto = ex.howto.map(s => String(s).slice(0, 400)).slice(0, 6);
+      if (ex?.palette_notes) body.palette_notes = String(ex.palette_notes).slice(0, 1000);
+      if (ex?.conclusion) body.conclusion = String(ex.conclusion).slice(0, 800);
+      textCostTotal = (textCost ?? 0) + (exCost ?? 0);
+    } catch (e) {
+      log({ event: 'article_expand_error', error: String(e.message || e).slice(0, 200) });
+    }
+  }
   const finalTitle = String(title || parsed.title || `${style} ${roomType}: как собрать интерьер`).slice(0, 140);
   const slug = `${slugify(`${style}-${roomType}`)}-${crypto.randomBytes(3).toString('hex')}`;
   return q.createArticle({
@@ -255,7 +286,7 @@ export async function generateArticleFromRender({ render, style, roomType, tier 
     status: 'draft',
     meta: {
       model: ARTICLE_MODEL,
-      text_cost: textCost ?? null,
+      text_cost: textCostTotal,
       cover_aspect: '3:2',
       source_render_id: render.id,
       target_query: kw[0] || null,
