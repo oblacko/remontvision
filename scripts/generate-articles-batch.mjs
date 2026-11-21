@@ -80,7 +80,8 @@ if (hasFlag('publish-drafts')) {
   let pub = 0;
   for (const d of drafts) {
     try {
-      let body = d.body || {};
+      const full = await q.articleById(d.id); // listArticles не несёт body/products
+      let body = full?.body || {};
       let words = countArticleWords(body);
       if (words < MIN_ARTICLE_WORDS) {
         const ex = await expandArticleBody(body);
@@ -88,7 +89,7 @@ if (hasFlag('publish-drafts')) {
         await q.updateArticleBody(d.id, body);
         words = countArticleWords(body);
       }
-      const fresh = { ...d, body };
+      const fresh = { ...(full || d), body };
       const reasons = validateArticleForPublish(fresh, await q.listArticles(), { maxPerCluster: perCluster });
       if (reasons.length) {
         console.log(`DRAFT-KEEP /${d.slug}: ${words} слов; ${reasons.join('; ')}`);
