@@ -1990,6 +1990,9 @@ app.get('/products/:file', h(async (req, res) => serveStored(req, res, 'products
 app.get('/procurement/:file', h(async (req, res) => serveStored(req, res, 'procurement', req.params.file)));
 app.get('/style-images/:file', h(async (req, res) => serveStored(req, res, 'style-images', req.params.file)));
 app.get('/covers/:file', h(async (req, res) => serveStored(req, res, 'covers', req.params.file)));
+// Обложки статей-рендеров лежат в renders/ (приватная раздача /renders/:file требует
+// владельца) — публичный маршрут только для обложек; имена файлов — UUID.
+app.get('/article-cover/:file', h(async (req, res) => serveStored(req, res, 'renders', req.params.file)));
 function notFoundPage(title, text) {
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} — ремонтвижн</title><meta name="robots" content="noindex"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><style>body{margin:0;background:#f5f2ec;color:#1e1c19;font-family:Georgia,'Times New Roman',serif;display:flex;min-height:100vh;align-items:center;justify-content:center}.box{max-width:520px;padding:40px 24px;text-align:center}.logo{display:inline-block}.logo img{display:block;height:20px;width:auto;margin:0 auto}h1{font-size:clamp(32px,6vw,56px);line-height:1.05;margin:24px 0 12px}p{color:#6b645c;line-height:1.6}a.btn{display:inline-block;margin-top:24px;padding:14px 22px;background:#1e1c19;color:#f5f2ec;text-decoration:none;font-family:system-ui,sans-serif;font-size:14px}</style></head><body><div class="box"><a class="logo" href="/" aria-label="Ремонтвижн — на главную"><img src="/logo.svg" alt="Ремонтвижн"></a><h1>${title}</h1><p>${text}</p><a class="btn" href="/">На главную</a></div></body></html>`;
 }

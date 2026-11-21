@@ -301,6 +301,15 @@ function productNote(body, offerId) {
   return note?.note || '';
 }
 
+// URL обложки: статья-рендер хранит картинку в renders/ — отдаём через публичный
+// /article-cover/:file (имена файлов — UUID, та же экспозиция, что у /gallery/img),
+// обычные статьи — через /covers/:file.
+function coverUrl(coverPath) {
+  if (!coverPath) return '';
+  const base = path.basename(String(coverPath));
+  return String(coverPath).startsWith('renders/') ? `/article-cover/${base}` : `/covers/${base}`;
+}
+
 // --- Гейты качества (аудит SEO 09.11.2026, §6.2/§6.3 P0): без их прохождения
 // публикация заблокирована. Пороги ниже целевых значений редактора (600–900 слов):
 // автомат отсекает тонкий контент, а не душит полезный.
@@ -367,7 +376,7 @@ const METRIKA_COUNTER = `<!-- Yandex.Metrika counter -->
 export function articlePage(article, { related = [] } = {}) {
   const body = article.body || {};
   const products = Array.isArray(article.products) ? article.products : [];
-  const cover = article.cover_path ? `/covers/${path.basename(article.cover_path)}` : '';
+  const cover = coverUrl(article.cover_path);
   const palette = Array.isArray(article.palette) ? article.palette : [];
   const BRAND_SUFFIX = ' — ремонтвижн';
   const rawTitle = String(article.title || '');
@@ -415,7 +424,7 @@ export function articlePage(article, { related = [] } = {}) {
   ]).replace(/</g, '\\u003c');
 
   const relatedCards = (Array.isArray(related) ? related : []).slice(0, 4).map(a => {
-    const rc = a.cover_path ? `/covers/${path.basename(a.cover_path)}` : '';
+    const rc = coverUrl(a.cover_path);
     const rimg = rc ? `<img src="${esc(rc)}" alt="${esc(a.title)}" width="600" height="400" loading="lazy">` : '';
     return `<a class="rel" href="/articles/${encodeURIComponent(a.slug)}">${rimg}<h3>${esc(a.title)}</h3></a>`;
   }).join('');
@@ -525,7 +534,7 @@ export function hubPage(articles, { rooms = [] } = {}) {
         `<a href="/articles/${encodeURIComponent(list[0].slug)}">${esc(style)} <b>${list.length}</b></a>`).join('')}</nav>`
     : '';
   const cards = published.map(a => {
-    const cover = a.cover_path ? `/covers/${path.basename(a.cover_path)}` : '';
+    const cover = coverUrl(a.cover_path);
     const img = cover ? `<img src="${esc(cover)}" alt="${esc(a.title)}" width="600" height="400" loading="lazy">` : '';
     const metaBits = [a.style, a.room_type].filter(Boolean).join(' · ');
     const date = formatRuDate(a.published_at || a.created_at);

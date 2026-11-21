@@ -141,6 +141,13 @@ test('articles: autoMetaTitle keeps brand suffix under 60 chars and trims by wor
   assert.ok(!long.endsWith(' '));
 });
 
+test('articles: render-based cover uses public /article-cover route', () => {
+  const html = articlePage(makeArticle({ cover_path: 'renders/ab-cd.png' }));
+  assert.match(html, /src="\/article-cover\/ab-cd\.png"/);
+  const classic = articlePage(makeArticle({ cover_path: 'covers/xx.png' }));
+  assert.match(classic, /src="\/covers\/xx\.png"/);
+});
+
 test('articles: articlePage uses editor meta_title and drops long brand suffix', () => {
   const html = articlePage(makeArticle());
   assert.match(html, /<title>Скандинавская спальня — идеи и товары<\/title>/);
