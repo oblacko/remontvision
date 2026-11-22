@@ -31,9 +31,12 @@ test('stylepage: buildStyleCard falls back to designdata palette without swatche
   assert.ok(card.palette.every(c => /^#[0-9A-Fa-f]{6}$/.test(c.hex)));
 });
 
-test('stylepage: cover URL resolves canonical key to a webp asset', () => {
-  assert.equal(styleCoverUrl(row('scandinavian')), '/images/style-scandi.webp');
-  assert.equal(styleCoverUrl(row('minimalism')), '/images/style-minimal.webp');
+test('stylepage: cover URL resolves canonical key to generated webp asset', () => {
+  assert.equal(styleCoverUrl(row('scandinavian')), '/images/style-scandinavian.webp');
+  assert.equal(styleCoverUrl(row('minimalism')), '/images/style-minimalism.webp');
+  // Стили без записи в COVER_ALIASES раньше падали в общий fallback style-modern.webp.
+  assert.equal(styleCoverUrl(row('provence')), '/images/style-provence.webp');
+  assert.equal(styleCoverUrl(row('bauhaus')), '/images/style-bauhaus.webp');
   assert.equal(styleCoverUrl(row('unknown-key')), '/images/style-modern.webp');
 });
 
@@ -62,7 +65,7 @@ test('stylepage: detail page has self-canonical, unique meta, no canonical to ho
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.remontvision\.ru\/styles\/scandinavian">/);
   assert.ok(!html.includes('<link rel="canonical" href="https://www.remontvision.ru/">'));
   assert.match(html, /<h1>Скандинавский стиль в интерьере<\/h1>/);
-  assert.match(html, /<meta property="og:image" content="https:\/\/www\.remontvision\.ru\/images\/style-scandi\.webp">/);
+  assert.match(html, /<meta property="og:image" content="https:\/\/www\.remontvision\.ru\/images\/style-scandinavian\.webp">/);
   assert.match(html, /"@type":"BreadcrumbList"/);
   // палитра и материалы
   assert.match(html, /светлый дуб, белёный текстиль, шерсть, керамика/);

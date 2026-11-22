@@ -4,6 +4,14 @@
 
 Дата обновления: 2026-11-22. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
 
+## 2026-11-22 — SSR-страницы стилей отдают сгенерированные обложки (фикс разводки)
+
+После сжатия обложек в WebP (`41e6ff9`) SSR-страницы стилей всё ещё показывали старые/fallback-обложки: `src/stylepage.js` `styleCoverUrl` использовал только статическую карту `COVER_ALIASES` (11 ключей), поэтому 21 из 32 карточек на `/styles` отдавали `style-modern.webp`, а остальные — старые `style-minimal/scandi/neo/…`. При этом `/api/styles` (`src/server.js` `styleImageUrl` → `generatedStyleImage`) уже отдавал правильные `style-{key}.webp` (32/32).
+
+- **Фикс:** `styleCoverUrl` теперь сначала проверяет сгенерированный `style-{key}.webp` (порядок `webp → png → jpg`, по аналогии с `generatedStyleImage()`), затем падает в `COVER_ALIASES`, затем в `style-modern.webp`.
+- **Тест:** `test/stylepage.test.js` — канонический ключ отдаёт собственный `style-{key}.webp` (в т.ч. `provence`/`bauhaus` без записи в aliases), `unknown-key` → fallback. `npm test` 518 pass (1 skip).
+- **Результат:** все 32 ключа `STYLE_SEO` резолвятся в собственный `style-{key}.webp` (0 fallback).
+
 ## 2026-11-22 — обложки 32 стилей переведены с PNG на WebP
 
 Сгенерированные обложки стилей лежали как `style-*.png` (~1.7–2 МБ каждая, 32 файла в `web/public/images` и столько же в `web/dist/images`), из-за чего `generatedStyleImage()` отдавал тяжёлый PNG.

@@ -6,6 +6,7 @@
 // Источник SEO-метаданных — src/styleseo.js (STYLE_SEO, 32 записи, REM-11).
 // Тексты, палитра и FAQ — src/stylecontent.js (32 записи, REM-46).
 // Палитра/материалы — из БД (styles.swatches) и src/designdata.js (materials).
+import fs from 'node:fs';
 import path from 'node:path';
 import { styleSeoByKey, STYLE_FAMILY_ORDER, CONFUSIONS } from './styleseo.js';
 import { styleById } from './designdata.js';
@@ -52,7 +53,16 @@ const COVER_ALIASES = {
 
 export function styleCoverUrl(style) {
   if (style?.preset_image_path) return `/style-images/${path.basename(String(style.preset_image_path))}`;
-  const alias = COVER_ALIASES[String(style?.key || '')];
+  const key = String(style?.key || '');
+  // Сгенерированная иллюстрация (style-{key}.webp) имеет приоритет над alias-обложкой —
+  // то же правило, что в generatedStyleImage() из server.js. PNG удалены после сжатия (REM-47),
+  // поэтому порядок webp → png → jpg (png/jpg оставлены для будущих исходников).
+  for (const ext of ['webp', 'png', 'jpg']) {
+    if (fs.existsSync(path.join(process.cwd(), 'web', 'dist', 'images', `style-${key}.${ext}`))) {
+      return `/images/style-${key}.${ext}`;
+    }
+  }
+  const alias = COVER_ALIASES[key];
   return alias ? `/images/style-${alias}.webp` : '/images/style-modern.webp';
 }
 
