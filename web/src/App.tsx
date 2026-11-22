@@ -3,8 +3,9 @@ import Home from './pages/Home'
 import Admin from './pages/Admin'
 import Cabinet from './pages/Cabinet'
 import Room from './pages/Room'
-import Procurement from './pages/Procurement'
 import Share from './pages/Share'
+import Styles from './pages/Styles'
+import StyleDetail from './pages/StyleDetail'
 import { TaskDock, TasksProvider } from './components/TaskDock'
 import { CreditRefundToast } from './components/CreditRefundToast'
 import { Metrika } from './components/Metrika'
@@ -18,8 +19,9 @@ export default function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/cabinet" element={<Cabinet />} />
         <Route path="/room/:id" element={<Room />} />
-        <Route path="/room/:id/procurement" element={<Procurement />} />
         <Route path="/s/:token" element={<Share />} />
+        <Route path="/styles" element={<Styles />} />
+        <Route path="/styles/:id" element={<StyleDetail />} />
       </Routes>
       <TaskDock />
       <CreditRefundToast />

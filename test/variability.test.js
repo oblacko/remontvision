@@ -78,6 +78,16 @@ test('empty room novelty may ask for a different composition', () => {
   assert.match(text, /visibly different composition/);
 });
 
+test('axes include concrete execution instructions', () => {
+  const out = buildRoomVariability({ seed: 'axis-test', styleName: 'Скандинавский', used: [] });
+  const text = variabilityPrompt(out);
+  assert.match(text, /STYLE AXES/);
+  assert.match(text, /styling:/);
+  assert.match(text, /composition:/);
+  assert.match(text, /Keep the frame airy|Build 3–5 styled vignettes/);
+  assert.match(text, /symmetric|asymmetric/);
+});
+
 test('first render of a room has no avoid list', () => {
   const out = buildRoomVariability({ seed: 'first', styleName: 'Скандинавский', used: [] });
   assert.deepEqual(out.avoid, []);

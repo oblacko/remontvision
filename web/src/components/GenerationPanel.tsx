@@ -13,7 +13,7 @@ import { buildMasterBrief, downloadText } from '@/lib/masterbrief'
 import { clearDraft, compressDraftPhoto, DRAFT_PARAMS_KEY, draftTimeLabel, loadDraftParams, loadDraftPhoto, saveDraftParams, saveDraftPhoto } from '@/lib/draft'
 import type { DraftParams } from '@/lib/draft'
 
-type Step = 'photo' | 'style' | 'generating' | 'result' | 'searching' | 'estimates'
+type Step = 'photo' | 'style' | 'generating' | 'result' | 'estimates'
 type GenItem = {
   id: number; name: string; price: number; qty: number; unit: string; category?: string;
   url: string; link_label?: string; direct_url?: boolean; source?: string; match_score?: number; price_tier?: string;
@@ -150,21 +150,21 @@ type DesignConcept = { id: string; name: string; main_move: string; quiet_areas:
 type DesignCompatibility = Record<string, Record<string, 'ok' | 'weaken' | 'conflict'>>
 
 type PanelStyle = CSSProperties & { '--photo-ratio': number }
-const rub = (value: number) => new Intl.NumberFormat('ru-RU').format(Math.round(value)) + ' ₽'
 
-type StylePreset = { key: string; name: string; accent: string; image_url?: string }
+type StylePreset = { key: string; name: string; display_name?: string; accent: string; image_url?: string; is_featured?: boolean }
 type RenderModelOption = { key: string; label: string; credits: number; resolutions: string[]; resolution_prices: Record<string, number> }
+// Топ-10 featured для основного сценария. Остальные 22 — в библиотеке /styles.
 const defaultStylePresets: StylePreset[] = [
-  { key: 'minimalism', name: 'Современный минимализм', accent: 'sand', image_url: '/images/style-minimal.webp' },
-  { key: 'scandinavian', name: 'Скандинавский', accent: 'dust', image_url: '/images/style-scandi.webp' },
-  { key: 'japandi', name: 'Джапанди', accent: 'forest', image_url: '/images/style-japandi.webp' },
-  { key: 'loft', name: 'Лофт', accent: 'graphite', image_url: '/images/style-loft.webp' },
-  { key: 'neoclassic', name: 'Неоклассика', accent: 'sand', image_url: '/images/style-neo.webp' },
-  { key: 'eco', name: 'Эко / органический модерн', accent: 'forest', image_url: '/images/style-country.webp' },
-  { key: 'dark_contemporary', name: 'Тёмный контемпорари', accent: 'graphite', image_url: '/images/style-dark.webp' },
-  { key: 'art_deco', name: 'Ар-деко', accent: 'terra', image_url: '/images/style-deco.webp' },
-  { key: 'mediterranean', name: 'Средиземноморский', accent: 'terra', image_url: '/images/style-boho.webp' },
-  { key: 'memphis_accent', name: 'Мемфис-акцент', accent: 'terra', image_url: '/images/style-modern.webp' },
+  { key: 'modern', name: 'Современный', display_name: 'Миланская нежность', accent: 'graphite', image_url: '/images/style-modern.webp' },
+  { key: 'loft', name: 'Лофт', display_name: 'Бруклинский ритм', accent: 'graphite', image_url: '/images/style-loft.webp' },
+  { key: 'scandinavian', name: 'Скандинавский', display_name: 'Копенгагенский свет', accent: 'dust', image_url: '/images/style-scandi.webp' },
+  { key: 'provence', name: 'Прованс', display_name: 'Лавандовое поле', accent: 'dust', image_url: '/images/style-country.webp' },
+  { key: 'minimalism', name: 'Современный минимализм', display_name: 'Токийская лёгкость', accent: 'sand', image_url: '/images/style-minimal.webp' },
+  { key: 'neoclassic', name: 'Неоклассика', display_name: 'Парижская классика', accent: 'sand', image_url: '/images/style-neo.webp' },
+  { key: 'boho', name: 'Бохо', display_name: 'Марракеш-текстиль', accent: 'terra', image_url: '/images/style-boho.webp' },
+  { key: 'baroque', name: 'Современное барокко', display_name: 'Версальское очарование', accent: 'terra', image_url: '/images/style-deco.webp' },
+  { key: 'japandi', name: 'Джапанди', display_name: 'Киотская тишина', accent: 'forest', image_url: '/images/style-japandi.webp' },
+  { key: 'classic', name: 'Классический', display_name: 'Лондонская библиотека', accent: 'sand', image_url: '/images/style-neo.webp' },
 ]
 
 const presentationLabel = (status?: GenItem['presentation_status']) => status === 'verified'
@@ -177,21 +177,20 @@ const BASE_GEN_STAGES = [
   { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик', eta: 'Обычно меньше минуты' },
   { key: 'analyzing', label: 'Анализ фото', hint: 'Разбираем комнату, свет и материалы', eta: 'Обычно до минуты' },
   { key: 'rendering', label: 'Создание дизайна', hint: 'Модель рисует изображение', eta: 'Обычно 1–3 минуты' },
-  { key: 'matching', label: 'Разбор и товары', hint: 'Архитектор смотрит кадр, даёт подсказки и ищет товары в каталоге', eta: 'Обычно до минуты' },
+  { key: 'matching', label: 'Разбор интерьера', hint: 'Архитектор смотрит кадр и даёт подсказки по отделке', eta: 'Обычно до минуты' },
   { key: 'done', label: 'Готово', hint: 'Открываем визуализацию', eta: '' },
 ] as const
 
 const EDIT_GEN_STAGES = [
   { key: 'queued', label: 'В очереди', hint: 'Ждём свободный обработчик', eta: 'Обычно меньше минуты' },
   { key: 'rendering', label: 'Применяем редактирование', hint: 'Модель перерисовывает кадр по референсам', eta: 'Обычно 1–3 минуты' },
-  { key: 'matching', label: 'Разбор редактирования', hint: 'Проверяем результат и обновляем подсказки и товары', eta: 'Обычно до минуты' },
+  { key: 'matching', label: 'Разбор редактирования', hint: 'Проверяем результат и обновляем подсказки', eta: 'Обычно до минуты' },
   { key: 'done', label: 'Готово', hint: 'Открываем новую версию', eta: '' },
 ] as const
 const defaultRoomTypes = ['Гостиная (зал)', 'Спальня', 'Детская', 'Кухня', 'Санузел', 'Кладовка', 'Прихожая', 'Столовая', 'Кабинет', 'Балкон / лоджия', 'Гардеробная', 'Другое']
 const SUMMARY_TABS = [
   ['repair', 'Ремонт'],
   ['changes', 'Что изменить'],
-  ['products', 'Товары'],
   ['ral', 'Палитра'],
   ['electrical', 'Розетки'],
   ['final', 'Итог'],
@@ -208,6 +207,7 @@ export function GenerationPanel({
   open,
   initialRoomId = '',
   initialRenderId = '',
+  initialStyle = '',
   inline = false,
   onClose,
   onRequireLogin,
@@ -221,6 +221,7 @@ export function GenerationPanel({
   open: boolean
   initialRoomId?: string
   initialRenderId?: string
+  initialStyle?: string
   inline?: boolean
   onClose: () => void
   onRequireLogin: () => void
@@ -243,6 +244,13 @@ export function GenerationPanel({
   const [photoError, setPhotoError] = useState('')
   const isBedRoom = roomType === 'Спальня' || roomType === 'Детская'
   const [stylePicks, setStylePicks] = useState<Array<{ style: string; concepts: string[] }>>([])
+  useEffect(() => {
+    if (!initialStyle) return
+    if (!stylePresets.some(item => item.name === initialStyle || item.display_name === initialStyle)) return
+    setStylePicks(prev => prev.some(pick => pick.style === initialStyle)
+      ? prev
+      : [...prev, { style: initialStyle, concepts: [] }])
+  }, [initialStyle, stylePresets])
   const [toast, setToast] = useState('')
   const toastTimer = useRef<number | null>(null)
   const [priceTier, setPriceTier] = useState('comfort')
@@ -255,7 +263,6 @@ export function GenerationPanel({
   const [hasSucceededPayment, setHasSucceededPayment] = useState(false)
   const [concepts, setConcepts] = useState<DesignConcept[]>([])
   const [compatibility, setCompatibility] = useState<DesignCompatibility>({})
-  const [selectedOffers, setSelectedOffers] = useState<Record<string, ProductOffer>>({})
   const [openSummaryTab, setOpenSummaryTab] = useState<string | null>(null)
   const [editRefs, setEditRefs] = useState<EditRefDraft[]>([])
   const [iterations, setIterations] = useState<Iteration[]>([])
@@ -306,7 +313,10 @@ export function GenerationPanel({
   const renderCredits = selectedModel
     ? (Number(selectedModel.resolution_prices?.[effectiveResolution ?? '']) || Number(selectedModel.credits) || 1)
     : 1
-  const styleKeyOf = (name: string) => stylePresets.find(item => item.name === name)?.key || null
+  const styleKeyOf = (name: string) => stylePresets.find(item => item.name === name || item.display_name === name)?.key || null
+  const featuredPresets = stylePresets.some(item => item.is_featured === true)
+    ? stylePresets.filter(item => item.is_featured === true)
+    : stylePresets
   // Уровни задаёт владелец в админке: label строки render_models — подпись уровня,
   // порядок — sort. Фронт не придумывает названия и не пересортировывает по цене.
   const tierLabelOf = (key: string | null) => renderModels.find(model => model.key === key)?.label || 'Уровень'
@@ -323,22 +333,6 @@ export function GenerationPanel({
     toastTimer.current = window.setTimeout(() => setToast(''), 2000)
   }
   const chargeText = (count: number) => `Спишется ${renderCredits * count} кр. за ${count} ${count === 1 ? 'дизайн' : count < 5 ? 'дизайна' : 'дизайнов'}`
-  // Быстрый выбор: добираем до N стилей, не трогая уже выбранные.
-  // Каждый стиль = один отдельный дизайн, поэтому N стилей = N дизайнов.
-  const pickStyles = (count: number) => {
-    if (stylePicks.length >= count) {
-      showToast(`Уже выбрано ${stylePicks.length} ${stylePicks.length < 5 ? 'стиля' : 'стилей'}`)
-      return
-    }
-    const limit = Math.min(count, 10)
-    const next = [...stylePicks]
-    for (const item of stylePresets) {
-      if (next.length >= limit) break
-      if (!next.some(pick => pick.style === item.name)) next.push({ style: item.name, concepts: [] })
-    }
-    setStylePicks(next)
-    showToast(chargeText(next.reduce((sum, pick) => sum + Math.max(1, pick.concepts.length), 0)))
-  }
   const toggleStyle = (name: string) => {
     const exists = stylePicks.some(pick => pick.style === name)
     let next = stylePicks
@@ -367,7 +361,6 @@ export function GenerationPanel({
     setStylePicks(next)
     showToast(chargeText(countVariants(next)))
   }
-  const productMatches = current?.analysis?.products || []
   const visibleObjects = (current?.analysis?.visible || []).filter(
     (object): object is { label?: string; bbox: number[]; area?: number } => typeof object === 'object' && object !== null && Array.isArray(object.bbox) && object.bbox.length === 4,
   )
@@ -381,13 +374,6 @@ export function GenerationPanel({
     if (!editRefs.length) addEditBlock()
   }, [objectTarget])
   const currentChanges = changesFromArchitect(current?.analysis?.architect)
-  const selectedOffersList = Object.values(selectedOffers)
-  const toggleOffer = (offer: ProductOffer) => setSelectedOffers(prev => {
-    const next = { ...prev }
-    if (next[offer.id]) delete next[offer.id]
-    else next[offer.id] = offer
-    return next
-  })
 
   const rememberUrl = (url: string) => { urls.current.push(url) }
   const releaseUrl = (url: string | null) => {
@@ -402,7 +388,7 @@ export function GenerationPanel({
       .then(r => r.ok ? r.json() : null)
       .then(list => {
         if (Array.isArray(list) && list.length) {
-          setStylePresets(list.map(s => ({ key: s.key, name: s.name, accent: s.accent || 'sand', image_url: s.image_url })))
+          setStylePresets(list.map(s => ({ key: s.key, name: s.name, display_name: s.display_name, accent: s.accent || 'sand', image_url: s.image_url, is_featured: s.is_featured === true })))
         }
       })
       .catch(() => {})
@@ -447,6 +433,7 @@ export function GenerationPanel({
           })))
           const defaultKey = typeof d?.default_key === 'string' ? d.default_key : String(list[0].key)
           setModelKey(defaultKey)
+          setModelChosen(true)
         }
       })
       .catch(() => {})
@@ -996,7 +983,6 @@ export function GenerationPanel({
       if (!r.ok) throw new Error(d.error || 'Не удалось собрать итог')
       setIterations(prev => prev.map(item => item.id === current.id ? { ...item, analysis: d.analysis || item.analysis } : item))
       setOpenSummaryTab(null)
-      setSelectedOffers({})
       setStep('estimates')
     } catch (e) {
       setFinalError(e instanceof Error ? e.message : 'Не удалось собрать итог')
@@ -1119,31 +1105,29 @@ export function GenerationPanel({
             <p className="eyebrow">Шаг 02 / Стиль</p>
             <h3 className="display-title mt-6 text-4xl">Выберите направление</h3>
             {roomType && <p className="mt-2 text-sm text-muted-foreground">Комната: {roomType}. Выберите один или несколько стилей — каждый станет отдельным дизайном.</p>}
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              {[3, 5].map(count => (
-                <button
-                  key={count}
-                  type="button"
-                  onClick={() => pickStyles(count)}
-                  className="k-btn k-btn--ov k-btn--s"
-                >Подобрать {count} {count === 3 ? 'стиля' : 'стилей'}</button>
-              ))}
-              {stylePicks.length > 0 && (
+            {stylePicks.length > 0 && (
+              <div className="mt-5">
                 <button type="button" onClick={() => setStylePicks([])} className="k-btn k-btn--s">Снять выбор</button>
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="k-tiles mt-6">
-              {stylePresets.map((item) => {
+              {featuredPresets.map((item) => {
                 const selected = stylePicks.some(pick => pick.style === item.name)
                 return (
                   <button key={item.key} type="button" role="checkbox" aria-checked={selected} onClick={() => toggleStyle(item.name)} className="k-tile">
                     <span className="im relative overflow-hidden"><img src={item.image_url || `/images/style-${item.key}.webp`} alt={`Интерьер в стиле ${item.name}`} loading="lazy" onError={(event) => { event.currentTarget.src = '/images/style-modern.webp' }} className="h-full w-full object-cover" /></span>
-                    <span className="nm">{item.name}</span>
+                    <span className="nm">{item.display_name || item.name}</span>
+                    <span className="bd block text-[10px] font-normal opacity-70">{item.name}</span>
                     <span className="bd"><KitIcon name="ok" /></span>
                   </button>
                 )
               })}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Link to="/styles" className="k-btn k-btn--ov k-btn--s">Больше стилей</Link>
+              <span className="text-xs text-muted-foreground">Полная библиотека: 32 стиля с примерами</span>
             </div>
 
             {stylePicks.length > 0 && (
@@ -1179,46 +1163,7 @@ export function GenerationPanel({
             )}
 
             <div className="mt-10 border-t pt-6">
-              {renderModels.length > 0 && (
-                <div>
-                  <p className="eyebrow">Качество</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{editing ? 'Уровень — от родительского дизайна.' : 'Три уровня: чем выше, тем детальнее результат и выше цена.'}</p>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {renderModels.map((m) => {
-                      const selected = modelKey === m.key
-                      const highlighted = selected && !editing
-                      return (
-                        <button key={m.key} type="button" disabled={editing} role="radio" aria-checked={highlighted} onClick={() => { setModelKey(m.key); setModelChosen(true); if (resolution && !m.resolutions.includes(resolution)) setResolution(null) }} className={`border bg-card p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${highlighted ? 'border-2 border-foreground' : 'border-input hover:border-foreground'}`}>
-                          <span className={`block ${highlighted ? '' : 'opacity-80'}`}>
-                            <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                              {m.label}
-                              {highlighted ? <KitIcon name="ok" className="size-4 shrink-0 text-primary-text" /> : null}
-                            </span>
-                            <span className="mt-1 block font-mono text-xs text-primary-text">{m.credits} кр.</span>
-                            {editing && <span className="mt-1 block text-xs leading-4 text-muted-foreground">Уровень — от родительского дизайна</span>}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {!editing && selectedModel && selectedModel.resolutions.length > 1 && (
-                    <div className="mt-4">
-                      <p className="eyebrow">Разрешение</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {selectedModel.resolutions.map(r => {
-                          const active = effectiveResolution === r
-                          return (
-                            <button key={r} type="button" aria-pressed={active} onClick={() => setResolution(r)} className={`min-h-10 border px-3 font-mono text-xs transition-colors ${active ? 'border-foreground bg-foreground text-background' : 'border-input hover:border-foreground'}`}>
-                              {r}<span className="ml-2 opacity-70">{Number(selectedModel.resolution_prices?.[r] ?? selectedModel.credits)} кр.</span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className={renderModels.length > 0 ? 'mt-6' : ''}>
+              <div>
                 <p className="eyebrow">Приватность</p>
                 <button
                   type="button"
@@ -1309,14 +1254,6 @@ export function GenerationPanel({
               <KitIcon name="info" className="mt-0.5 size-4 shrink-0" />
               <span className="min-w-0">Обычно 1–4 минуты. Можно закрыть вкладку — пришлём письмо, когда дизайн будет готов.</span>
             </p>
-          </div>
-        )}
-
-        {step === 'searching' && (
-          <div className="mx-auto flex max-w-xl flex-col items-center justify-center py-16 text-center" role="status" aria-live="polite">
-            <KitIcon name="q" className="size-10 animate-pulse text-primary-text" />
-            <h3 className="display-title mt-8 text-4xl">Собираем подборку</h3>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">Ищем товары по фактурам и цветам из вашего дизайна, переводим оттенки в RAL и готовим разметку электрики.</p>
           </div>
         )}
 
@@ -1683,7 +1620,7 @@ export function GenerationPanel({
 
         {step === 'estimates' && current && (
           <div>
-            <p className="eyebrow">Шаг 04 / Товары и электрика</p>
+            <p className="eyebrow">Шаг 04 / Разбор и электрика</p>
             <div className="mt-6 grid gap-10 xl:grid-cols-2">
               <div>
                 <div className="relative mx-auto w-full bg-secondary" style={{ aspectRatio: String(current.ratio), width: `min(100%, calc(58svh * ${current.ratio}))` }}>
@@ -1703,7 +1640,7 @@ export function GenerationPanel({
                 </div>
 
                 {openSummaryTab === null && (
-                  <p className="mt-5 border-y py-4 text-sm text-muted-foreground">Выберите раздел: план ремонта, что изменить, товары и стоимость, палитра, розетки или итог.</p>
+                  <p className="mt-5 border-y py-4 text-sm text-muted-foreground">Выберите раздел: план ремонта, что изменить, палитра, розетки или итог.</p>
                 )}
 
                 {openSummaryTab === 'repair' && ((repairRows(current.repairScope).length || current.repairScope?.storage?.length) ? (
@@ -1739,52 +1676,6 @@ export function GenerationPanel({
                         ))}
                       </ol>
                     ) : <p className="border-y py-4 text-sm text-muted-foreground">Архитектор не оставил значимых изменений.</p>}
-                  </section>
-                )}
-
-                {openSummaryTab === 'products' && (
-                  <section className="mt-5" aria-labelledby="gen-products">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h4 id="gen-products" className="eyebrow">Товары</h4>
-                    </div>
-                    {productMatches.length ? (
-                      <div className="mt-4 space-y-4">
-                        {productMatches.map((match, index) => (
-                          <div key={`${match.item.category}-${index}`}>
-                            <p className="text-xs font-medium">{match.item.label}</p>
-                            {match.offers.length ? (
-                              <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
-                                {match.offers.map(offer => {
-                                  const active = Boolean(selectedOffers[offer.id])
-                                  return (
-                                    <div key={offer.id} className={`w-40 shrink-0 border transition-colors ${active ? 'border-primary' : 'border'}`}>
-                                      <button type="button" onClick={() => toggleOffer(offer)} className="block w-full text-left">
-                                        <div className="h-24 w-full overflow-hidden bg-secondary">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Нет фото</div>}</div>
-                                        <div className="p-2">
-                                          <p className="line-clamp-2 text-xs font-medium leading-4">{offer.name}</p>
-                                          <p className="mt-1 text-xs font-medium">{offer.price === null ? 'Цена не указана' : rub(offer.price)}</p>
-                                        </div>
-                                      </button>
-                                      {offer.url ? <a href={offer.url} target="_blank" rel="noopener nofollow sponsored" className="block border-t px-2 py-1 text-xs underline underline-offset-2">{offer.merchant || 'в магазин'}</a> : null}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            ) : <p className="mt-1 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    ) : <p className="mt-4 border-y py-4 text-sm text-muted-foreground">{current.productsEnabled === false ? 'Подбор товаров выключен в админке.' : 'Подбор товаров скоро вернётся.'}</p>}
-                    {selectedOffersList.length ? (
-                      <div className="mt-5 border-t pt-3">
-                        <p className="eyebrow">Выбрано</p>
-                        <ul className="mt-2 divide-y border-y text-sm">
-                          {selectedOffersList.map(offer => (
-                            <li key={offer.id} className="flex items-start justify-between gap-3 py-2"><span className="min-w-0">{offer.name}</span><span className="shrink-0 font-medium">{offer.price === null ? '—' : rub(offer.price)}</span></li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
                   </section>
                 )}
 

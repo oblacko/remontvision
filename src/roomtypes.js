@@ -18,10 +18,10 @@ const DEFAULT_ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'the sofa, armchairs, coffee table, TV/media console and their realistic proportions; the architecture, camera, walls, windows, doors and ceiling height. Do not block doors or windows.',
+    keep: 'the sofa, armchairs, coffee table, TV/media console and their realistic proportions; the architecture, camera, walls, windows, doors and ceiling height. Keep all openings clear and walkable.',
     change: 'floor finish, wall finish, lighting, textiles, decor and styling. Replace or restyle the sofa, armchairs, coffee table and storage using the listed furniture. You may rearrange freestanding furniture to improve composition and flow while keeping it functional.',
     guidance: 'A sofa or armchairs, coffee table, TV/media console, shelving, rug and layered lighting are appropriate.',
-    forbid: 'No bed, no kitchen cabinets, countertop, sink or faucet, no toilet, shower or bathroom fixtures. Do not replace the floor with large-format porcelain tile unless a floor product is provided.',
+    forbid: 'Keep the room as a living room. Bedrooms, kitchens and bathrooms belong to other rooms. Replace the floor with large-format porcelain tile only if a floor product is provided.',
     electrical: [
       { title: 'Розетки у дивана', text: '2–4 розетки + USB, 300 мм от пола, чтобы заряжать технику и торшер.' },
       { title: 'ТВ-зона', text: '4 розетки + интернет за ТВ-панелью, скрытый кабель-канал.' },
@@ -43,10 +43,10 @@ const DEFAULT_ROOM_TYPES = [
       { key: 'outlets', categories: ['outlets'] },
       { key: 'textile', categories: ['textile'] },
     ],
-    keep: 'the bed, bedside tables, wardrobe and their realistic proportions; the architecture, camera, walls, windows, doors and ceiling height. Keep the bed functional and do not block doors or windows.',
+    keep: 'the bed, bedside tables, wardrobe and their realistic proportions; the architecture, camera, walls, windows, doors and ceiling height. Keep the bed functional and all openings clear and walkable.',
     change: 'floor finish, wall finish, ceiling and bedside lighting, textiles, and replace or restyle the bed, headboard and wardrobe using the listed furniture. You may move the bed and other freestanding furniture to improve composition and flow, but keep the layout realistic and functional.',
     guidance: 'A comfortable bed with an upholstered headboard, two bedside tables, soft textiles, a wardrobe and calm layered lighting are appropriate.',
-    forbid: 'No kitchen, no sink/faucet, no toilet, shower or bathroom fixtures, no kitchen cabinets or countertop, no large-format porcelain floor tile. The floor must stay wood, laminate, carpet or vinyl unless a floor product explicitly says otherwise.',
+    forbid: 'Keep the room as a bedroom. Kitchens, bathrooms and utility fixtures belong to other rooms. Use large-format porcelain floor tile only if a floor product is provided; otherwise keep the floor as wood, laminate, carpet or vinyl.',
     electrical: [
       { title: 'Розетки у кровати', text: 'По 2 розетки + USB с каждой стороны, 300 мм от пола.' },
       { title: 'Выключатели', text: 'Проходной у входа и у изголовья; отдельный сценарий на бра.' },
@@ -72,7 +72,7 @@ const DEFAULT_ROOM_TYPES = [
     keep: 'the bed, desk, storage and their realistic proportions; the architecture, camera, walls, windows and doors. Keep the room child-safe and practical.',
     change: 'floor finish, wall finish, lighting, textiles, decor and styling. Replace or restyle the bed, desk and storage using the listed furniture. You may rearrange the bed, desk and storage for a better safe layout.',
     guidance: 'A single or bunk bed, desk, storage, playful accents and child-safe materials are appropriate.',
-    forbid: 'No kitchen, no bar area, no bathroom fixtures, no adult bedroom styling, no fragile decor at child height. Keep the room child-safe and appropriate for children.',
+    forbid: 'Keep the room as a child-safe bedroom and play space. Use only child-appropriate styling, safe materials and soft, robust decor within the child\'s reach.',
     electrical: [
       { title: 'У кровати', text: '2 розетки с защитными шторками + ночник.' },
       { title: 'Рабочее место', text: '2–4 розетки + USB у стола, 900 мм; отдельный свет.' },
@@ -95,10 +95,10 @@ const DEFAULT_ROOM_TYPES = [
       { key: 'appliance', categories: ['appliance'] },
       { key: 'outlets', categories: ['outlets'] },
     ],
-    keep: 'the cabinet run, sink, cooktop, oven, hood, plumbing and electrical points; walls, windows, doors, ceiling height and camera angle. Do not move the sink or cooktop.',
+    keep: 'the cabinet run, sink, cooktop, oven, hood, plumbing and electrical points; walls, windows, doors, ceiling height and camera angle. Keep the sink and cooktop in their existing positions.',
     change: 'cabinet fronts, countertop, backsplash, floor, wall paint, lighting, faucet, sink and appliances. Keep the work triangle functional.',
     guidance: 'Kitchen cabinets, countertop, sink, faucet, cooktop or oven, hood and practical layered lighting are appropriate.',
-    forbid: 'No bed, no toilet, no shower or bathtub, no living-room furniture. Do not turn the room into a bedroom or living room.',
+    forbid: 'Keep the room as a kitchen. Bedrooms, bathrooms and living-room furniture belong to other spaces.',
     electrical: [
       { title: 'Фартук', text: '4–6 розеток на 1000–1100 мм, разбить на группы.' },
       { title: 'Техника', text: 'Отдельные линии для варочной, духовки, посудомойки, холодильника и вытяжки.' },
@@ -120,10 +120,10 @@ const DEFAULT_ROOM_TYPES = [
       { key: 'light', categories: ['light'] },
       { key: 'outlets', categories: ['outlets'] },
     ],
-    keep: 'the plumbing positions, toilet, sink, shower/bath footprint, waterproofing and camera angle. Do not move wet zones.',
+    keep: 'the plumbing positions, toilet, sink, shower/bath footprint, waterproofing and camera angle. Keep all wet zones in their existing positions.',
     change: 'wall and floor tile, vanity, countertop, fixtures, mirror, lighting and styling. Keep everything moisture-resistant.',
     guidance: 'A vanity, sink, mirror, toilet, shower or bath and moisture-resistant materials are appropriate.',
-    forbid: 'No bed, no sofa, no kitchen cabinets or cooktop, no living-room furniture, no wood floor in wet zones.',
+    forbid: 'Keep the room as a bathroom. Bedrooms, kitchens and living-room furniture belong to other spaces. Use only moisture-resistant flooring in wet zones.',
     electrical: [
       { title: 'Зеркало', text: 'Розетка и свет 1800–2000 мм, IP44.' },
       { title: 'Стиральная машина', text: 'Отдельная линия и УЗО; розетка вне зоны душа.' },
@@ -145,7 +145,7 @@ const DEFAULT_ROOM_TYPES = [
     keep: 'shelving and storage positions; architecture and camera angle.',
     change: 'floor, walls, shelving fronts, lighting and practical storage.',
     guidance: 'Shelving, boxes and practical lighting are appropriate.',
-    forbid: 'No bed, no sofa, no kitchen sink/cooktop, no bathroom fixtures. Do not turn it into a living space.',
+    forbid: 'Keep the room as a storage or pantry space. Sleeping, cooking, washing and living-room functions belong to other rooms.',
     electrical: [
       { title: 'Свет', text: 'Датчик движения или выключатель у входа.' },
       { title: 'Розетка', text: 'Одна розетка для пылесоса/зарядки у входа.' },
@@ -168,7 +168,7 @@ const DEFAULT_ROOM_TYPES = [
     keep: 'wardrobe, bench and shoe storage and their realistic proportions; doors, walls and camera angle.',
     change: 'floor, walls, cabinet fronts, lighting, textiles and styling. You may rearrange freestanding storage and the bench for better flow. Keep durable materials near the entrance.',
     guidance: 'A bench, wardrobe, mirror, shoe storage and durable floor materials are appropriate.',
-    forbid: 'No bed, no kitchen, no bathroom fixtures. Do not add living-room furniture.',
+    forbid: 'Keep the room as an entryway or hallway. Sleeping, cooking, washing and living-room furniture belong to other spaces.',
     electrical: [
       { title: 'У входа', text: 'Розетка для пылесоса и зарядки, 300 мм.' },
       { title: 'Шкаф', text: 'Подсветка ниши и розетка внутри шкафа.' },
@@ -194,7 +194,7 @@ const DEFAULT_ROOM_TYPES = [
     keep: 'the dining table, chairs, sideboard and their realistic proportions; the architecture, camera, walls, windows and doors.',
     change: 'floor, walls, lighting, textiles, decor and styling. Replace or restyle the dining table, chairs and sideboard using the listed furniture. You may rearrange the table, chairs and sideboard for a better composition; keep circulation around the table.',
     guidance: 'A dining table, chairs, sideboard and pendant light are appropriate.',
-    forbid: 'No bed, no kitchen sink/cooktop, no bathroom fixtures. Do not add a sofa or kitchen cabinets.',
+    forbid: 'Keep the room as a dining room. Sleeping, washing, cooking and living-room furniture belong to other spaces.',
     electrical: [
       { title: 'Стол', text: 'Розетка у стола для техники, скрытая в полу или у плинтуса.' },
       { title: 'Свет', text: 'Подвес над столом на отдельной группе с диммером.' },
@@ -219,7 +219,7 @@ const DEFAULT_ROOM_TYPES = [
     keep: 'desk, chair, shelving and their realistic proportions; the architecture, camera, walls, windows and doors.',
     change: 'floor, walls, lighting, textiles, storage fronts and styling. Replace or restyle the desk, chair and storage using the listed furniture. You may reposition freestanding furniture for a better composition, keeping the workspace ergonomic.',
     guidance: 'A desk, ergonomic office chair, shelving and task lighting are appropriate.',
-    forbid: 'No bed, no kitchen, no bathroom fixtures. Do not add living-room furniture.',
+    forbid: 'Keep the room as a home office. Sleeping, cooking, washing and living-room furniture belong to other spaces.',
     electrical: [
       { title: 'Стол', text: '4–6 розеток + интернет, 900 мм; отдельная линия для техники.' },
       { title: 'Свет', text: 'Общий свет + task-свет на столе, тёплый и нейтральный сценарии.' },
@@ -235,10 +235,10 @@ const DEFAULT_ROOM_TYPES = [
       { key: 'light', categories: ['light'] },
       { key: 'outlets', categories: ['outlets'] },
     ],
-    keep: 'glazing, railing, structural elements and camera angle. Do not merge the balcony with the room.',
+    keep: 'glazing, railing, structural elements and camera angle. Keep the balcony separate from the room.',
     change: 'floor, walls/ceiling, lighting and weather-resistant styling.',
     guidance: 'Plants, compact seating, storage and weather-resistant materials are appropriate.',
-    forbid: 'No bed, no kitchen, no bathroom fixtures. Keep it as a balcony, not a full room.',
+    forbid: 'Keep the space as a balcony or loggia. Full-room functions such as sleeping, cooking and washing belong inside the apartment.',
     electrical: [
       { title: 'Розетка', text: 'IP44 у пола для техники и подсветки.' },
       { title: 'Свет', text: 'Влагостойкий светильник, отдельный выключатель.' },
@@ -259,7 +259,7 @@ const DEFAULT_ROOM_TYPES = [
     keep: 'rails, shelving, storage positions and camera angle.',
     change: 'floor, walls, cabinet fronts, integrated lighting and styling.',
     guidance: 'Rails, shelving, a mirror and integrated lighting are appropriate.',
-    forbid: 'No bed, no sofa, no kitchen, no bathroom fixtures. Do not add living-room furniture.',
+    forbid: 'Keep the room as a walk-in closet. Sleeping, cooking, washing and living-room furniture belong to other spaces.',
     electrical: [
       { title: 'Свет', text: 'Подсветка полок и датчик движения.' },
       { title: 'Розетка', text: 'Одна розетка у входа для зарядки/пылесоса.' },
@@ -278,7 +278,7 @@ const DEFAULT_ROOM_TYPES = [
     keep: 'the existing room purpose, architecture, large furniture and camera angle.',
     change: 'finishes, lighting, textiles and styling that match the room purpose shown in the source photo.',
     guidance: 'Keep the room purpose exactly as in the source photo.',
-    forbid: 'Do not add fixtures from another room type. Do not change the room purpose.',
+    forbid: 'Keep the room purpose exactly as shown in Image 1. Use only fixtures and furniture that belong to that room type.',
     electrical: [
       { title: 'Электрика', text: 'Розетки и выключатели по фактическому сценарию комнаты; уточните зоны у дизайнера.' },
     ],
@@ -286,17 +286,17 @@ const DEFAULT_ROOM_TYPES = [
 ];
 
 const STYLING_BY_ROOM = {
-  'Спальня': 'Dress the bed like an editorial shoot: layered linen bedding, duvet, mixed-texture pillows, a throw, bedside books, a carafe and warm lamps. Add a rug, floor-length curtains, framed art, a plant, ceramics and a sculptural object. Use warm layered lighting and tactile materials. Hide the radiator completely behind a flush wall-colored grille; no white panel under the window. Remove the old TV or mount it flush with hidden cables. Add a warm cove or wall wash and bedside pools of light. Replace old blinds with floor-length curtains or a clean Roman blind; hide the cornice. Add framed art above the bed, a throw and cushions, and a headboard ledge or open shelf with 3–5 styled objects. Place a closed modern laptop or headphones on the nightstand or console and one small plush toy on the bed or chair — visible but neat, never on the floor.',
-  'Гостиная (зал)': 'Style the sofa with cushions and a throw; add a rug, coffee-table books, ceramics, a tray, candles, art, plants, a floor lamp and a sculptural chair. Layer textiles and warm light; make it feel collected, not staged. If there is a TV, mount it flush with hidden cables or use a frame TV; cover the radiator with a slim grille. Add a warm cove or wall wash. Replace old blinds with floor-length curtains or a clean Roman blind; hide the cornice. Add a gallery wall, open shelving with books and ceramics, and a modern laptop, headphones or speaker styled on the console or coffee table — visible and on a surface, never on the floor. Hide all cables, chargers and straps.',
-  'Кухня': 'Style with a wooden board, ceramics, herbs, a bowl of fruit, a runner, a small plant and warm under-cabinet light. Keep counters uncluttered; make it look like a real home, not a showroom. Use warm under-cabinet LED, hood light and hidden cable management; no exposed wires. Replace old window treatments with a clean Roman/roller blind. Add cookbooks, ceramics and a small framed print; no laptop on the kitchen counter.',
-  'Санузел': 'Fold towels, add soap, a tray, a plant, a mirror, warm spa lighting and a small stool. Make it feel like a boutique hotel bathroom. Use a backlit mirror and niche light; hide pipes and cables. Replace old window treatments with a clean moisture-resistant blind. Add a small framed print, folded towels and a plant; no electronics in the wet zone.',
+  'Спальня': 'Dress the bed like an editorial shoot: layered linen bedding, duvet, mixed-texture pillows, a throw, bedside books, a carafe and warm lamps. Add a rug, floor-length curtains, framed art, a plant, ceramics and a sculptural object. Use warm layered lighting and tactile materials. Hide the radiator completely behind a flush wall-colored grille that matches the wall. Remove the old TV or mount it flush with hidden cables. Add a warm cove or wall wash and bedside pools of light. Replace old blinds with floor-length curtains or a clean Roman blind; hide the cornice. Add framed art above the bed, a throw and cushions, and a headboard ledge or open shelf with 3–5 styled objects. Place a closed modern laptop or headphones on the nightstand or console and one small plush toy on the bed or chair — visible but neat, always on a surface.',
+  'Гостиная (зал)': 'Style the sofa with cushions and a throw; add a rug, coffee-table books, ceramics, a tray, candles, art, plants, a floor lamp and a sculptural chair. Layer textiles and warm light; make it feel collected and personal. If there is a TV, mount it flush with hidden cables or use a frame TV; cover the radiator with a slim grille. Add a warm cove or wall wash. Replace old blinds with floor-length curtains or a clean Roman blind; hide the cornice. Add a gallery wall, open shelving with books and ceramics, and a modern laptop, headphones or speaker styled on the console or coffee table — visible and on a surface. Hide all cables, chargers and straps.',
+  'Кухня': 'Style with a wooden board, ceramics, herbs, a bowl of fruit, a runner, a small plant and warm under-cabinet light. Keep counters curated and functional; make it look like a real home, not a showroom. Use warm under-cabinet LED, hood light and hidden cable management; keep all wiring concealed. Replace old window treatments with a clean Roman/roller blind. Add cookbooks, ceramics and a small framed print; keep the kitchen counter free of laptops and electronics.',
+  'Санузел': 'Fold towels, add soap, a tray, a plant, a mirror, warm spa lighting and a small stool. Make it feel like a boutique hotel bathroom. Use a backlit mirror and niche light; hide pipes and cables. Replace old window treatments with a clean moisture-resistant blind. Add a small framed print, folded towels and a plant; keep electronics out of the wet zone.',
   'Столовая': 'Set the table with ceramics, glassware, a linen runner, candles and a small vase. Style the sideboard with art, books and a lamp; add a plant and a pendant that relates to the table. Add a warm cove or wall wash; hide cables and the radiator. Replace old blinds with floor-length curtains. Style the sideboard with art, books, candles and ceramics; add a pendant and table setting.',
   'Кабинет': 'Style the desk with a lamp, books, ceramics, a plant and a tray. Add art, a rug, shelving details and a comfortable chair; make it feel calm and productive. Add a shelf backlight and desk lamp; manage all cables. Replace old blinds with floor-length curtains or a clean Roman blind. Add an open MacBook-style laptop, headphones, books, a pinboard and framed art on the desk and shelves. The laptop must be visible on the desk; keep all electronics on surfaces and hide cables.',
-  'Детская': 'Add soft textiles, books, toys, art, a rug and a night light; keep it playful but styled, safe and not cluttered. Hide cables and the radiator; use soft warm light. Replace old blinds with soft curtains or a clean roller blind. Add 2–3 plush toys, books, art and a night light in a tasteful, uncluttered way. Keep plush toys on the bed or shelf, never on the floor.',
+  'Детская': 'Add soft textiles, books, toys, art, a rug and a night light; keep it playful but styled, safe and curated. Hide cables and the radiator; use soft warm light. Replace old blinds with soft curtains or a clean roller blind. Add 2–3 plush toys, books, art and a night light in a tasteful, uncluttered way. Keep plush toys on the bed or shelf, always on a surface.',
   'Прихожая': 'Style with a bench, tray, mirror, hooks, a plant, a runner and warm light; make the first impression inviting. Add console or wardrobe backlight; hide cables and the radiator. Replace old blinds with a clean Roman/roller blind. Style the console with a tray, art, a plant and a mirror; add a bench cushion or throw.',
   'Балкон / лоджия': 'Add plants, a small table, a chair, textiles and warm light; make it a cozy retreat.',
   'Гардеробная': 'Style shelves with folded textiles, boxes, a mirror and warm integrated light.',
-  'Кладовка': 'Keep it practical: boxes, labels, shelving and warm light; no decor clutter.',
+  'Кладовка': 'Keep it practical: boxes, labels, shelving and warm light; skip purely decorative clutter.',
   'Другое': 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in.',
 };
 const ROOM_CATEGORIES = new Set(DEFAULT_ROOM_TYPES.flatMap(type => type.categories));

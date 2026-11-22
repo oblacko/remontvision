@@ -49,6 +49,14 @@ export function layoutKey({ roomId = '', dimensions = null, keepFurniture = true
   });
 }
 
+// openings: только фото + shell, не зависит от стиля.
+export function openingsKey({ photoPath = '', shellPath = '' } = {}) {
+  return hashPayload({
+    photo: String(photoPath || ''),
+    shell: String(shellPath || ''),
+  });
+}
+
 // art direction: всё, включая стиль/концепт и бриф.
 export function artDirectionKey({ photoPath = '', shellPath = '', style = '', conceptId = '', keepFurniture = true, dimensions = null, briefHash = '' } = {}) {
   return hashPayload({

@@ -46,6 +46,7 @@ import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupCo
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { generateArticle, generateArticleFromRender, articlePage, hubPage, validateArticleForPublish, findPublishedDuplicate, countArticleWords, slugify } from './articles.js';
 import { galleryPage, GALLERY_PAGE_SIZE } from './gallery.js';
+import { GALLERY_NOINDEX_ROOMS } from './roomseo.js';
 import { promptsPage } from './prompts.js';
 import { normalizeMove } from './moveobject.js';
 import { buildPassport, renderPassportPdf } from './passport.js';
@@ -132,6 +133,8 @@ function sendNoindexSpa(res) {
 
 app.get(['/room/:id', '/room/:id/'], (_req, res) => sendNoindexSpa(res));
 app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => sendNoindexSpa(res));
+// Публичная библиотека стилей: SPA-оболочка, индексируется.
+app.get(['/styles', '/styles/', '/styles/:id', '/styles/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
   res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
 });
@@ -254,23 +257,83 @@ function productLink(p) {
   return `https://yandex.ru/search/?text=${encodeURIComponent(query)}`;
 }
 
-const STATIC_STYLE_KEYS = new Set(['modern', 'scandi', 'loft', 'japandi', 'neo', 'minimal', 'dark', 'boho', 'deco', 'country']);
-// Новые стили 2026 показываем ближайшей существующей обложкой, пока нет своих ассетов.
+// 32 ключа каталога. Обложки: style-<key>.webp, иначе — алиас.
+const STATIC_STYLE_KEYS = new Set([
+  'modern', 'loft', 'scandinavian', 'provence', 'minimalism', 'neoclassic',
+  'boho', 'baroque', 'japandi', 'classic', 'country', 'art_nouveau',
+  'english', 'eclectic', 'mediterranean', 'eco', 'art_deco',
+  'dark_contemporary', 'memphis_accent', 'mid_century', 'soviet_modern',
+  'bauhaus', 'dark_academia', 'modern_farmhouse', 'coastal', 'space_age',
+  'grandmillennial', 'desert_modern', 'tropical_modern', 'neo_deco',
+  'high_tech', 'chalet',
+]);
+// Алиасы — временное решение до своих обложек.
 const STYLE_IMAGE_ALIASES = {
-  'wabi-sabi': 'japandi',
-  'organic': 'minimal',
-  'warm-minimal': 'scandi',
-  'biophilic': 'country',
-  'heritage': 'neo',
-  'maximalism': 'deco',
-  'mediterranean': 'deco',
+  'mid_century': 'modern',
+  'soviet_modern': 'loft',
+  'bauhaus': 'minimal',
+  'dark_academia': 'english',
+  'modern_farmhouse': 'country',
+  'coastal': 'scandi',
+  'space_age': 'deco',
+  'grandmillennial': 'boho',
+  'desert_modern': 'boho',
+  'tropical_modern': 'country',
+  'neo_deco': 'deco',
+  'high_tech': 'dark',
+  'chalet': 'country',
+  'art_nouveau': 'deco',
+  'provence': 'country',
+  'baroque': 'deco',
+  'classic': 'neo',
+  'eclectic': 'boho',
+  'english': 'neo',
 };
+
+function generatedStyleImage(key) {
+  if (!key) return null;
+  // Сгенерированная иллюстрация имеет приоритет над статической обложкой.
+  for (const ext of ['png', 'webp', 'jpg']) {
+    const file = `style-${key}.${ext}`;
+    if (fs.existsSync(path.join(WEB_DIST, 'images', file))) return `/images/${file}`;
+  }
+  return null;
+}
 
 function styleImageUrl(style) {
   if (style.preset_image_path) return `/style-images/${path.basename(style.preset_image_path)}`;
-  if (STATIC_STYLE_KEYS.has(style.key)) return `/images/style-${style.key}.webp`;
+  const generated = generatedStyleImage(style.key);
+  if (generated) return generated;
+  if (STATIC_STYLE_KEYS.has(style.key)) {
+    const staticByKey = {
+      modern: 'modern',
+      loft: 'loft',
+      scandinavian: 'scandi',
+      minimalism: 'minimal',
+      neoclassic: 'neo',
+      art_deco: 'deco',
+      dark_contemporary: 'dark',
+      boho: 'boho',
+      country: 'country',
+      japandi: 'japandi',
+      mediterranean: 'boho',
+      eco: 'country',
+      memphis_accent: 'modern',
+    };
+    const file = staticByKey[style.key];
+    if (file) return `/images/style-${file}.webp`;
+  }
   const alias = STYLE_IMAGE_ALIASES[style.key];
   return alias ? `/images/style-${alias}.webp` : '/images/style-modern.webp';
+}
+
+function parseSwatches(value) {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function styleDto(style) {
@@ -278,8 +341,14 @@ function styleDto(style) {
     id: style.id,
     key: style.key,
     name: style.name,
+    display_name: style.display_name || style.name,
+    family: style.family || '',
+    era: style.era || '',
+    is_featured: style.is_featured === true,
+    seo_name: style.seo_name || style.name,
     accent: style.accent,
     description: style.description,
+    swatches: parseSwatches(style.swatches),
     image_url: styleImageUrl(style),
     active: style.active,
     sort: style.sort,
@@ -378,14 +447,18 @@ app.get('/api/models', h(async (_req, res) => {
   res.json({ models: modelsOut, default_key: defaultKey });
 }));
 app.get('/api/legal', (_req, res) => res.json({ versions: LEGAL_VERSIONS, urls: LEGAL_URLS, documents: currentLegal() }));
-app.get('/api/styles', h(async (_req, res) => {
-  res.json((await q.styles(true)).map(styleDto));
+app.get('/api/styles', h(async (req, res) => {
+  const featuredOnly = String(req.query.featured || '') === '1';
+  const rows = await q.styles(true);
+  res.json((featuredOnly ? rows.filter(row => row.is_featured === true) : rows).map(styleDto));
 }));
 app.get('/api/room-types', (_req, res) => res.json(activeRoomTypeNames()));
 
 app.get('/api/design', (_req, res) => {
   res.json({
-    styles: DESIGN_STYLES.map(({ id, name, palette, materials }) => ({ id, name, palette, materials })),
+    styles: DESIGN_STYLES.map(({ id, name, display_name, family, era, is_featured, palette, materials }) => ({
+      id, name, display_name, family, era, is_featured, palette, materials,
+    })),
     concepts: DESIGN_CONCEPTS.map(({ id, name, main_move, quiet_areas, description }) => ({
       id, name, main_move, quiet_areas, description,
     })),
@@ -1152,9 +1225,10 @@ app.patch('/api/admin/articles/:id', h(async (req, res) => {
   if (!current) return res.status(404).json({ error: 'Статья не найдена' });
   const patch = req.body?.meta || {};
   const allowed = {};
-  for (const k of ['target_query', 'meta_title', 'meta_description']) {
+  for (const k of ['target_query', 'meta_title', 'meta_description', 'canonical_slug']) {
     if (typeof patch[k] === 'string') allowed[k] = patch[k].slice(0, 300);
   }
+  if (typeof patch.indexable === 'boolean') allowed.indexable = patch.indexable;
   const article = await q.updateArticleMeta(current.id, allowed);
   log({ event: 'article_meta_updated', id: article.id, slug: article.slug, keys: Object.keys(allowed) });
   res.json({ article });
@@ -2008,7 +2082,7 @@ function notFoundPage(title, text) {
 }
 
 app.get(['/articles', '/articles/'], h(async (_req, res) => {
-  const rooms = (await q.galleryRooms()).map(r => ({ name: r.name, slug: slugify(r.name), count: r.count }));
+  const rooms = (await q.galleryRooms()).filter(r => !GALLERY_NOINDEX_ROOMS.has(r.name)).map(r => ({ name: r.name, slug: slugify(r.name), count: r.count }));
   res.type('html').send(hubPage(await q.listArticles(), { rooms }));
 }));
 // Лендинг промт-кластера: реальные промты из опубликованных статей.
@@ -2060,8 +2134,9 @@ app.get('/sitemap.xml', h(async (_req, res) => {
   // public/sitemap.xml удалён, чтобы он не «перекрывал» динамический вывод
   // (иначе опубликованные статьи не попадали бы в sitemap).
   const articles = await q.listArticles();
-  const galleryEntries = ['/gallery', ...(await q.galleryRooms()).map(r => `/gallery/${slugify(r.name)}`)];
-  const xml = buildSitemapXml({ staticEntries: [...STATIC_ENTRIES, ...galleryEntries], articles, baseUrl: APP_URL });
+  const galleryEntries = ['/gallery', ...(await q.galleryRooms()).filter(r => !GALLERY_NOINDEX_ROOMS.has(r.name)).map(r => `/gallery/${slugify(r.name)}`)];
+  const styleEntries = ['/styles', ...DESIGN_STYLES.map(style => `/styles/${style.id}`)];
+  const xml = buildSitemapXml({ staticEntries: [...STATIC_ENTRIES, ...styleEntries, ...galleryEntries], articles, baseUrl: APP_URL });
   res.type('application/xml').send(xml);
 }));
 app.get('/search-lab/:file', h(async (req, res) => {

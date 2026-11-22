@@ -109,16 +109,75 @@ export function pickVariety(room = {}, style = null, seed = '', used = []) {
   };
 }
 
+const AXIS_INSTRUCTIONS = {
+  styling: {
+    minimal: 'Keep the frame airy: fewer objects, generous negative space, one sculptural accent and calm surfaces.',
+    curated: 'Build 3–5 styled vignettes with layered textiles, art, plants, books and ceramics; every area feels finished.',
+  },
+  composition: {
+    symmetric: 'Compose around a clear central axis; mirror visual weight left-to-right or around the focal plane.',
+    asymmetric: 'Place the main visual weight off-center and balance it with smaller counterweights; avoid perfect mirroring.',
+  },
+  temperature: {
+    warm: 'Favor warm woods, cream plasters, honey metals and soft terracotta notes.',
+    neutral: 'Keep the palette in the middle: greige, taupe, soft grey woods, brushed steel.',
+    cool: 'Allow cool stone, slate, silver metals and crisp blue-grey notes where the style supports them.',
+    sunlit: 'Emphasize warm daylight, sun-bleached surfaces and Mediterranean brightness.',
+  },
+  light: {
+    soft: 'Use diffused daylight and gentle 2700K layers; avoid harsh shadows or high contrast.',
+    even: 'Keep illumination uniform across the frame with no single dominant hotspot.',
+    airy: 'Maximize the sense of daylight with sheer treatments and light-reflecting surfaces.',
+    shadowed: 'Allow deep, soft shadows to sculpt the space; light should feel quiet and directional.',
+    contrast: 'Let light and shadow create clear shape; one strong light direction is welcome.',
+    dramatic: 'Use strong chiaroscuro, pools of light and dark recesses for theatrical depth.',
+    moody: 'Keep overall levels low and warm, with precise accent lighting on materials and edges.',
+    formal: 'Use symmetrical, balanced lighting: matching sconces, centered pendants, even wall wash.',
+    glamorous: 'Add polished reflections, sparkle and refined highlights on metal and glass.',
+    bright: 'Fill the room with clear, sunlit brightness and pale surfaces.',
+    dappled: 'Let light feel filtered through foliage or sheer layers, with soft moving patches.',
+  },
+  texture: {
+    matte: 'Prefer matte, absorbent surfaces: lime plaster, raw linen, unpolished wood.',
+    satin: 'Use satin sheen where appropriate: eggshell paint, polished plaster, brushed metal.',
+    tactile: 'Emphasize touchable irregularity: hand-trowelled plaster, nubby textiles, live wood grain.',
+    raw: 'Leave materials honest and unrefined: exposed brick, concrete, reclaimed wood.',
+    refined: 'Use clean, processed surfaces: smooth stone, lacquer, fine joinery.',
+    polished: 'Add mirror-like gloss on stone, metal or lacquer where it suits the style.',
+    glossy: 'Include reflective, high-gloss planes as a deliberate graphic element.',
+  },
+  density: {
+    airy: 'Keep the room visually light: open floor area, slim furniture, breathing space around every piece.',
+    tonal: 'Layer similar tones at different values to create depth without clutter.',
+    minimal: 'Reduce to essentials; each object must earn its place.',
+    layered: 'Add depth through overlapping planes, textures and foreground-to-background layers.',
+    sparse: 'Leave deliberate emptiness; let architecture and one or two pieces carry the room.',
+  },
+  contrast: {
+    low: 'Keep tonal transitions gentle and harmonious.',
+    tonal: 'Build interest with value shifts within one hue family.',
+    high: 'Allow strong light/dark or material contrast for graphic impact.',
+  },
+  geometry: {
+    playful: 'Introduce one or two unexpected shapes: rounded corners, arcs, bold silhouettes.',
+    graphic: 'Use crisp lines, blocks of colour and flat planes as compositional tools.',
+  },
+};
+
 // Оси как отдельный блок-модификатор: мягкая вариация внутри стиля, не спорит
 // с палитрой, акцентом и геометрией. Пусто, если у стиля нет осей или значений.
 export function axesPrompt(variety) {
   const axes = Array.isArray(variety?.axes) ? variety.axes.filter(axis => axis?.key && axis?.value) : [];
   if (!axes.length) return '';
-  return [
+  const lines = [
     'STYLE AXES — SOFT VARIATION',
     'These are soft style modifiers that differentiate this render inside the chosen style. They never override the style palette, the single accent colour, the composition emphasis or the geometry lock.',
-    ...axes.map(axis => `- ${axis.key}: ${axis.value}`),
-  ].join('\n');
+    ...axes.map(axis => {
+      const instruction = AXIS_INSTRUCTIONS[axis.key]?.[axis.value];
+      return instruction ? `- ${axis.key}: ${axis.value} — ${instruction}` : `- ${axis.key}: ${axis.value}`;
+    }),
+  ];
+  return lines.join('\n');
 }
 
 export function variabilityPrompt(variety) {

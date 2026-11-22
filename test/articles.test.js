@@ -12,6 +12,8 @@ const {
   MIN_ARTICLE_WORDS,
   autoMetaTitle,
   autoMetaDescription,
+  normalizeSeoTitle,
+  normalizeSeoDescription,
   hubPage,
   articlePage,
 } = await import('../src/articles.js');
@@ -169,6 +171,37 @@ test('articles: autoMetaDescription truncates at word/sentence boundary within 1
 test('articles: autoMetaDescription keeps short text intact and handles empty input', () => {
   assert.equal(autoMetaDescription(''), '');
   assert.equal(autoMetaDescription('Короткое описание'), 'Короткое описание');
+});
+
+test('articles: normalizeSeoTitle trims dangling words and caps at 60 without brand suffix', () => {
+  assert.equal(normalizeSeoTitle(''), '');
+  assert.equal(normalizeSeoTitle('Дизайн гостиной в стиле лофт и'), 'Дизайн гостиной в стиле лофт');
+  assert.ok(!normalizeSeoTitle('Светлая кухня в скандинавском стиле').includes('ремонтвижн'));
+  const long = normalizeSeoTitle('Очень длинный редакторский заголовок статьи про интерьер, который не помещается в выдачу поиска');
+  assert.ok(long.length <= 60);
+  assert.doesNotMatch(long, /\s(и|с|на|без|в|для|по|из|от|до)$/);
+  assert.doesNotMatch(long, /-$/);
+});
+
+test('articles: normalizeSeoDescription adds terminal period and never breaks a word', () => {
+  assert.equal(normalizeSeoDescription(''), '');
+  assert.equal(normalizeSeoDescription('Короткое описание интерьера'), 'Короткое описание интерьера.');
+  const done = 'Готовое описание, уже с точкой.';
+  assert.equal(normalizeSeoDescription(done), done);
+  const words = ['интерьер', 'свет', 'дуб', 'лён', 'шерсть', 'керамика', 'фактура', 'пространство', 'зонирование', 'палитра', 'материал', 'текстиль', 'деталь', 'акцент', 'композиция', 'атмосфера', 'уют', 'практичность', 'гармония', 'баланс'];
+  const long = `Начинайте с базы и света: белые стены, светлый дуб и лён. ${words.join(' ')}`;
+  const out = normalizeSeoDescription(long);
+  assert.ok(out.length <= 160, `длина ${out.length}`);
+  assert.ok(/[.!?…]$/.test(out), `без терминальной точки: «${out}»`);
+});
+
+test('articles: articlePage cover alt is descriptive (not H1) and sets og:image:alt', () => {
+  const html = articlePage(makeArticle());
+  const cover = html.match(/<img class="cover"[^>]*>/);
+  assert.ok(cover, 'ожидалась обложка');
+  assert.match(cover[0], /alt="Как собрать светлую скандинавскую спальню[^"]*"/);
+  assert.ok(!cover[0].includes('alt="Скандинавская спальня: свет и воздух'), 'alt не должен повторять H1');
+  assert.match(html, /<meta property="og:image:alt" content="Как собрать светлую скандинавскую спальню[^"]*">/);
 });
 
 test('articles: articlePage renders no <img> without alt and declares favicon', () => {

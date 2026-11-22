@@ -107,6 +107,22 @@ test('layout text renders zones, items and circulation', () => {
 });
 
 
+test('v2 planner normalizes frame_bbox to grid 0-1000', () => {
+  const plan = normalizeLayoutPlanV2({
+    status: 'proposed',
+    strategy: 'Диван у окна',
+    zones: [{ id: 'zone_1', name: 'Отдых', purpose: 'ТВ', position: 'левая стена' }],
+    items: [
+      { id: 'item_1', type: 'sofa', label: 'Диван 200', position: 'у левой стены', frame_bbox: [600, 100, 900, 500], width_cm: 200, depth_cm: 85 },
+      { id: 'item_2', type: 'sideboard', label: 'Тумба 150', position: 'у правой стены', frame_bbox: [10, 10, 12, 12], width_cm: 150, depth_cm: 35 },
+    ],
+    circulation: { description: 'проход 90 см' },
+    validation: { result: 'passed', checks: [] },
+  });
+  assert.deepEqual(plan.items[0].frame_bbox, [600, 100, 900, 500]);
+  assert.equal(plan.items[1].frame_bbox, null);
+});
+
 test('v2 planner result is converted to the legacy layout shape', () => {
   const plan = normalizeLayoutPlanV2({
     status: 'proposed',

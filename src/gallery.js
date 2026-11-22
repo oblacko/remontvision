@@ -3,6 +3,8 @@
 // и фильтры по комнатам — index; глубокие листания (?page=N) — noindex,
 // чтобы не плодить тонкие дубли.
 
+import { roomSeo, pluralRu, GALLERY_NOINDEX_ROOMS } from './roomseo.js';
+
 export const GALLERY_PAGE_SIZE = 24;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => (
@@ -28,15 +30,17 @@ export function galleryPage(items, opts) {
   const base = roomSlug ? `/gallery/${roomSlug}` : '/gallery';
   const canonical = `https://www.remontvision.ru${base}`;
   const pages = Math.max(1, Math.ceil(total / GALLERY_PAGE_SIZE));
-  const robots = page > 1 ? 'noindex, follow' : 'index, follow';
+  // Глубокие листания и тонкие разделы («Другое», «Кладовка») — noindex.
+  const robots = (page > 1 || (room && GALLERY_NOINDEX_ROOMS.has(room))) ? 'noindex, follow' : 'index, follow';
 
+  const seo = room ? roomSeo(room) : null;
   const title = room
-    ? `${room}: ${total} дизайнов интерьера по фото — ремонтвижн`
+    ? `${seo.title}: ${total} ${pluralRu(total, 'дизайн', 'дизайна', 'дизайнов')} интерьера по фото — ремонтвижн`
     : page > 1
       ? `Галерея дизайнов интерьера — страница ${page} — ремонтвижн`
       : 'Галерея дизайнов интерьера по фото — ремонтвижн';
   const description = room
-    ? `Готовые AI-дизайны ${room.toLowerCase()} в разных стилях: реальные визуализации пользователей. Загрузите своё фото и получите дизайн своей комнаты.`
+    ? `Готовые AI-дизайны ${seo.genitive} в разных стилях: реальные визуализации пользователей. Загрузите своё фото и получите дизайн своей комнаты.`
     : 'Галерея интерьеров, созданных нейросетью по фото: кухни, гостиные, спальни и другие комнаты в разных стилях. Примерьте на свою комнату.';
 
   const cards = items.map(r => {
@@ -59,9 +63,10 @@ export function galleryPage(items, opts) {
       }).join('')}</nav>`
     : '';
 
-  const roomLinks = rooms.length
-    ? `<nav class="rooms">${rooms.map(r =>
-        `<a${r.slug === roomSlug ? ' class="on"' : ''} href="/gallery/${r.slug}">${esc(r.name)} <b>${r.count}</b></a>`).join('')}</nav>`
+  const navRooms = (Array.isArray(rooms) ? rooms : []).filter(r => !GALLERY_NOINDEX_ROOMS.has(r.name));
+  const roomLinks = navRooms.length
+    ? `<nav class="rooms">${navRooms.map(r =>
+        `<a${r.slug === roomSlug ? ' class="on"' : ''} href="/gallery/${r.slug}">${esc(roomSeo(r.name).title)} <b>${r.count}</b></a>`).join('')}</nav>`
     : '';
 
   const jsonLd = JSON.stringify({
@@ -125,7 +130,7 @@ footer a{color:var(--muted)}
 <body>
 <header><a href="/">ремонтвижн</a><nav><a href="/articles">Статьи</a><a href="/#upload">Создать свой дизайн</a></nav></header>
 <main>
-<h1>${room ? esc(room) : 'Галерея дизайнов интерьера'}</h1>
+<h1>${room ? esc(seo.title) : 'Галерея дизайнов интерьера'}</h1>
 <p class="intro">${esc(description)}</p>
 ${roomLinks}
 ${list}

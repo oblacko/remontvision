@@ -2,7 +2,71 @@
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-21. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
+Дата обновления: 2026-11-22. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
+
+## 2026-11-22 — pipeline-обложки 5 стилей и фикс кэша openings
+
+- **Pipeline-обложки:** новый `scripts/generate-style-covers-pipeline.mjs` проходит через полный production-путь (`processRender`), а не через тестовый скрипт. Для одного исходного фото `assets/zal.jpg` сгенерированы и применены обложки 5 стилей: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/style-*.png` и `web/dist/images/style-*.png`.
+- **Фикс `room_analysis.openings`:** в `src/jobs.js` `cachedOpenings` теперь читается как `openingsRow.data?.openings`, потому что `upsertRoomAnalysis` сохраняет обёртку `{ openings }`. Это устраняло `Cannot read properties of undefined (reading 'length')` на повторных рендерах одной комнаты.
+- **Тестовые брифы очищены:** из `scripts/style-briefs.mjs` и `scripts/generate-style-illustrations.mjs` убраны `floorOverride`, `FLOOR_BY_STYLE`, `FLOOR_ALT`, `LIGHT_FIXTURE`, `pickFloor`; смягчены `ROOM_PROGRAM`, `WALLS`, `PLACEMENT` и правила радиатора/света. Подписные движения для `tropical_modern`, `english`, `dark_academia`, `chalet` больше не нарушают `ARCH_LOCK`.
+- **Регрессия промтов:** обновлён `docs/regression/baseline.json` под electrical lock (замена старого потолочного светильника на стилевой pendant/chandelier).
+- **Тесты:** `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
+
+## 2026-11-21 — REM-40 технический SEO: шаблон статей, alt, noindex, favicon
+
+Правки по аудиту REM-36 (техническая часть; контентные тексты готовит SEO, REM-39). Публикаций и деплоя не было.
+
+- **Meta статей без обрывов** (`src/articles.js`): `autoMetaDescription` режет по границе слова/предложения, `autoMetaTitle`/`normalizeSeoTitle` не заканчивают заголовок на союзе/предлоге. В схему `ARTICLE_RENDER_SYSTEM` добавлены поля `seo_title`/`seo_description` (50–60 и 140–160 симв. с терминальной точкой) — `generateArticleFromRender` сохраняет их в meta с фолбэком на авто-генерацию.
+- **Порог публикации 600 слов** (`MIN_ARTICLE_WORDS` 500 → 600), совпадает с целевым объёмом генерации.
+- **Публикация батчем под контролем** (`scripts/generate-articles-batch.mjs`): `--publish`/`--publish-drafts` требуют `--approved`; publish-гейт всегда `maxPerCluster=1` (независимо от `--per-cluster`); стили приведены к каноническим именам `DESIGN_STYLES`.
+- **Sitemap** (`src/sitemap.js`): опубликованные статьи с `meta.indexable === false` или `meta.canonical_slug` не попадают в sitemap.
+- **Галерея** (`src/gallery.js`, новый `src/roomseo.js`): `pluralRu` для «дизайн/дизайна/дизайнов», родительный падеж в описаниях, «Гостиная (зал)» → «Гостиная»; разделы «Другое» и «Кладовка» — noindex и убраны из room-nav и sitemap.
+- **Alt обложки и og:image:alt** (`src/articles.js`): alt описательный (описание/стиль×комната), а не повтор H1.
+- **Admin PATCH** (`src/server.js`): разрешены поля `meta.indexable` (bool) и `meta.canonical_slug` (string).
+- **favicon** (`public/favicon.ico`, 16/32/48) и `<link rel="icon">` в шаблонах — `/favicon.ico` больше не 404. noindex для `/room/:id` и `/s/:token` в raw HTML/заголовках — внедрён ранее.
+- **Тесты:** `articles.test.js`, `sitemap.test.js`, `gallery.test.js`; `npm test` 470 (469 pass, 1 skip), web lint (0 ошибок) и build зелёные.
+
+## 2026-11-21 — каталог 32 стилей и библиотека стилей
+
+- **Данные:** `src/designdata.js` расширен с 10 до 32 стилей. Добавлены `display_name` (продающее название), `family`, `era`, `is_featured`, `description`. Топ-10 featured: modern, loft, scandinavian, provence, minimalism, neoclassic, boho, baroque, japandi, classic.
+- **Матрица:** 32 × 10 = 320 ячеек: 257 ok, 50 weaken, 13 conflict. `WEAKEN_PARAMS` — 50 записей.
+- **Миграция `065_styles_32.sql`:** новые колонки `display_name`, `family`, `era`, `is_featured`, `seo_name`; upsert 32 стилей; переиспользованы существующие ключи modern/boho/country; все 32 активны.
+- **API:** `/api/styles` отдаёт `display_name`, `family`, `is_featured`, `swatches`; `?featured=1` — только топ-10. `/api/design` — 32 стиля и 320 ячеек.
+- **UI:** основной сценарий показывает 10 featured; кнопка «Больше стилей» ведёт в `/styles`. Библиотека `/styles` с фильтрами по семействам, страница `/styles/:id` с палитрой и кнопкой «Сгенерировать такой же» (через `rv_prefill_style`).
+- **SEO:** `/styles` и 32 страницы стилей добавлены в sitemap; SPA-роуты отдают index.html.
+- **Маркеры:** обновлены `STYLE_TAGS`, `STYLE_WORDS`, `STYLE_MARKERS` под 32 стиля.
+- **Иллюстрации:** `scripts/generate-style-illustrations.mjs` — 32 генерации по одному стилю (1K, FLUX 3 Image, bbox lock), сохраняет в `web/dist/images/style-<id>.webp` и `web/public/images/style-<id>.webp`; `styleImageUrl` отдаёт сгенерированную обложку раньше алиаса.
+- **Контраст и живость обложек:** палитры 32 стилей пересобраны по колористике (60-30-10, тёплый/холодный контраст, комплементарные пары), миграция `066`. Добавлены style-specific `COLOR LOCK`, `LIGHT LOCK`, `DESIGN CONTRAST`, `DESIGN BRIEF`; полотно двери можно менять, сохраняя проём; окно фиксируется bbox детектора и `WINDOW LOCK`, без хардкода числа створок. Добавлены lived-in стилинг, заполнение стен (комоды, консоли, стеллажи, полки) и 20 приёмов в `docs/STYLING-TECHNIQUES.md`.
+- **QA и перегенерация:** `scripts/style-qa.mjs` проверяет архитектуру, окно, двери, радиаторы, стиль, контраст, живость и заполнение стен. `scripts/run-style-illustrations.mjs` генерирует по одному стилю, проверяет и делает повторную попытку при провале (лимит 100 генераций). Спальни генерируются из реального фото спальни, зал/кабинет/столовая — из фото зала с `keepFurniture=true`, чтобы не ломать окно.
+- **Тесты:** `npm test` 477/478 (1 skipped), integration 75/75, web lint/build зелёные.
+
+## 2026-11-21 — FLUX 3 quality-max: позитивная реформа промта + bbox-заморозка архитектуры
+
+- **Цель:** повысить качество генерации по критериям: сохранение архитектуры, правильный масштаб, расстановка мебели, дизайн уровня бюро, вариативность.
+- **Позитивная реформа промта** (`src/promptconfig.js`, `src/openrouter.js`, `src/roomtypes.js`, `src/scaleplan.js`): заменены десятки негативных формулировок «no X / do not X» на позитивные состояния по гайду FLUX 3 (final state, keep, preserve). У FLUX 3 нет negative prompt; запреты ведут модель к запрещённому.
+- **Обновлённые блоки:** lighting, cleanup, window, pinterest, furnitureOn/Off, geometry lock, dimensions, scale plan, bed, radiators, room `forbid`/`keep`/`styling`, base prompt TASK/CHANGE/COMPOSITION/LIFE & STYLING.
+- **Bbox-заморозка архитектуры:**
+  - `src/openings.js` — vision-детекция окон/дверей/встроенных элементов с bbox 0–1000.
+  - `src/bboxprompt.js` — построение FLUX 3 bbox JSON (Keep-строки) и конвертер координат.
+  - `src/jobs.js` — вызов детекции параллельно repair/art/layout, кэш `room_analysis` artifact `openings`.
+  - `src/openrouter.js` — вставка bbox JSON в конец промпта с `<id>`-ссылками в теле.
+  - Фича-флаг `BBOX_LOCK_ENABLED` (default `false`); повторные рендеры используют кэш.
+- **Layout bbox (phase 3):**
+  - `src/layoutprompt.js` — схема плана получила `frame_bbox [top, left, bottom, right]` для каждого предмета.
+  - `src/layoutagent.js` — `normalizeLayoutPlanV2` сохраняет `id`, нормализует и отбрасывает слишком мелкие/невалидные bbox.
+  - `src/openrouter.js` — планировочные предметы с `frame_bbox` добавляются в bbox JSON как New-строки (`from: null`) рядом с Keep-строками архитектуры.
+  - Тест: `test/layoutagent.test.js` (frame_bbox), `test/prompt.test.js` (New-строки в промте).
+- **Тесты:** `test/openings.test.js`, `test/bboxprompt.test.js`, `test/layoutagent.test.js`, обновлён `test/prompt.test.js`.
+- **Регрессия:** обновлён `docs/regression/baseline.json` (20 конфигураций), `npm test` 460/460.
+- **Phase 2 — Bbox-заморозка архитектуры:**
+  - `src/openings.js`, `src/bboxprompt.js`, кэш `room_analysis` artifact `openings`, wiring в `src/jobs.js` и `src/openrouter.js`.
+  - Canary v1: 10 генераций FLUX 3 Image (`scripts/canary-bbox-10.mjs`, $0.53). Vision-QA: style 9.0, photo 8.2, arch 7.7, scale 7.3, authorial 8.4. Проблема — нестабильность детектора на балконных блоках.
+  - Canary v2: детектор усилен few-shot примерами и явным правилом разделения двери/окна. 5 генераций (`scripts/canary-bbox-5.mjs`, $0.27). Vision-QA: style 8.8, photo 8.6, arch 8.4, scale 6.8, authorial 8.0. arch вырос с 7.7 до 8.4, scandi-kids arch — с 2 до 10.
+  - `BBOX_LOCK_ENABLED` включён по умолчанию. Отключить: `BBOX_LOCK_ENABLED=false`.
+- **Phase 3 — Layout bbox:** `frame_bbox` в `src/layoutprompt.js`, нормализация и `id` в `src/layoutagent.js`, New-строки в `src/bboxprompt.js`/`src/openrouter.js`, тесты.
+- **Phase 4 — Designer signature move:** поле `signature_move` в `src/designerprompt.js` и `src/artdirector.js`, отдельный блок в `src/openrouter.js`, тест.
+- **Phase 5 — Variability axes:** оси `styling` и `composition` добавлены во все стили `src/designdata.js`; `src/variety.js` теперь переводит оси в конкретные execution-инструкции; golden-тесты обновлены.
+- **A/B-стенд:** создан `tmp/ab-flux3/score.mjs` для vision-скоринга рендеров по 6 метрикам (architecture_preserved, windows_doors_exact, scale_honesty, design_quality, layout_intelligence, overall).
 
 ## 2026-11-21 — ускорение генерации: параллельный layout/бриф, настраиваемые тики и таймауты
 

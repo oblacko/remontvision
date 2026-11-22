@@ -31,21 +31,30 @@
 ## Структура base-промта
 
 1. `IMAGE ROLES` — исходник + максимум один art ref; product refs нет.
-2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум.
-3. `ARCHITECTURE LOCK` — архитектура/камера/пропорции.
-4. `GEOMETRY LOCK` — дословные метры и запреты окон/дверей/высоты/перспективы.
+2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум; первое предложение — тождество комнаты и камеры.
+3. `ARCHITECTURE LOCK` — архитектура/камера/пропорции (позитивные формулировки: PRESERVE EXACTLY).
+4. `GEOMETRY LOCK` — дословные метры и неизменность окон/дверей/высоты/перспективы.
 5. `ART DIRECTION` + `VARIABILITY` — замысел и новизна комнаты из одного vision-вызова.
 6. `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`.
 7. `KEEP EXACTLY`, `FURNITURE MODE`.
 8. `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`.
 9. `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`.
-10. `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
+10. `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `FINAL STATE` (бывший `AVOID`) — позитивное описание итогового кадра, без negative-промптов.
 
 ## Direction
 
 - Один vision-вызов `buildArtDirection`: факты по фото + поле `direction` (карточки стиля/концепции и история на входе).
 - Без концепции или при конфликтной паре — `facts_only`; `prompt_en` (60–120 слов) идёт в `ART DIRECTION`.
 - Повторные рендеры — из `room_analysis`; новизна — `src/variability.js`. См. [GENERATION.md](GENERATION.md#5-direction-и-кэш).
+
+## Позитивные формулировки вместо negative prompt
+
+FLUX 3 не имеет negative prompt. Фразы «no new windows», «do not add a door» и аналоги модель воспринимает как цели, а не запреты. Поэтому в промте используется:
+- `FINAL STATE` — позитивное описание итогового кадра;
+- `PRESERVE EXACTLY` / `KEEP EXACTLY` — что сохраняем;
+- `keep ... unchanged`, `leave ... clear`, `ignore ...` вместо `do not ...`.
+
+Исключения — технические контексты, где модель не путает отсутствие с действием: `no text` → `clean, unmarked surfaces`, `no watermark` → `the frame contains only the room`.
 
 ## Очистка комнаты
 

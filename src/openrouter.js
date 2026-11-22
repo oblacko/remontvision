@@ -9,6 +9,7 @@ import { PRICE_TIER_META, SLOT_LABELS, normalizeTier } from './pricing.js';
 import { getPromptConfig } from './promptconfig.js';
 import { buildScalePlan } from './scaleplan.js';
 import { layoutPlanToText } from './layoutagent.js';
+import { buildBboxJson, bboxMentions } from './bboxprompt.js';
 import { proxyFetch } from './proxy.js';
 import { withImageSlot as acquireImageSlot } from './imageslot.js';
 
@@ -18,7 +19,10 @@ export const MOCK_MODE = !process.env.OPENROUTER_API_KEY;
 
 const HTTP_REFERER = process.env.APP_URL || 'http://localhost:3000';
 const TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 120_000);
-const IMAGE_TIMEOUT_MS = Number(process.env.OPENROUTER_IMAGE_TIMEOUT_MS || 300_000);
+// Дефолт снижен со 150 с: BFL почти всегда отвечает < 60 с; зависший вызов 300 с
+// блокировал image-слот и lease, удерживая очередь. Один retry уже есть, так что
+// редкий медленный ответ всё равно получает шанс, но не 10 минут подряд.
+const IMAGE_TIMEOUT_MS = Number(process.env.OPENROUTER_IMAGE_TIMEOUT_MS || 150_000);
 export const MAX_REFERENCES = 4; // сколько референсов уходит в генерацию (проверяй supported_parameters модели)
 
 // --- логирование: json-строки для юнит-экономики и отладки ---
@@ -258,10 +262,10 @@ This is the SAME physical room, not a new room. This is a cosmetic renovation on
 LOCKED INVARIANTS — do not violate any of these:
 - Camera: same position, eye height, focal length, perspective, horizon, framing, crop and aspect ratio. Same left/right and top/bottom composition. No zoom, pan, tilt, room widening or narrowing.
 - Room volume: same width, depth, ceiling height, wall planes, floor plane, soffits, beams, columns, niches and arches. Do not add, remove, move, resize, open or close any wall, window, door, niche, beam, column, arch, cove, ceiling recess, skylight or room volume.
-- Windows: same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Do not add a second window. Do not widen, raise, lower or move the window.
-- Doors: same count, size, position, frame, handle and swing. Do not add a doorway, hallway or second room.
+- Windows: same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Keep the full glazed area and every mullion exactly as in the source. Curtains frame the window and leave the full glazed width visible. Do not add a second window. Do not widen, raise, lower, shrink or move the window.
+- Doors: same count, size, position, frame and swing. The door leaf may be restyled or replaced to match the selected style; the opening and frame stay fixed. Do not add a doorway, hallway or second room.
 - Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobe, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Preserve their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers. Do not remove shelves, add niches, change the ceiling line, add beams or columns.
-- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights may use only existing points; do not add new recessed, cove, track or wall lights.
+- Electrical: preserve the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. Replace the old ceiling fixture with a style-appropriate pendant or chandelier at the same ceiling point; keep the point and wiring. New lights may use only existing points; do not add new recessed, cove, track or wall lights.
 - Mirrors and reflections are reflections, not openings: do not turn a mirrored wardrobe or mirror reflection into a window, door or new room.
 - If a design idea conflicts with any locked invariant, keep the architecture and change the finish or decor instead.`;
 
@@ -271,10 +275,10 @@ This is the SAME physical room from the source photograph, captured by the same 
 PRESERVE EXACTLY:
 - Camera: the same position, eye height, focal length, perspective, horizon, framing, crop and aspect ratio. The left/right and top/bottom composition stays identical.
 - Room volume: the same width, depth, ceiling height, wall planes, floor plane, soffits, beams, columns, niches and arches.
-- Windows: the same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche.
-- Doors: the same count, size, position, frame, handle and swing.
+- Windows: the same count, size, shape, position, sill, reveal, frame, glazing bars and radiator niche. Keep the full glazed area and every mullion exactly; curtains frame the window and leave its width visible.
+- Doors: the same count, size, position, frame, swing and door type. Restyle only the door leaf material and colour to match the style; keep the opening, frame and glazing pattern unchanged. Interior doors stay interior doors; terrace, balcony, French and all-glass door leaves are out of scope.
 - Built-ins are architecture, not furniture: built-in wardrobes, mirrored wardrobes, kitchen cabinets, shelving, niches, wall panels, banquettes, media walls and radiator grilles. Keep their exact footprint, depth, height, bay divisions, shelf spacing and vertical dividers.
-- Electrical: the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. New lights use only the existing points.
+- Electrical: the exact position of every visible outlet, switch, ceiling light point, radiator, pipe, vent, TV and wall-mounted item. Replace the old ceiling fixture with a style-appropriate pendant or chandelier at the same ceiling point; keep the point and wiring. New lights use only the existing points.
 - Floor: keep the existing plank or tile direction, pattern, seams and board width; change only the surface colour and finish.
 - Mirrors and reflections stay reflections; the only room they reflect is the existing room.
 - If a design idea conflicts with any locked element, keep the architecture and change the finish, furniture or decor instead.`;
@@ -306,7 +310,14 @@ export function buildPrompt({
   architectureFacts = null,
   accentHex = null,
   novelty = '',
-}) {
+  openings = null,
+  signatureMove = '',
+  stylePalette = null,
+  lightOverride = '',
+  designContrast = false,
+  designBrief = '',
+  floorOverride = '',
+} = {}) {
   const tierKey = normalizeTier(priceTier);
   const tier = PRICE_TIER_META[tierKey];
   const styleDesc = styleDescription || STYLES[style] || STYLES['Современный'];
@@ -323,27 +334,27 @@ export function buildPrompt({
     .replace(/\.+$/, '') || 'Update surface finishes, textiles, lighting and decor without changing the room layout';
   const roomRules = room ? `${room.guidance} ${room.forbid}`.replace(/\s+/g, ' ').trim() : 'Keep the room purpose exactly as in the source photo.';
   const styling = keepFurniture
-    ? 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use only existing shelves, ledges and niches; never add a new built-in, ledge, cove or wall panel.'
-    : 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use existing or freestanding shelves, consoles and ledges; never add a new built-in, niche, cove or wall panel.';
+    ? 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use only existing shelves, ledges and niches; keep the architecture unchanged.'
+    : 'Add tasteful textiles, art, plants, books, ceramics and warm layered lighting; make it feel finished and lived-in. All decor must stay inside the existing wall, floor and ceiling planes. Use existing or freestanding shelves, consoles and ledges; keep the architecture unchanged.';
   const rules = getPromptConfig();
   const furnitureRule = keepFurniture
     ? rules.furnitureOn
     : layoutPlan
-      ? 'The room is empty. Furnish it from scratch according to the LAYOUT PLAN. Keep all architecture, openings, plumbing and electrical points. Do not reproduce old furniture positions and do not leave the room half-finished.'
+      ? 'The room is empty. Furnish it from scratch according to the LAYOUT PLAN. Keep all architecture, openings, plumbing and electrical points. Create a fresh, complete layout and leave the room fully furnished and finished.'
       : rules.furnitureOff;
   const placementRule = keepFurniture
-    ? 'Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation; do not center it under the window if it was not there. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; do not swap sides, move across the room or block the window/door. If a piece is aligned with outlets, radiators or built-ins, keep its position.'
+    ? 'Keep the existing functional zones and furniture positions. The bed stays against the same wall with the same headboard orientation, even if a window is nearby. Desk/wardrobe/sofa stay in the same zones, TV stays on the same wall. Restyle or replace furniture in place; keep each piece in its existing zone and keep all openings walkable. If a piece is aligned with outlets, radiators or built-ins, keep its position.'
     : layoutPlan
-      ? 'Place furniture exactly as the LAYOUT PLAN describes: zones, items and circulation. Keep 60–90 cm walkways and do not block windows, doors or radiators. Do not invent old furniture positions.'
-      : 'Design a believable furniture layout from scratch: 2–3 zones, 60–90 cm walkways, nothing blocking windows, doors or radiators. Do not reduce the room to a single desk+chair+shelf set.';
+      ? 'Place furniture exactly as the LAYOUT PLAN describes: zones, items and circulation. Keep 60–90 cm walkways clear of windows, doors and radiators. Place only the items listed in the plan.'
+      : 'Design a believable furniture layout from scratch: 2–3 zones, 60–90 cm walkways clear of windows, doors and radiators, and a complete, balanced arrangement.';
   const compositionRule = keepFurniture
-    ? 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved only when furniture replacement is allowed; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.'
+    ? 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be moved only when furniture replacement is allowed; built-ins, plumbing and electrical points stay in place. Keep geometry natural and grounded, with each item resting on a surface and only one of each piece visible.'
     : layoutPlan
-      ? 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be placed anywhere the LAYOUT PLAN allows; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.'
-      : 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be placed freely to support the designed zones; built-ins, plumbing and electrical points stay in place. No distorted geometry, no floating objects, no duplicate furniture.';
+      ? 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be placed anywhere the LAYOUT PLAN allows; built-ins, plumbing and electrical points stay in place. Keep geometry natural and grounded, with each item resting on a surface and only one of each piece visible.'
+      : 'Keep the camera and architecture. Create a strong focal point, balanced composition and believable depth. Freestanding furniture may be placed freely to support the designed zones; built-ins, plumbing and electrical points stay in place. Keep geometry natural and grounded, with each item resting on a surface and only one of each piece visible.';
   const catalogText = useCatalog
     ? productsText(products)
-    : 'No catalog products are used for this render. Choose materials, lighting and furniture that best fit the style and the room. Do not add a product list or estimate.';
+    : 'Design freely from the style and room requirements. Choose materials, lighting and furniture that best fit the design; no product list or estimate is needed for this render.';
   const catalogRule = useCatalog ? rules.catalogOn : rules.catalogOff;
   const roles = imageRolesText(imageMap);
   const hasRoomDimensions = Boolean(dimensions
@@ -379,11 +390,19 @@ export function buildPrompt({
   const hasOpeningFacts = architectureFacts?.windows != null && architectureFacts?.doors != null
     && Number.isFinite(factWindows) && factWindows >= 0 && Number.isFinite(factDoors) && factDoors >= 0;
   const geometryOpenings = hasOpeningFacts
-    ? `Detected openings in the photo: ${factWindows} window${factWindows === 1 ? '' : 's'} and ${factDoors} door${factDoors === 1 ? '' : 's'} — keep exactly these, do not invent extra openings.`
-    : 'Count every visible window and door in Image 1 and keep exactly that set; do not invent extra openings.';
+    ? `Detected openings in the photo: ${factWindows} window${factWindows === 1 ? '' : 's'} and ${factDoors} door${factDoors === 1 ? '' : 's'} — keep exactly this set; the openings stay unchanged.`
+    : 'Count every visible window and door in Image 1 and keep exactly that set; the openings stay unchanged.';
   const geometryText = fillTemplate(rules.geometryLock, { measurements: geometryMeasurements, openings: geometryOpenings });
   const useLockV2 = archLockV2 === null ? ARCH_LOCK_V2_ENABLED : Boolean(archLockV2);
   const architectureLock = useLockV2 ? ARCH_LOCK_V2 : ARCH_LOCK_V1;
+  const layoutItems = (!keepFurniture && layoutPlan?.items?.length)
+    ? layoutPlan.items.filter(item => item?.frame_bbox)
+    : null;
+  const bboxJson = (openings || layoutItems?.length) ? buildBboxJson({ openings, layoutItems }) : '';
+  const bboxIds = (openings || layoutItems?.length) ? bboxMentions(openings, layoutItems) : [];
+  const bboxMentionText = bboxIds.length
+    ? `The following architectural elements are pinned by exact bounding boxes and must keep their position and size: ${bboxIds.map(id => `\`<${id}>\``).join(', ')}.`
+    : '';
 
   if (iteration) {
     return `${roles}
@@ -397,9 +416,9 @@ Do not restyle the room. Do not move objects. Photorealistic result.`;
 
   const styleRefText = hasStyleRef
     ? (userStyleRef
-      ? 'The user style reference guides only the mood, light, palette, materials and level of styling. Do not copy its furniture, fixtures, layout, windows, architecture, camera angle or composition. The source room remains the only authority for geometry.'
-      : 'The style reference guides only the mood, light direction and temperature, palette, material character and level of styling. Do not copy its furniture, fixtures, layout, windows, architecture, camera angle or composition. The source room remains the only authority for geometry.')
-    : 'There is no separate style reference. Build the photographic language from the style description, room and material constraints.';
+      ? 'The user style reference guides only the mood, light, palette, materials and level of styling. Ignore its furniture, fixtures, layout, windows, architecture, camera angle and composition; the source room remains the only authority for geometry.'
+      : 'The style reference guides only the mood, light direction and temperature, palette, material character and level of styling. Ignore its furniture, fixtures, layout, windows, architecture, camera angle and composition; the source room remains the only authority for geometry.')
+    : 'Build the photographic language from the style description, the room and the material constraints without a separate style reference.';
   const colors = [
     PALETTES[palette] ? `Color scheme: ${PALETTES[palette]}.` : '',
     accentHex
@@ -439,19 +458,19 @@ Create a photorealistic, aspirational editorial photograph of the SAME ${roomNam
 ${repairScope
   ? 'This is a renovation, not a styling pass. The room volume, window and door openings and camera must remain identical, but finishes, floor, ceiling, doors, windows, furniture, lighting and textiles may change exactly as REPAIR SCOPE allows.'
   : 'This is not a new room and not a deep structural renovation. The room volume, architecture and camera must remain identical to the source. Change only surface finishes, furniture, lighting, textiles, decor and styling.'}
-The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must not look like a moodboard, a sterile furniture showroom or an empty staged flat.
-${productRefs ? 'This render includes specific hero products shown in the reference images. Place each one naturally in the room, keep its exact shape, colour, material and proportions, light it with the room\'s own light and add a soft contact shadow.' : 'This is the art-direction pass. Design the strongest room first; do not turn the image into a catalog assembly. Specific hero products can be attached later in separate local edits.'}
+The result must feel like a completed designer renovation with a genuine WOW effect: the kind of image that makes the viewer want to live in this room and save it to a Pinterest board. It must look warm, inviting and fully finished — like a real home, not a bare moodboard, a sterile furniture showroom or an empty staged flat.
+${productRefs ? 'This render includes specific hero products shown in the reference images. Place each one naturally in the room, keep its exact shape, colour, material and proportions, light it with the room\'s own light and add a soft contact shadow.' : 'This is the art-direction pass. Design the strongest room first, treating the space as a cohesive interior rather than a catalog assembly. Specific hero products can be attached later in separate local edits.'}
 
 ${architectureLock}
-
+${bboxMentionText ? `\n${bboxMentionText}\n` : ''}
 ${geometryText}
 ${repairScopeText}
-${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}${novelty ? `\n${novelty}\n` : ''}
-${layoutPlan ? `\nLAYOUT PLAN — DESIGNED BY THE ARCHITECT\n${layoutPlanToText(layoutPlan)}\nFollow this plan as the primary layout: place each item in the described zone, keep the circulation, and do not collapse the room into a minimal desk+chair+shelf set. Exact centimetres may be adjusted to the photo, but keep the composition and the item list. If the plan lists hard furniture limits, they override the art direction.\n` : ''}
+${artDirection ? `\nART DIRECTION — BESPOKE FOR THIS ROOM\nWritten by the art director from the source photo. Follow it for palette, materials, focal point, lighting, textiles and styling. If it conflicts with the ARCHITECTURE LOCK or the scale plan, keep the architecture and the real dimensions.\n${artDirection}\n` : ''}${signatureMove ? `\nDESIGNER SIGNATURE MOVE\n${signatureMove}\nThis is the single authoring gesture that makes the room memorable. Execute it clearly and keep it visible in the frame.\n` : ''}${stylePalette ? `\nCOLOR LOCK — STYLE PALETTE\nUse this exact palette across the room:\n- base ${stylePalette.base} on walls and large surfaces;\n- support ${stylePalette.support} on secondary surfaces and textiles;\n- dark ${stylePalette.dark} on wood, metal and deep accents;\n- accent ${accentHex || stylePalette.accent} on one or two objects only.\nKeep these colors distinct and visible; do not shift the whole room into a single beige tone.\n` : ''}${lightOverride ? `\nLIGHT LOCK — STYLE-SPECIFIC\n${lightOverride}\n` : ''}${designContrast ? `\nDESIGN CONTRAST — MAKE THE STYLE READ\nBuild one bold material contrast, one saturated accent colour, one sculptural focal move and one signature texture. The room must look authored and specific, not like a generic beige render.\n` : ''}${designBrief ? `\nDESIGN BRIEF — STYLE-SPECIFIC PROGRAM\n${designBrief}\n` : ''}${floorOverride ? `\nFLOOR REPLACEMENT — STYLE-SPECIFIC\nInstall a new floor finish across the whole floor plane: ${floorOverride}. The floor plane, level and room geometry stay identical; the finished surface is a clean new floor in the style palette.\n` : ''}${novelty ? `\n${novelty}\n` : ''}
+${layoutPlan ? `\nLAYOUT PLAN — DESIGNED BY THE ARCHITECT\n${layoutPlanToText(layoutPlan)}\nFollow this plan as the primary layout: place each item in the described zone and keep the circulation. Keep the room fully furnished according to the item list rather than reducing it to a minimal set. Exact centimetres may be adjusted to the photo, but keep the composition and the item list. If the plan lists hard furniture limits, they override the art direction.\n` : ''}
 ${scaleText ? `\n${scaleText}\n` : ''}
 KEEP EXACTLY
 ${keep}.
-Keep the room purpose exactly as a ${roomName}. Do not move plumbing, electrical points, windows or doors.
+Keep the room purpose exactly as a ${roomName}. Keep plumbing, electrical points, windows and doors in their existing positions.
 
 FURNITURE MODE
 ${furnitureRule}
@@ -462,9 +481,9 @@ ${placementRule}
 CHANGE / DEEP TRANSFORMATION
 ${change}.
 ${repairScope
-  ? 'Follow REPAIR SCOPE for floor, walls, ceiling, doors and windows. Do not fall back to preserving the old finish when the scope says change.'
-  : 'If a floor product is listed below, change only its surface finish; do not change the floor plane or geometry. If no floor product is listed, preserve the existing floor. Style words such as "light oak" refer to furniture and joinery only, not to replacing the floor unless a floor product is explicitly listed. The same applies to walls: change only the surface finish when a wall finish is listed.'}
-Keep the result functional, keep realistic dimensions, and do not block doors or windows.
+  ? 'Follow REPAIR SCOPE for floor, walls, ceiling, doors and windows. Replace the old finish when the scope says change, rather than preserving it.'
+  : 'If a floor product is listed below, preserve the floor plane and geometry while changing only the surface finish. If the floor product list is empty, preserve the existing floor. Style words such as "light oak" refer to furniture and joinery, not to replacing the floor, unless a floor product is explicitly listed. The same applies to walls: preserve the wall plane and change only the surface finish when a wall finish is listed.'}
+Keep the result functional, keep realistic dimensions, and keep all doors and windows clear and walkable.
 
 COMPOSITION
 ${compositionRule}
@@ -483,7 +502,7 @@ ${roomRules}
 
 LIFE & STYLING — THIS IS WHERE THE WOW EFFECT COMES FROM
 ${styling}
-Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. All decor must sit inside the existing room volume; do not alter wall, floor or ceiling planes, corners, perspective, plinth or room proportions. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. Never a bare mattress, empty walls or a cold showroom.
+Add generous but tasteful small details: layered textiles, cushions, throws, curtains, rugs, framed art, books, ceramics, candles, trays, plants and sculptural objects. All decor must sit inside the existing room volume; keep wall, floor and ceiling planes, corners, perspective, plinth and room proportions unchanged. Use warm layered lighting — ceiling, bedside/floor lamps, cove and accent light — with soft shadows and tactile material contrast. Layer soft textures and warm pools of light. The room must feel cozy, inhabited, warm, calm and aspirational, like a boutique hotel suite or a designer portfolio. The bed must be fully dressed, walls resolved and the lighting warm — always finished, never bare, empty or cold.
 
 PINTEREST-LEVEL STYLING
 ${rules.pinterest}
@@ -496,14 +515,14 @@ ${catalogRule}
 
 MATERIAL CONSTRAINTS — TEXT ONLY, NO PRODUCT IMAGES
 ${catalogText}
-Use these text descriptions only as constraints for finishes, colors, formats and physical scale. Match large surfaces (floor, walls, countertop, cabinet fronts) to the listed material where visible. Tile/plank patterns must match the stated format. Do not force a material into the frame if it is not visible. Choose furniture, lighting, decor and composition for the strength of the design rather than trying to depict the estimate. Small decor, plants, textiles, art and books are encouraged to complete the styling.
+Use these text descriptions only as constraints for finishes, colors, formats and physical scale. Match large surfaces (floor, walls, countertop, cabinet fronts) to the listed material where visible. Tile/plank patterns must match the stated format. Use a material only in the parts of the frame where it is visible. Choose furniture, lighting, decor and composition for the strength of the design rather than trying to depict the estimate. Small decor, plants, textiles, art and books are encouraged to complete the styling.
 
 STYLE BRIEF
 ${styleDesc}
 
 STYLE REFERENCE
 ${styleRefText}
-The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Do not transfer any architectural feature from the reference.
+The art reference is for palette, materials and light temperature ONLY. Ignore all architecture in the reference: windows, doors, sloped ceilings, niches, bay windows, beams, room size, layout and camera. Keep every architectural feature from the reference out of the generated room.
 ${colors}
 
 MATERIAL CLASS
@@ -511,7 +530,8 @@ ${tier.promptName || tier.name} — ${tier.prompt}
 The selected materials already match this class; keep the rest of the room consistent with it.
 
 OUTPUT
-${rules.photo} ${rules.avoid}`;
+${rules.photo} ${rules.avoid}
+${bboxJson ? `\nLAYOUT ANNOTATIONS — FIXED SPATIAL LOCKS (do not interpret as objects to redraw)\n${bboxJson}` : ''}`;
 }
 
 // Короткий промт для правки: один или несколько target'ов с референсами, без полного стилевого промта.

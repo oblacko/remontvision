@@ -10,6 +10,7 @@ import { detectImageExt } from './imagesize.js';
 import { putBuffer } from './storage.js';
 import { roomTypeByName } from './roomtypes.js';
 import { PRICE_TIER_META, normalizeTier } from './pricing.js';
+import { roomSeo, GALLERY_NOINDEX_ROOMS } from './roomseo.js';
 
 const ARTICLE_MODEL = process.env.ARTICLE_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
 const MIME_BY_EXT = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
@@ -95,12 +96,14 @@ const ARTICLE_SYSTEM = `Ты редактор интерьерного журн�
 Только JSON.`;
 
 // Статья-рендер: текст пишется под ключевые запросы (Wordstat), объём жёстко
-// задан — пакетная генерация без редактора должна проходить гейт ≥500 слов.
+// задан — пакетная генерация без редактора должна проходить гейт ≥600 слов.
 const ARTICLE_RENDER_SYSTEM = `Ты редактор интерьерного журнала. По данным (стиль, комната, товары, ключевые запросы) напиши статью на русском.
 Верни строго JSON без текста вокруг:
-{"title":"...","intro":"2-3 предложения","palette":[{"hex":"#RRGGBB","name":"кратко"}],"howto":["4-6 шагов, как повторить интерьер"],"palette_notes":"1-2 предложения про палитру и материалы","product_notes":[{"offer_id":"...","note":"1 предложение, почему товар подходит"}],"conclusion":"1 предложение"}
+{"title":"...","intro":"2-3 предложения","palette":[{"hex":"#RRGGBB","name":"кратко"}],"howto":["4-6 шагов, как повторить интерьер"],"palette_notes":"1-2 предложения про палитру и материалы","product_notes":[{"offer_id":"...","note":"1 предложение, почему товар подходит"}],"conclusion":"1 предложение","seo_title":"...","seo_description":"..."}
 Правила:
 - Суммарный объём intro + howto + palette_notes + product_notes + conclusion — не менее 600 слов.
+- seo_title — заголовок для поисковой выдачи, 50–60 символов, законченная фраза без союзов/предлогов на конце, без суффикса бренда.
+- seo_description — описание для поисковой выдачи, 140–160 символов, заканчивается точкой на границе слова.
 - Ключевые запросы используй естественно: раскрой темы, не набивай строки ключами.
 - Не выдумывай цены, ссылки и товары — используй только переданные.
 - Пиши живо, конкретно, без markdown и без списков внутри строк.
@@ -207,6 +210,29 @@ export function autoMetaDescription(text, { min = 140, max = 160 } = {}) {
   // чтобы не рвать слово (длина может быть < 140 — это лучше, чем обрыв).
   const before = clean.lastIndexOf(' ', min - 1);
   return (before > 0 ? clean.slice(0, before) : head).trim();
+}
+
+// SEO-заголовок от модели (отдельное поле seo_title в схеме): чистим и валидируем.
+// Редакторский seo_title идёт в <title> как есть, без бренд-суффикса (в отличие
+// от autoMetaTitle), поэтому суффикс сюда не добавляем — только обрезка по слову
+// и без союза/предлога на конце.
+export function normalizeSeoTitle(text) {
+  const clean = trimTrailingDangling(String(text || '').replace(/\s+/g, ' ').trim());
+  if (!clean) return '';
+  if (clean.length <= 60) return clean;
+  return trimTrailingDangling(clean.slice(0, 60).replace(/\s+\S*$/, '')) || '';
+}
+
+// SEO-описание от модели (отдельное поле seo_description в схеме): 140–160 символов,
+// граница слова/предложения, терминальная точка в конце (аудит REM-40 §1).
+export function normalizeSeoDescription(text, { min = 140, max = 160 } = {}) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  const base = autoMetaDescription(clean, { min, max });
+  if (!base) return '';
+  if (/[.!?…]$/.test(base)) return base;
+  if (base.length + 1 <= max) return `${base}.`;
+  return base;
 }
 
 export async function generateArticle({ style = 'Скандинавский', roomType = 'Спальня', tier = 'comfort', title = '', targetQuery = '' } = {}) {
@@ -361,8 +387,8 @@ export async function generateArticleFromRender({ render, style, roomType, tier 
       cover_aspect: '3:2',
       source_render_id: render.id,
       target_query: kw[0] || null,
-      meta_title: autoMetaTitle(finalTitle),
-      meta_description: autoMetaDescription(parsed.intro),
+      meta_title: normalizeSeoTitle(parsed.seo_title) || autoMetaTitle(finalTitle),
+      meta_description: normalizeSeoDescription(parsed.seo_description) || autoMetaDescription(parsed.intro),
     },
   });
 }
@@ -381,11 +407,11 @@ function coverUrl(coverPath) {
   return String(coverPath).startsWith('renders/') ? `/article-cover/${base}` : `/covers/${base}`;
 }
 
-// --- Гейты качества (аудит SEO 09.11.2026, §6.2/§6.3 P0): без их прохождения
-// публикация заблокирована. Пороги ниже целевых значений редактора (600–900 слов):
-// автомат отсекает тонкий контент, а не душит полезный.
+// --- Гейты качества (аудит SEO 09.11.2026, §6.2/§6.3 P0; REM-40 §6: порог 600 слов):
+// без их прохождения публикация заблокирована. Генерация уже целится в 600–900 слов
+// (ARTICLE_RENDER_SYSTEM + расширяющий проход) — гейт отсекает тонкий контент.
 
-export const MIN_ARTICLE_WORDS = 500;
+export const MIN_ARTICLE_WORDS = 600;
 export const MIN_ARTICLE_PRODUCTS = 3;
 
 export function countArticleWords(body) {
@@ -467,6 +493,11 @@ export function articlePage(article, { related = [] } = {}) {
   const metaTitle = String(article.meta?.meta_title || '').trim();
   const pageTitle = metaTitle ? esc(metaTitle) : title;
   const description = esc(autoMetaDescription(article.meta?.meta_description || body.intro));
+  // Alt обложки — описательный (что изображено), а не повторение H1 (аудит REM-40 §7).
+  const coverAltText = autoMetaDescription(article.meta?.meta_description || body.intro)
+    || [article.style, article.room_type].filter(Boolean).join(' · ')
+    || 'Дизайн интерьера';
+  const coverAlt = esc(coverAltText);
   const canonical = `https://www.remontvision.ru/articles/${encodeURIComponent(article.slug || '')}`;
 
   const productCards = products.map(p => {
@@ -532,6 +563,7 @@ export function articlePage(article, { related = [] } = {}) {
 <meta property="og:title" content="${pageTitle}">
 <meta property="og:description" content="${description}">
 ${cover ? `<meta property="og:image" content="https://www.remontvision.ru${cover}">` : ''}
+${cover ? `<meta property="og:image:alt" content="${coverAlt}">` : ''}
 <script type="application/ld+json">${jsonLd}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -581,7 +613,7 @@ footer{max-width:1000px;margin:0 auto;padding:24px 20px 48px;border-top:1px soli
 <header><a href="/">ремонтвижн</a><nav><a href="/articles">Все статьи</a><a href="/#upload">Создать свой дизайн</a></nav></header>
 <main>
 <h1>${title}</h1>
-${cover ? `<img class="cover" src="${cover}" alt="${title}" width="1200" height="800">` : ''}
+${cover ? `<img class="cover" src="${cover}" alt="${coverAlt}" width="1200" height="800">` : ''}
 <p class="intro">${esc(body.intro || '')}</p>
 ${YANDEX_ADS}
 ${palette.length ? `<h2>Палитра и материалы</h2><div class="swatches">${paletteHtml}</div><p>${esc(body.palette_notes || '')}</p>` : ''}
@@ -605,8 +637,9 @@ export function hubPage(articles, { rooms = [] } = {}) {
   const robots = published.length ? 'index, follow' : 'noindex, follow';
   // Перелинковка по двум осям (решение владельца 21.11.2026): комнаты ведут
   // в фильтры галереи, стили — в статьи кластера.
-  const roomNav = rooms.length
-    ? `<h2>Комнаты</h2><nav class="tags">${rooms.map(r => `<a href="/gallery/${esc(r.slug)}">${esc(r.name)} <b>${Number(r.count) || 0}</b></a>`).join('')}</nav>`
+  const navRooms = (Array.isArray(rooms) ? rooms : []).filter(r => !GALLERY_NOINDEX_ROOMS.has(r.name));
+  const roomNav = navRooms.length
+    ? `<h2>Комнаты</h2><nav class="tags">${navRooms.map(r => `<a href="/gallery/${esc(r.slug)}">${esc(roomSeo(r.name).title)} <b>${Number(r.count) || 0}</b></a>`).join('')}</nav>`
     : '';
   const byStyle = new Map();
   for (const a of published) {

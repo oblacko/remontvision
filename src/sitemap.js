@@ -63,6 +63,9 @@ export function buildSitemapXml({
 
   for (const article of articles) {
     if (article?.status !== 'published') continue;
+    // noindex-статьи и канонические дубли (canonical_slug) в sitemap не включаем (REM-40 §5).
+    if (article.meta?.indexable === false) continue;
+    if (article.meta?.canonical_slug) continue;
     urls.push({
       loc: `${base}/articles/${encodeURIComponent(String(article.slug || ''))}`,
       lastmod: lastmodOrToday(article.published_at || article.created_at),

@@ -10,7 +10,7 @@
 | Свободный дизайн | очищает комнату до пустого каркаса, затем обставляет | `keep_furniture=false` + очистка включена |
 | Мульти-стиль | до 10 пар «стиль × концепция», каждая — отдельный рендер | `items: [{style, concept}]` |
 
-Очистка **выключена по умолчанию** (`cleanupconfig.js`). При `keep_furniture=false` и включённой очистке shell строится асинхронно при первом enqueue комнаты; `processRender` ждёт его до 3 минут (heartbeat `waiting_shell`), затем рисует дизайн.
+Очистка **выключена по умолчанию** (`cleanupconfig.js`). При `keep_furniture=false` и включённой очистке shell строится асинхронно при первом enqueue комнаты; `processRender` ждёт его до 30 с по умолчанию (`RENDER_SHELL_WAIT_MS`, максимум 300 с; heartbeat `waiting_shell`), затем рисует дизайн по оригинальному фото.
 
 ## Путь базового рендера
 
@@ -21,9 +21,8 @@ flowchart LR
   C --> CL["cleanup при первом enqueue (async, если включён)"]
   C --> W["Worker: claim + lease"]
   CL --> W
-  W --> V["repair_scope ∥ art_direction + direction"]
-  V --> L["layout (пустая комната)"]
-  L --> P["buildPrompt (design-first)"]
+  W --> V["repair_scope ∥ art_direction + direction ∥ layout"]
+  V --> P["buildPrompt (design-first)"]
   P --> I["design: FLUX 3 Image"]
   I --> S["fitAspect + storage"]
   S --> R["architect review (vision)"]
@@ -55,7 +54,7 @@ flowchart LR
 
 - `repair_scope` — объём ремонта (пол/потолок/стены/двери), параллельно с арт-директором.
 - `art_direction` — один vision-вызов: размеры, объектив, мебель, палитра и (при концепции) `direction` в том же JSON.
-- `layout` — только для пустой комнаты.
+- `layout` — планировщик стартует параллельно с арт-директором всегда; применяется только для пустой комнаты (план меблированной комнаты отбрасывается).
 
 ### 5. Direction и кэш
 
@@ -114,12 +113,51 @@ flowchart LR
 - `renders.prompt`, `renders.meta`, `renders.cost_breakdown`.
 - Замеры ёмкости: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 
+## BBOX-заморозка архитектуры (экспериментальная)
+
+`BBOX_LOCK_ENABLED` включён по умолчанию. Перед генерацией запускается vision-детектор проёмов (`src/openings.js`): окна, двери и крупные встроенные элементы получают bbox в сетке 0–1000. Кэш `room_analysis` (артефакт `openings`) делает повторные рендеры комнаты бесплатными.
+
+Результат вставляется в базовый промт как FLUX 3 bbox JSON: Keep-строки с `from=ref_image_0`, `src_bbox=tgt_bbox`, и id-ссылки (`<window_1>`) в теле промпта, чтобы upsampler не сбросил аннотации.
+
+Для пустых комнат планировщик (`src/layoutagent.js`) тоже может возвращать `frame_bbox` для отдельно стоящей мебели. Эти предметы добавляются в тот же bbox JSON как New-строки (`from: null`) и упоминаются в теле промпта (`<sofa_1>`), фиксируя положение новой мебели без передачи её как референсного изображения.
+
+Отключить фичу можно переменной `BBOX_LOCK_ENABLED=false`.
+
+## Каталог 32 стилей
+
+`src/designdata.js` содержит 32 стиля. В основном сценарии показываются 10 featured (топ спроса), остальные доступны в библиотеке `/styles`. У каждого стиля есть:
+- `name` — академическое название для URL/SEO;
+- `display_name` — продающее название для UI;
+- `family` — семейство для фильтров;
+- `palette`, `materials`, `axes`, `prompt_en`, `description`.
+
+Матрица совместимости — 32 × 10 (320 ячеек). `prompt_en` пишется по гайду FLUX 3: полный сцен-капшн, свет с направлением, hex+имя цвета, камера, позитивные формулировки.
+
+## Designer signature move
+
+Арт-директор (`src/artdirector.js`, `src/designerprompt.js`) теперь возвращает `signature_move` — один конкретный авторский приём для комнаты. Он вставляется в базовый промт отдельным блоком `DESIGNER SIGNATURE MOVE`, чтобы модель чётко исполнила главный дизайнерский жест и не растворила его в общем тексте.
+
+## Вариативность (variability axes)
+
+`src/variety.js` + `src/designdata.js` дают детерминированную вариативность повторных рендеров:
+- акцентный цвет ротируется внутри палитры стиля по `seed` (render id);
+- emphasis меняет композиционный фокус;
+- оси стиля (`temperature`, `light`, `texture`, `density`/`contrast`/`geometry`, `styling`, `composition`) выбираются по `seed` и переводятся в конкретные execution-инструкции в промте;
+- avoid-список не повторяет последние 5 focal_zone / main_move / palette direction.
+
+Оси не переопределяют палитру, акцент, геометрию и bbox-заморозку.
+
+## Architecture QA
+
+`ARCHITECTURE_QA_ENABLED=true` + `ARCHITECTURE_QA_ENFORCE=false` — режим observe: vision сравнивает исходник и рендер, логирует дрейф окон/дверей/пропорций и показывает notice пользователю. По умолчанию выключено.
+
 ## Ограничения
 
 - Смета новых рендеров пуста; старый procurement не подключён.
 - Нет inpainting люстр/розеток.
 - Один провайдер — OpenRouter.
 - Style-ref/hero-референсы выключены по умолчанию.
+- BBOX-заморозка требует включения `BBOX_LOCK_ENABLED` и проверки на canary.
 - Часть правил админки не применяется: `catalogOn`, `styling` (см. выше).
 - Direction/акцент для кастомных admin-стилей без статической палитры — ограничены.
 

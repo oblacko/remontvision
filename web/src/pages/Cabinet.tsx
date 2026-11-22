@@ -32,7 +32,7 @@ type RoomGroup = { roomId: string; batchId: string; style: string; versions: Gen
 const reasonNames: Record<string, string> = {
   signup_bonus: 'бонус регистрации', signup_bonus_2: 'бонус регистрации', purchase: 'пополнение',
   render: 'создание дизайна', iterate: 'редактирование', iterate_refund: 'возврат кредита',
-  procurement: 'подбор товаров', procurement_refund: 'возврат за подбор товаров',
+  procurement: 'поиск товаров', procurement_refund: 'возврат за поиск товаров',
   refund: 'возврат', admin_adjust: 'корректировка администратором', admin_test: 'корректировка',
   referral: 'реферальная программа',
 }
@@ -400,8 +400,6 @@ export default function Cabinet() {
     )
   }
 
-  const realProducts = roomData?.render?.analysis?.products || []
-  const realOfferCount = realProducts.reduce((sum, match) => sum + match.offers.length, 0)
   return (
     <div className="min-h-dvh bg-page text-foreground">
       <header className="sticky top-0 z-40 border-b bg-page">
@@ -504,7 +502,7 @@ export default function Cabinet() {
         ) : (
           <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_24rem]">
             <section>
-              <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 flex items-baseline gap-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="max-w-[20rem] text-xs text-muted-foreground">1 кредит = дизайн (в каждом 3 бесплатных редактирования) или подбор товаров</span></div>
+              <div className="flex items-end justify-between gap-3 border-b pb-4"><div><p className="eyebrow">Баланс</p><p className="display-title mt-2 flex items-baseline gap-2 text-5xl">{me.balance} <span className="text-2xl font-light">кр.</span></p></div><span className="max-w-[20rem] text-xs text-muted-foreground">1 кредит = дизайн (в каждом 3 бесплатных редактирования)</span></div>
               <div id="referral-block" className="k-note mt-6">
                 <KitIcon name="bolt" /><div className="min-w-0"><p className="text-sm font-medium">Пригласите друга — +2 кредита вам</p><p className="mt-1 text-xs leading-5">+2 кредита начислим после первой покупки друга по вашей ссылке.</p></div>
               </div>
@@ -520,7 +518,7 @@ export default function Cabinet() {
               <p className="mt-4 text-xs leading-5 text-muted-foreground">Нажимая «Купить», вы принимаете <a className="underline underline-offset-2" href="/offer" target="_blank" rel="noopener">оферту</a> и <a className="underline underline-offset-2" href="/prices" target="_blank" rel="noopener">условия и цены</a>.</p>
               <div className="mt-8"><div className="flex items-center justify-between border-b pb-3"><h2 className="eyebrow">История кредитов</h2><span className="text-xs text-muted-foreground">{credits.length} {plural(credits.length, 'операция', 'операции', 'операций')}</span></div><div className="divide-y">{credits.map(c => <div key={c.id} className="flex items-start justify-between gap-4 py-3 text-sm"><div><b className={c.delta > 0 ? 'text-primary-text' : ''}>{c.delta > 0 ? '+' : ''}{c.delta} кр.</b><p className="mt-1 text-xs text-muted-foreground">{reasonNames[c.reason] || c.reason}{c.note ? ` · ${c.note}` : ''}</p></div><span className="shrink-0 text-xs text-muted-foreground">{dateTime(c.created_at)}</span></div>)}{!credits.length && <p className="py-4 text-sm text-muted-foreground">Операций пока нет.</p>}</div></div>
             </section>
-            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — дизайн (в каждом 3 бесплатных редактирования) или подбор товаров.</li><li>+2 кредита за друга после его первой покупки.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="lnk mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <KitIcon name="ur" /></a></aside>
+            <aside className="border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0"><p className="eyebrow">Как это работает</p><ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground"><li>2 кредита начисляются при регистрации.</li><li>1 кредит — дизайн (в каждом 3 бесплатных редактирования).</li><li>+2 кредита за друга после его первой покупки.</li><li>При сбое кредит возвращается.</li><li>Кредиты не сгорают.</li></ul><a href="/prices" className="lnk mt-6 inline-flex text-sm underline decoration-border underline-offset-4">Все условия и цены <KitIcon name="ur" /></a></aside>
           </div>
         )}
       </main>
@@ -547,11 +545,8 @@ export default function Cabinet() {
                   <a href={`/?panel=1&room=${encodeURIComponent(selectedRoom.roomId)}`} className="k-btn k-btn--s"><KitIcon name="ur" />Редактировать</a>
                   <button type="button" onClick={deleteRoom} className="k-btn k-btn--s k-btn--danger"><KitIcon name="tr" />Удалить комнату</button>
                 </div>
-                <div className="grid gap-4 border-y py-5 sm:grid-cols-2"><div><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-xs text-muted-foreground">Подбор по уровню, а не по сумме</p></div><div><p className="eyebrow">Оценка материалов</p><p className="mt-2 text-xl font-light">{rub(roomData.total)}</p><p className="mt-1 text-xs text-muted-foreground">Стоимость ориентировочная</p>{roomData.prices_as_of && <p className="mt-1 text-xs text-muted-foreground">Цены актуальны на {dateTime(roomData.prices_as_of)}</p>}</div></div>
+                <div className="border-y py-5"><p className="eyebrow">Класс материалов</p><p className="mt-2 text-xl font-light">{tierName(roomData.price_tier)}</p><p className="mt-1 text-xs text-muted-foreground">Подбор по уровню, а не по сумме</p></div>
                 <div><p className="eyebrow">Версии</p><div className="mt-3 flex flex-wrap gap-2">{selectedRoom.versions.map((v, index) => <button key={v.id} type="button" aria-selected={selectedRenderId === v.id} onClick={() => selectVersion(v.id)} className="k-tab">Версия {selectedRoom.versions.length - index} · {v.request_text ? 'редактирование' : 'базовая'} · <span className={statusView(v.status).className}>{statusView(v.status).label}</span></button>)}</div></div>
-                {realProducts.length > 0 && <div><p className="eyebrow">Подобранные товары · {realOfferCount}</p><div className="mt-3 space-y-5">{realProducts.map((match, index) => <div key={`${match.item.category}-${index}`}><div className="flex items-baseline justify-between gap-3 border-b pb-2"><p className="text-sm font-medium">{match.item.label}</p><span className="text-xs text-muted-foreground">{match.offers.length ? `${match.offers.length} в каталоге` : 'нет в каталоге'}</span></div>{match.offers.length ? <div className="mt-3 grid gap-3 sm:grid-cols-2">{match.offers.map(offer => <a key={offer.id} href={offer.url || '#'} target="_blank" rel={offer.url ? 'noopener nofollow sponsored' : 'noopener nofollow'} className="k-card flex min-w-0 gap-3 p-2">{offer.image_url ? <img src={offer.image_url} alt={offer.name} className="size-16 shrink-0 object-cover" loading="lazy" /> : <div className="flex size-16 shrink-0 items-center justify-center bg-secondary text-xs text-muted-foreground">нет фото</div>}<div className="min-w-0"><p className="line-clamp-2 text-xs font-medium leading-5">{offer.name}</p><p className="mt-1 text-xs">{offer.price === null ? 'цена не указана' : rub(offer.price)}{offer.merchant ? ` · ${offer.merchant}` : ''}</p>{offer.erid ? <p className="text-xs text-muted-foreground">реклама · erid {offer.erid}</p> : null}</div></a>)}</div> : <p className="mt-2 text-xs text-muted-foreground">{match.note || 'Нет в каталоге'}</p>}</div>)}</div></div>}
-                {roomData.use_catalog === false && <p className="border-y py-4 text-sm text-muted-foreground">Товары были отключены для этого дизайна — подборка не формировалась.</p>}
-                {roomData.items.length > 0 && <div><p className="eyebrow">Товары и стоимость</p><div className="mt-3 divide-y border-y">{roomData.items.map((item, i) => <div key={`${item.name}-${i}`} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 py-3 text-sm"><span>{item.name}</span><span className="font-medium">{rub(item.price * item.qty)}</span><span className="col-span-2 text-xs text-muted-foreground">{rub(item.price)} × {item.qty} {item.unit}{` · ${item.presentation_status === 'verified' ? 'Проверен на рендере' : item.presentation_status === 'matched' ? 'Похожий по рендеру' : 'Подобран к дизайну'}`}{item.source ? ` · ${item.source}` : ''}{item.url ? <> · <a className={item.direct_url ? 'font-medium text-primary-text underline underline-offset-2' : 'underline underline-offset-2'} href={item.url} target="_blank" rel={item.direct_url ? 'noopener nofollow sponsored' : 'noopener nofollow'}>{item.link_label || 'в магазин'}</a></> : null}</span></div>)}</div></div>}
                 {roomData.error && <p className="k-ban k-ban--bad">{roomData.error}</p>}
               </>
             ) : <p className="text-sm text-muted-foreground">Не удалось загрузить комнату.</p>}

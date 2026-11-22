@@ -3,6 +3,8 @@
 //
 // Правила (источник истины — «Решения владельца» в плане):
 //   - в пользовательских текстах нет слов «генераци…», «правк…» и фразы «реальные товары»;
+//   - запрещены обещания несуществующего: «подбор товаров» (и словоформы),
+//     «ориентировочная стоимость» (в обоих порядках слов) и «итого … ₽»;
 //   - слово «смета» запрещено, кроме:
 //       (a) public/offer.html в явной фразе «Сервис не составляет смету»;
 //       (b) строк с пометками «демо-пример» / «демонстрационный пример».
@@ -68,7 +70,7 @@ export function findCopyViolations(files) {
   const violations = [];
   const matchWord = (line, re) => {
     const m = line.match(re);
-    return m ? m[0].trim() : null;
+    return m ? m[0].trim().toLowerCase() : null;
   };
   for (const file of files) {
     const isSource = /\.(ts|tsx)$/.test(file.path);
@@ -86,6 +88,21 @@ export function findCopyViolations(files) {
       }
       if (/реальные\s+товары/i.test(line)) {
         violations.push({ path: file.path, line: lineNo, word: matchWord(line, /реальные\s+товары/i) || 'реальные товары' });
+      }
+      // «подбор товаров» и словоформы: подборка/подбирает/подобрать/подберём …
+      if (/(?:подбор|подбир|подобра|подбер)\S*\s+товар/i.test(line)) {
+        violations.push({ path: file.path, line: lineNo, word: matchWord(line, /(?:подбор|подбир|подобра|подбер)\S*\s+товар\S*/i) || 'подбор товаров' });
+      }
+      // «ориентировочная стоимость» — в любом порядке слов.
+      if (/ориентировочн\S*\s+стоимост|стоимост\S*\s+ориентировочн/i.test(line)) {
+        violations.push({ path: file.path, line: lineNo, word: matchWord(line, /ориентировочн\S*\s+стоимост\S*|стоимост\S*\s+ориентировочн\S*/i) || 'ориентировочная стоимость' });
+      }
+      // «итого … ₽» — обещание итоговой суммы, кроме демо-примеров.
+      if (/итого/i.test(line) && /₽/.test(line)) {
+        const demo = /демо[- ]пример|демонстрационный\s+пример/i.test(line);
+        if (!demo) {
+          violations.push({ path: file.path, line: lineNo, word: 'итого … ₽' });
+        }
       }
       if (/смет[ауеыой]/i.test(line)) {
         // в оферте разрешена только явная фраза «Сервис не составляет смету»,

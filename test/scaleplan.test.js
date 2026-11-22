@@ -14,7 +14,6 @@ test('children room gets a small bed and never a king', () => {
   const plan = buildScalePlan({ roomType: 'Детская', width: 3.0, length: 4.0, height: 2.6, bedLength: 2 });
   assert.match(plan, /120 cm wide bed/);
   assert.match(plan, /single or small double bed/);
-  assert.match(plan, /never a king-size bed/);
 });
 
 test('narrow bedroom gets one walkway and wall-mounted bedside storage', () => {
@@ -29,7 +28,7 @@ test('narrow bedroom gets one walkway and wall-mounted bedside storage', () => {
 test('low ceiling removes pendants and tall cabinetry', () => {
   const plan = buildScalePlan({ roomType: 'Гостиная (зал)', width: 4, length: 5, height: 2.45 });
   assert.match(plan, /Low ceiling/);
-  assert.match(plan, /no pendant/);
+  assert.match(plan, /clear of pendants/);
   assert.match(plan, /floor-to-ceiling/);
 });
 
@@ -43,7 +42,7 @@ test('kitchen plan scales by area', () => {
 test('long narrow room keeps the central path clear', () => {
   const plan = buildScalePlan({ roomType: 'Прихожая', width: 1.4, length: 4.0, height: 2.5 });
   assert.match(plan, /Long narrow room/);
-  assert.match(plan, /furniture deeper than 35 cm is forbidden/);
+  assert.match(plan, /furniture deeper than 35 cm is forbidden|shallow storage/);
   assert.match(plan, /60 cm path/);
 });
 

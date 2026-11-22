@@ -50,6 +50,41 @@ test('does not hide strings behind a URL containing //', () => {
   assert.equal(v.length, 1);
 });
 
+test('detects forbidden «подбор товаров»', () => {
+  const v = findCopyViolations([{ path: 'web/src/pages/Home.tsx', content: 'Подбор товаров и ориентировочная стоимость' }]);
+  assert.ok(v.some((x) => x.word.includes('подбор товаров')));
+});
+
+test('detects forbidden «подборка товаров»', () => {
+  const v = findCopyViolations([{ path: 'web/index.html', content: 'подборка товаров с ценами' }]);
+  assert.ok(v.some((x) => x.word.includes('подборка товаров')));
+});
+
+test('detects forbidden «ориентировочная стоимость»', () => {
+  const v = findCopyViolations([{ path: 'web/index.html', content: 'дизайн и ориентировочная стоимость' }]);
+  assert.ok(v.some((x) => x.word.includes('ориентировочная стоимость')));
+});
+
+test('detects reversed «стоимость ориентировочная»', () => {
+  const v = findCopyViolations([{ path: 'web/src/pages/Cabinet.tsx', content: 'Стоимость ориентировочная' }]);
+  assert.ok(v.some((x) => x.word.includes('стоимость ориентировочная')));
+});
+
+test('detects forbidden «итого … ₽»', () => {
+  const v = findCopyViolations([{ path: 'web/src/pages/Home.tsx', content: 'Итого, ориентировочно 98 900 ₽' }]);
+  assert.ok(v.some((x) => x.word === 'итого … ₽'));
+});
+
+test('allows «итого … ₽» only in a demo example', () => {
+  const v = findCopyViolations([{ path: 'web/src/pages/Home.tsx', content: 'Демонстрационный пример: итого 98 900 ₽' }]);
+  assert.equal(v.length, 0);
+});
+
+test('allows «RAL ориентировочно» without a cost promise', () => {
+  const v = findCopyViolations([{ path: 'web/src/components/GenerationPanel.tsx', content: 'Палитра по рендеру · RAL ориентировочно' }]);
+  assert.equal(v.length, 0);
+});
+
 test('real repo tree is clean under the scanner', () => {
   const violations = findCopyViolations(collectFiles());
   assert.deepEqual(violations, []);

@@ -36,7 +36,7 @@ export default function Share() {
 
   useEffect(() => {
     const meta = document.createElement('meta')
-    meta.name = 'robots'; meta.content = 'noindex, nofollow'
+    meta.name = 'robots'; meta.content = 'noindex, follow'
     document.head.appendChild(meta)
     return () => { meta.remove() }
   }, [])

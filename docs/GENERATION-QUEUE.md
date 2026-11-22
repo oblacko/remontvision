@@ -6,9 +6,9 @@
 
 - Мульти-стиль генерация: пользователь выбирает до 10 пар «стиль × концепт», каждая пара — отдельный рендер (`renders.style` / `renders.concept`, миграция `050`).
 - Все варианты создаются сразу и ставятся в очередь `renders` со статусом `queued`.
-- Воркер живёт внутри процесса API (`src/jobs.js`, `startWorker`), забирает задачи (`claimNextRender`) раз в 2 секунды и держит до `WORKER_CONCURRENCY` рендеров одновременно (default 100, `src/workerknobs.js`).
+- Воркер живёт внутри процесса API (`src/jobs.js`, `startWorker`), забирает задачи (`claimNextRender`) каждый тик (default 500 мс, `WORKER_TICK_MS`, `src/workerknobs.js`) и держит до `WORKER_CONCURRENCY` рендеров одновременно (default 100, `src/workerknobs.js`).
 - Image-вызовы идут параллельно в пределах семафора (`withImageSlot` в `src/openrouter.js`): лимиты система/провайдер/пользователь, пауза `image_min_gap_ms` по умолчанию 0 (`src/renderconfig.js`, админка «Генерация»).
-- Очистка комнаты — отдельная асинхронная задача на первом enqueue: `rooms.cleanup_status`, до 3 попыток, shell переиспользуется; рендер ждёт shell ≤3 мин.
+- Очистка комнаты — отдельная асинхронная задача на первом enqueue: `rooms.cleanup_status`, до 3 попыток, shell переиспользуется; рендер ждёт shell ≤30 с по умолчанию (`RENDER_SHELL_WAIT_MS`, максимум 300 с).
 
 ## Суть проблемы
 
@@ -46,7 +46,7 @@
 
 ## Код-референсы
 
-- `src/jobs.js` — `startWorker` (тик 2 с, `running >= 2`), `claimNextRender`, `staleRenders(24 * 60)`.
+- `src/jobs.js` — `startWorker` (тик `workerTickMs()`, default 500 мс, `running >= 2`), `claimNextRender`, `staleRenders(24 * 60)`.
 - `src/openrouter.js` — `withImageSlot`, `IMAGE_MIN_GAP`, ретраи на 429.
 - `src/renderconfig.js` — `image_min_gap_ms` (по умолчанию 0, админка).
 - `web/src/components/GenerationPanel.tsx` — `pollRoom` (2 с).

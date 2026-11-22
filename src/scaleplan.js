@@ -32,7 +32,7 @@ function bedroomPlan({ width, length, height, bedLength, child = false }) {
   } else {
     lines.push('Use two 40–45 cm nightstands and keep generous passages on both sides; add storage only if it preserves a 60 cm path.');
   }
-  if (child) lines.push('Use a single or small double bed (90–140 cm), never a king-size bed; keep a clear play zone and child-height storage.');
+  if (child) lines.push('Use a single or small double bed (90–140 cm); keep a clear play zone and child-height storage.');
   if (bedLength && length < bedLength + 1.2) {
     lines.push('Omit a bench or storage at the foot of the bed and keep at least 60 cm between the bed foot and the opposite wall or door.');
   } else if (bedLength) {
@@ -55,12 +55,12 @@ function livingPlan({ width, height }) {
   }
   lines.push('Keep a minimum 60 cm circulation path and a 35–45 cm gap between sofa and coffee table.');
   if (width < 4.0) {
-    lines.push('Room under 4 m wide: keep at most two furniture pieces across the width; their total depth must be no more than 1.3 m. No central coffee or dining table.');
+    lines.push('Room under 4 m wide: keep at most two furniture pieces across the width; their total depth must be no more than 1.3 m. Keep the centre of the room clear of coffee or dining tables.');
   } else {
     lines.push('Room 4 m or wider: up to three furniture pieces across the width are allowed — two against the walls plus one central table.');
   }
-  lines.push('Check the sum: furniture along one wall + the 60 cm path must not exceed the room width; if it does, remove or shrink an item.');
-  if (height < 2.6) lines.push('Low ceiling: no pendant over circulation, no oversized shelving, no floor-to-ceiling cabinetry, and keep the ceiling plane unaltered.');
+  lines.push('Check the sum: furniture along one wall plus the 60 cm path must fit within the room width; if it does not, remove or shrink an item.');
+  if (height < 2.6) lines.push('Low ceiling: keep the ceiling plane unaltered and keep circulation clear of pendants; use low-profile furniture instead of floor-to-ceiling cabinetry.');
   return lines.join(' ');
 }
 
@@ -68,7 +68,7 @@ function kitchenPlan({ width, length, height }) {
   const area = width * length;
   let line;
   if (area < 6) {
-    line = 'Kitchen under 6 m²: single linear run along one wall, 60 cm deep, at least 90 cm clear passage, no island, compact folding table only.';
+    line = 'Kitchen under 6 m²: single linear run along one wall, 60 cm deep, at least 90 cm clear passage, compact folding table only; keep the centre clear of an island.';
   } else if (area < 10) {
     line = 'Kitchen 6–10 m²: L-shaped run; an island is allowed only with at least 100 cm passage, maximum 180 × 60 cm.';
   } else if (area < 16) {
@@ -76,7 +76,7 @@ function kitchenPlan({ width, length, height }) {
   } else {
     line = 'Kitchen over 16 m²: island plus dining table, separate lighting layers over each zone, at least 100 cm main paths.';
   }
-  if (height < 2.6) line += ' Low ceiling: no pendant over the main path and no floor-to-ceiling tall cabinets.';
+  if (height < 2.6) line += ' Low ceiling: keep pendants away from the main path and use low cabinets rather than floor-to-ceiling tall cabinets.';
   return line;
 }
 
@@ -88,7 +88,7 @@ function diningPlan({ width, length }) {
 function officePlan({ width, height }) {
   const lines = [`Office: desk 60–70 cm deep and no wider than ${fmt(Math.max(100, width * 100 - 120))} cm, with at least 90 cm behind the chair.`];
   lines.push('Use shallow 40 cm storage and keep the window and door clear.');
-  if (height < 2.6) lines.push('Low ceiling: no pendant over the desk; use a desk or floor lamp instead.');
+  if (height < 2.6) lines.push('Low ceiling: keep pendants away from the desk; use a desk or floor lamp instead.');
   return lines.join(' ');
 }
 
@@ -98,17 +98,17 @@ function bathroomPlan() {
 
 function hallwayPlan({ width }) {
   if (width < 1.6) return 'Narrow hallway: furniture deeper than 35 cm is forbidden, keep one clear 60 cm path, and prefer wall-mounted storage, a slim bench and a shallow console.';
-  return 'Hallway: keep a 60 cm clear path, use shallow storage and do not block the door swing or radiator.';
+  return 'Hallway: keep a 60 cm clear path, use shallow storage and keep the door swing and radiator accessible.';
 }
 
 function balconyPlan() {
-  return 'Balcony or loggia: use only shallow, lightweight furniture, keep the door and window fully operable, and do not block ventilation or drainage.';
+  return 'Balcony or loggia: use only shallow, lightweight furniture, keep the door and window fully operable, and keep ventilation and drainage clear.';
 }
 
 function genericPlan({ width, height }) {
   const lines = ['Keep at least 60 cm clear circulation, 80 cm where comfortable, and preserve the door swing, window access and heating controls.'];
   if (width < 2.2) lines.push('Narrow room: use wall-mounted or shallow storage, avoid bulky freestanding pieces and keep one clear path.');
-  if (height < 2.6) lines.push('Low ceiling: no pendant over circulation, no floor-to-ceiling cabinetry and low-profile furniture.');
+  if (height < 2.6) lines.push('Low ceiling: keep pendants away from circulation, avoid floor-to-ceiling cabinetry and use low-profile furniture.');
   return lines.join(' ');
 }
 
@@ -149,6 +149,6 @@ export function buildScalePlan({ roomType = '', width, length, height, bedLength
   if (w / l < 0.4 || l / w > 2.5) {
     lines.push('Long narrow room: use furniture and a rug to define zones, keep the central path clear and avoid placing storage across the room width.');
   }
-  lines.push('Do not overscale furniture, do not shrink it unnaturally and do not change the room dimensions to make the plan fit. If the requested layout is impossible, choose smaller furniture and show the honest compromise.');
+  lines.push('Keep furniture naturally scaled and keep the room dimensions unchanged. If the requested layout is impossible, choose smaller furniture and show the honest compromise.');
   return lines.join('\n');
 }

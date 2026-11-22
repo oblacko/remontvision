@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-21T09:08:36.431Z
+Generated: 2026-11-22T10:30:01.090Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -708,12 +708,51 @@ flowchart LR
 - `renders.prompt`, `renders.meta`, `renders.cost_breakdown`.
 - Замеры ёмкости: [ops/QUEUE-CAPACITY.md](ops/QUEUE-CAPACITY.md).
 
+## BBOX-заморозка архитектуры (экспериментальная)
+
+`BBOX_LOCK_ENABLED` включён по умолчанию. Перед генерацией запускается vision-детектор проёмов (`src/openings.js`): окна, двери и крупные встроенные элементы получают bbox в сетке 0–1000. Кэш `room_analysis` (артефакт `openings`) делает повторные рендеры комнаты бесплатными.
+
+Результат вставляется в базовый промт как FLUX 3 bbox JSON: Keep-строки с `from=ref_image_0`, `src_bbox=tgt_bbox`, и id-ссылки (`<window_1>`) в теле промпта, чтобы upsampler не сбросил аннотации.
+
+Для пустых комнат планировщик (`src/layoutagent.js`) тоже может возвращать `frame_bbox` для отдельно стоящей мебели. Эти предметы добавляются в тот же bbox JSON как New-строки (`from: null`) и упоминаются в теле промпта (`<sofa_1>`), фиксируя положение новой мебели без передачи её как референсного изображения.
+
+Отключить фичу можно переменной `BBOX_LOCK_ENABLED=false`.
+
+## Каталог 32 стилей
+
+`src/designdata.js` содержит 32 стиля. В основном сценарии показываются 10 featured (топ спроса), остальные доступны в библиотеке `/styles`. У каждого стиля есть:
+- `name` — академическое название для URL/SEO;
+- `display_name` — продающее название для UI;
+- `family` — семейство для фильтров;
+- `palette`, `materials`, `axes`, `prompt_en`, `description`.
+
+Матрица совместимости — 32 × 10 (320 ячеек). `prompt_en` пишется по гайду FLUX 3: полный сцен-капшн, свет с направлением, hex+имя цвета, камера, позитивные формулировки.
+
+## Designer signature move
+
+Арт-директор (`src/artdirector.js`, `src/designerprompt.js`) теперь возвращает `signature_move` — один конкретный авторский приём для комнаты. Он вставляется в базовый промт отдельным блоком `DESIGNER SIGNATURE MOVE`, чтобы модель чётко исполнила главный дизайнерский жест и не растворила его в общем тексте.
+
+## Вариативность (variability axes)
+
+`src/variety.js` + `src/designdata.js` дают детерминированную вариативность повторных рендеров:
+- акцентный цвет ротируется внутри палитры стиля по `seed` (render id);
+- emphasis меняет композиционный фокус;
+- оси стиля (`temperature`, `light`, `texture`, `density`/`contrast`/`geometry`, `styling`, `composition`) выбираются по `seed` и переводятся в конкретные execution-инструкции в промте;
+- avoid-список не повторяет последние 5 focal_zone / main_move / palette direction.
+
+Оси не переопределяют палитру, акцент, геометрию и bbox-заморозку.
+
+## Architecture QA
+
+`ARCHITECTURE_QA_ENABLED=true` + `ARCHITECTURE_QA_ENFORCE=false` — режим observe: vision сравнивает исходник и рендер, логирует дрейф окон/дверей/пропорций и показывает notice пользователю. По умолчанию выключено.
+
 ## Ограничения
 
 - Смета новых рендеров пуста; старый procurement не подключён.
 - Нет inpainting люстр/розеток.
 - Один провайдер — OpenRouter.
 - Style-ref/hero-референсы выключены по умолчанию.
+- BBOX-заморозка требует включения `BBOX_LOCK_ENABLED` и проверки на canary.
 - Часть правил админки не применяется: `catalogOn`, `styling` (см. выше).
 - Direction/акцент для кастомных admin-стилей без статической палитры — ограничены.
 
@@ -762,21 +801,30 @@ flowchart LR
 ## Структура base-промта
 
 1. `IMAGE ROLES` — исходник + максимум один art ref; product refs нет.
-2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум.
-3. `ARCHITECTURE LOCK` — архитектура/камера/пропорции.
-4. `GEOMETRY LOCK` — дословные метры и запреты окон/дверей/высоты/перспективы.
+2. `TASK` — глубокий редизайн, WOW, Pinterest, не шоурум; первое предложение — тождество комнаты и камеры.
+3. `ARCHITECTURE LOCK` — архитектура/камера/пропорции (позитивные формулировки: PRESERVE EXACTLY).
+4. `GEOMETRY LOCK` — дословные метры и неизменность окон/дверей/высоты/перспективы.
 5. `ART DIRECTION` + `VARIABILITY` — замысел и новизна комнаты из одного vision-вызова.
 6. `ROOM DIMENSIONS AND SCALE`, `SCALE PLAN`, `BED SIZE`, `RADIATOR COVERS`.
 7. `KEEP EXACTLY`, `FURNITURE MODE`.
 8. `CHANGE / DEEP TRANSFORMATION`, `COMPOSITION`, `LIGHTING DESIGN`.
 9. `CLEANUP / REALISM`, `WINDOW STYLING`, `LIFE & STYLING`, `PINTEREST-LEVEL STYLING`.
-10. `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `AVOID`.
+10. `STYLE`, `MATERIAL CLASS`, `OUTPUT`, `FINAL STATE` (бывший `AVOID`) — позитивное описание итогового кадра, без negative-промптов.
 
 ## Direction
 
 - Один vision-вызов `buildArtDirection`: факты по фото + поле `direction` (карточки стиля/концепции и история на входе).
 - Без концепции или при конфликтной паре — `facts_only`; `prompt_en` (60–120 слов) идёт в `ART DIRECTION`.
 - Повторные рендеры — из `room_analysis`; новизна — `src/variability.js`. См. [GENERATION.md](GENERATION.md#5-direction-и-кэш).
+
+## Позитивные формулировки вместо negative prompt
+
+FLUX 3 не имеет negative prompt. Фразы «no new windows», «do not add a door» и аналоги модель воспринимает как цели, а не запреты. Поэтому в промте используется:
+- `FINAL STATE` — позитивное описание итогового кадра;
+- `PRESERVE EXACTLY` / `KEEP EXACTLY` — что сохраняем;
+- `keep ... unchanged`, `leave ... clear`, `ignore ...` вместо `do not ...`.
+
+Исключения — технические контексты, где модель не путает отсутствие с действием: `no text` → `clean, unmarked surfaces`, `no watermark` → `the frame contains only the room`.
 
 ## Очистка комнаты
 
@@ -1370,26 +1418,29 @@ cd /root/remontvision
 ./scripts/ops/smoke.sh
 ```
 
-## Статус на 2026-11-09
+## Статус на 2026-11-21
 
 | Проверка | Статус | Доказательство |
 |---|---|---|
-| Дамп БД снимается | ✅ | `/root/rv-backups/20261109-165346/db-remontvision-*.dump`, 1.3 MB |
-| Restore БД в чистую БД | ✅ PASS | 42 таблицы, users=6, rooms=119, renders=156, payments=15, products=110, migrations=44 |
-| Архив файлов снимается | ✅ | `20261109-165400`, 254 MB, 952 записи |
-| Архив файлов читается | ✅ PASS | gzip + sha256 + путей вне каталога нет |
-| Копия **вне VPS** | ❌ нет | не выбран таргет/нет доступов |
-| Расписание cron | ❌ нет | нужно разрешение на изменение прода |
-| Внешний uptime-алерт | ❌ нет | нужен аккаунт/канал алертов |
-| Ежедневный `render_error` | ⚠️ скрипт готов | запускается вручную; cron не включён |
+| Дамп БД снимается | ✅ | `/root/rv-backups/20261121-031501/db-remontvision-*.dump`, sha256 = manifest |
+| Restore БД в чистую БД | ✅ PASS | 49 таблиц, users=6, rooms=132, renders=204, payments=16, products=110, migrations=64 |
+| Архив файлов снимается | ✅ | `20261121-031501`, 341 MB, 1048 записей |
+| Архив файлов читается | ✅ PASS | gzip + sha256 + путей вне каталога нет, `.env` не входит |
+| Расписание cron | ✅ | бэкап `15 3 * * *`, `daily-check --strict` каждый час |
+| Копия **вне VPS** | ❌ нет | rclone не установлен, `RV_BACKUP_REMOTE` не задан |
+| Внешний uptime-алерт | ❌ нет | нет аккаунта/канала алертов |
+| Ежедневный `render_error` / платежи | ⚠️ отчёт есть | `daily-check` пишет в `check.log`; доставки и разбора автоматом нет |
 | Runbook | ✅ | [RUNBOOK.md](RUNBOOK.md) |
+| Smoke на проде | ✅ PASS | `scripts/ops/smoke.sh`, 2026-11-21 |
 
-**Вывод:** процедура бэкапа и восстановления проверена, но G4 не закрыт без копии вне VPS.
-G8 не закрыт без внешнего монитора и тестового алерта.
+**Вывод:** бэкап, restore, расписание и smoke проверены. G4 не закрыт без копии вне VPS
+(владелец отложил 2026-11-21 — принятый риск) и escrow `.env`, G8 — без внешнего
+монитора, Telegram-канала и тестового алерта.
 
 ## Ограничения
 
-- Диск VPS на 2026-11-09 занят на **86%** (свободно ~1.4 GB). Полный архив файлов — 254 MB. До расширения диска локально держим не больше одной полной копии; глубокое хранение — только на remote.
+- Диск VPS на 2026-11-21 занят на **39%** (свободно ~23 GB); 7 локальных копий — 2.3 GB.
+  Глубокое хранение всё равно должно быть на remote, а не на VPS.
 - `.env` и секреты в ежедневный бэкап **не входят**: их резервная копия должна храниться отдельно у владельца (менеджер паролей / зашифрованный архив).
 - Каталог `catalog-db` (≈900 MB, 36k офферов + эмбеддинги) — восстанавливаемый, но дорогой: дампится в weekly-бэкап, не в daily.
 - Автоматического мониторинга 429/платежей и APM/Sentry нет; ежедневная проверка — минимальный уровень.
@@ -1408,8 +1459,8 @@ G8 не закрыт без внешнего монитора и тестово�
 
 | Объект | Где | Размер (2026-11-09) | Частота |
 |---|---|---|---|
-| БД `remontvision` | том `remontvision_pgdata` | 16 MB (дамп 1.3 MB) | daily |
-| Файлы `appdata` | том `remontvision_appdata` | 258 MB (архив 254 MB) | daily |
+| БД `remontvision` | том `remontvision_pgdata` | 16 MB (дамп 1.9 MB) | daily |
+| Файлы `appdata` | том `remontvision_appdata` | ≈360 MB (архив 341 MB) | daily |
 | БД `catalog` | том `remontvision_catalogdata` | 898 MB | weekly |
 | `.env`, TLS-ключи | `/root/remontvision/.env`, `/etc/letsencrypt` | — | отдельно, у владельца |
 
@@ -1460,26 +1511,29 @@ RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1 \
 rclone lsf rv-s3:remontvision-backups/daily
 ```
 
-## Расписание (после разрешения владельца)
+## Расписание (установлено 2026-11-21)
 
-Cron root на VPS (`crontab -e`). Часовой пояс VPS — MSK.
+Cron root на VPS (`crontab -l`). Часовой пояс VPS — MSK.
 
 ```cron
-# ежедневно: БД + файлы, обязательно с копией вне VPS
-30 3 * * * cd /root/remontvision && RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1 RV_BACKUP_LOCAL_KEEP=1 ./scripts/ops/backup.sh >> /var/log/remontvision-backup.log 2>&1
+# ежедневно: БД + файлы; локально храним 7 копий
+15 3 * * * cd /root/remontvision && RV_BACKUP_LOCAL_KEEP=7 ./scripts/ops/backup.sh >> /root/rv-backups/backup.log 2>&1
 
-# еженедельно: + каталог catalog-db
-0 3 * * 0 cd /root/remontvision && RV_BACKUP_REMOTE=rv-s3:remontvision-backups/weekly RV_BACKUP_REQUIRE_REMOTE=1 RV_BACKUP_LOCAL_KEEP=1 ./scripts/ops/backup.sh --weekly >> /var/log/remontvision-backup.log 2>&1
-
-# ежедневная проверка эксплуатации
-15 9 * * * cd /root/remontvision && ./scripts/ops/daily-check.sh --strict >> /var/log/remontvision-daily.log 2>&1
+# проверка эксплуатации каждый час (CRIT → код 1)
+7 * * * * cd /root/remontvision && ./scripts/ops/daily-check.sh --strict >> /root/rv-backups/check.log 2>&1
 ```
 
-`flock` внутри скрипта не даёт двум бэкапам пересечься. Логи ротировать:
+Целевая конфигурация после появления remote (требует разрешения владельца): добавить
+`RV_BACKUP_REMOTE=rv-s3:remontvision-backups/daily RV_BACKUP_REQUIRE_REMOTE=1` к
+ежедневной строке, weekly-строку для `catalog-db` и уменьшить `RV_BACKUP_LOCAL_KEEP`
+до 1–2.
+
+`flock` внутри скрипта не даёт двум бэкапам пересечься. Сейчас logrotate **не**
+настроен: логи растут в `/root/rv-backups/*.log`. Добавить:
 
 ```bash
 # /etc/logrotate.d/remontvision
-/var/log/remontvision-*.log {
+/root/rv-backups/*.log {
   weekly
   rotate 8
   compress
@@ -1488,8 +1542,8 @@ Cron root на VPS (`crontab -e`). Часовой пояс VPS — MSK.
 }
 ```
 
-Хранение на remote: 14 daily + 8 weekly (bucket lifecycle). Локально — 1 каталог:
-на VPS свободно ~1.4 GB, полный архив 254 MB.
+Хранение на remote (после настройки): 14 daily + 8 weekly (bucket lifecycle).
+Локально — 7 каталогов (2.3 GB при диске 39%).
 
 ## Проверка восстановления (обязательно раз в месяц и после смены схемы)
 
@@ -1532,6 +1586,31 @@ cd /root/remontvision
 `/root/rv-backups/restore-drill-files-20261109.md`. Копии — в
 [docs/ops/drills/2026-11-09.md](drills/2026-11-09.md).
 
+### Протокол от 2026-11-21 (прод, cron-бэкап)
+
+| Проверка | Результат |
+|---|---|
+| Дамп | `db-remontvision-20261121-031501.dump` (cron 03:15 MSK), sha256 = manifest |
+| Временная БД | `postgres:16-alpine`, `--network none`, удалена |
+| `pg_restore` | OK |
+| Таблиц в `public` | 49 |
+| `users` / `rooms` / `renders` / `payments` / `products` | 6 / 132 / 204 / 16 / 110 |
+| `_migrations` | 64, последняя `063_render_queue.sql` |
+| Архив файлов | 341 MB, 1048 записей, gzip/sha256 OK, `.env` не входит |
+| **Итог** | **PASS** |
+
+Отчёт на VPS: `/root/rv-backups/restore-drill-20261121.md`. Копия —
+[docs/ops/drills/2026-11-21.md](drills/2026-11-21.md).
+
+### Перепроверка инструментов 2026-11-21 (dev, не прод)
+
+На текущей схеме локально прогнаны `backup.sh --db-only` и
+`restore-verify.sh --latest`: дамп снят, sha256 совпал, `pg_restore` в чистый
+`postgres:16-alpine` без ошибок, 49 таблиц, счётчики совпали с manifest, последняя
+миграция `064_articles_updated_at.sql`. Это подтверждает, что скрипты не устарели;
+приёмка G4 по-прежнему требует бэкап **с прода** и копию **вне VPS** (первое уже
+подтверждено протоколом выше).
+
 ## Полное восстановление на новом сервере
 
 1. Установить Docker + Compose, клонировать репозиторий в `/root/remontvision`.
@@ -1558,7 +1637,8 @@ cd /root/remontvision
 
 ## Риски и ограничения
 
-- Диск 86%: до расширения держим локально 1 полную копию; следить за `daily-check`.
+- Диск на 2026-11-21 — 39% (свободно ~23 GB), локально 7 копий (2.3 GB); следить за
+  `daily-check`. Глубокое хранение — только на remote.
 - Нет шифрования client-side: защита — приватный bucket + SSE + TLS. Для PII можно
   добавить `gpg --symmetric` перед upload (ключ хранить отдельно у владельца).
 - Нет проверки «бэкап за вчера есть на remote» отдельным алертом: `daily-check` проверяет
@@ -1574,7 +1654,9 @@ cd /root/remontvision
 # Мониторинг и алерты (G8)
 
 Цель G8: падение `/api/health` даёт алерт **≤ 5 минут**, а `render_error` и платежи
-кто-то смотрит каждый день. Сейчас есть только Docker logs и ручной health-check.
+кто-то смотрит каждый день. Сейчас есть ежечасный `daily-check` (пишет отчёт в
+`/root/rv-backups/check.log`), Docker logs и ручной health-check. **Внешнего монитора и
+канала доставки алертов нет** — это главный блокер G8.
 
 ## Уровни
 
@@ -1631,7 +1713,9 @@ Workflow должен попасть в `main`, а пуш в `main` запуск
 - свежесть бэкапа (`> 26 ч` — CRIT), наличие `db_dump`, `files_archive`, `remote=`;
 - TLS-сертификат (`< 14 дн` — WARN, `< 7` — CRIT);
 - логи за 24 ч: `render_done`, `render_error`, `render_timeout`, `credit_restored`,
-  `payment_created`, `webhook_error`, строки с `429`;
+  `payment_created`, `payment_succeeded`, `webhook_error`, `payment_amount_mismatch`,
+  `receipt_hook_error`, `robokassa_state_error`, `refund_receipt_error`,
+  строки с `429`;
 - доля `render_error` от `done+error`: WARN ≥ 10%, CRIT ≥ 25%;
 - топ `stage` ошибок и последние 5 ошибок (обрезаны до 300 символов).
 
@@ -1691,11 +1775,16 @@ WHERE cleanup_status = 'error' ORDER BY cleanup_finished_at DESC LIMIT 20;
 Смотреть ежедневно:
 
 ```bash
-docker compose logs --since 24h app | grep -E '"event":"(payment_created|webhook_error|refund_error)"'
+docker compose logs --since 24h app | grep -E '"event":"(payment_created|payment_succeeded|webhook_error|payment_amount_mismatch|receipt_hook_error|robokassa_state_error|refund_receipt_error)"'
 ```
 
+- `payment_amount_mismatch` > 0 — **CRIT в daily-check**: сумма от провайдера не совпала
+  с локальной; сверить `payments`, не начислять вручную до разбора;
 - `webhook_error` > 0 — проверить подпись/URL Robokassa и повторно синхронизировать платёж;
-- `payment_created` без начисления — сверить `payments` и `credit_txn` в БД;
+- `payment_created` без `payment_succeeded` — сверить `payments` и `credit_txn` в БД;
+  часть брошенных оплат нормальна, важен рост доли;
+- `receipt_hook_error` / `robokassa_state_error` / `refund_receipt_error` — ошибки чека
+  54-ФЗ, опроса состояния или чека возврата; проверить настройки Robokassa;
 - возвраты выключены (`REFUNDS_ENABLED=false`) — делать вручную.
 
 Автоматического алерта на «платёж не начислился» нет: это ручная сверка.
@@ -1717,11 +1806,13 @@ docker compose logs --since 24h app | grep -E '"event":"(payment_created|webhook
 
 ## 6. Чего пока нет
 
+- Внешнего uptime-монитора и канала алертов (G8 не закрыт).
 - APM/Sentry, метрики Prometheus, дашборды.
 - Алертов на 429/платежи/бэкап в реальном времени.
 - Dead-man's switch для бэкапов (Healthchecks.io) — полезно добавить после выбора
   внешнего хранилища.
-- Ротации и централизованного хранения логов.
+- Ротации и централизованного хранения логов (logrotate не настроен, см.
+  [BACKUP-RESTORE.md](BACKUP-RESTORE.md)).
 
 
 ---
@@ -1918,7 +2009,9 @@ df -h /var/lib/docker
 
 ## 4. Диск заполнен
 
-На 2026-11-09 занято 86% (свободно ~1.4 GB). Полный бэкап — 254 MB.
+На 2026-11-21 занято 39% (свободно ~23 GB); 2026-11-09 было 86% — диск расширен.
+Полный бэкап — 341 MB, локально 7 копий. Если `daily-check` даёт WARN ≥ 80% или
+CRIT ≥ 90%, действовать сразу.
 
 ```bash
 df -h /
@@ -1989,7 +2082,7 @@ docker compose exec -T db psql -U remont -d remontvision -c \
 
 ```bash
 cd /root/remontvision
-tail -100 /var/log/remontvision-backup.log
+tail -100 /root/rv-backups/backup.log
 ls -la /root/rv-backups | tail
 ./scripts/ops/backup.sh
 ```
@@ -2050,64 +2143,76 @@ dig +short www.remontvision.ru
 
 # Чек-лист эксплуатационной готовности G4/G8
 
-Дата проверки: 2026-11-09. Прод: `https://www.remontvision.ru`, коммит `0d0f89c`.
+Дата проверки: 2026-11-21. Прод: `https://www.remontvision.ru`, коммит `d55fcb1`.
 Отметка ставится только по факту с доказательством (команда/лог/протокол).
 
 ## G4 — восстановление данных
 
 | # | Условие | Статус | Доказательство / блокер |
 |---|---|---|---|
-| 1 | Бэкап БД снимается и читается | ✅ | дамп 1.3 MB, `pg_restore --list` OK |
-| 2 | Бэкап файлов снимается и читается | ✅ | 254 MB, 952 записи, gzip/sha256 OK |
-| 3 | Restore в чистую БД | ✅ PASS | 42 таблицы; users=6, rooms=119, renders=156, payments=15, products=110, migrations=44 |
-| 4 | Протокол restore зафиксирован | ✅ | [drills/2026-11-09.md](drills/2026-11-09.md) |
-| 5 | Копия **вне VPS** | ❌ | не выбран таргет, нет ключей rclone |
-| 6 | Ежедневное расписание | ❌ | cron не установлен (нужно разрешение) |
-| 7 | Ротация и контроль места | ⚠️ | скрипт умеет; диск 86%, локально держать 1 копию |
-| 8 | Алерт «бэкапа нет > 26 ч» | ⚠️ | `daily-check.sh` умеет; cron/канал не включены |
-| 9 | `.env`/секреты в escrow | ❌ | хранит владелец, в бэкап не входят |
+| 1 | Бэкап БД снимается и читается | ✅ | `/root/rv-backups/20261121-031501/…dump`, sha256 = manifest, `pg_restore --list` OK |
+| 2 | Бэкап файлов снимается и читается | ✅ | 355 MB архив, 1048 записей, gzip/sha256 OK, `.env` не входит |
+| 3 | Restore в чистую БД | ✅ PASS | 49 таблиц; users=6, rooms=132, renders=204, payments=16, products=110, migrations=64 |
+| 4 | Протокол restore зафиксирован | ✅ | [drills/2026-11-21.md](drills/2026-11-21.md) |
+| 5 | Копия **вне VPS** | ❌ | отложено владельцем 2026-11-21 (принятый риск); rclone/remote не настроены |
+| 6 | Ежедневное расписание | ✅ | root-cron `15 3 * * *`, 7 последних каталогов, `backup.log` без ошибок |
+| 7 | Ротация и контроль места | ✅ | `RV_BACKUP_LOCAL_KEEP=7`, 2.3 GB, диск 39% (23 GB свободно) |
+| 8 | Алерт «бэкапа нет > 26 ч» | ⚠️ | `daily-check.sh` проверяет ежечасно; доставки алерта нет (канал не настроен) |
+| 9 | `.env`/секреты в escrow | ❌ | хранит владелец; в бэкап не входит (проверено) |
 | 10 | Полное восстановление на чистом хосте | ❌ | процедура описана, второй хост не проверялся |
 
-**G4: не пройден.** Осталось: внешнее хранилище + cron + (желательно) escrow `.env`.
-Процедура и restore-учения выполнены.
+**G4: не пройден (storage отложен владельцем 2026-11-21, принятый риск).** Бэкап,
+restore, расписание и ротация — выполнены. Открыто: внешнее хранилище (п.5), escrow
+`.env` (п.9), полный restore на чистом хосте (п.10).
 
 ## G8 — мониторинг
 
 | # | Условие | Статус | Доказательство / блокер |
 |---|---|---|---|
-| 1 | Внешний uptime-чек `/api/health` | ❌ | нужен аккаунт Better Stack/UptimeRobot |
-| 2 | Алерт ≤ 5 мин | ❌ | зависит от п.1 и канала |
+| 1 | Внешний uptime-чек `/api/health` | ❌ | нет аккаунта Better Stack/UptimeRobot и алертов в nginx-логах; канал выбран — Telegram |
+| 2 | Алерт ≤ 5 мин | ❌ | нужны monitor-аккаунт + Telegram token/chat_id |
 | 3 | Тестовая остановка health дала алерт | ❌ | после п.1–2, в согласованное окно |
-| 4 | Ежедневный просмотр `render_error` | ⚠️ | скрипт готов, запускается вручную |
-| 5 | Cron ежедневной проверки | ❌ | нужно разрешение |
-| 6 | Мониторинг 429/платежей | ⚠️ | только дневной отчёт, алертов в реальном времени нет |
+| 4 | Ежедневный просмотр `render_error` | ⚠️ | `daily-check` пишет отчёт каждый час в `/root/rv-backups/check.log`; смотрит человек |
+| 5 | Cron ежедневной проверки | ✅ | root-cron `7 * * * * … daily-check.sh --strict` |
+| 6 | Мониторинг 429/платежей | ⚠️ | ежечасный отчёт по логам; алертов в реальном времени нет |
 | 7 | Runbook инцидентов | ✅ | [RUNBOOK.md](RUNBOOK.md) |
-| 8 | Smoke после деплоя/отката | ✅ | `scripts/ops/smoke.sh`, проверен на проде |
+| 8 | Smoke после деплоя/отката | ✅ | `scripts/ops/smoke.sh` → PASS на проде 2026-11-21 |
 
-**G8: не пройден.** Осталось: внешний монитор + канал алертов + приёмочный тест.
+**G8: не пройден.** Осталось: внешний монитор + доставка алерта + приёмочный тест.
+Канал выбран владельцем — **Telegram**; нужны token/chat_id и аккаунт монитора.
 
-## Что нужно от владельца
+Замечание: `daily-check --strict` сейчас всегда возвращает 1 из-за WARN «off-site копия
+не отмечена» (storage отложен). Пока канал алертов не настроен, это только запись в
+`check.log`; после настройки алертов WARN нужно либо принять, либо отключить `--strict`
+до появления remote.
 
-1. **Внешнее хранилище** для бэкапов: Yandex Object Storage (рекомендуется), другой
-   сервер или S3. Нужны bucket/endpoint + ключ с правами только на bucket.
-2. **Канал алертов**: Telegram-бот (token + chat_id) или e-mail получателя. Для
-   внешнего монитора — аккаунт Better Stack/UptimeRobot (или согласие на GitHub-fallback).
-3. **Разрешение на изменения прода**: установить `rclone`, скопировать скрипты в
-   `/root/remontvision/scripts/ops/`, добавить 3 строки в root-crontab, включить logrotate.
-   Это не деплой и не меняет БД/`.env`.
-4. **Окно 10 минут** для теста G8: остановить `app`, получить алерт, поднять обратно.
-5. **Диск**: 86% занято. Расширить диск/том или согласовать очистку (старые образы,
-   логи, лишние копии). Иначе ежедневные полные бэкапы рискованны.
-6. **`.env`**: положить актуальную копию в менеджер паролей/зашифрованный архив.
+## Решение владельца 2026-11-21
 
-После выполнения п.1–6: включить cron, провести тест, заполнить таблицы, приложить
-скрин алерта и `restore-verify` отчёт — тогда G4/G8 можно подписывать.
+- **Внешнее хранилище:** отложено. Копия остаётся только на VPS; G4 не подписывается,
+  риск зафиксирован здесь.
+- **Канал алертов:** Telegram. Нужны bot token и chat_id; в репозиторий не попадают.
+- **Изменения прода:** запрещены в этой задаче («только отчёт»). Исполнение выносится
+  отдельными задачами в `backlog`.
+- **Окно для теста health:** не выдано; тест провести после настройки монитора.
+
+## Что нужно от владельца / следующего исполнителя
+
+1. **Telegram-бот** для алертов: token + chat_id (хранить у владельца, не в git).
+2. **Аккаунт внешнего монитора** Better Stack/UptimeRobot (или разрешение на
+   GitHub Actions fallback из [MONITORING.md](MONITORING.md)).
+3. **Окно 10 минут** для теста G8: остановить `app`, получить алерт, поднять обратно.
+4. **Внешнее хранилище** — когда владелец передумает: bucket/endpoint + ключ только на
+   bucket, затем `rclone` + remote-копия по [BACKUP-RESTORE.md](BACKUP-RESTORE.md).
+5. **`.env`**: положить актуальную копию в менеджер паролей/зашифрованный архив.
+
+После этого: включить remote-копию, провести тест алерта, приложить `restore-verify`
+отчёт и скрин алерта — тогда G4/G8 можно подписывать. Диск больше не блокер (39%).
 
 ## Подпись
 
 | Роль | Имя | Дата | Решение |
 |---|---|---|---|
-| DevOps | — | 2026-11-09 | работа выполнена, G4/G8 заблокированы доступами |
+| DevOps | — | 2026-11-21 | бэкап/restore/cron/smoke проверены; G4/G8 не подписаны: storage отложен, нет монитора и Telegram-канала |
 | QA/владелец | — | — | — |
 
 
@@ -2528,7 +2633,71 @@ export const MAX_REFERENCES; // 4
 
 # История работ (что сделано)
 
-Дата обновления: 2026-11-21. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
+Дата обновления: 2026-11-22. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
+
+## 2026-11-22 — pipeline-обложки 5 стилей и фикс кэша openings
+
+- **Pipeline-обложки:** новый `scripts/generate-style-covers-pipeline.mjs` проходит через полный production-путь (`processRender`), а не через тестовый скрипт. Для одного исходного фото `assets/zal.jpg` сгенерированы и применены обложки 5 стилей: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/style-*.png` и `web/dist/images/style-*.png`.
+- **Фикс `room_analysis.openings`:** в `src/jobs.js` `cachedOpenings` теперь читается как `openingsRow.data?.openings`, потому что `upsertRoomAnalysis` сохраняет обёртку `{ openings }`. Это устраняло `Cannot read properties of undefined (reading 'length')` на повторных рендерах одной комнаты.
+- **Тестовые брифы очищены:** из `scripts/style-briefs.mjs` и `scripts/generate-style-illustrations.mjs` убраны `floorOverride`, `FLOOR_BY_STYLE`, `FLOOR_ALT`, `LIGHT_FIXTURE`, `pickFloor`; смягчены `ROOM_PROGRAM`, `WALLS`, `PLACEMENT` и правила радиатора/света. Подписные движения для `tropical_modern`, `english`, `dark_academia`, `chalet` больше не нарушают `ARCH_LOCK`.
+- **Регрессия промтов:** обновлён `docs/regression/baseline.json` под electrical lock (замена старого потолочного светильника на стилевой pendant/chandelier).
+- **Тесты:** `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
+
+## 2026-11-21 — REM-40 технический SEO: шаблон статей, alt, noindex, favicon
+
+Правки по аудиту REM-36 (техническая часть; контентные тексты готовит SEO, REM-39). Публикаций и деплоя не было.
+
+- **Meta статей без обрывов** (`src/articles.js`): `autoMetaDescription` режет по границе слова/предложения, `autoMetaTitle`/`normalizeSeoTitle` не заканчивают заголовок на союзе/предлоге. В схему `ARTICLE_RENDER_SYSTEM` добавлены поля `seo_title`/`seo_description` (50–60 и 140–160 симв. с терминальной точкой) — `generateArticleFromRender` сохраняет их в meta с фолбэком на авто-генерацию.
+- **Порог публикации 600 слов** (`MIN_ARTICLE_WORDS` 500 → 600), совпадает с целевым объёмом генерации.
+- **Публикация батчем под контролем** (`scripts/generate-articles-batch.mjs`): `--publish`/`--publish-drafts` требуют `--approved`; publish-гейт всегда `maxPerCluster=1` (независимо от `--per-cluster`); стили приведены к каноническим именам `DESIGN_STYLES`.
+- **Sitemap** (`src/sitemap.js`): опубликованные статьи с `meta.indexable === false` или `meta.canonical_slug` не попадают в sitemap.
+- **Галерея** (`src/gallery.js`, новый `src/roomseo.js`): `pluralRu` для «дизайн/дизайна/дизайнов», родительный падеж в описаниях, «Гостиная (зал)» → «Гостиная»; разделы «Другое» и «Кладовка» — noindex и убраны из room-nav и sitemap.
+- **Alt обложки и og:image:alt** (`src/articles.js`): alt описательный (описание/стиль×комната), а не повтор H1.
+- **Admin PATCH** (`src/server.js`): разрешены поля `meta.indexable` (bool) и `meta.canonical_slug` (string).
+- **favicon** (`public/favicon.ico`, 16/32/48) и `<link rel="icon">` в шаблонах — `/favicon.ico` больше не 404. noindex для `/room/:id` и `/s/:token` в raw HTML/заголовках — внедрён ранее.
+- **Тесты:** `articles.test.js`, `sitemap.test.js`, `gallery.test.js`; `npm test` 470 (469 pass, 1 skip), web lint (0 ошибок) и build зелёные.
+
+## 2026-11-21 — каталог 32 стилей и библиотека стилей
+
+- **Данные:** `src/designdata.js` расширен с 10 до 32 стилей. Добавлены `display_name` (продающее название), `family`, `era`, `is_featured`, `description`. Топ-10 featured: modern, loft, scandinavian, provence, minimalism, neoclassic, boho, baroque, japandi, classic.
+- **Матрица:** 32 × 10 = 320 ячеек: 257 ok, 50 weaken, 13 conflict. `WEAKEN_PARAMS` — 50 записей.
+- **Миграция `065_styles_32.sql`:** новые колонки `display_name`, `family`, `era`, `is_featured`, `seo_name`; upsert 32 стилей; переиспользованы существующие ключи modern/boho/country; все 32 активны.
+- **API:** `/api/styles` отдаёт `display_name`, `family`, `is_featured`, `swatches`; `?featured=1` — только топ-10. `/api/design` — 32 стиля и 320 ячеек.
+- **UI:** основной сценарий показывает 10 featured; кнопка «Больше стилей» ведёт в `/styles`. Библиотека `/styles` с фильтрами по семействам, страница `/styles/:id` с палитрой и кнопкой «Сгенерировать такой же» (через `rv_prefill_style`).
+- **SEO:** `/styles` и 32 страницы стилей добавлены в sitemap; SPA-роуты отдают index.html.
+- **Маркеры:** обновлены `STYLE_TAGS`, `STYLE_WORDS`, `STYLE_MARKERS` под 32 стиля.
+- **Иллюстрации:** `scripts/generate-style-illustrations.mjs` — 32 генерации по одному стилю (1K, FLUX 3 Image, bbox lock), сохраняет в `web/dist/images/style-<id>.webp` и `web/public/images/style-<id>.webp`; `styleImageUrl` отдаёт сгенерированную обложку раньше алиаса.
+- **Контраст и живость обложек:** палитры 32 стилей пересобраны по колористике (60-30-10, тёплый/холодный контраст, комплементарные пары), миграция `066`. Добавлены style-specific `COLOR LOCK`, `LIGHT LOCK`, `DESIGN CONTRAST`, `DESIGN BRIEF`; полотно двери можно менять, сохраняя проём; окно фиксируется bbox детектора и `WINDOW LOCK`, без хардкода числа створок. Добавлены lived-in стилинг, заполнение стен (комоды, консоли, стеллажи, полки) и 20 приёмов в `docs/STYLING-TECHNIQUES.md`.
+- **QA и перегенерация:** `scripts/style-qa.mjs` проверяет архитектуру, окно, двери, радиаторы, стиль, контраст, живость и заполнение стен. `scripts/run-style-illustrations.mjs` генерирует по одному стилю, проверяет и делает повторную попытку при провале (лимит 100 генераций). Спальни генерируются из реального фото спальни, зал/кабинет/столовая — из фото зала с `keepFurniture=true`, чтобы не ломать окно.
+- **Тесты:** `npm test` 477/478 (1 skipped), integration 75/75, web lint/build зелёные.
+
+## 2026-11-21 — FLUX 3 quality-max: позитивная реформа промта + bbox-заморозка архитектуры
+
+- **Цель:** повысить качество генерации по критериям: сохранение архитектуры, правильный масштаб, расстановка мебели, дизайн уровня бюро, вариативность.
+- **Позитивная реформа промта** (`src/promptconfig.js`, `src/openrouter.js`, `src/roomtypes.js`, `src/scaleplan.js`): заменены десятки негативных формулировок «no X / do not X» на позитивные состояния по гайду FLUX 3 (final state, keep, preserve). У FLUX 3 нет negative prompt; запреты ведут модель к запрещённому.
+- **Обновлённые блоки:** lighting, cleanup, window, pinterest, furnitureOn/Off, geometry lock, dimensions, scale plan, bed, radiators, room `forbid`/`keep`/`styling`, base prompt TASK/CHANGE/COMPOSITION/LIFE & STYLING.
+- **Bbox-заморозка архитектуры:**
+  - `src/openings.js` — vision-детекция окон/дверей/встроенных элементов с bbox 0–1000.
+  - `src/bboxprompt.js` — построение FLUX 3 bbox JSON (Keep-строки) и конвертер координат.
+  - `src/jobs.js` — вызов детекции параллельно repair/art/layout, кэш `room_analysis` artifact `openings`.
+  - `src/openrouter.js` — вставка bbox JSON в конец промпта с `<id>`-ссылками в теле.
+  - Фича-флаг `BBOX_LOCK_ENABLED` (default `false`); повторные рендеры используют кэш.
+- **Layout bbox (phase 3):**
+  - `src/layoutprompt.js` — схема плана получила `frame_bbox [top, left, bottom, right]` для каждого предмета.
+  - `src/layoutagent.js` — `normalizeLayoutPlanV2` сохраняет `id`, нормализует и отбрасывает слишком мелкие/невалидные bbox.
+  - `src/openrouter.js` — планировочные предметы с `frame_bbox` добавляются в bbox JSON как New-строки (`from: null`) рядом с Keep-строками архитектуры.
+  - Тест: `test/layoutagent.test.js` (frame_bbox), `test/prompt.test.js` (New-строки в промте).
+- **Тесты:** `test/openings.test.js`, `test/bboxprompt.test.js`, `test/layoutagent.test.js`, обновлён `test/prompt.test.js`.
+- **Регрессия:** обновлён `docs/regression/baseline.json` (20 конфигураций), `npm test` 460/460.
+- **Phase 2 — Bbox-заморозка архитектуры:**
+  - `src/openings.js`, `src/bboxprompt.js`, кэш `room_analysis` artifact `openings`, wiring в `src/jobs.js` и `src/openrouter.js`.
+  - Canary v1: 10 генераций FLUX 3 Image (`scripts/canary-bbox-10.mjs`, $0.53). Vision-QA: style 9.0, photo 8.2, arch 7.7, scale 7.3, authorial 8.4. Проблема — нестабильность детектора на балконных блоках.
+  - Canary v2: детектор усилен few-shot примерами и явным правилом разделения двери/окна. 5 генераций (`scripts/canary-bbox-5.mjs`, $0.27). Vision-QA: style 8.8, photo 8.6, arch 8.4, scale 6.8, authorial 8.0. arch вырос с 7.7 до 8.4, scandi-kids arch — с 2 до 10.
+  - `BBOX_LOCK_ENABLED` включён по умолчанию. Отключить: `BBOX_LOCK_ENABLED=false`.
+- **Phase 3 — Layout bbox:** `frame_bbox` в `src/layoutprompt.js`, нормализация и `id` в `src/layoutagent.js`, New-строки в `src/bboxprompt.js`/`src/openrouter.js`, тесты.
+- **Phase 4 — Designer signature move:** поле `signature_move` в `src/designerprompt.js` и `src/artdirector.js`, отдельный блок в `src/openrouter.js`, тест.
+- **Phase 5 — Variability axes:** оси `styling` и `composition` добавлены во все стили `src/designdata.js`; `src/variety.js` теперь переводит оси в конкретные execution-инструкции; golden-тесты обновлены.
+- **A/B-стенд:** создан `tmp/ab-flux3/score.mjs` для vision-скоринга рендеров по 6 метрикам (architecture_preserved, windows_doors_exact, scale_honesty, design_quality, layout_intelligence, overall).
 
 ## 2026-11-21 — ускорение генерации: параллельный layout/бриф, настраиваемые тики и таймауты
 
@@ -2548,6 +2717,29 @@ export const MAX_REFERENCES; // 4
 - **Хаб `/articles`**: секции «Комнаты» (→ фильтры галереи со счётчиками) и «Стили» (→ статьи кластера) — перелинковка по двум осям.
 - **Sitemap**: `/gallery` + `/gallery/<комната>` подмешиваются в статические записи на лету.
 - **Тесты**: `test/gallery.test.js` (5), `test/articles.test.js` +3 (хаб-секции, блок промта, autoMetaTitle). Итог `npm test` 438/438, `check-copy` чисто.
+
+### Первая партия на проде (21.11, вечер)
+
+- Опубликованы 5 статей-рендеров через гейты (680–766 слов, 3 товара Hoff, промт-блок, обложка-рендер): `/articles/skandinavskiy-kuhnya-a7c859`, `-sanuzel-229c72`, `-gostinaya-zal-f910da`, `-detskaya-897f63`, `-kabinet-1dbe23`. Плюс 2 ручные (владелец): `skandinavskiy-spalnya-c240e2`, `dzhapandi-kabinet-40f90c`. Итого 7 статей в индексной очереди.
+- **OpenRouter блокирует chat/completions с IP VPS** (`403 Access denied by security policy`, рендеры при этом работают). Батч перенесён на раннер GitHub Actions: SSH-туннели к БД и catalog-service, генерация с egress раннера. Workflow `.github/workflows/articles-batch.yml` (`workflow_dispatch`: limit, publish, fix_meta).
+- **Ловушка окружения:** `docker-compose.yml` переопределяет `RV_DATABASE_URL` из `.env` — для фоновых скриптов реальный env только из контейнера (`docker compose exec app env`), иначе «password authentication failed».
+- `autoMetaTitle` фикс: на границе 60 символов срезал последнее слово; `--fix-meta` перезаписал meta_title у 3 статей.
+- Публичная раздача обложек рендеров: `GET /article-cover/:file` (renders-dir; имена UUID).
+
+### Волна 2 (21.11, вечер) — 43 статьи
+
+- Планировщик батча перевёрнут: сначала кластеры «стиль × комната» из публичных рендеров, ключи подбираются под них. Флаг `--per-cluster N` — несколько статей на кластер по разным рендерам (у каждой своя обложка, гейт дублей с лимитом).
+- Прогон `limit=100, per-cluster=3`: 24 новые опубликованы (662–784 слова), 4 не прошли по объёму (черновики 370–440 слов), на 4 кластерах рендеры кончились. **Итого в проде 43 статьи** (+2 ваши ручные из них).
+- Реклама: РСЯ Autoplacement (block 20466972) в теле каждой статьи.
+- Рутина: повторные волны — Actions → articles-batch (limit, per-cluster, publish, fix_meta).
+
+### Волна 3 и инфраструктура промтов (21.11, день)
+
+- Прогон `per-cluster=3`: +24 статьи (итого 43). Прогон `per-cluster=10`: +28 (итого 71 в sitemap).
+- Лендинг промт-кластера `/promty/dizayn-interera` (`src/prompts.js`): сборник реальных промтов из опубликованных статей + FAQ/JSON-LD, UTM-CTA; в sitemap.
+- Реклама: цель Метрики `gallery_click` на карточках галереи; `public/ads.txt` для РСЯ (block 20466972).
+- `articlesWithPrompts` в db.js; `--publish-drafts` в батче (расширение текста + гейты) — дожал 1 черновик; 7 остались (пустые тела сбоев генерации — на удаление вручную).
+- Техдолг сессии: TDZ-падение старта (маршрут промтов до объявления `h`), фикс в `661c2f5`.
 
 ## 2026-11-21 — SEO-волна 0 (остаток): хаб статей, гейты публикации, лендинг «дизайн по фото»
 

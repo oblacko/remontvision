@@ -8,6 +8,7 @@ import { callAgentJson } from './openrouteragent.js';
 import { validateRepairScope, validateDesignDirection } from './agentcontracts.js';
 import { DESIGN_STYLES, styleById, conceptById, compatibilityOf, compatibilityNote } from './designdata.js';
 import { isArtDirectionEnabled } from './modelconfig.js';
+const STYLE_NAME_LIST = DESIGN_STYLES.map(style => style.name).join(', ');
 
 // Категории, которые арт-директор может просить из каталога. Локальный список,
 // чтобы не зависеть от searchvision.js (он может отличаться в разных сборках).
@@ -363,6 +364,7 @@ export async function buildArtDirection({
     roomDimensions: normalizeRoomDimensions(source.room_dimensions),
     lens: normalizeLens(source.lens),
     focalPoint: clampText(source.focal_point, 240),
+    signatureMove: clampText(source.signature_move, 240),
     featureWall: clampText(source.feature_wall, 240),
     materials: clampText(source.materials, 320),
     materialContrasts: clampText(source.material_contrasts, 320),
@@ -380,6 +382,7 @@ export async function buildArtDirection({
     if (!text) {
       text = [
         fields.mood,
+        fields.signatureMove ? `Signature move: ${fields.signatureMove}.` : '',
         fields.designRecipe ? `Design recipe: ${fields.designRecipe}.` : '',
         fields.materialContrasts ? `Material contrasts: ${fields.materialContrasts}.` : '',
         fields.featureWall ? `Feature wall: ${fields.featureWall}.` : '',
@@ -442,7 +445,7 @@ const BRIEF_SYSTEM = `Ты арт-директор и эксперт по инт
 }
 Правила:
 - Размеры в метрах, округляй до 0.1; при неясном масштабе дай разумную оценку и confidence low.
-- style_suggestions — 2-3 варианта из списка: Скандинавский, Джапанди, Ваби-саби, Органик модерн, Тёплый минимализм, Биофильный, Современная классика, Средиземноморский модерн.
+- style_suggestions — 2-3 варианта из списка: ${STYLE_NAME_LIST}.
 - Никаких выдуманных измерений и лишнего текста. Только JSON.`;
 
 export async function analyzeRoomBrief({ imageDataUrl, roomType = '' } = {}) {

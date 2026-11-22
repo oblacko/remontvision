@@ -1,10 +1,21 @@
 # Статус проекта: что сделано и что работает
 
-**Дата:** 2026-11-12. **Прод:** `main`, деплой 2026-11-12. **Ветка:** `main`.
+**Дата:** 2026-11-22. **Прод:** `main`, деплой 2026-11-12. **Ветка:** `main`.
 
 Это единый источник истины о состоянии продукта. Остальные документы описывают механику; при расхождении верьте этому файлу и коду.
 
 ## Сделано за последние изменения
+
+### 2026-11-22
+- **Обложки стилей через реальный пайплайн:** `scripts/generate-style-covers-pipeline.mjs` создаёт комнату, ставит в очередь рендер и прогоняет его через `processRender` (cleanup → art director → layout → render → QA). Сгенерированы и применены 5 проблемных стилей из одного фото `assets/zal.jpg`: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/style-*.png` и `web/dist/images/style-*.png`. `/api/styles` теперь отдаёт новые обложки.
+- **Фикс кэша `room_analysis.openings`:** `cachedOpenings` теперь корректно разворачивается из `data.openings` перед использованием; устранён `Cannot read properties of undefined (reading 'length')` при повторных рендерах той же комнаты.
+- **Мягче тестовые брифы:** убраны хардкодные перекрытия пола (`floorOverride`), снижена агрессивность `ROOM_PROGRAM`, `WALLS`, `PLACEMENT`, убран `LIGHT_FIXTURE` и инструкция заменять светильник в `style-briefs.mjs` (production и так заменяет через electrical lock). Подписные движения `tropical_modern`, `english`, `dark_academia`, `chalet` больше не нарушают `ARCH_LOCK`.
+- **Регрессия промтов:** baseline обновлён под новый electrical lock (замена старого потолочного светильника на стилевой pendant/chandelier). `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
+
+### 2026-11-21
+- **Каталог стилей:** 32 стиля в `src/designdata.js` и БД (миграция `065`). Топ-10 featured в основном сценарии, остальные — в библиотеке `/styles`. Страница `/styles/:id` с палитрой и кнопкой «Сгенерировать такой же». `/api/styles` отдаёт `display_name`, `family`, `is_featured`.
+- **Матрица:** 32 × 10 = 320 ячеек (257 ok / 50 weaken / 13 conflict).
+- **FLUX 3 quality-max:** bbox-заморозка архитектуры включена по умолчанию, layout bbox, designer signature move, расширенные axes вариативности.
 
 ### Ночной прогон 2026-11-12
 - **Доки и мёртвый код:** README/AGENTS/STATUS синхронизированы; удалены `reviewDesign`-ветка в `jobs.js`, `spendCredit`, `estimateRoomDimensions`; лог `credit_restore_failed` при отмене.
@@ -48,6 +59,7 @@
 | Вход через Яндекс | Работает (если настроен) | `/api/auth/yandex/start` |
 | Генерация по фото | Работает (live/mock) | `POST /api/rooms` → `GET /api/rooms/:id` |
 | Мульти-стиль до 10 пар | Работает | `items: [{style, concept}]` |
+| Библиотека 32 стилей | Работает | `/styles`, `/styles/:id`, `GET /api/styles` |
 | Оценка размеров vision | Работает в воркере | `renders.meta.room_dimensions_estimate` |
 | Очистка комнаты | Работает при `keep_furniture=false`; выключена по умолчанию, асинхронно при первом enqueue, shell переиспользуется | админка «Очистка» |
 | Правки (3 бесплатные) | Работает; цена видна до подтверждения | `POST /api/rooms/:id/iterate` |

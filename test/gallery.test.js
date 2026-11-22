@@ -41,3 +41,27 @@ test('gallery: empty state renders', () => {
 test('gallery: page size is stable for pagination math', () => {
   assert.equal(GALLERY_PAGE_SIZE, 24);
 });
+
+test('gallery: room title uses plural form, genitive description, renames «Гостиная (зал)»', () => {
+  const g22 = galleryPage([], { room: 'Гостиная (зал)', roomSlug: 'gostinaya-zal', page: 1, total: 22, rooms: [] });
+  assert.match(g22, /<title>Гостиная: 22 дизайна интерьера по фото — ремонтвижн<\/title>/);
+  assert.match(g22, /Готовые AI-дизайны гостиной в разных стилях/);
+  assert.ok(!g22.includes('Гостиная (зал):'));
+  const s95 = galleryPage([], { room: 'Спальня', roomSlug: 'spalnya', page: 1, total: 95, rooms: [] });
+  assert.match(s95, /<title>Спальня: 95 дизайнов интерьера по фото — ремонтвижн<\/title>/);
+  assert.match(s95, /Готовые AI-дизайны спальни в разных стилях/);
+});
+
+test('gallery: «Другое» and «Кладовка» are noindex and excluded from room nav', () => {
+  const rooms = [
+    { name: 'Кухня', slug: 'kuhnya', count: 12 },
+    { name: 'Другое', slug: 'drugoe', count: 14 },
+    { name: 'Кладовка', slug: 'kladovka', count: 4 },
+  ];
+  const drugoe = galleryPage([], { room: 'Другое', roomSlug: 'drugoe', page: 1, total: 14, rooms });
+  assert.match(drugoe, /<meta name="robots" content="noindex, follow">/);
+  const all = galleryPage([], { page: 1, total: 12, rooms });
+  assert.match(all, /href="\/gallery\/kuhnya"/);
+  assert.ok(!all.includes('href="/gallery/drugoe"'));
+  assert.ok(!all.includes('href="/gallery/kladovka"'));
+});

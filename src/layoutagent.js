@@ -89,10 +89,21 @@ export function normalizeLayoutPlanV2(parsed = {}) {
   const items = (Array.isArray(parsed.items) ? parsed.items : []).map(item => {
     const width = Number(item?.width_cm);
     const depth = Number(item?.depth_cm);
+    const bbox = Array.isArray(item?.frame_bbox) && item.frame_bbox.length === 4
+      ? item.frame_bbox.map(Number).map(v => (Number.isFinite(v) ? Math.max(0, Math.min(1000, Math.round(v))) : null))
+      : [null, null, null, null];
+    const frame_bbox = bbox.every(v => v !== null)
+      ? [bbox[0], bbox[1], Math.max(bbox[0], bbox[2]), Math.max(bbox[1], bbox[3])]
+      : null;
+    const valid_bbox = frame_bbox && (frame_bbox[2] - frame_bbox[0] >= 20) && (frame_bbox[3] - frame_bbox[1] >= 20)
+      ? frame_bbox
+      : null;
     return {
+      id: text(item?.id, 40) || `${text(item?.type, 20) || 'item'}_${index + 1}`,
       type: text(item?.type, 40) || 'storage',
       label: text(item?.label, 160) || text(item?.type, 40),
       position: text(item?.position, 300),
+      frame_bbox: valid_bbox,
       size_cm: Number.isFinite(width) && Number.isFinite(depth) ? `${Math.round(width)}x${Math.round(depth)}` : '',
       width_cm: Number.isFinite(width) ? Math.round(width) : null,
       depth_cm: Number.isFinite(depth) ? Math.round(depth) : null,

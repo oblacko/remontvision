@@ -27,10 +27,11 @@ import { restoreCreditForRender, enqueueRenderWithCredit } from './payments.js';
 import { sendRenderDoneEmail, renderShareUrl } from './notify.js';
 import { friendlyRenderError } from './rendererrors.js';
 import { shouldMarkRoomError, roomStatusAfterFailure, isIterationRender, resolveRenderStyleConcept } from './variants.js';
-import { workerConcurrency } from './workerknobs.js';
+import { workerConcurrency, workerTickMs, shellWaitTimeoutMs } from './workerknobs.js';
 import { roomGcDays, shouldGcRoom } from './roomgc.js';
 import { pickVariety, variabilityPrompt } from './variety.js';
-import { factsKey, layoutKey, artDirectionKey, briefHash, shouldCacheRoomAnalysis } from './roomanalysis.js';
+import { factsKey, layoutKey, artDirectionKey, openingsKey, briefHash, shouldCacheRoomAnalysis } from './roomanalysis.js';
+import { buildOpenings, BBOX_LOCK_ENABLED } from './openings.js';
 
 const MOCK_AFTER = path.join(process.cwd(), 'assets', 'kitchen_after.png');
 
@@ -174,10 +175,12 @@ export async function processRender(renderId, claimedBy = null) {
   const heartbeat = setInterval(() => { q.heartbeatRender(renderId, claimedBy, 300, waitingShell).catch(() => {}); }, 30_000);
   if (heartbeat.unref) heartbeat.unref();
 
-  // Cleanup запускается при enqueue. Здесь только ждём готовый shell до 3 минут.
+  // Cleanup запускается при enqueue. Ждём готовый shell ограниченное время
+  // (RENDER_SHELL_WAIT_MS, по умолчанию 30 с — раньше холостые 3 минуты), затем
+  // честно идём по оригинальному фото, не блокируя рендер.
   if (cleanupRequested && !precleanedShell) {
     waitingShell = true;
-    const deadline = Date.now() + 3 * 60 * 1000;
+    const deadline = Date.now() + shellWaitTimeoutMs();
     while (Date.now() < deadline) {
       const state = await q.roomCleanupState(room.id).catch(() => null);
       if (state?.precleaned_shell_path) {
@@ -194,7 +197,7 @@ export async function processRender(renderId, claimedBy = null) {
     if (precleanedShell) log({ event: 'room_cleanup_ready', room_id: room.id, render_id: renderId });
     else {
       const state = await q.roomCleanupState(room.id).catch(() => null);
-      log({ event: 'room_cleanup_wait_timeout', room_id: room.id, render_id: renderId, status: state?.cleanup_status || null });
+      log({ event: 'room_cleanup_wait_timeout', room_id: room.id, render_id: renderId, status: state?.cleanup_status || null, waited_ms: shellWaitTimeoutMs() });
     }
   }
 
@@ -345,16 +348,22 @@ export async function processRender(renderId, claimedBy = null) {
         dimensions: roomDimensions,
         briefHash: briefHashValue,
       });
+      const openingsCacheKey = openingsKey({
+        photoPath: room.photo_path,
+        shellPath: precleanedShell || '',
+      });
 
-      // Три независимых артефакта room_analysis, у каждого свой ключ.
-      const [factsRow, layoutRow, artRow] = await Promise.all([
+      // Три независимых артефакта room_analysis, у каждого свой ключ (+ openings при включённом bbox lock).
+      const [factsRow, layoutRow, artRow, openingsRow] = await Promise.all([
         q.roomAnalysis(room.id, 'facts').catch(() => null),
         q.roomAnalysis(room.id, 'layout').catch(() => null),
         q.roomAnalysis(room.id, 'art').catch(() => null),
+        BBOX_LOCK_ENABLED ? q.roomAnalysis(room.id, 'openings').catch(() => null) : Promise.resolve(null),
       ]);
       const cachedFacts = factsRow?.cache_key === factsCacheKey ? factsRow.data : null;
       const cachedLayout = layoutRow?.cache_key === layoutCacheKey ? layoutRow.data : null;
       const cachedArt = artRow?.cache_key === artCacheKey ? artRow.data : null;
+      const cachedOpenings = openingsRow?.cache_key === openingsCacheKey ? openingsRow.data?.openings || null : null;
       if (cachedArt) {
         meta = { ...meta, ...(cachedArt.meta || {}) };
         log({ event: 'room_analysis_cache_hit', room_id: room.id, render_id: renderId, style: styleName });
@@ -449,6 +458,8 @@ export async function processRender(renderId, claimedBy = null) {
       let estimatedDimensions = cachedArt?.dimensions || roomDimensions;
       let effectiveKeepFurniture = cachedArt?.effective_keep_furniture ?? keepFurniture;
       let artFailed = false;
+      // Fallback-бриф мебели запускается внутри artPromise параллельно с layout.
+      let briefPromise = null;
       const artPromise = (MOCK_MODE || cachedArt) ? Promise.resolve(null) : (async () => {
         try {
           const adStart = Date.now();
@@ -468,10 +479,15 @@ export async function processRender(renderId, claimedBy = null) {
           });
           if (ad && keepFurniture && ad.existingFurniture === null) {
             // Старый промт дизайнера мог не вернуть existing_furniture — уточняем брифом.
+            // Раньше вызов шёл последовательно и добавлял ~20–40 с к критическому пути;
+            // теперь бриф запускается параллельно с layout и подхватывается ниже.
             try {
-              const brief = await analyzeRoomBrief({ imageDataUrl: await bufferToDataUrl(adBuf), roomType });
-              if (Array.isArray(brief?.existing_furniture)) ad.existingFurniture = brief.existing_furniture;
-              if (brief?.architecture) architectureFacts = brief.architecture;
+              briefPromise = (async () => {
+                const brief = await analyzeRoomBrief({ imageDataUrl: await bufferToDataUrl(adBuf), roomType });
+                if (Array.isArray(brief?.existing_furniture)) ad.existingFurniture = brief.existing_furniture;
+                if (brief?.architecture) architectureFacts = brief.architecture;
+                return brief;
+              })();
             } catch { /* остаётся null */ }
           }
           if (ad && keepFurniture && Array.isArray(ad.existingFurniture) && ad.existingFurniture.length === 0) {
@@ -554,23 +570,55 @@ export async function processRender(renderId, claimedBy = null) {
         }
       };
       let layoutPromise = Promise.resolve(null);
-      if (!MOCK_MODE && !keepFurniture && !cachedLayout) {
+      // Layout стартует параллельно сразу — независимо от keep_furniture.
+      // Раньше при keep_furniture=true он ждал арт-директора, чтобы узнать, пустая
+      // ли комната: это добавляло лишнюю последовательную задержку. Запускаем всегда;
+      // если комната окажется меблированной, план просто не используется.
+      if (!MOCK_MODE && !cachedLayout) {
         layoutPromise = buildLayout(roomDimensions, false);
       }
 
-      // Ждём три vision-этапа: repair и layout уже идут параллельно с арт-директором.
-      const [repairResult, , layoutResult] = await Promise.all([repairPromise, artPromise, layoutPromise]);
-      repairScope = repairResult;
+      let openingsPromise = Promise.resolve(cachedOpenings);
+      let openingsFailed = false;
+      if (BBOX_LOCK_ENABLED && !cachedOpenings && !MOCK_MODE) {
+        openingsPromise = (async () => {
+          try {
+            const openingsStart = Date.now();
+            const obuf = await getBuffer(room.photo_path || sourceStored);
+            const o = await buildOpenings({
+              imageDataUrl: await bufferToDataUrl(obuf),
+              roomType,
+              sessionId: meta.render_session,
+            });
+            if (o && !o.empty) {
+              addCost('openings', o.cost);
+              log({ event: 'openings_ok', room_id: room.id, render_id: renderId, windows: o.windows.length, doors: o.doors.length, builtins: o.builtins.length, confidence: o.confidence, cost_usd: o.cost ?? null, ms: Date.now() - openingsStart });
+              return o;
+            }
+            log({ event: 'openings_empty', room_id: room.id, render_id: renderId, confidence: o?.confidence || null, ms: Date.now() - openingsStart });
+            return null;
+          } catch (e) {
+            log({ event: 'openings_error', room_id: room.id, render_id: renderId, error: String(e.message || e).slice(0, 300) });
+            openingsFailed = true;
+            return null;
+          }
+        })();
+      }
 
-      // Если layout не стартовал параллельно (keep_furniture=true), но арт-директор
-      // увидел пустую комнату — запускаем планировщик последовательно.
+      // Ждём vision-этапы: repair, layout и openings уже идут параллельно с арт-директором.
+      const [repairResult, , layoutResult, openingsResult] = await Promise.all([repairPromise, artPromise, layoutPromise, openingsPromise]);
+      repairScope = repairResult;
+      const openings = openingsResult || null;
+      if (openings) {
+        meta.openings = { windows: openings.windows.length, doors: openings.doors.length, builtins: openings.builtins.length, confidence: openings.confidence, assumptions: openings.assumptions };
+      }
+      // Догоняем fallback-бриф (мог идти параллельно с layout).
+      if (briefPromise) await briefPromise.catch(() => {});
+
       let rawLayout = layoutResult?.plan ?? null;
       if (layoutResult) layoutBuildMs = layoutResult.ms;
-      if (!MOCK_MODE && keepFurniture && !cachedLayout && !effectiveKeepFurniture) {
-        const res = await buildLayout(roomDimensions, false);
-        rawLayout = res.plan;
-        layoutBuildMs = res.ms;
-      }
+      // Если комната меблированная (effectiveKeepFurniture=true), план пустой комнаты
+      // ниже не применяется — пустой блок здесь не нужен.
 
       // Финализация layout для пустой комнаты: подгонка под финальные размеры
       // и направление арт-директора (они готовы после Promise.all).
@@ -641,6 +689,12 @@ export async function processRender(renderId, claimedBy = null) {
             meta: snapshotOf(['layout_plan', 'layout_validation', 'layout_assumptions', 'layout_plan_skipped', 'layout_fit']),
           }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, artifact: 'layout', error: String(e.message || e).slice(0, 300) }));
         }
+        if (BBOX_LOCK_ENABLED && openings && shouldCacheRoomAnalysis({ cached: Boolean(cachedOpenings), failed: openingsFailed })) {
+          await q.upsertRoomAnalysis(room.id, 'openings', openingsCacheKey, {
+            openings,
+            meta: snapshotOf(['openings']),
+          }).catch(e => log({ event: 'room_analysis_cache_save_error', room_id: room.id, render_id: renderId, artifact: 'openings', error: String(e.message || e).slice(0, 300) }));
+        }
       }
 
       prompt = buildPrompt({
@@ -667,6 +721,8 @@ export async function processRender(renderId, claimedBy = null) {
         architectureFacts,
         accentHex: variety?.accent || null,
         novelty: variabilityPrompt(variety),
+        openings,
+        signatureMove: artDirection?.signatureMove || '',
       });
 
       referenceImagesB64 = [...styleRefUrls];
@@ -1093,7 +1149,7 @@ export function startWorker() {
     } catch (e) {
       log({ event: 'worker_error', error: String(e.message || e).slice(0, 300) });
     }
-  }, 2000);
+  }, workerTickMs());
   console.log(`[worker] запущен, режим: ${MOCK_MODE ? 'MOCK (без OPENROUTER_API_KEY)' : 'LIVE'}, concurrency: ${MAX_RUNNING}`);
 }
 

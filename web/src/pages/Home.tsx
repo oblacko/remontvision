@@ -24,9 +24,9 @@ const CONSENTS = { offer: true, privacy: true, cross_border: true }
 const faq = [
   { q: 'Сколько стоит дизайн по фото?', a: 'После регистрации доступны 2 бесплатных дизайна. Дальше: 10 дизайнов за 399 ₽, 20 за 599 ₽ или 60 за 1 499 ₽. Каждый дизайн включает 3 бесплатных редактирования; каждое следующее — 1 кредит. Подписка не нужна.' },
   { q: 'Какое фото подойдёт?', a: 'Чёткое фото комнаты при дневном свете: JPG, PNG, WebP или HEIC до 15 МБ. Подойдут портретные, квадратные и альбомные кадры. Чем лучше видно стены, пол и мебель, тем полезнее результат.' },
-  { q: 'Что я получу, кроме картинки?', a: 'Подбор материалов и товаров с ценами и ссылками на магазины, палитру в RAL и рекомендации по розеткам и выключателям — всё для выбранного интерьера.' },
+  { q: 'Что я получу, кроме картинки?', a: 'Разбор интерьера: палитру отделки в RAL, рекомендации по розеткам и выключателям и подсказки, что изменить — всё для выбранного интерьера.' },
   { q: 'Можно изменить готовый дизайн?', a: 'Да, результат можно уточнять текстовыми запросами: например, изменить цвет пола, заменить текстиль или сделать интерьер светлее. Каждая версия сохраняется в истории правок.' },
-  { q: 'Можно сразу покупать товары?', a: 'Подборка помогает сориентироваться, но ИИ может ошибаться. Перед покупкой проверьте размеры, количество, цены и наличие товаров в магазинах.' },
+  { q: 'Это заменяет дизайнера?', a: 'Нет. Это AI-визуализация, которая помогает увидеть направление и подготовиться к разговору с дизайнером или бригадой, но не является проектной документацией.' },
 ]
 
 function ShiftLabel({ children }: { children: string }) {
@@ -50,6 +50,7 @@ export default function Home() {
   const [pendingPanel, setPendingPanel] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelRoomId, setPanelRoomId] = useState('')
+  const [prefillStyle, setPrefillStyle] = useState('')
   const [packs, setPacks] = useState<PublicPack[]>(defaultPacks)
   const [referralInvited, setReferralInvited] = useState(false)
   const { refresh: refreshTasks, setPanelOpen: setTasksPanelOpen } = useTasks()
@@ -58,6 +59,14 @@ export default function Home() {
     setTasksPanelOpen(panelOpen)
   }, [panelOpen, setTasksPanelOpen])
   useEffect(() => () => setTasksPanelOpen(false), [setTasksPanelOpen])
+  // Переход из библиотеки стилей: открываем панель с предвыбранным стилем.
+  useEffect(() => {
+    const style = localStorage.getItem('rv_prefill_style')
+    if (!style) return
+    localStorage.removeItem('rv_prefill_style')
+    setPrefillStyle(style)
+    setPanelOpen(true)
+  }, [])
 
   async function loadMe() {
     try {
@@ -300,7 +309,7 @@ export default function Home() {
 
               <div className="hero-enter hero-delay-3 mt-8 grid gap-8 border-t border-background/35 pt-6 lg:grid-cols-12 lg:items-start">
                 <p className="max-w-xl text-lg font-light leading-7 text-background sm:text-xl lg:col-span-5">
-                  По вашему фото — дизайн комнаты, а затем подбор товаров и ориентировочная стоимость. <strong className="font-medium text-primary">Сначала увидьте результат, потом тратьте деньги.</strong>
+                  По вашему фото — дизайн комнаты с сохранением планировки и разбор: палитра RAL, розетки, что изменить. <strong className="font-medium text-primary">Сначала увидьте результат, потом тратьте деньги.</strong>
                 </p>
                 <div className="lg:col-span-7 lg:pl-8">
                   <div className="flex flex-col gap-4 sm:flex-row">
@@ -340,8 +349,8 @@ export default function Home() {
         <section className="mt-8 bg-foreground text-background" aria-label="Главные преимущества">
           <div className="page-shell grid md:grid-cols-3">
             {[
-              ['[ 01 ]', 'Изображение + подбор', 'Увидьте интерьер и узнайте, из чего его собрать: пол, краска, свет, мебель и отделка.'],
-              ['[ 02 ]', 'Класс материалов', 'Старт, комфорт, премиум или ателье — сервис подберёт материалы и товары под выбранный уровень.'],
+              ['[ 01 ]', 'Дизайн по фото', 'Загрузите снимок — получите визуализацию в выбранном стиле, с сохранением планировки вашей комнаты.'],
+              ['[ 02 ]', 'Класс материалов', 'Старт, комфорт, премиум или ателье — выберите уровень, и сервис подстроит интерьер под него.'],
               ['[ 03 ]', 'Без подписки', 'Начните с двух бесплатных кредитов. Дальше платите только за нужные кредиты.'],
             ].map(([index, title, text]) => (
               <div key={index} className="border-b border-background/20 py-8 md:border-b-0 md:border-r md:px-8 md:py-10 md:first:pl-0 md:last:border-r-0 md:last:pr-0">
@@ -369,9 +378,9 @@ export default function Home() {
             <div className="border-b py-12 lg:col-span-5 lg:border-b-0 lg:border-r lg:py-16 lg:pr-12">
               <SectionMarker index="03">Генератор</SectionMarker>
               <h2 id="upload-title" className="display-title mt-8 text-4xl sm:text-5xl">Четыре шага<br />до результата</h2>
-              <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Фото комнаты, пресет стиля или ваш референс, редактирование текстом — а в финале товары, цвета RAL и разметка розеток.</p>
+              <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Фото комнаты, пресет стиля или ваш референс, редактирование текстом — а в финале разбор: цвета RAL, разметка розеток и подсказки, что изменить.</p>
               <ol className="mt-8 space-y-3 border-t pt-6 text-sm">
-                {['Загрузите фото комнаты', 'Выберите пресет стиля или референс', 'Правьте результат текстом', 'Получите подборку, RAL и электрику'].map((item, index) => (
+                {['Загрузите фото комнаты', 'Выберите пресет стиля или референс', 'Правьте результат текстом', 'Получите разбор: RAL, розетки и подсказки'].map((item, index) => (
                   <li key={item} className="flex gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span>{item}</li>
                 ))}
               </ol>
@@ -395,32 +404,34 @@ export default function Home() {
             <SectionMarker index="04">Не только картинка</SectionMarker>
             <div className="mt-6 grid gap-8 lg:grid-cols-12">
               <div className="lg:col-span-5">
-                <h2 id="result-title" className="display-title section-title">От идеи<br />к покупкам</h2>
-                <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Не тратьте время на поиск «такого же пола» или «похожего светильника» после рендера. Сервис покажет позиции, цены и ссылки на магазины в одном результате.</p>
+                <h2 id="result-title" className="display-title section-title">От идеи<br />к решению</h2>
+                <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">После рендера сервис разбирает результат: покажет палитру в RAL, отметит розетки и подскажет, что изменить, — чтобы вы пришли к дизайнеру или бригаде уже с готовым направлением.</p>
                 <div className="mt-8 divide-y border-y">
-                  {['Пол, краска и отделка', 'Свет, мебель и товары', 'Цены и ссылки на магазины'].map((item, index) => <div key={item} className="flex items-center gap-4 py-4 text-sm"><span className="font-mono text-xs text-primary-text">0{index + 1}</span>{item}</div>)}
+                  {['Палитра отделки в RAL', 'Розетки и выключатели', 'Подсказки, что изменить'].map((item, index) => <div key={item} className="flex items-center gap-4 py-4 text-sm"><span className="font-mono text-xs text-primary-text">0{index + 1}</span>{item}</div>)}
                 </div>
               </div>
               <div className="lg:col-span-7">
                 <div className="bg-foreground p-6 text-background sm:p-8">
                   <div className="flex flex-wrap items-start justify-between gap-4 border-b border-background/20 pb-6">
-                    <div><p className="font-mono text-xs uppercase tracking-widest text-background/60">Пример результата</p><h3 className="mt-2 text-xl font-light uppercase">Спальня / пример</h3></div>
-                    <span className="border border-background/25 px-3 py-2 font-mono text-xs">6 позиций</span>
+                    <div><p className="font-mono text-xs uppercase tracking-widest text-background/60">Пример разбора</p><h3 className="mt-2 text-xl font-light uppercase">Спальня / пример</h3></div>
+                    <span className="border border-background/25 px-3 py-2 font-mono text-xs">разбор</span>
                   </div>
                   <p className="mt-4 border border-primary-text px-3 py-2 font-mono text-xs uppercase tracking-widest text-primary">Демонстрационный пример · не оферта</p>
                   <div className="divide-y divide-background/15">
                     {[
-                      ['Краска для стен', '10 л', '8 400 ₽'], ['Ламинат дуб натуральный', '18 м²', '41 800 ₽'], ['Плинтус и профиль', '1 комплект', '9 600 ₽'], ['Шторы и карниз', '1 комплект', '18 900 ₽'], ['Прикроватный светильник', '2 шт.', '7 800 ₽'], ['Потолочный свет', '1 комплект', '12 400 ₽'],
-                    ].map(([name, qty, price]) => <div key={name} className="estimate-row grid gap-x-4 gap-y-1 py-4 text-sm"><span>{name}</span><span className="row-span-2 self-center font-medium">{price}</span><span className="text-xs text-background/55">{qty}</span></div>)}
+                      ['Палитра отделки', 'RAL 9010 · белый тёплый'],
+                      ['Стены', 'краска, матовое покрытие'],
+                      ['Розетки', '2 у изголовья, 1 у окна'],
+                      ['Что изменить', 'убрать ковёр, добавить свет над кроватью'],
+                    ].map(([label, text]) => <div key={label} className="grid gap-x-4 gap-y-1 py-4 text-sm"><span>{label}</span><span className="text-xs text-background/55">{text}</span></div>)}
                   </div>
-                  <div className="flex items-end justify-between gap-4 border-t border-background/20 pt-6"><span className="text-sm text-background/65">Итого, ориентировочно</span><strong className="text-3xl font-light text-primary">98 900 ₽</strong></div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-muted-foreground">Состав и суммы — демонстрационный пример, не оферта и не актуальный прайс магазинов.</p>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">Состав и детали — демонстрационный пример разбора, не оферта и не проект.</p>
               </div>
             </div>
             <figure className="mt-12">
               <div className="material-image overflow-hidden bg-muted">
-                <img src="/images/materials-editorial.webp" alt="Подбор материалов для интерьера: дуб, травертин, лён, керамика и тёплые оттенки краски" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                <img src="/images/materials-editorial.webp" alt="Материалы для интерьера: дуб, травертин, лён, керамика и тёплые оттенки краски" className="h-full w-full object-cover" loading="lazy" decoding="async" />
               </div>
               <figcaption className="mt-3 flex items-center justify-between gap-4 font-mono text-xs uppercase tracking-widest text-muted-foreground"><span>Материалы / палитра</span><span>Реальные текстуры</span></figcaption>
             </figure>
@@ -439,7 +450,7 @@ export default function Home() {
                 ['Сфотографируйте комнату', 'Подойдёт чёткий кадр при дневном свете. Загрузите JPG, PNG, WebP или HEIC до 15 МБ.'],
                 ['Выберите стиль и палитру', 'Задайте направление интерьера, цветовую схему или загрузите свой референс.'],
                 ['Получите дизайн и редактируйте текстом', 'Каждая версия сохраняется в истории — можно вернуться к любой.'],
-                ['Соберите подборку', 'Товары с ценами, цвета RAL и рекомендации по розеткам и выключателям.'],
+                ['Получите разбор', 'Палитра RAL, розетки и подсказки, что изменить, — по вашему готовому дизайну.'],
               ].map(([title, text], index) => <div key={title} className="step-row grid gap-4 border-t border-background/20 py-6"><span className="font-mono text-xs text-primary">0{index + 1}</span><div><h3 className="text-lg font-light uppercase tracking-wide">{title}</h3><p className="mt-2 max-w-xl text-sm leading-6 text-background/60">{text}</p></div></div>)}
             </div>
           </div>
@@ -463,6 +474,7 @@ export default function Home() {
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={openPanel} className="k-btn k-btn--primary">Начать бесплатно <KitIcon name="ur" /></button>
+                <a href="/styles" className="k-btn">Библиотека стилей <KitIcon name="ur" /></a>
                 <a href="/cabinet#credits" className="k-btn">Купить кредиты <KitIcon name="ur" /></a>
               </div>
               <a href={`${site}/prices`} className="inline-flex min-h-11 items-center gap-2 text-sm underline decoration-border underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">Все условия и цены <KitIcon name="ur" /></a>
@@ -481,7 +493,7 @@ export default function Home() {
                 {[
                   ['Это AI-визуализация, а не дизайн-проект', 'Мы не заменяем дизайнера и не выпускаем чертежи. Это черновик направления, с которым можно идти к дизайнеру или бригаде.'],
                   ['Планировка сохраняется, детали — нет', 'Окна, двери и пропорции остаются на месте. Мебель, свет и декор могут отличаться от кадра — проверяйте размеры.'],
-                  ['Подборка и стоимость ориентировочные', 'Цены, наличие и ссылки на товары могут меняться. Итоговую стоимость по позициям сервис не считает: проверяйте всё перед покупкой.'],
+                  ['Сервис не подбирает материалы и не считает стоимость', 'Это визуализация и разбор: палитра RAL, розетки и подсказки. Размеры и материалы проверяйте у специалистов перед началом работ.'],
                   ['При технической ошибке кредит возвращается', 'Если дизайн не создался, списанный кредит возвращается автоматически.'],
                 ].map(([title, text]) => (
                   <li key={title} className="border bg-card p-4">
@@ -516,7 +528,7 @@ export default function Home() {
               <div className="flex items-center justify-between gap-4 border-t border-foreground/30 pt-3 font-mono text-xs uppercase tracking-widest"><span>Ваш интерьер начинается с фото</span><KitIcon name="ur" /></div>
               <h2 id="final-cta-title" className="display-title section-title mt-8">Посмотрите,<br />что возможно</h2>
               <div className="mt-8 flex flex-col gap-6 border-t border-foreground/30 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="max-w-lg text-sm leading-6">Два дизайна бесплатно после регистрации — каждый с тремя бесплатными редактированиями. Дизайн, материалы, цены и ссылки — в одном результате.</p>
+                <p className="max-w-lg text-sm leading-6">Два дизайна бесплатно после регистрации — каждый с тремя бесплатными редактированиями. Дизайн и разбор — палитра RAL, розетки и подсказки — в одном результате.</p>
                 <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l k-btn--on-orange button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><KitIcon name="r" /></button>
               </div>
             </div>
@@ -540,7 +552,8 @@ export default function Home() {
       <GenerationPanel
         open={panelOpen}
         initialRoomId={panelRoomId}
-        onClose={() => { setPanelOpen(false); setPanelRoomId('') }}
+        initialStyle={prefillStyle}
+        onClose={() => { setPanelOpen(false); setPanelRoomId(''); setPrefillStyle('') }}
         onRequireLogin={() => { setPendingPanel(true); openLogin() }}
         onRefreshUser={loadMe}
         isAuthed={Boolean(me)}

@@ -31,6 +31,20 @@ test('sitemap: excludes non-published articles', () => {
   assert.ok(xml.includes('articles/published-slug'));
 });
 
+test('sitemap: excludes noindex articles (meta.indexable=false) and canonical duplicates', () => {
+  const xml = buildSitemapXml({
+    staticEntries: [],
+    articles: [
+      { slug: 'noindex-slug', status: 'published', created_at: '2026-11-09T00:00:00Z', meta: { indexable: false } },
+      { slug: 'canonical-slug', status: 'published', created_at: '2026-11-09T00:00:00Z', meta: { canonical_slug: 'main-slug' } },
+      { slug: 'keep-slug', status: 'published', created_at: '2026-11-09T00:00:00Z', meta: {} },
+    ],
+  });
+  assert.ok(!xml.includes('articles/noindex-slug'));
+  assert.ok(!xml.includes('articles/canonical-slug'));
+  assert.ok(xml.includes('articles/keep-slug'));
+});
+
 test('sitemap: includes static /offer entry', () => {
   const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles: [] });
   assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/offer<\/loc>/);

@@ -62,7 +62,7 @@ test('dimensions, bed length and radiator covers are injected as mandatory block
   assert.match(prompt, /exactly 2 metres/);
   assert.match(prompt, /RADIATOR COVERS/);
   assert.match(prompt, /thermostatic/i);
-  assert.match(prompt, /Do not invent radiators/);
+  assert.match(prompt, /Add radiator covers only where radiators are actually present/);
 });
 
 test('geometry lock restates verbatim metres and bans opening changes', () => {
@@ -77,8 +77,8 @@ test('geometry lock restates verbatim metres and bans opening changes', () => {
   assert.match(prompt, /length 4\.4 m/);
   assert.match(prompt, /height 2\.7 m/);
   assert.match(prompt, /окно слева от входа/);
-  assert.match(prompt, /Do not add, remove, resize, move or invent a window/);
-  assert.match(prompt, /Do not add, remove, resize, move or invent a doorway/);
+  assert.match(prompt, /The window set stays unchanged/);
+  assert.match(prompt, /The doorway set stays unchanged/);
 });
 
 test('geometry lock keeps opening counts from the photo when provided', () => {
@@ -90,7 +90,7 @@ test('geometry lock keeps opening counts from the photo when provided', () => {
     architectureFacts: { windows: 2, doors: 1 },
   });
   assert.match(prompt, /2 windows and 1 door/);
-  assert.match(prompt, /do not invent extra openings/);
+  assert.match(prompt, /the openings stay unchanged/);
 });
 
 test('geometry lock does not turn unknown opening counts into zero', () => {
@@ -184,7 +184,7 @@ test('design pass excludes hero products and keeps preserved furniture out of re
     hasStyleRef: true,
   });
   assert.match(prompt, /NO PRODUCT IMAGES/);
-  assert.match(prompt, /Do not copy its furniture/);
+  assert.match(prompt, /Ignore its furniture/);
   assert.doesNotMatch(prompt, /Диван «Тест»|Свет «Тест»/);
   assert.doesNotMatch(prompt, /replace or restyle the bed/i);
   assert.equal(canBindProduct(sofa, true), false);
@@ -381,6 +381,93 @@ test('move removal prompt names the exact object region', () => {
   assert.match(prompt, /Шкаф/);
   assert.match(prompt, /\[0\.12, 0\.2, 0\.3, 0\.45\]/);
   assert.match(prompt, /Remove only the object inside this region/);
+});
+
+test('openings produce FLUX 3 bbox JSON pinned to ref_image_0', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    useCatalog: false,
+    openings: {
+      confidence: 'medium',
+      windows: [{ id: 'window_1', bbox: [100, 200, 400, 800], kind: 'window' }],
+      doors: [{ id: 'door_1', bbox: [500, 900, 600, 1000], kind: 'interior' }],
+      builtins: [],
+      assumptions: [],
+    },
+  });
+  assert.match(prompt, /LAYOUT ANNOTATIONS/);
+  assert.match(prompt, /window_1/);
+  assert.match(prompt, /door_1/);
+  assert.match(prompt, /ref_image_0/);
+  assert.match(prompt, /"src_bbox"/);
+  assert.match(prompt, /"tgt_bbox"/);
+});
+
+test('layout plan with frame_bbox adds New rows to FLUX 3 bbox JSON', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Гостиная (зал)',
+    keepFurniture: false,
+    useCatalog: false,
+    layoutPlan: {
+      strategy: 'Диван у окна',
+      zones: [{ name: 'Отдых', purpose: 'ТВ', position: 'левая стена' }],
+      items: [
+        { id: 'sofa_1', type: 'sofa', label: 'Диван 200', position: 'у левой стены', frame_bbox: [600, 100, 900, 500], width_cm: 200, depth_cm: 85 },
+      ],
+      circulation: '',
+      focal_point: '',
+      avoid: [],
+    },
+  });
+  assert.match(prompt, /LAYOUT ANNOTATIONS/);
+  assert.match(prompt, /sofa_1/);
+  assert.match(prompt, /"from": null/);
+  assert.match(prompt, /"src_bbox": null/);
+  assert.match(prompt, /600,\s*100,\s*900,\s*500/);
+});
+
+test('openings and layout items mix Keep and New bbox rows', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Гостиная (зал)',
+    keepFurniture: false,
+    useCatalog: false,
+    openings: {
+      confidence: 'high',
+      windows: [{ id: 'window_1', bbox: [100, 200, 400, 800], kind: 'window' }],
+      doors: [],
+      builtins: [],
+      assumptions: [],
+    },
+    layoutPlan: {
+      strategy: 'Диван у окна',
+      zones: [],
+      items: [
+        { id: 'sofa_1', type: 'sofa', label: 'Диван 200', position: 'у левой стены', frame_bbox: [600, 100, 900, 500], width_cm: 200, depth_cm: 85 },
+      ],
+      circulation: '',
+      focal_point: '',
+      avoid: [],
+    },
+  });
+  assert.match(prompt, /"from": "ref_image_0"/);
+  assert.match(prompt, /"from": null/);
+  assert.match(prompt, /`<window_1>`/);
+  assert.match(prompt, /`<sofa_1>`/);
+});
+
+test('signature move is rendered as a separate designer block', () => {
+  const prompt = buildPrompt({
+    style: 'Скандинавский',
+    roomType: 'Спальня',
+    useCatalog: false,
+    signatureMove: 'выстроить ритм дубовых реек на стене изголовья и подсветить их сверху',
+  });
+  assert.match(prompt, /DESIGNER SIGNATURE MOVE/);
+  assert.match(prompt, /выстроить ритм дубовых реек/);
+  assert.match(prompt, /single authoring gesture/);
 });
 
 test('text-only edit prompt applies a single change without reference wording', () => {

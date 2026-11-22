@@ -5,9 +5,11 @@
 // и генерируем статью (generateArticleFromRender). Публикация — через гейты.
 //
 // Запуск (на сервере, с env приложения):
-//   node scripts/generate-articles-batch.mjs --csv /path/keywords.csv --limit 8 --publish
+//   node scripts/generate-articles-batch.mjs --csv /path/keywords.csv --limit 8 --publish --approved
 // Флаги: --room «Кухня» --style «Скандинавский» — фиксировать кластер;
-//        --min-count 500 — отсев хвоста по месячной частоте; --dry — без записей.
+//        --min-count 500 — отсев хвоста по месячной частоте; --dry — без записей;
+//        --publish --approved — публикация только после согласования владельца;
+//        --per-cluster N — сколько черновиков генерировать на кластер (публикация всегда 1).
 import fs from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -23,7 +25,16 @@ const perCluster = Math.max(1, Math.floor(Number(arg('per-cluster', '1'))));
 const fixedRoom = arg('room');
 const fixedStyle = arg('style');
 const doPublish = hasFlag('publish');
+const approved = hasFlag('approved');
 const dry = hasFlag('dry');
+
+// Публикация — строго после согласования владельца (аудит REM-40 P0): батч
+// генерирует черновики, публикация руками через --publish --approved. Гейт
+// «одна статья на style × room» для публикации — всегда 1, независимо от --per-cluster.
+if ((doPublish || hasFlag('publish-drafts')) && !approved) {
+  console.error('публикация требует --approved: генерируйте черновики (без --publish) и публикуйте после согласования');
+  process.exit(1);
+}
 
 if (!csvPath || !fs.existsSync(csvPath)) {
   console.error('укажите --csv <путь к wordstat csv>');
@@ -90,7 +101,7 @@ if (hasFlag('publish-drafts')) {
         words = countArticleWords(body);
       }
       const fresh = { ...(full || d), body };
-      const reasons = validateArticleForPublish(fresh, await q.listArticles(), { maxPerCluster: perCluster });
+      const reasons = validateArticleForPublish(fresh, await q.listArticles(), { maxPerCluster: 1 });
       if (reasons.length) {
         console.log(`DRAFT-KEEP /${d.slug}: ${words} слов; ${reasons.join('; ')}`);
         continue;
@@ -148,17 +159,49 @@ const ROOM_MARKERS = [
   ['столов', 'Столовая'],
 ];
 // Стиль определяем по активным стилям из БД (имя как подстрока фразы).
+// Только канонические имена (DESIGN_STYLES) — иначе гейт кластера style × room
+// не совпадёт и публикация/дубль-проверка дадут ложный пропуск (REM-40 §4).
+// Порядок важен: специфичные маркеры раньше общих («современн» — в конце).
 const STYLE_MARKERS = [
   ['скандинав', 'Скандинавский'],
-  ['минимализм', 'Современный минимализм'],
-  ['лофт', 'Лофт'],
+  ['прованс', 'Прованс'],
+  ['бохо', 'Бохо'],
   ['джапанди', 'Джапанди'],
   ['неоклассик', 'Неоклассика'],
-  ['бохо', 'Бохо'],
+  ['современная классика', 'Неоклассика'],
+  ['современное барокко', 'Современное барокко'],
+  ['барокко', 'Современное барокко'],
+  ['ар-нуво', 'Модерн (ар-нуво)'],
+  ['ар нуво', 'Модерн (ар-нуво)'],
+  ['модерн', 'Модерн (ар-нуво)'],
+  ['минимализм', 'Современный минимализм'],
+  ['лофт', 'Лофт'],
+  ['классическ', 'Классический'],
+  ['кантри', 'Кантри'],
+  ['английск', 'Английский'],
+  ['эклектик', 'Эклектика'],
   ['ар деко', 'Ар-деко'],
-  ['современн', 'Современный минимализм'],
-  ['прованс', 'Прованс'],
-  ['эко', 'Эко'],
+  ['эко', 'Эко / органический модерн'],
+  ['контемпорари', 'Тёмный контемпорари'],
+  ['средиземномор', 'Средиземноморский'],
+  ['мемфис', 'Мемфис-акцент'],
+  ['мид-сенчури', 'Мид-сенчури'],
+  ['mid-century', 'Мид-сенчури'],
+  ['советск', 'Советский модернизм'],
+  ['ссср', 'Советский модернизм'],
+  ['баухаус', 'Баухаус'],
+  ['академ', 'Тёмная академия'],
+  ['ферма', 'Современная ферма'],
+  ['прибрежн', 'Прибрежный / Хэмптонс'],
+  ['хэмптонс', 'Прибрежный / Хэмптонс'],
+  ['космическ', 'Космическая эра (1960s)'],
+  ['бабушкин', '«Бабушкин шик»'],
+  ['пустынн', 'Пустынный модерн'],
+  ['тропическ', 'Тропический модерн'],
+  ['нео-деко', 'Нео-деко'],
+  ['хай-тек', 'Хай-тек'],
+  ['шале', 'Шале'],
+  ['современн', 'Современный'],
 ];
 
 function roomFromPhrase(phrase) {
@@ -263,7 +306,7 @@ for (const item of planned) {
       const words = countArticleWords(article.body || {});
       let suffix = `draft /${article.slug}, ${words} слов`;
       if (doPublish) {
-        const reasons = validateArticleForPublish(article, published, { maxPerCluster: perCluster });
+        const reasons = validateArticleForPublish(article, published, { maxPerCluster: 1 });
         if (reasons.length) {
           suffix = `НЕ ОПУБЛИКОВАНА, причины: ${reasons.join('; ')}`;
         } else {
