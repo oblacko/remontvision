@@ -45,6 +45,18 @@ test('sitemap: excludes noindex articles (meta.indexable=false) and canonical du
   assert.ok(xml.includes('articles/keep-slug'));
 });
 
+test('sitemap: includes self-canonical article (canonical_slug === slug), excludes foreign canonical duplicate', () => {
+  const xml = buildSitemapXml({
+    staticEntries: [],
+    articles: [
+      { slug: 'kuhnya-v-stile-provans', status: 'published', created_at: '2026-11-22T00:00:00Z', meta: { canonical_slug: 'kuhnya-v-stile-provans' } },
+      { slug: 'foreign-dupe', status: 'published', created_at: '2026-11-09T00:00:00Z', meta: { canonical_slug: 'main-slug' } },
+    ],
+  });
+  assert.ok(xml.includes('articles/kuhnya-v-stile-provans'));
+  assert.ok(!xml.includes('articles/foreign-dupe'));
+});
+
 test('sitemap: includes static /offer entry', () => {
   const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles: [] });
   assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/offer<\/loc>/);

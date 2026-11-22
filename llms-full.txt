@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-22T13:23:57.133Z
+Generated: 2026-11-22T14:31:19.380Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2634,6 +2634,24 @@ export const MAX_REFERENCES; // 4
 # История работ (что сделано)
 
 Дата обновления: 2026-11-22. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
+
+## 2026-11-22 — sitemap: self-canonical статьи не исключаются (REM-50)
+
+Волна A импортировала статьи с `meta.canonical_slug`, равным собственному slug (self-canonical). `src/sitemap.js` отбрасывал **любую** статью с `canonical_slug`, поэтому статья 78 (`kuhnya-v-stile-provans`) корректно отдавала 200 и self-canonical, но отсутствовала в `/sitemap.xml`.
+
+- **Фикс:** `buildSitemapXml` пропускает только реальный канонический дубль (`canonical_slug` задан **и** `canonical_slug !== slug`). Self-canonical попадает в sitemap. Правка текстов и backfill БД не потребовались — уже импортированные 6 строк подхватываются логикой на лету.
+- **Тест:** unit в `test/sitemap.test.js` — статья с `canonical_slug === slug` включается, статья с чужим `canonical_slug` исключается.
+- **Проверка:** `npm test` 518 pass (1 skip).
+
+## 2026-11-22 — статьи волны A: импорт 6 текстов, гейт без товаров, блоки и FAQ (REM-47)
+
+Подключение готовых текстов SEO-лида к механике `articles` без публикации (публикация 4 из 6 — REM-49). Тексты не менялись; массовых генераций и платных вызовов не было.
+
+- **Гейт A (информационные статьи):** `validateArticleForPublish` пропускает статью без товаров, если `meta.content_type = 'informational'`. Коммерческие статьи сохраняют прежнюю проверку «от 3 товаров со ссылкой»; при импорте признак ставится автоматически (`informational` без `products`, `commercial` с ними).
+- **Подсчёт слов:** `countArticleWords` теперь считает `sections` (h+p) и `faq` (q+a) — тексты волны A дают 602–670 слов и честно проходят порог `MIN_ARTICLE_WORDS = 600`.
+- **Рендер:** `articlePage` выводит `sections` как H2 + абзац и `faq` как список вопрос-ответ; добавлен `FAQPage` JSON-LD (валидный, с `Question`/`Answer`). Тег стиля на `/styles/{key}` и подвал со стилями/статьями/галереей уже были в шаблоне (REM-45).
+- **Импорт:** `normalizeImportedArticle` (чистая валидация/нормализация) + скрипт `scripts/import-articles.mjs` (флаг `--dry`): создаёт черновики, не публикует, проверяет уникальность slug, наличие стиля (`q.styleByName`) и комнаты (`roomTypeByName`). Данные — `scripts/articles/wave-a.json` (6 текстов, slug сверены с REM-11).
+- **Тесты:** unit — гейт A, подсчёт с sections/faq, рендер FAQPage (парсится), нормализация импорта, прогон реальных 6 текстов; integration — импорт 6 черновиков + публикация + рендер. `npm test` 517 pass (1 skip), `npm run test:integration` 82/82.
 
 ## 2026-11-22 — pipeline-обложки 5 стилей, фикс кэша openings, деплой в прод
 
