@@ -10,7 +10,8 @@
 
 - **Фикс:** `buildSitemapXml` пропускает только реальный канонический дубль (`canonical_slug` задан **и** `canonical_slug !== slug`). Self-canonical попадает в sitemap. Правка текстов и backfill БД не потребовались — уже импортированные 6 строк подхватываются логикой на лету.
 - **Тест:** unit в `test/sitemap.test.js` — статья с `canonical_slug === slug` включается, статья с чужим `canonical_slug` исключается.
-- **Проверка:** `npm test` 518 pass (1 skip).
+- **Проверка:** `npm test` 518 pass (1 skip), `npm run test:integration` 82/82.
+- **Деплой (REM-51):** коммит `cc085d9` в `main`, workflow `deploy` зелёный. Прод-smoke: `/sitemap.xml` содержит URL статьи 78, `<loc>` 120 → 121 (других изменений нет), `/articles/kuhnya-v-stile-provans` → 200, self-canonical на месте.
 
 ## 2026-11-22 — статьи волны A: импорт 6 текстов, гейт без товаров, блоки и FAQ (REM-47)
 

@@ -1,12 +1,13 @@
 # Статус проекта: что сделано и что работает
 
-**Дата:** 2026-11-22. **Прод:** `main`, деплой 2026-11-22 11:08 UTC. **Ветка:** `main`.
+**Дата:** 2026-11-22. **Прод:** `main`, деплой `cc085d9` 2026-11-22 14:43 UTC. **Ветка:** `main`.
 
 Это единый источник истины о состоянии продукта. Остальные документы описывают механику; при расхождении верьте этому файлу и коду.
 
 ## Сделано за последние изменения
 
 ### 2026-11-22
+- **Деплой фикса sitemap (REM-51):** коммит `cc085d9` запушен в `main`, workflow `deploy` (test → SSH deploy → smoke) зелёный. На проде `/sitemap.xml` содержит `https://www.remontvision.ru/articles/kuhnya-v-stile-provans`; число `<loc>` 120 → 121 (добавлена только статья 78), статья отдаёт 200 и self-canonical, `/api/health` ok. Статьи 79–83 не менялись.
 - **Деплой в прод:** коммит `fc2553d` запушен в `main`, CI (`ci.yml`) и `deploy.yml` прошли успешно. Прод `https://www.remontvision.ru` поднят, smoke PASS, `/api/health` ok, `/api/styles` отдаёт новые обложки.
 - **Обложки стилей через реальный пайплайн:** `scripts/generate-style-covers-pipeline.mjs` создаёт комнату, ставит в очередь рендер и прогоняет его через `processRender` (cleanup → art director → layout → render → QA). Сгенерированы и применены 5 проблемных стилей из одного фото `assets/zal.jpg`: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/style-*.png` и `web/dist/images/style-*.png`. `/api/styles` теперь отдаёт новые обложки.
 - **Фикс кэша `room_analysis.openings`:** `cachedOpenings` теперь корректно разворачивается из `data.openings` перед использованием; устранён `Cannot read properties of undefined (reading 'length')` при повторных рендерах той же комнаты.
