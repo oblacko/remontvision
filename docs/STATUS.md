@@ -1,16 +1,20 @@
 # Статус проекта: что сделано и что работает
 
-**Дата:** 2026-11-22. **Прод:** `main`, деплой 2026-11-12. **Ветка:** `main`.
+**Дата:** 2026-11-22. **Прод:** `main`, деплой 2026-11-22 11:08 UTC. **Ветка:** `main`.
 
 Это единый источник истины о состоянии продукта. Остальные документы описывают механику; при расхождении верьте этому файлу и коду.
 
 ## Сделано за последние изменения
 
 ### 2026-11-22
+- **Деплой в прод:** коммит `fc2553d` запушен в `main`, CI (`ci.yml`) и `deploy.yml` прошли успешно. Прод `https://www.remontvision.ru` поднят, smoke PASS, `/api/health` ok, `/api/styles` отдаёт новые обложки.
 - **Обложки стилей через реальный пайплайн:** `scripts/generate-style-covers-pipeline.mjs` создаёт комнату, ставит в очередь рендер и прогоняет его через `processRender` (cleanup → art director → layout → render → QA). Сгенерированы и применены 5 проблемных стилей из одного фото `assets/zal.jpg`: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/style-*.png` и `web/dist/images/style-*.png`. `/api/styles` теперь отдаёт новые обложки.
 - **Фикс кэша `room_analysis.openings`:** `cachedOpenings` теперь корректно разворачивается из `data.openings` перед использованием; устранён `Cannot read properties of undefined (reading 'length')` при повторных рендерах той же комнаты.
 - **Мягче тестовые брифы:** убраны хардкодные перекрытия пола (`floorOverride`), снижена агрессивность `ROOM_PROGRAM`, `WALLS`, `PLACEMENT`, убран `LIGHT_FIXTURE` и инструкция заменять светильник в `style-briefs.mjs` (production и так заменяет через electrical lock). Подписные движения `tropical_modern`, `english`, `dark_academia`, `chalet` больше не нарушают `ARCH_LOCK`.
-- **Регрессия промтов:** baseline обновлён под новый electrical lock (замена старого потолочного светильника на стилевой pendant/chandelier). `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
+- **ARCH_LOCK_V2 усилен:** двери теперь сохраняют тип, заполнение и глухарь; restyle касается только материала/цвета дверного полотна. Terrace/balcony/French/all-glass door leaves вне зоны допустимого.
+- **tropical_modern:** описание стиля (`prompt_description`) и миграция `068` убрали terrace-ассоциации (`humid airy atmosphere` → `humid enclosed interior atmosphere`), вернули терракотовый акцент `#E07A5F`.
+- **Генератор UI:** скрыт выбор модели и разрешения; скрыты кнопки «Подобрать 3 стиля» / «Подобрать 5 стилей». При загрузке списка `renderModels` автоматически выбирается дефолтная модель и разрешение.
+- **Регрессия промтов:** baseline обновлён под новый electrical lock и ARCH_LOCK_V2. `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
 
 ### 2026-11-21
 - **Каталог стилей:** 32 стиля в `src/designdata.js` и БД (миграция `065`). Топ-10 featured в основном сценарии, остальные — в библиотеке `/styles`. Страница `/styles/:id` с палитрой и кнопкой «Сгенерировать такой же». `/api/styles` отдаёт `display_name`, `family`, `is_featured`.

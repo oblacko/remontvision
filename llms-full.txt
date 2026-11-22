@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-22T10:30:01.090Z
+Generated: 2026-11-22T11:12:40.421Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2635,12 +2635,16 @@ export const MAX_REFERENCES; // 4
 
 Дата обновления: 2026-11-22. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
 
-## 2026-11-22 — pipeline-обложки 5 стилей и фикс кэша openings
+## 2026-11-22 — pipeline-обложки 5 стилей, фикс кэша openings, деплой в прод
 
+- **Деплой:** коммит `fc2553d` в `main`, CI и `deploy.yml` успешны. Прод `https://www.remontvision.ru` работает, smoke PASS.
 - **Pipeline-обложки:** новый `scripts/generate-style-covers-pipeline.mjs` проходит через полный production-путь (`processRender`), а не через тестовый скрипт. Для одного исходного фото `assets/zal.jpg` сгенерированы и применены обложки 5 стилей: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/style-*.png` и `web/dist/images/style-*.png`.
 - **Фикс `room_analysis.openings`:** в `src/jobs.js` `cachedOpenings` теперь читается как `openingsRow.data?.openings`, потому что `upsertRoomAnalysis` сохраняет обёртку `{ openings }`. Это устраняло `Cannot read properties of undefined (reading 'length')` на повторных рендерах одной комнаты.
 - **Тестовые брифы очищены:** из `scripts/style-briefs.mjs` и `scripts/generate-style-illustrations.mjs` убраны `floorOverride`, `FLOOR_BY_STYLE`, `FLOOR_ALT`, `LIGHT_FIXTURE`, `pickFloor`; смягчены `ROOM_PROGRAM`, `WALLS`, `PLACEMENT` и правила радиатора/света. Подписные движения для `tropical_modern`, `english`, `dark_academia`, `chalet` больше не нарушают `ARCH_LOCK`.
-- **Регрессия промтов:** обновлён `docs/regression/baseline.json` под electrical lock (замена старого потолочного светильника на стилевой pendant/chandelier).
+- **ARCH_LOCK_V2 усилен:** двери сохраняют тип, заполнение и глухарь; restyle ограничен материалом и цветом дверного полотна. Запрещены terrace/balcony/French/all-glass door leaves.
+- **tropical_modern:** `prompt_description` и миграция `068` убрали terrace-ассоциации, вернули терракотовый акцент `#E07A5F`.
+- **Генератор UI:** скрыт выбор модели/разрешения и кнопки «Подобрать 3/5 стилей»; дефолтная модель/разрешение выбираются автоматически.
+- **Регрессия промтов:** обновлён `docs/regression/baseline.json` под electrical lock и ARCH_LOCK_V2.
 - **Тесты:** `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
 
 ## 2026-11-21 — REM-40 технический SEO: шаблон статей, alt, noindex, favicon
