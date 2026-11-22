@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-22T15:00:01.991Z
+Generated: 2026-11-22T15:07:05.459Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2642,6 +2642,7 @@ export const MAX_REFERENCES; // 4
 - **Сжатие:** новый `scripts/compress-style-images.mjs` конвертирует `style-*.png` → `style-*.webp` (quality 82). С флагом `--remove-png` удаляет исходные PNG, и `generatedStyleImage()` начинает отдавать WebP.
 - **Результат:** 64 PNG удалены (public + dist), 64 WebP добавлены/обновлены; рабочий набор — 37 WebP на каталог, все файлы валидны (640×640 … 1248×832), ~0.1–0.2 МБ каждый.
 - **Проверка:** `npm test` 518 pass (1 skip), `cd web && npm run lint && npm run build` — 0 ошибок (8 прежних warning), сборка зелёная; список ассетов `public` и `dist` совпадает.
+- **Деплой:** коммит `41e6ff9` в `main`, workflow `deploy` зелёный. Прод-smoke: 32/32 `image_url` в `/api/styles` — WebP, HTTP 200, `image/webp`; PNG-URL — 404; `/styles` и `/styles/tropical_modern` — 200.
 
 ## 2026-11-22 — sitemap: self-canonical статьи не исключаются (REM-50)
 
