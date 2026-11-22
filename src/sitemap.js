@@ -23,6 +23,7 @@ export const STATIC_ENTRIES = [
   { loc: '/offer', lastmod: '2026-11-09', changefreq: 'yearly', priority: '0.4' },
   { loc: '/contacts', lastmod: '2026-11-22', changefreq: 'yearly', priority: '0.4' },
   { loc: '/articles', lastmod: '2026-11-21', changefreq: 'weekly', priority: '0.6' },
+  { loc: '/styles', lastmod: '2026-11-21', changefreq: 'weekly', priority: '0.7' },
   { loc: '/ai-dizayn-interera-po-foto', lastmod: '2026-11-21', changefreq: 'monthly', priority: '0.8' },
   { loc: '/promty/dizayn-interera', lastmod: '2026-11-21', changefreq: 'weekly', priority: '0.7' },
 ];
@@ -46,6 +47,7 @@ function lastmodOrToday(value) {
 export function buildSitemapXml({
   staticEntries = STATIC_ENTRIES,
   articles = [],
+  styles = [],
   baseUrl = 'https://www.remontvision.ru',
 } = {}) {
   const base = String(baseUrl || '').replace(/\/+$/, '');
@@ -70,6 +72,18 @@ export function buildSitemapXml({
     urls.push({
       loc: `${base}/articles/${encodeURIComponent(String(article.slug || ''))}`,
       lastmod: lastmodOrToday(article.published_at || article.created_at),
+      changefreq: null,
+      priority: null,
+    });
+  }
+
+  // Стили — из активных строк БД; loc совпадает с self-canonical карточки,
+  // lastmod — из styles.updated_at (не константа).
+  for (const style of styles) {
+    if (!style?.key) continue;
+    urls.push({
+      loc: `${base}/styles/${encodeURIComponent(String(style.key))}`,
+      lastmod: lastmodOrToday(style.updated_at),
       changefreq: null,
       priority: null,
     });

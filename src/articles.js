@@ -11,6 +11,7 @@ import { putBuffer } from './storage.js';
 import { roomTypeByName } from './roomtypes.js';
 import { PRICE_TIER_META, normalizeTier } from './pricing.js';
 import { roomSeo, GALLERY_NOINDEX_ROOMS } from './roomseo.js';
+import { styleKeyByName } from './styleseo.js';
 
 const ARTICLE_MODEL = process.env.ARTICLE_MODEL || 'deepseek/deepseek-v4.1-flash-1017';
 const MIME_BY_EXT = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
@@ -547,6 +548,12 @@ export function articlePage(article, { related = [] } = {}) {
   const ctaHref = `/?utm_source=article&utm_medium=cta&utm_campaign=${encodeURIComponent(article.slug || '')}#upload`;
   const ctaClick = `ym(114132104,'reachGoal','article_cta_click',{slug:'${String(article.slug || '').replace(/'/g, '')}',position:'bottom'});`;
 
+  // Тег стиля ведёт на страницу стиля /styles/{key}, а не на первую статью (REM-45).
+  const articleStyleKey = styleKeyByName(article.style);
+  const styleTag = articleStyleKey
+    ? `<p class="styletag">Стиль: <a href="/styles/${encodeURIComponent(articleStyleKey)}">${esc(article.style)}</a></p>`
+    : '';
+
   return `<!doctype html>
 <html lang="ru">
 <head>
@@ -579,6 +586,8 @@ main{max-width:1000px;margin:0 auto;padding:32px 20px 72px}
 .cover{width:100%;aspect-ratio:3/2;object-fit:cover;border:1px solid var(--line);margin:8px 0 28px}
 h1{font-family:var(--fh);font-weight:300;text-transform:uppercase;font-size:clamp(30px,6vw,56px);line-height:1.05;margin:0 0 16px}
 .intro{font-size:20px;color:var(--muted);max-width:70ch}
+.styletag{margin:0 0 8px;font:400 12px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.styletag a{color:var(--rust);text-decoration:none}
 h2{font-family:var(--fh);font-weight:300;text-transform:uppercase;font-size:clamp(20px,3vw,28px);margin:40px 0 12px;border-top:1px solid var(--line2);padding-top:24px}
 p,li{color:var(--muted)}
 .swatches{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}
@@ -613,6 +622,7 @@ footer{max-width:1000px;margin:0 auto;padding:24px 20px 48px;border-top:1px soli
 <header><a href="/">ремонтвижн</a><nav><a href="/articles">Все статьи</a><a href="/#upload">Создать свой дизайн</a></nav></header>
 <main>
 <h1>${title}</h1>
+${styleTag}
 ${cover ? `<img class="cover" src="${cover}" alt="${coverAlt}" width="1200" height="800">` : ''}
 <p class="intro">${esc(body.intro || '')}</p>
 ${YANDEX_ADS}
@@ -624,7 +634,7 @@ ${body.prompt ? `<h2>Промт дизайна</h2><p>Этот интерьер 
 ${body.conclusion ? `<p>${esc(body.conclusion)}</p>` : ''}
 <div class="cta"><p>Хотите так же, но для своей комнаты?</p><a href="${ctaHref}" onclick="${ctaClick}">Загрузите фото и получите дизайн</a></div>
 </main>
-<footer>© ремонтвижн · <a href="/articles">статьи</a> · <a href="/offer">оферта</a> · <a href="/privacy">конфиденциальность</a></footer>
+<footer>© ремонтвижн · <a href="/styles">стили</a> · <a href="/articles">статьи</a> · <a href="/gallery">галерея</a> · <a href="/offer">оферта</a> · <a href="/privacy">конфиденциальность</a></footer>
 ${METRIKA_COUNTER}
 </body>
 </html>`;
@@ -648,8 +658,11 @@ export function hubPage(articles, { rooms = [] } = {}) {
     byStyle.get(key).push(a);
   }
   const styleNav = byStyle.size
-    ? `<h2>Стили</h2><nav class="tags">${[...byStyle.entries()].map(([style, list]) =>
-        `<a href="/articles/${encodeURIComponent(list[0].slug)}">${esc(style)} <b>${list.length}</b></a>`).join('')}</nav>`
+    ? `<h2>Стили</h2><nav class="tags">${[...byStyle.entries()].map(([style, list]) => {
+        const styleKey = styleKeyByName(style);
+        const href = styleKey ? `/styles/${encodeURIComponent(styleKey)}` : `/articles/${encodeURIComponent(list[0].slug)}`;
+        return `<a href="${href}">${esc(style)} <b>${list.length}</b></a>`;
+      }).join('')}</nav>`
     : '';
   const cards = published.map(a => {
     const cover = coverUrl(a.cover_path);
@@ -730,7 +743,7 @@ ${list}
 <div class="cta"><p>Дизайн вашей комнаты по фото — за минуты</p><a href="/?utm_source=articles_hub&utm_medium=cta&utm_campaign=hub#upload">Загрузить фото</a></div>
 <p class="promo">Как это работает: <a href="/ai-dizayn-interera-po-foto">дизайн интерьера по фото нейросетью</a>.</p>
 </main>
-<footer>© ремонтвижн · <a href="/articles">статьи</a> · <a href="/offer">оферта</a> · <a href="/privacy">конфиденциальность</a></footer>
+<footer>© ремонтвижн · <a href="/styles">стили</a> · <a href="/articles">статьи</a> · <a href="/gallery">галерея</a> · <a href="/offer">оферта</a> · <a href="/privacy">конфиденциальность</a></footer>
 ${METRIKA_COUNTER}
 </body>
 </html>`;

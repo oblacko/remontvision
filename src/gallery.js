@@ -137,7 +137,7 @@ ${list}
 ${pager}
 <div class="cta"><p>Хотите так же для своей комнаты?</p><a href="/?utm_source=gallery&utm_medium=cta&utm_campaign=${roomSlug || 'all'}#upload">Загрузить фото и получить дизайн</a></div>
 </main>
-<footer>© ремонтвижн · <a href="/articles">статьи</a> · <a href="/gallery">галерея</a> · <a href="/offer">оферта</a> · <a href="/privacy">конфиденциальность</a></footer>
+<footer>© ремонтвижн · <a href="/styles">стили</a> · <a href="/articles">статьи</a> · <a href="/gallery">галерея</a> · <a href="/offer">оферта</a> · <a href="/privacy">конфиденциальность</a></footer>
 ${METRIKA_COUNTER}
 </body>
 </html>`;

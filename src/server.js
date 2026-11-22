@@ -48,6 +48,7 @@ import { generateArticle, generateArticleFromRender, articlePage, hubPage, valid
 import { galleryPage, GALLERY_PAGE_SIZE } from './gallery.js';
 import { GALLERY_NOINDEX_ROOMS } from './roomseo.js';
 import { promptsPage } from './prompts.js';
+import { stylesHubPage, stylePage, buildStyleCard } from './stylepage.js';
 import { normalizeMove } from './moveobject.js';
 import { buildPassport, renderPassportPdf } from './passport.js';
 import { renderRoadmapPdf } from './roadmappdf.js';
@@ -133,8 +134,6 @@ function sendNoindexSpa(res) {
 
 app.get(['/room/:id', '/room/:id/'], (_req, res) => sendNoindexSpa(res));
 app.get(['/room/:id/procurement', '/room/:id/procurement/'], (_req, res) => sendNoindexSpa(res));
-// Публичная библиотека стилей: SPA-оболочка, индексируется.
-app.get(['/styles', '/styles/', '/styles/:id', '/styles/:id/'], (_req, res) => res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html')));
 app.get('/', (_req, res) => {
   res.sendFile(fs.existsSync(webIndexPath) ? webIndexPath : path.join(process.cwd(), 'public', 'app.html'));
 });
@@ -2132,8 +2131,9 @@ app.get('/articles/:slug', h(async (req, res) => {
 app.get('/sitemap.xml', h(async (_req, res) => {
   // Маршрут зарегистрирован после express.static('public'); статический
   // public/sitemap.xml удалён, чтобы он не «перекрывал» динамический вывод
-  // (иначе опубликованные статьи не попадали бы в sitemap).
+  // (иначе опубликованные статьи и стили не попадали бы в sitemap).
   const articles = await q.listArticles();
+  const styles = await q.styles(true); // активные стили, lastmod из updated_at (REM-45)
   const galleryEntries = [
     { loc: '/gallery', lastmod: '2026-11-22', changefreq: 'weekly', priority: '0.6' },
     ...(await q.galleryRooms()).filter(r => !GALLERY_NOINDEX_ROOMS.has(r.name)).map(r => ({
@@ -2143,17 +2143,33 @@ app.get('/sitemap.xml', h(async (_req, res) => {
       priority: '0.5',
     })),
   ];
-  const styleEntries = [
-    { loc: '/styles', lastmod: '2026-11-22', changefreq: 'weekly', priority: '0.7' },
-    ...DESIGN_STYLES.map(style => ({
-      loc: `/styles/${style.id}`,
-      lastmod: '2026-11-22',
-      changefreq: 'weekly',
-      priority: '0.6',
-    })),
-  ];
-  const xml = buildSitemapXml({ staticEntries: [...STATIC_ENTRIES, ...styleEntries, ...galleryEntries], articles, baseUrl: APP_URL });
+  const xml = buildSitemapXml({ staticEntries: [...STATIC_ENTRIES, ...galleryEntries], articles, styles, baseUrl: APP_URL });
   res.type('application/xml').send(xml);
+}));
+
+// Страницы стилей: SSR-хаб и карточки (SEO P0, REM-45). Контент и ссылки видны
+// без JS; SPA-гидрации по этим маршрутам нет. Источник мета — src/styleseo.js.
+// Слэш на конце — 301 строгим regex: со strict routing off Express матчит
+// /styles и /styles/ одинаково, поэтому слэш редиректим раньше обычных маршрутов.
+app.get(new RegExp('^/styles/$'), (_req, res) => res.redirect(301, '/styles'));
+app.get(new RegExp('^/styles/([^/]+)/$'), (req, res) => res.redirect(301, `/styles/${encodeURIComponent(String(req.params[0] || ''))}`));
+app.get('/styles', h(async (_req, res) => {
+  const cards = (await q.styles(true)).map(buildStyleCard);
+  res.type('html').send(stylesHubPage(cards, { baseUrl: APP_URL }));
+}));
+app.get('/styles/:key', h(async (req, res) => {
+  const key = String(req.params.key || '');
+  const rows = await q.styles(true);
+  const row = rows.find(s => s.key === key);
+  if (!row) return res.status(404).type('html').send(notFoundPage('Стиль не найден', 'Такого стиля нет или он скрыт.'));
+  const cards = rows.map(buildStyleCard);
+  const card = cards.find(c => c.key === key);
+  // Статьи по стилю: article.style хранит имя стиля (БД), совпадает с card.name.
+  const articles = (await q.listArticles())
+    .filter(a => a.status === 'published' && (a.style === card.name || a.style === row.name))
+    .slice(0, 4);
+  const rooms = (await q.galleryRooms()).map(r => ({ name: r.name, slug: slugify(r.name) }));
+  res.type('html').send(stylePage(card, { baseUrl: APP_URL, allCards: cards, articles, rooms }));
 }));
 app.get('/search-lab/:file', h(async (req, res) => {
   if (!requireAdmin(req, res)) return;

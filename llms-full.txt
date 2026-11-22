@@ -1,6 +1,6 @@
 # Remontvision — full LLM context
 
-Generated: 2026-11-22T11:22:36.537Z
+Generated: 2026-11-22T13:23:57.133Z
 
 This file concatenates the project documentation for LLM ingestion.
 The canonical source is the repository; if this file is stale, read the linked files.
@@ -2649,6 +2649,30 @@ export const MAX_REFERENCES; // 4
 - **Регрессия промтов:** обновлён `docs/regression/baseline.json` под electrical lock и ARCH_LOCK_V2.
 - **Тесты:** `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
 
+## 2026-11-22 — тексты 32 страниц стилей: волны 1–3, FAQ и перелинковка (REM-46)
+
+Контент по шаблону REM-11 §6 поверх SSR-техники REM-45. Все 32 страницы `/styles/{key}` получили уникальные блоки; массовых генераций и платных вызовов не было.
+
+- **`src/stylecontent.js`** — 32 записи (`intro`, `quick`, `paletteText` с 4 HEX и пропорцией 60-30-10, `light`, `rooms`, `pairs`, `faq`, `imageAlt`, `links`, `materials`, `palette`). Объём: T1 450–470 слов (14), T2 300–320 (10), T3 245–285 (8). Палитра/эпоха/материалы сверены с `styles.swatches` и `description` (32 активных стиля в проде на 22.11.2026) и `src/designdata.js`; брендов, цен и обещаний товаров/сметы нет.
+- **`src/stylepage.js`** — карточка рендерит лид, «Узнать за 10 секунд», палитру с текстом, свет/архитектуру, «Где работает», блок сочетаний и «не путать», FAQ (`<details>` + `FAQPage` JSON-LD), 4–6 ссылок на стили, до 2 комнат галереи, два CTA (середина и конец) с `style_generate_click`. Alt — «{Название} в {комнате}: {деталь}», под обложкой — пометка об AI-визуализации. Без контента страница отдаёт `noindex, follow` (тонкая страница не индексируется).
+- **Палитра вне `designdata.js`** — fallback из контента для 22 стилей, которых нет в `DESIGN_STYLES`; это позволяет странице быть полной до мержа миграций 32 стилей и в unit-тестах без БД.
+- **Тесты** — `test/stylecontent.test.js` (11): 32 ключа = `STYLE_SEO`; непустые блоки, 4 HEX в тексте, FAQ по волнам, объём в границах, отсутствие повторяющихся предложений >20 слов, ссылки только на существующие стили и не на себя, запрет обещаний товаров/сметы/бюджета, рендер всех блоков и двух CTA, `noindex` без контента.
+- **Проверка** — `npm test` 466 pass, 1 skip; `npm run test:integration` 80/80; `web` lint/build зелёные.
+
+## 2026-11-22 — SEO-страницы стилей: SSR-хаб и карточки, метаданные, sitemap (REM-45, волна 0)
+
+P0-техника под 32 страницы `/styles/{key}` (SEO-план REM-11, документ `styles-seo`). Контент волн 1–3 — отдельная задача REM-46; здесь только шаблон и техника.
+
+- **`src/styleseo.js`** — единый источник SEO-метаданных 32 стилей (`STYLE_SEO`: `key`, `name`, `family`, `tier`, `h1`, `title`, `description`, `target_query`, `frequency` из `style-seo-32.json`), порядок 4 семейств, пары «часто путают» (`CONFUSIONS`), `styleSeoByKey`/`styleKeyByName`.
+- **`src/stylepage.js`** — SSR-шаблоны `stylesHubPage` (H1, лид, карточки по 4 семействам, `ItemList` JSON-LD) и `stylePage` (H1, лид, палитра из `styles.swatches`, материалы из `designdata.js`, 4–6 похожих стилей, блок «не путать с», статьи, галерея, CTA, `BreadcrumbList`), обогащение `buildStyleCard`, обложки `styleCoverUrl`, события Метрики (`style_view`, `style_generate_click`, `style_related_click`, `style_article_click`, `style_gallery_click`).
+- **Маршруты** (`src/server.js`): `GET /styles` (хаб), `GET /styles/:key` (карточка), 404 для неизвестного ключа, 301 для `/styles/` и `/styles/:key/`. Canonical/loc строятся из единого `APP_URL`.
+- **Sitemap** (`src/sitemap.js`): стили из активных строк БД (`q.styles(true)`), `lastmod` из `styles.updated_at`; `loc` совпадает с canonical. `/styles` — статическая запись.
+- **Перелинковка**: подвалы (Home.tsx, articles, gallery, stylepage) ведут на `/styles`, `/articles`, `/gallery`; хаб статей «Стили» и тег стиля в статье → `/styles/{key}`.
+- **Картинки**: `width/height`, `loading` (первые 6 карточек eager, остальные lazy), hero `eager + fetchpriority=high`. Обложки уже WebP 640×640 ≤100 КБ (32 PNG из аудита в репозитории отсутствуют); `srcset` 480/720/1080 отложен до появления исходников.
+- **Тесты**: `test/styleseo.test.js` (9), `test/stylepage.test.js` (8), `test/sitemap.test.js` +4, интеграционные `test/integration/styles.test.js` (5). `npm test` 455/455 (+1 skip), `npm run test:integration` 80/80, `web` lint/build зелёные.
+
+Зависимость: 32 активных стиля в БД заводятся миграциями `065_styles_32`/`066_style_palettes_32` (задача REM-29 «ТЗ: 15 стилей в каталоге»); в текущем `main` этих миграций нет — до их мержа `/styles` отдаёт столько карточек, сколько активных стилей в БД.
+
 ## 2026-11-21 — REM-40 технический SEO: шаблон статей, alt, noindex, favicon
 
 Правки по аудиту REM-36 (техническая часть; контентные тексты готовит SEO, REM-39). Публикаций и деплоя не было.
@@ -2704,7 +2728,6 @@ export const MAX_REFERENCES; // 4
 - **Phase 4 — Designer signature move:** поле `signature_move` в `src/designerprompt.js` и `src/artdirector.js`, отдельный блок в `src/openrouter.js`, тест.
 - **Phase 5 — Variability axes:** оси `styling` и `composition` добавлены во все стили `src/designdata.js`; `src/variety.js` теперь переводит оси в конкретные execution-инструкции; golden-тесты обновлены.
 - **A/B-стенд:** создан `tmp/ab-flux3/score.mjs` для vision-скоринга рендеров по 6 метрикам (architecture_preserved, windows_doors_exact, scale_honesty, design_quality, layout_intelligence, overall).
-
 ## 2026-11-21 — ускорение генерации: параллельный layout/бриф, настраиваемые тики и таймауты
 
 - **Layout всегда параллельно.** `jobs.js` запускает `buildLayoutPlan` одновременно с арт-директором независимо от `keep_furniture` — раньше при `keep_furniture=true` планировщик ждал арт-директора и шёл последовательно (+20–40 с на критическом пути). Комнаты `keep_furniture=true`, оказавшиеся меблированными, тратят один vision-вызов планировщика впустую (план не применяется) — осознанный обмен скорость/стоимость.

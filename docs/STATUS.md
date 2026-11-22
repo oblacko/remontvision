@@ -18,6 +18,14 @@
 - **SEO:** на главную страницу добавлен мета-тег `google-site-verification`.
 - **Регрессия промтов:** baseline обновлён под новый electrical lock и ARCH_LOCK_V2. `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
 
+### SEO страницы стилей 2026-11-22
+- **Тексты 32 страниц** (REM-46, волны 1–3): `src/stylecontent.js` — уникальные лид, «узнать за 10 секунд», палитра с HEX и 60-30-10, свет, комнаты, сочетания, FAQ. Объём T1 450–470 слов, T2 300–320, T3 245–285; повторяющихся абзацев >20 слов нет (тест).
+- **Карточка стиля**: блоки контента, `FAQPage` JSON-LD, 4–6 ссылок на стили, до 2 комнат галереи, два CTA с prefill; alt по шаблону «{Название} в {комнате}: {деталь}»; без контента — `noindex, follow`.
+- **SSR-страницы стилей** (REM-45, волна 0): `GET /styles` (хаб) и `GET /styles/:key` (карточка) отдают серверный HTML — уникальный `title`/`description`, self-canonical `/styles/{key}`, OG/Twitter, `H1`, лид, палитра, материалы, ссылки, CTA, `BreadcrumbList`/`ItemList` JSON-LD. Неизвестный ключ → 404; `/styles/` и `/styles/{key}/` → 301. Источник мета — `src/styleseo.js` (32 записи из `style-seo-32.json`).
+- **Sitemap**: стили из активных строк БД, `lastmod` из `updated_at`, `loc` = canonical; `/styles` — статическая запись.
+- **Перелинковка**: подвалы (лендинг, статьи, галерея, стили) → `/styles`, `/articles`, `/gallery`; статья ↔ страница стиля.
+- **Метрика**: события `style_view`, `style_generate_click`, `style_related_click`, `style_article_click`, `style_gallery_click`.
+
 ### 2026-11-21
 - **Каталог стилей:** 32 стиля в `src/designdata.js` и БД (миграция `065`). Топ-10 featured в основном сценарии, остальные — в библиотеке `/styles`. Страница `/styles/:id` с палитрой и кнопкой «Сгенерировать такой же». `/api/styles` отдаёт `display_name`, `family`, `is_featured`.
 - **Матрица:** 32 × 10 = 320 ячеек (257 ok / 50 weaken / 13 conflict).
@@ -81,6 +89,7 @@
 | Рефералка | +2 кредита пригласившему после первой покупки | `/api/referral` |
 | Админка | 15 вкладок | `/admin` + `X-Admin-Key` |
 | Статьи | Работают | `/articles/:slug` |
+| Стили (SSR) | Работают | `/styles`, `/styles/:key` |
 | Search Lab | Внутренний R&D | `/admin` → «Поиск (лаб)» |
 | Каталог | Демо, 100 товаров, 0 URL | админка «Каталог» |
 
@@ -100,8 +109,8 @@
 
 ## Проверка (свежие прогоны, 2026-11-12)
 
-- `npm test` — 421 pass, 1 skip (прогон 2026-11-21, включая регрессию 20/20).
-- `npm run test:integration` — 75/75 (прогон 2026-11-21).
+- `npm test` — 508 pass, 1 skip (включая регрессию 20/20).
+- `npm run test:integration` — 80/80.
 - `cd web && npm run lint` — 0 errors; `npm run build` — зелёный.
 - `catalog-service` pytest — 72 passed (сервис не менялся, прогон 2026-11-11).
 - Прод-смоук 2026-11-12: `/api/health` → `ok:true`, `/` → 200, `/app` → 301, `/offer` → 200, `/api/referral/context` → `{invited:false}`, `/api/credits/refunds` без auth → 401 — PASS.

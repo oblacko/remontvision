@@ -543,8 +543,8 @@ export default function Home() {
       <footer className="page-shell py-8">
         <div className="grid gap-8 border-t pt-8 md:grid-cols-12">
           <div className="md:col-span-5"><Logo href="#top" /><p className="mt-4 max-w-md text-xs leading-5 text-muted-foreground"><a href="/contacts" className="underline underline-offset-2">Реквизиты</a></p></div>
-          <nav className="flex flex-wrap content-start gap-x-6 gap-y-3 text-xs text-muted-foreground md:col-span-7 md:justify-end" aria-label="Юридическая информация">
-            <a className="footer-link" href={`${site}/prices`}>Услуги и цены</a><a className="footer-link" href={`${site}/offer`}>Оферта</a><a className="footer-link" href={`${site}/delivery`}>Получение</a><a className="footer-link" href={`${site}/contacts`}>Контакты</a><a className="footer-link" href={`${site}/privacy`}>Конфиденциальность</a>
+          <nav className="flex flex-wrap content-start gap-x-6 gap-y-3 text-xs text-muted-foreground md:col-span-7 md:justify-end" aria-label="Навигация по сайту">
+            <a className="footer-link" href="/styles">Стили интерьера</a><a className="footer-link" href="/articles">Статьи</a><a className="footer-link" href="/gallery">Галерея</a><a className="footer-link" href={`${site}/prices`}>Услуги и цены</a><a className="footer-link" href={`${site}/offer`}>Оферта</a><a className="footer-link" href={`${site}/delivery`}>Получение</a><a className="footer-link" href={`${site}/contacts`}>Контакты</a><a className="footer-link" href={`${site}/privacy`}>Конфиденциальность</a>
           </nav>
         </div>
       </footer>

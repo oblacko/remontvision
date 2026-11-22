@@ -95,3 +95,32 @@ test('sitemap: article slug is URL-encoded and never leaks raw XML chars', () =>
   assert.ok(xml.includes('articles/a%26b%3Cc%3Ed'));
   assert.ok(!/<loc>[^<]*[<>&][^<]*<\/loc>/.test(xml));
 });
+
+test('sitemap: includes style URLs with lastmod from updated_at', () => {
+  const xml = buildSitemapXml({
+    staticEntries: [],
+    articles: [],
+    styles: [{ key: 'scandinavian', updated_at: '2026-11-20T00:00:00Z' }],
+    baseUrl: 'https://www.remontvision.ru',
+  });
+  assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/styles\/scandinavian<\/loc>/);
+  assert.match(xml, /<lastmod>2026-11-20<\/lastmod>/);
+});
+
+test('sitemap: style count equals number of active styles passed in', () => {
+  const styles = [
+    { key: 'minimalism', updated_at: '2026-11-20T00:00:00Z' },
+    { key: 'loft', updated_at: '2026-11-21T00:00:00Z' },
+    { key: 'eco' }, // без updated_at → lastmod сегодня
+  ];
+  const xml = buildSitemapXml({ staticEntries: [], articles: [], styles });
+  const locs = xml.match(/<loc>https:\/\/www\.remontvision\.ru\/styles\/[^<]+<\/loc>/g) || [];
+  assert.equal(locs.length, styles.length);
+});
+
+test('sitemap: style loc uses key and lastmod falls back to today', () => {
+  const xml = buildSitemapXml({ staticEntries: [], articles: [], styles: [{ key: 'eco' }] });
+  const today = new Date().toISOString().slice(0, 10);
+  assert.match(xml, /<loc>https:\/\/www\.remontvision\.ru\/styles\/eco<\/loc>/);
+  assert.match(xml, new RegExp(`<lastmod>${today}</lastmod>`));
+});
