@@ -4,6 +4,14 @@
 
 Дата обновления: 2026-11-22. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
 
+## 2026-11-22 — обложки 32 стилей переведены с PNG на WebP
+
+Сгенерированные обложки стилей лежали как `style-*.png` (~1.7–2 МБ каждая, 32 файла в `web/public/images` и столько же в `web/dist/images`), из-за чего `generatedStyleImage()` отдавал тяжёлый PNG.
+
+- **Сжатие:** новый `scripts/compress-style-images.mjs` конвертирует `style-*.png` → `style-*.webp` (quality 82). С флагом `--remove-png` удаляет исходные PNG, и `generatedStyleImage()` начинает отдавать WebP.
+- **Результат:** 64 PNG удалены (public + dist), 64 WebP добавлены/обновлены; рабочий набор — 37 WebP на каталог, все файлы валидны (640×640 … 1248×832), ~0.1–0.2 МБ каждый.
+- **Проверка:** `npm test` 518 pass (1 skip), `cd web && npm run lint && npm run build` — 0 ошибок (8 прежних warning), сборка зелёная; список ассетов `public` и `dist` совпадает.
+
 ## 2026-11-22 — sitemap: self-canonical статьи не исключаются (REM-50)
 
 Волна A импортировала статьи с `meta.canonical_slug`, равным собственному slug (self-canonical). `src/sitemap.js` отбрасывал **любую** статью с `canonical_slug`, поэтому статья 78 (`kuhnya-v-stile-provans`) корректно отдавала 200 и self-canonical, но отсутствовала в `/sitemap.xml`.
@@ -26,7 +34,7 @@
 ## 2026-11-22 — pipeline-обложки 5 стилей, фикс кэша openings, деплой в прод
 
 - **Деплой:** коммит `fc2553d` в `main`, CI и `deploy.yml` успешны. Прод `https://www.remontvision.ru` работает, smoke PASS.
-- **Pipeline-обложки:** новый `scripts/generate-style-covers-pipeline.mjs` проходит через полный production-путь (`processRender`), а не через тестовый скрипт. Для одного исходного фото `assets/zal.jpg` сгенерированы и применены обложки 5 стилей: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/style-*.png` и `web/dist/images/style-*.png`.
+- **Pipeline-обложки:** новый `scripts/generate-style-covers-pipeline.mjs` проходит через полный production-путь (`processRender`), а не через тестовый скрипт. Для одного исходного фото `assets/zal.jpg` сгенерированы и применены обложки 5 стилей: `tropical_modern`, `english`, `art_deco`, `dark_academia`, `chalet` → `web/public/images/` и `web/dist/images/` (тогда PNG; позже сжаты в WebP).
 - **Фикс `room_analysis.openings`:** в `src/jobs.js` `cachedOpenings` теперь читается как `openingsRow.data?.openings`, потому что `upsertRoomAnalysis` сохраняет обёртку `{ openings }`. Это устраняло `Cannot read properties of undefined (reading 'length')` на повторных рендерах одной комнаты.
 - **Тестовые брифы очищены:** из `scripts/style-briefs.mjs` и `scripts/generate-style-illustrations.mjs` убраны `floorOverride`, `FLOOR_BY_STYLE`, `FLOOR_ALT`, `LIGHT_FIXTURE`, `pickFloor`; смягчены `ROOM_PROGRAM`, `WALLS`, `PLACEMENT` и правила радиатора/света. Подписные движения для `tropical_modern`, `english`, `dark_academia`, `chalet` больше не нарушают `ARCH_LOCK`.
 - **ARCH_LOCK_V2 усилен:** двери сохраняют тип, заполнение и глухарь; restyle ограничен материалом и цветом дверного полотна. Запрещены terrace/balcony/French/all-glass door leaves.
