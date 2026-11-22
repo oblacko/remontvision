@@ -54,7 +54,7 @@ test('sitemap: static entries use fixed lastmod values, not today', () => {
   const xml = buildSitemapXml({ staticEntries: STATIC_ENTRIES, articles: [] });
   assert.ok(xml.includes('<lastmod>2026-11-09</lastmod>'));
   const today = new Date().toISOString().slice(0, 10);
-  if (today !== '2026-11-09' && today !== '2026-11-21') {
+  if (today !== '2026-11-09' && today !== '2026-11-21' && today !== '2026-11-22') {
     assert.ok(!xml.includes(`<lastmod>${today}</lastmod>`));
   }
 });

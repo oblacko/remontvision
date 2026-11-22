@@ -2134,8 +2134,24 @@ app.get('/sitemap.xml', h(async (_req, res) => {
   // public/sitemap.xml удалён, чтобы он не «перекрывал» динамический вывод
   // (иначе опубликованные статьи не попадали бы в sitemap).
   const articles = await q.listArticles();
-  const galleryEntries = ['/gallery', ...(await q.galleryRooms()).filter(r => !GALLERY_NOINDEX_ROOMS.has(r.name)).map(r => `/gallery/${slugify(r.name)}`)];
-  const styleEntries = ['/styles', ...DESIGN_STYLES.map(style => `/styles/${style.id}`)];
+  const galleryEntries = [
+    { loc: '/gallery', lastmod: '2026-11-22', changefreq: 'weekly', priority: '0.6' },
+    ...(await q.galleryRooms()).filter(r => !GALLERY_NOINDEX_ROOMS.has(r.name)).map(r => ({
+      loc: `/gallery/${slugify(r.name)}`,
+      lastmod: '2026-11-22',
+      changefreq: 'weekly',
+      priority: '0.5',
+    })),
+  ];
+  const styleEntries = [
+    { loc: '/styles', lastmod: '2026-11-22', changefreq: 'weekly', priority: '0.7' },
+    ...DESIGN_STYLES.map(style => ({
+      loc: `/styles/${style.id}`,
+      lastmod: '2026-11-22',
+      changefreq: 'weekly',
+      priority: '0.6',
+    })),
+  ];
   const xml = buildSitemapXml({ staticEntries: [...STATIC_ENTRIES, ...styleEntries, ...galleryEntries], articles, baseUrl: APP_URL });
   res.type('application/xml').send(xml);
 }));

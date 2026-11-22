@@ -14,6 +14,8 @@
 - **ARCH_LOCK_V2 усилен:** двери теперь сохраняют тип, заполнение и глухарь; restyle касается только материала/цвета дверного полотна. Terrace/balcony/French/all-glass door leaves вне зоны допустимого.
 - **tropical_modern:** описание стиля (`prompt_description`) и миграция `068` убрали terrace-ассоциации (`humid airy atmosphere` → `humid enclosed interior atmosphere`), вернули терракотовый акцент `#E07A5F`.
 - **Генератор UI:** скрыт выбор модели и разрешения; скрыты кнопки «Подобрать 3 стиля» / «Подобрать 5 стилей». При загрузке списка `renderModels` автоматически выбирается дефолтная модель и разрешение.
+- **Sitemap:** добавлена `/contacts`, стили и страницы галереи теперь с `lastmod`/`changefreq`/`priority`.
+- **SEO:** на главную страницу добавлен мета-тег `google-site-verification`.
 - **Регрессия промтов:** baseline обновлён под новый electrical lock и ARCH_LOCK_V2. `npm test` 477/478 (1 skipped), `npm run test:integration` 75/75, web lint/build зелёные.
 
 ### 2026-11-21

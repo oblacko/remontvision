@@ -21,6 +21,7 @@ export const STATIC_ENTRIES = [
   { loc: '/delivery', lastmod: '2026-11-09', changefreq: 'yearly', priority: '0.4' },
   { loc: '/privacy', lastmod: '2026-11-09', changefreq: 'yearly', priority: '0.4' },
   { loc: '/offer', lastmod: '2026-11-09', changefreq: 'yearly', priority: '0.4' },
+  { loc: '/contacts', lastmod: '2026-11-22', changefreq: 'yearly', priority: '0.4' },
   { loc: '/articles', lastmod: '2026-11-21', changefreq: 'weekly', priority: '0.6' },
   { loc: '/ai-dizayn-interera-po-foto', lastmod: '2026-11-21', changefreq: 'monthly', priority: '0.8' },
   { loc: '/promty/dizayn-interera', lastmod: '2026-11-21', changefreq: 'weekly', priority: '0.7' },
