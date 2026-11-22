@@ -46,7 +46,8 @@ import { getCleanupConfig, getCleanupDefaults, saveCleanupConfig, resetCleanupCo
 import { getRenderConfig, getRenderDefaults, saveRenderConfig, resetRenderConfig, loadRenderConfig } from './renderconfig.js';
 import { generateArticle, generateArticleFromRender, articlePage, hubPage, validateArticleForPublish, findPublishedDuplicate, countArticleWords, slugify } from './articles.js';
 import { galleryPage, GALLERY_PAGE_SIZE } from './gallery.js';
-import { GALLERY_NOINDEX_ROOMS } from './roomseo.js';
+import { GALLERY_NOINDEX_ROOMS, roomSeo } from './roomseo.js';
+import { FEATURED_RENDERS, GALLERY_ROOMS, buildFeaturedItems } from './galleryfeatured.js';
 import { promptsPage } from './prompts.js';
 import { stylesHubPage, stylePage, buildStyleCard } from './stylepage.js';
 import { normalizeMove } from './moveobject.js';
@@ -452,6 +453,18 @@ app.get('/api/styles', h(async (req, res) => {
   res.json((featuredOnly ? rows.filter(row => row.is_featured === true) : rows).map(styleDto));
 }));
 app.get('/api/room-types', (_req, res) => res.json(activeRoomTypeNames()));
+// Курируемая галерея для блока лендинга (REM-56): только done + !is_private,
+// изображение через /gallery/img/:id (уже отдаёт 404 для приватных/незавершённых).
+// rooms — статичные 6 комнат для ряда ссылок /gallery/{slug}; slug вычисляется
+// сервером (slugify), без хардкода на фронте. Без миграций БД.
+app.get('/api/gallery/featured', h(async (_req, res) => {
+  const pairs = await Promise.all(FEATURED_RENDERS.map(async entry => {
+    const render = await q.getRender(String(entry.id || ''));
+    return { entry, render };
+  }));
+  const rooms = GALLERY_ROOMS.map(name => ({ name: roomSeo(name).title, slug: slugify(name) }));
+  res.json({ items: buildFeaturedItems(pairs), rooms });
+}));
 
 app.get('/api/design', (_req, res) => {
   res.json({

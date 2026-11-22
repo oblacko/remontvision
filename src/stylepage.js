@@ -297,8 +297,10 @@ export function stylePage(card, { baseUrl = DEFAULT_BASE_URL, allCards = [], art
         `<a href="/gallery/${esc(r.slug)}" onclick="ym(114132104,'reachGoal','style_gallery_click',{key:'${esc(key)}',room:'${esc(r.slug)}'});">${esc(r.name)}</a>`).join('')}</nav>`
     : '';
 
-  const ctaHref = `/?utm_source=styles&utm_medium=cta&utm_campaign=${encodeURIComponent(key)}&style=${encodeURIComponent(key)}#upload`;
-  const ctaButton = (where) => `<a href="${ctaHref}" onclick="ym(114132104,'reachGoal','style_generate_click',{key:'${esc(key)}',place:'${where}'});">Загрузить фото и получить дизайн</a>`;
+  // Prefill через localStorage, без ?style= — лендинг его не читает (G4).
+  // Значение — name (не key): GenerationPanel матчит initialStyle по name/display_name.
+  const ctaHref = '/';
+  const ctaButton = (where) => `<a href="${ctaHref}" onclick="localStorage.setItem('rv_prefill_style','${esc(card.name)}');ym(114132104,'reachGoal','style_generate_click',{key:'${esc(key)}',place:'${where}'});">Загрузить фото и получить дизайн</a>`;
   const midCta = content.rooms
     ? `<div class="cta cta-mid"><p>${esc(STYLE_CTA)}</p>${ctaButton('mid')}</div>`
     : '';

@@ -2,6 +2,12 @@ import { getUtm } from './utm'
 
 export const COUNTER_ID = 114132104
 
+// Место, откуда открыт генератор: каждый вход лендинга шлёт generator_open с place.
+export type GeneratorPlace = 'hero' | 'styles_rail' | 'gallery' | 'upload' | 'prices' | 'final'
+
+// Блоки лендинга, для которых шлём block_view (знаменатель CTR).
+export type LandingBlock = 'gallery' | 'styles'
+
 declare global {
   interface Window {
     ym?: (counterId: number, action: string, ...args: unknown[]) => void

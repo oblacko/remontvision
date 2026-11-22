@@ -4,6 +4,21 @@
 
 Дата обновления: 2026-11-22. Статус: приложение работает локально и на VPS, автодеплой настроен; прод — `main`, деплой 2026-11-14, smoke PASS.
 
+## 2026-11-22 — блоки лендинга «Галерея» и «Стили» (REM-56)
+
+Реализация по техспеке REM-55 (брифы Growth REM-53, SEO REM-54). Два блока на лендинге + читающий эндпоинт + фикс CTA стилей. Без миграций, платежей и `.env`.
+
+- **Галерея (`#gallery`)** — заменяет `#examples`: курируемый слайдер «до/после» (`ExamplesCarousel`) + лента реальных рендеров (`GalleryRail`, только «после», бейдж «дизайн в ремонтвижн») + ссылка «Смотреть все примеры» → `/gallery` + ряд 6 ссылок на комнаты `/gallery/{slug}`.
+- **Стили (`#styles`)** — новый блок: 10 featured в слайдере (`StylesRail`, scroll-snap, стрелки) + плитка «Все 32 стиля» → `/styles`. CTA «Примерить» ставит `rv_prefill_style` и открывает генератор с выбранным стилем.
+- **`GET /api/gallery/featured`** (`src/galleryfeatured.js`, `src/server.js`) — курируемый список `FEATURED_RENDERS` (пуст до подтверждения G3), только `done` + `!is_private`; `rooms` — 6 комнат со slug с сервера. Без миграций.
+- **Фикс CTA `?style=`** (`src/stylepage.js`) — CTA со страниц `/styles/:key` ставит `localStorage.rv_prefill_style` (по `name`) и ведёт на `/`, выбор стиля не теряется (G4).
+- **Аналитика** — `block_view` (50%, 1/сессия), `style_click`, `style_apply`, `gallery_click {place,target,room,style,position}`, `generator_open {place, style_key?}`.
+- **Доступность/производительность** — роли `region`/`carousel`, `aria-label`, `focus-visible`, `prefers-reduced-motion`, `width/height`+`aspect-ratio`, `loading="lazy"`.
+
+**Остатки (решения за Директором/SEO/Growth):** (1) сырой-HTML SEO-оболочка (D3 — отдельное под-задание); (2) наполнение `FEATURED_RENDERS` 8 id с письменным разрешением — до этого лента галереи скрыта (G3); (3) вариант копирайта A/B (по умолчанию A, переключение флагом `copyVariant`).
+
+**Проверка** — `npm test` 513 pass/1 skip; интеграционные `styles` + `gallery-featured` 7/7; `web` lint 0 ошибок, build OK; `check-copy` чист.
+
 ## 2026-11-22 — SSR-страницы стилей отдают сгенерированные обложки (фикс разводки)
 
 После сжатия обложек в WebP (`41e6ff9`) SSR-страницы стилей всё ещё показывали старые/fallback-обложки: `src/stylepage.js` `styleCoverUrl` использовал только статическую карту `COVER_ALIASES` (11 ключей), поэтому 21 из 32 карточек на `/styles` отдавали `style-modern.webp`, а остальные — старые `style-minimal/scandi/neo/…`. При этом `/api/styles` (`src/server.js` `styleImageUrl` → `generatedStyleImage`) уже отдавал правильные `style-{key}.webp` (32/32).

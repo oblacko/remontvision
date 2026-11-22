@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react'
 import '../App.css'
 import { KitIcon } from '@/components/KitIcon'
 import { KitSheet } from '@/components/KitSheet'
-import { ExamplesCarousel } from '@/components/ExamplesCarousel'
+import { GallerySection } from '@/components/GallerySection'
+import { StylesSection } from '@/components/StylesSection'
+import { SectionMarker } from '@/components/SectionMarker'
 import { GenerationPanel } from '@/components/GenerationPanel'
 import { Logo } from '@/components/Logo'
 import { useTasks } from '@/components/TaskDock'
-import { goal } from '@/lib/analytics'
+import { goal, type GeneratorPlace } from '@/lib/analytics'
 
 const site = 'https://www.remontvision.ru'
-const navItems = [['До / после', '#examples', 'examples'], ['Что вы получите', '#result', 'result'], ['Как работает', '#how', 'how'], ['Цены', '#prices', 'prices']] as const
+const navItems = [['Галерея', '#gallery', 'gallery'], ['Стили', '#styles', 'styles'], ['Что вы получите', '#result', 'result'], ['Как работает', '#how', 'how'], ['Цены', '#prices', 'prices']] as const
 
 type Me = { email: string; balance: number }
 type PublicPack = { id: string; title: string; credits: number; price_kopecks: number }
@@ -31,10 +33,6 @@ const faq = [
 
 function ShiftLabel({ children }: { children: string }) {
   return <span className="shift-label" aria-hidden="true"><span>{children}</span><span>{children}</span></span>
-}
-
-function SectionMarker({ index, children }: { index: string; children: string }) {
-  return <p className="eyebrow">[ {index} ] <span className="ml-3">{children}</span></p>
 }
 
 export default function Home() {
@@ -206,10 +204,18 @@ export default function Home() {
     }
   }
 
-  const openPanel = () => {
-    goal('generator_open')
+  const openPanel = (place: GeneratorPlace = 'hero', styleKey?: string) => {
+    goal('generator_open', styleKey ? { place, style_key: styleKey } : { place })
     setMenuOpen(false)
     setPanelOpen(true)
+  }
+
+  // «Примерить» из блока стилей: prefill уже в localStorage (ставит StylesSection),
+  // поднимаем его в state и открываем генератор с местом и ключом стиля.
+  const openStylesGenerator = (place: 'styles_rail', styleKey?: string) => {
+    const style = localStorage.getItem('rv_prefill_style')
+    if (style) setPrefillStyle(style)
+    openPanel(place, styleKey)
   }
 
   return (
@@ -230,7 +236,7 @@ export default function Home() {
             ) : (
               <button type="button" onClick={openLogin} className="hidden min-h-11 items-center gap-2 px-3 text-sm transition-opacity hover:opacity-50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring sm:flex">Войти <KitIcon name="ur" className="size-4" /></button>
             )}
-            <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--s hidden sm:inline-flex">Попробовать <KitIcon name="ur" /></button>
+            <button type="button" onClick={() => openPanel('hero')} className="k-btn k-btn--primary k-btn--s hidden sm:inline-flex">Попробовать <KitIcon name="ur" /></button>
             <button type="button" className="k-btn k-btn--s lg:hidden" aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
               {menuOpen ? <KitIcon name="x" /> : 'Меню'}
             </button>
@@ -246,7 +252,7 @@ export default function Home() {
             ) : (
               <button type="button" onClick={() => { setMenuOpen(false); openLogin() }} className="flex min-h-12 items-center justify-between border-b text-left text-sm hover:opacity-50">Войти<KitIcon name="ur" className="size-4" /></button>
             )}
-            <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--block mt-3">Попробовать бесплатно</button>
+            <button type="button" onClick={() => openPanel('hero')} className="k-btn k-btn--primary k-btn--block mt-3">Попробовать бесплатно</button>
           </nav>
         )}
       </header>
@@ -313,7 +319,7 @@ export default function Home() {
                 </p>
                 <div className="lg:col-span-7 lg:pl-8">
                   <div className="flex flex-col gap-4 sm:flex-row">
-                    <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l k-btn--on-dark button-shift flex-1">
+                    <button type="button" onClick={() => openPanel('hero')} className="k-btn k-btn--primary k-btn--l k-btn--on-dark button-shift flex-1">
                       <span className="sr-only">Создать мой дизайн</span><ShiftLabel>Создать мой дизайн</ShiftLabel><KitIcon name="ur" className="size-5" />
                     </button>
                     <a href="#how" className="k-btn k-btn--l k-btn--on-dark button-shift flex-1">
@@ -341,7 +347,7 @@ export default function Home() {
           <section className="border-b border-foreground/15 bg-secondary" aria-label="Приглашение по ссылке">
             <div className="page-shell flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="min-w-0 text-sm leading-6"><span className="font-medium">Вас пригласили в Ремонтвижн.</span> Начните с бесплатных дизайнов — пригласивший получит 2 кредита после вашей первой покупки.</p>
-              <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--s shrink-0">Создать дизайн</button>
+              <button type="button" onClick={() => openPanel('hero')} className="k-btn k-btn--primary k-btn--s shrink-0">Создать дизайн</button>
             </div>
           </section>
         )}
@@ -362,21 +368,14 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="examples" className="scroll-mt-20 py-16 lg:py-24" aria-labelledby="examples-title">
-          <div className="page-shell">
-            <SectionMarker index="02">До / после</SectionMarker>
-            <div className="mb-10 mt-6 grid gap-6 md:grid-cols-12 md:items-end">
-              <h2 id="examples-title" className="display-title section-title md:col-span-8">Одна комната.<br />Новая жизнь.</h2>
-              <p className="max-w-sm text-sm leading-6 text-muted-foreground md:col-span-4">Листайте примеры и двигайте ползунок. Каждый формат сохраняет пропорции — без случайной обрезки.</p>
-            </div>
-            <ExamplesCarousel />
-          </div>
-        </section>
+        <GallerySection onOpenGenerator={() => openPanel('gallery')} />
+
+        <StylesSection onOpenGenerator={openStylesGenerator} />
 
         <section id="upload" className="scroll-mt-20 border-y bg-card" aria-labelledby="upload-title">
           <div className="page-shell grid lg:grid-cols-12">
             <div className="border-b py-12 lg:col-span-5 lg:border-b-0 lg:border-r lg:py-16 lg:pr-12">
-              <SectionMarker index="03">Генератор</SectionMarker>
+              <SectionMarker index="04">Генератор</SectionMarker>
               <h2 id="upload-title" className="display-title mt-8 text-4xl sm:text-5xl">Четыре шага<br />до результата</h2>
               <p className="mt-6 max-w-md text-base leading-7 text-muted-foreground">Фото комнаты, пресет стиля или ваш референс, редактирование текстом — а в финале разбор: цвета RAL, разметка розеток и подсказки, что изменить.</p>
               <ol className="mt-8 space-y-3 border-t pt-6 text-sm">
@@ -384,7 +383,7 @@ export default function Home() {
                   <li key={item} className="flex gap-3"><span className="font-mono text-xs text-primary-text">0{index + 1}</span>{item}</li>
                 ))}
               </ol>
-              <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l button-shift mt-8">
+              <button type="button" onClick={() => openPanel('upload')} className="k-btn k-btn--primary k-btn--l button-shift mt-8">
                 <span className="sr-only">Открыть генератор</span><ShiftLabel>Открыть генератор</ShiftLabel><KitIcon name="ur" className="size-5" />
               </button>
               <p className="mt-4 text-xs text-muted-foreground">2 кредита бесплатно после регистрации · без подписки</p>
@@ -392,7 +391,7 @@ export default function Home() {
             <div className="relative min-h-80 overflow-hidden bg-foreground lg:col-span-7 lg:min-h-full">
               <img src="/images/living-after.webp" alt="Готовая гостиная в современной классике — результат редизайна" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
               <div className="absolute inset-0 bg-foreground/35" aria-hidden="true" />
-              <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l k-btn--on-dark absolute inset-x-6 bottom-6 sm:inset-x-auto sm:bottom-10 sm:left-1/2 sm:w-80 sm:-translate-x-1/2">
+              <button type="button" onClick={() => openPanel('upload')} className="k-btn k-btn--primary k-btn--l k-btn--on-dark absolute inset-x-6 bottom-6 sm:inset-x-auto sm:bottom-10 sm:left-1/2 sm:w-80 sm:-translate-x-1/2">
                 Собрать мой дизайн <KitIcon name="ur" className="size-5" />
               </button>
             </div>
@@ -401,7 +400,7 @@ export default function Home() {
 
         <section id="result" className="scroll-mt-20 py-16 lg:py-24" aria-labelledby="result-title">
           <div className="page-shell">
-            <SectionMarker index="04">Не только картинка</SectionMarker>
+            <SectionMarker index="05">Не только картинка</SectionMarker>
             <div className="mt-6 grid gap-8 lg:grid-cols-12">
               <div className="lg:col-span-5">
                 <h2 id="result-title" className="display-title section-title">От идеи<br />к решению</h2>
@@ -441,7 +440,7 @@ export default function Home() {
         <section id="how" className="scroll-mt-20 border-y bg-foreground text-background" aria-labelledby="how-title">
           <div className="page-shell grid lg:grid-cols-12">
             <div className="py-12 lg:col-span-5 lg:py-16 lg:pr-12">
-              <p className="font-mono text-xs uppercase tracking-widest text-background/60">[ 05 ] / Процесс</p>
+              <p className="font-mono text-xs uppercase tracking-widest text-background/60">[ 06 ] / Процесс</p>
               <h2 id="how-title" className="display-title mt-8 text-4xl sm:text-5xl">От фото<br />до решения</h2>
               <p className="mt-6 max-w-sm text-sm leading-6 text-background/60">Без установки программ и освоения 3D-редактора. Всё происходит в браузере.</p>
             </div>
@@ -458,7 +457,7 @@ export default function Home() {
 
         <section id="prices" className="scroll-mt-20 py-16 lg:py-24" aria-labelledby="prices-title">
           <div className="page-shell">
-            <SectionMarker index="06">Прозрачная оплата</SectionMarker>
+            <SectionMarker index="07">Прозрачная оплата</SectionMarker>
             <div className="mt-6 grid gap-8 md:grid-cols-12 md:items-end">
               <h2 id="prices-title" className="display-title section-title md:col-span-8">Без подписки.<br />Без сюрпризов.</h2>
               <p className="max-w-sm text-sm leading-6 text-muted-foreground md:col-span-4">Одна комната целиком — от 399 ₽. Каждый дизайн включает 3 бесплатных редактирования. Покупайте только то, что нужно сейчас.</p>
@@ -473,7 +472,7 @@ export default function Home() {
             </div>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button type="button" onClick={openPanel} className="k-btn k-btn--primary">Начать бесплатно <KitIcon name="ur" /></button>
+                <button type="button" onClick={() => openPanel('prices')} className="k-btn k-btn--primary">Начать бесплатно <KitIcon name="ur" /></button>
                 <a href="/styles" className="k-btn">Библиотека стилей <KitIcon name="ur" /></a>
                 <a href="/cabinet#credits" className="k-btn">Купить кредиты <KitIcon name="ur" /></a>
               </div>
@@ -485,7 +484,7 @@ export default function Home() {
         <section id="limits" className="scroll-mt-20 border-t py-16 lg:py-24" aria-labelledby="limits-title">
           <div className="page-shell grid gap-8 lg:grid-cols-12">
             <div className="lg:col-span-4">
-              <SectionMarker index="07">Ограничения</SectionMarker>
+              <SectionMarker index="08">Ограничения</SectionMarker>
               <h2 id="limits-title" className="display-title mt-6 text-4xl sm:text-5xl">Что это<br />и чего здесь нет</h2>
             </div>
             <div className="lg:col-span-8">
@@ -508,7 +507,7 @@ export default function Home() {
 
         <section id="faq" className="scroll-mt-20 border-t bg-card" aria-labelledby="faq-title">
           <div className="page-shell grid gap-10 py-16 lg:grid-cols-12 lg:py-24">
-            <div className="lg:col-span-4"><SectionMarker index="08">Вопросы</SectionMarker><h2 id="faq-title" className="display-title mt-6 text-4xl sm:text-5xl">Перед<br />началом</h2><p className="mt-6 text-sm leading-6 text-muted-foreground">Остался вопрос?<br /><a className="mt-2 inline-block text-foreground underline decoration-border underline-offset-4" href="mailto:support@remontvision.ru">support@remontvision.ru</a></p></div>
+            <div className="lg:col-span-4"><SectionMarker index="09">Вопросы</SectionMarker><h2 id="faq-title" className="display-title mt-6 text-4xl sm:text-5xl">Перед<br />началом</h2><p className="mt-6 text-sm leading-6 text-muted-foreground">Остался вопрос?<br /><a className="mt-2 inline-block text-foreground underline decoration-border underline-offset-4" href="mailto:support@remontvision.ru">support@remontvision.ru</a></p></div>
             <div className="border-t border-foreground/20 lg:col-span-8">
               {faq.map((item, index) => (
                 <details key={item.q} className="group border-b border-foreground/20" open={index === 0}>
@@ -529,7 +528,7 @@ export default function Home() {
               <h2 id="final-cta-title" className="display-title section-title mt-8">Посмотрите,<br />что возможно</h2>
               <div className="mt-8 flex flex-col gap-6 border-t border-foreground/30 pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <p className="max-w-lg text-sm leading-6">Два дизайна бесплатно после регистрации — каждый с тремя бесплатными редактированиями. Дизайн и разбор — палитра RAL, розетки и подсказки — в одном результате.</p>
-                <button type="button" onClick={openPanel} className="k-btn k-btn--primary k-btn--l k-btn--on-orange button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><KitIcon name="r" /></button>
+                <button type="button" onClick={() => openPanel('final')} className="k-btn k-btn--primary k-btn--l k-btn--on-orange button-shift"><span className="sr-only">Загрузить комнату</span><ShiftLabel>Загрузить комнату</ShiftLabel><KitIcon name="r" /></button>
               </div>
             </div>
             <div className="relative min-h-80 overflow-hidden lg:col-span-4 lg:min-h-full">

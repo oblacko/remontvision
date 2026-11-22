@@ -157,6 +157,118 @@
 }
 .comparison-enter { animation: comparison-enter 300ms ease-out both; }
 
+/* ============ Блоки лендинга «Галерея» и «Стили» (REM-56) ============ */
+
+/* Горизонтальный ряд: нативный scroll-snap, скроллбар скрыт. */
+.rv-rail {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.rv-rail::-webkit-scrollbar { display: none; }
+.rv-rail > * { flex: none; scroll-snap-align: start; }
+
+/* Карточка галереи: одна ссылка на карточку (share). */
+.rv-gallery-card {
+  position: relative;
+  display: block;
+  width: min(72vw, 20rem);
+  border: 1px solid oklch(var(--p-line));
+  background: oklch(var(--p-paper));
+  text-decoration: none;
+  color: oklch(var(--p-ink));
+  overflow: hidden;
+}
+.rv-gallery-media { display: block; aspect-ratio: 4 / 3; overflow: hidden; background: #b9a88f; }
+.rv-gallery-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rv-gallery-card:hover .rv-gallery-media img { transform: scale(1.025); }
+.rv-gallery-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: oklch(var(--p-paper));
+  padding: 4px 8px;
+  font-family: var(--fm);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.rv-gallery-caption {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: break-word;
+}
+
+/* Карточка стиля: div с отдельной ссылкой и кнопкой «Примерить». */
+.rv-style-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(68vw, 16rem);
+  border: 1px solid oklch(var(--p-line));
+  background: oklch(var(--p-paper));
+  overflow: hidden;
+}
+.rv-style-link { display: flex; flex-direction: column; text-decoration: none; color: oklch(var(--p-ink)); }
+.rv-style-media { display: block; aspect-ratio: 4 / 5; overflow: hidden; background: #b9a88f; }
+.rv-style-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rv-style-card:hover .rv-style-media img { transform: scale(1.03); }
+.rv-style-body { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; }
+.rv-style-display { font-size: 16px; font-weight: 600; line-height: 1.25; overflow-wrap: break-word; }
+.rv-style-name { font-size: 12px; color: oklch(var(--p-ink-muted)); overflow-wrap: break-word; }
+.rv-style-swatches { margin-top: 8px; }
+.rv-style-swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid oklch(var(--p-line-strong));
+  border-radius: 50%;
+  display: inline-block;
+}
+.rv-style-apply {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  margin: 12px 14px 14px;
+  padding: 0 16px;
+  border: 1px solid oklch(var(--p-ink));
+  background: transparent;
+  color: oklch(var(--p-ink));
+  font: 500 15px/1.2 var(--fb);
+  cursor: pointer;
+  box-shadow: 4px 4px 0 oklch(var(--p-orange));
+  transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s, color 0.12s;
+}
+@media (hover: hover) {
+  .rv-style-apply:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 oklch(var(--p-orange));
+    background: oklch(var(--p-ink));
+    color: oklch(var(--p-paper));
+  }
+}
+.rv-style-apply:focus-visible { outline: 3px solid oklch(var(--p-ink)); outline-offset: 3px; }
+
 @keyframes hero-image-enter {
   from { opacity: 0.6; transform: scale(1.045); }
   to { opacity: 1; transform: scale(1); }
@@ -303,6 +415,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .rv-rail { scroll-behavior: auto; }
+  .rv-gallery-media img,
+  .rv-style-media img { transition: none; }
+  .rv-gallery-card:hover .rv-gallery-media img,
+  .rv-style-card:hover .rv-style-media img,
+  .rv-style-apply:hover { transform: none; }
+  .rv-style-apply { transition: none; }
   .gen-overlay,
   .gen-overlay[data-open='true'] { transition: none; }
   .gen-lightbox { animation: none; }
