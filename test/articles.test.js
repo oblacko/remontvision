@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 // articles.js тянет db.js, который падает без RV_DATABASE_URL.
 // Соединение не открывается: нужны только чистые функции и шаблоны.
@@ -9,6 +10,7 @@ const {
   countArticleWords,
   findPublishedDuplicate,
   validateArticleForPublish,
+  normalizeImportedArticle,
   MIN_ARTICLE_WORDS,
   autoMetaTitle,
   autoMetaDescription,
@@ -231,4 +233,120 @@ test('articles: articlePage uses editor meta_title and drops long brand suffix',
   const long = articlePage(makeArticle({ title: longTitle, meta: {} }));
   assert.match(long, new RegExp(`<title>${longTitle.slice(0, 20).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</title>`));
   assert.ok(!long.includes('— ремонтвижн</title>'));
+});
+
+// --- REM-47: информационные статьи без товаров (волна A) ---
+
+function makeInformational(overrides = {}) {
+  const base = makeArticle();
+  return {
+    ...base,
+    products: [],
+    body: {
+      ...base.body,
+      sections: [{ h: 'Кому подходит', p: 'Описание раздела.' }],
+      faq: [{ q: 'Вопрос?', a: 'Ответ.' }],
+      ...(overrides.body || {}),
+    },
+    meta: { ...base.meta, content_type: 'informational', ...(overrides.meta || {}) },
+    ...overrides,
+  };
+}
+
+test('articles: countArticleWords includes sections and faq', () => {
+  assert.equal(countArticleWords({
+    intro: 'один два',
+    sections: [{ h: 'три', p: 'четыре пять' }],
+    faq: [{ q: 'шесть', a: 'семь восемь' }],
+  }), 8);
+});
+
+test('articles: informational article passes without products', () => {
+  assert.deepEqual(validateArticleForPublish(makeInformational(), []), []);
+});
+
+test('articles: commercial article still requires 3 products with links', () => {
+  const reasons = validateArticleForPublish(makeArticle({ products: [] }), []);
+  assert.ok(reasons.some(r => /Товаров со ссылкой/.test(r)));
+});
+
+test('articles: articlePage renders sections and faq with FAQPage JSON-LD', () => {
+  const html = articlePage(makeInformational());
+  assert.match(html, /<h2>Кому подходит<\/h2>/);
+  assert.match(html, /<p>Описание раздела\.<\/p>/);
+  assert.match(html, /<h2>Частые вопросы<\/h2>/);
+  assert.match(html, /<h3>Вопрос\?<\/h3>/);
+  assert.match(html, /<p>Ответ\.<\/p>/);
+  assert.match(html, /"@type":"FAQPage"/);
+  assert.match(html, /"@type":"Question"/);
+  assert.match(html, /"@type":"Answer"/);
+});
+
+test('articles: articlePage emits parseable FAQPage JSON-LD', () => {
+  const html = articlePage(makeInformational());
+  const m = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  assert.ok(m, 'ожидался ld+json');
+  const parsed = JSON.parse(m[1]);
+  const faq = parsed.find(x => x['@type'] === 'FAQPage');
+  assert.ok(faq, 'ожидался FAQPage');
+  assert.equal(faq.mainEntity.length, 1);
+  assert.equal(faq.mainEntity[0]['@type'], 'Question');
+  assert.equal(faq.mainEntity[0].name, 'Вопрос?');
+  assert.equal(faq.mainEntity[0].acceptedAnswer['@type'], 'Answer');
+  assert.equal(faq.mainEntity[0].acceptedAnswer.text, 'Ответ.');
+});
+
+test('articles: normalizeImportedArticle builds an informational draft', () => {
+  const { article, error } = normalizeImportedArticle({
+    slug: 'kuhnya-v-stile-provans',
+    title: 'Кухня в стиле прованс',
+    style: 'Прованс',
+    room_type: 'Кухня',
+    palette: [{ hex: '#F6F1E7', name: 'кремовый' }],
+    body: {
+      intro: 'Вводный текст.',
+      howto: ['Шаг'],
+      palette_notes: 'Палитра.',
+      conclusion: 'Итог.',
+      sections: [{ h: 'Кому подходит', p: 'Описание.' }],
+      faq: [{ q: 'Вопрос?', a: 'Ответ.' }],
+    },
+    meta: { meta_title: 'Заголовок', meta_description: 'Описание.' },
+  });
+  assert.equal(error, undefined);
+  assert.equal(article.slug, 'kuhnya-v-stile-provans');
+  assert.equal(article.status, 'draft');
+  assert.equal(article.meta.content_type, 'informational');
+  assert.deepEqual(article.products, []);
+  assert.equal(article.body.sections[0].h, 'Кому подходит');
+  assert.equal(article.body.faq[0].q, 'Вопрос?');
+});
+
+test('articles: normalizeImportedArticle keeps commercial type when products present', () => {
+  const { article } = normalizeImportedArticle({
+    slug: 'x', title: 'X', style: 'Лофт', room_type: 'Кухня',
+    body: { intro: 'Текст' },
+    products: [{ offer_id: '1', affiliate_url: 'https://x' }],
+  });
+  assert.equal(article.meta.content_type, 'commercial');
+});
+
+test('articles: normalizeImportedArticle rejects missing slug/title/style/room', () => {
+  assert.ok(normalizeImportedArticle(null).error);
+  assert.ok(normalizeImportedArticle({}).error);
+  assert.ok(normalizeImportedArticle({ slug: 'a', title: 'T', style: 'S' }).error);
+  assert.ok(normalizeImportedArticle({ slug: 'a', title: 'T', style: 'S', room_type: 'Кухня' }).error === undefined);
+});
+
+test('articles: wave A texts pass the informational gate with 600–670 words', () => {
+  const data = JSON.parse(fs.readFileSync(new URL('../scripts/articles/wave-a.json', import.meta.url), 'utf8'));
+  assert.equal(data.articles.length, 6);
+  for (const raw of data.articles) {
+    const { article, error } = normalizeImportedArticle(raw);
+    assert.equal(error, undefined, `${raw.slug}: ${error}`);
+    assert.equal(article.meta.content_type, 'informational', raw.slug);
+    const words = countArticleWords(article.body);
+    assert.ok(words >= 600 && words <= 670, `${raw.slug}: ${words} слов`);
+    assert.deepEqual(validateArticleForPublish(article, []), [], raw.slug);
+  }
 });

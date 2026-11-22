@@ -420,6 +420,10 @@ export function countArticleWords(body) {
     body?.intro, body?.palette_notes, body?.conclusion,
     ...(Array.isArray(body?.howto) ? body.howto : []),
     ...(Array.isArray(body?.product_notes) ? body.product_notes.map(n => n?.note) : []),
+    // sections/faq — блоки информационных статей (REM-47); без них гейт ≥600 слов
+    // не считается честно (602–670 слов у текстов волны A).
+    ...(Array.isArray(body?.sections) ? body.sections.flatMap(s => [s?.h, s?.p]) : []),
+    ...(Array.isArray(body?.faq) ? body.faq.flatMap(f => [f?.q, f?.a]) : []),
   ];
   return parts.filter(Boolean).join(' ').trim().split(/\s+/).filter(Boolean).length;
 }
@@ -440,12 +444,17 @@ export function validateArticleForPublish(article, publishedList, { maxPerCluste
   if (words < MIN_ARTICLE_WORDS) {
     reasons.push(`Мало текста: ${words} слов, нужно от ${MIN_ARTICLE_WORDS} (цель редактора 600–900)`);
   }
-  const products = Array.isArray(article?.products) ? article.products : [];
-  const withLink = products.filter(p => p?.affiliate_url);
-  if (withLink.length < MIN_ARTICLE_PRODUCTS) {
-    reasons.push(`Товаров со ссылкой ${withLink.length}, нужно от ${MIN_ARTICLE_PRODUCTS}`);
-  }
   const meta = article?.meta || {};
+  // Гейт A (решение владельца, REM-47): информационная статья без товаров
+  // (явный признак meta.content_type = 'informational') публикуется без ≥3 товаров.
+  // Коммерческие статьи сохраняют проверку «от 3 товаров со ссылкой».
+  if (meta.content_type !== 'informational') {
+    const products = Array.isArray(article?.products) ? article.products : [];
+    const withLink = products.filter(p => p?.affiliate_url);
+    if (withLink.length < MIN_ARTICLE_PRODUCTS) {
+      reasons.push(`Товаров со ссылкой ${withLink.length}, нужно от ${MIN_ARTICLE_PRODUCTS}`);
+    }
+  }
   if (!String(meta.meta_title || '').trim()) reasons.push('Не заполнен meta_title (редактор)');
   if (!String(meta.meta_description || '').trim()) reasons.push('Не заполнена meta_description (редактор)');
   const mates = (publishedList || []).filter(a => a.status === 'published'
@@ -456,6 +465,78 @@ export function validateArticleForPublish(article, publishedList, { maxPerCluste
     reasons.push(`Дубль кластера: уже опубликовано статей «${article?.style} × ${article?.room_type}» — ${mates.length}`);
   }
   return reasons;
+}
+
+// --- Импорт готовых текстов (REM-47, волна A) -------------------------------
+// Нормализует один элемент JSON импорта в объект для q.createArticle. Slug,
+// style и room_type здесь не проверяются по БД (это делают скрипт/эндпоинт) —
+// функция чистая, чтобы её можно было юнит-тестировать.
+// Возвращает { article } либо { error: 'русский текст' }.
+export function normalizeImportedArticle(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { error: 'Элемент импорта должен быть объектом' };
+  }
+  const slug = String(raw.slug || '').trim();
+  if (!slug) return { error: 'Не указан slug' };
+  const title = String(raw.title || '').trim();
+  if (!title) return { error: `«${slug}»: не указан title` };
+  const style = String(raw.style || '').trim();
+  if (!style) return { error: `«${slug}»: не указан style` };
+  const room_type = String(raw.room_type || '').trim();
+  if (!room_type) return { error: `«${slug}»: не указан room_type` };
+
+  const srcBody = raw.body && typeof raw.body === 'object' && !Array.isArray(raw.body) ? raw.body : {};
+  const palette = Array.isArray(raw.palette)
+    ? raw.palette.filter(c => c && typeof c === 'object').map(c => ({
+        hex: String(c.hex || '').slice(0, 7),
+        name: String(c.name || '').slice(0, 80),
+      }))
+    : [];
+  const sections = Array.isArray(srcBody.sections)
+    ? srcBody.sections.filter(s => s && (s.h || s.p)).map(s => ({
+        h: String(s.h || '').slice(0, 200),
+        p: String(s.p || '').slice(0, 4000),
+      }))
+    : [];
+  const faq = Array.isArray(srcBody.faq)
+    ? srcBody.faq.filter(f => f && (f.q || f.a)).map(f => ({
+        q: String(f.q || '').slice(0, 200),
+        a: String(f.a || '').slice(0, 2000),
+      }))
+    : [];
+
+  const body = {
+    intro: String(srcBody.intro || '').slice(0, 2000),
+    howto: Array.isArray(srcBody.howto) ? srcBody.howto.map(s => String(s).slice(0, 400)).slice(0, 6) : [],
+    palette_notes: String(srcBody.palette_notes || '').slice(0, 1500),
+    conclusion: String(srcBody.conclusion || '').slice(0, 1000),
+    sections,
+    faq,
+  };
+  if (srcBody.prompt) body.prompt = String(srcBody.prompt).slice(0, 1500);
+
+  const products = Array.isArray(raw.products) ? raw.products : [];
+  const meta = { ...(raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta) ? raw.meta : {}) };
+  // Явный признак: информационная статья без товаров проходит гейт без ≥3 товаров.
+  // Коммерческий импорт (с products) получает content_type = 'commercial' и сохраняет
+  // прежнюю проверку товаров в validateArticleForPublish.
+  if (!meta.content_type) meta.content_type = products.length ? 'commercial' : 'informational';
+
+  return {
+    article: {
+      slug,
+      title: title.slice(0, 140),
+      style,
+      room_type,
+      tier: null,
+      cover_path: null,
+      palette,
+      body,
+      products,
+      status: 'draft',
+      meta,
+    },
+  };
 }
 
 const RU_MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -513,7 +594,17 @@ export function articlePage(article, { related = [] } = {}) {
   const paletteHtml = palette.map(c => `<span class="swatch" style="background:${esc(c.hex || '#ccc')}" title="${esc(c.name || '')}"></span>`).join('');
   const howto = (body.howto || []).map(step => `<li>${esc(step)}</li>`).join('');
 
-  const jsonLd = JSON.stringify([
+  // Информационные блоки (REM-47): sections → H2 + абзац, faq → список вопрос-ответ.
+  const sections = (Array.isArray(body.sections) ? body.sections : [])
+    .filter(s => s && (s.h || s.p))
+    .map(s => `<h2>${esc(s.h || '')}</h2><p>${esc(s.p || '')}</p>`).join('');
+  const faqItems = (Array.isArray(body.faq) ? body.faq : [])
+    .filter(f => f && (f.q || f.a));
+  const faqHtml = faqItems.length
+    ? `<h2>Частые вопросы</h2><div class="faq">${faqItems.map(f => `<h3>${esc(f.q || '')}</h3><p>${esc(f.a || '')}</p>`).join('')}</div>`
+    : '';
+
+  const ld = [
     {
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
@@ -535,7 +626,19 @@ export function articlePage(article, { related = [] } = {}) {
       author: { '@type': 'Organization', name: 'ремонтвижн' },
       publisher: { '@type': 'Organization', name: 'ремонтвижн' },
     },
-  ]).replace(/</g, '\\u003c');
+  ];
+  if (faqItems.length) {
+    ld.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqItems.map(f => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    });
+  }
+  const jsonLd = JSON.stringify(ld).replace(/</g, '\\u003c');
 
   const relatedCards = (Array.isArray(related) ? related : []).slice(0, 4).map(a => {
     const rc = coverUrl(a.cover_path);
@@ -602,6 +705,8 @@ ul.howto{padding-left:20px}ul.howto li{margin:8px 0}
 .buy{margin-top:auto;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;background:var(--orange);color:var(--ink);text-decoration:none;border:1px solid var(--ink);font:500 14px var(--fb);box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s}
 .buy:hover{transform:translate(-2px,-2px);box-shadow:5px 5px 0 var(--ink);color:var(--ink)}
 .erid{font:400 10px var(--fm);color:var(--muted);margin-top:6px}
+.faq h3{font:500 16px/1.4 var(--fb);color:var(--ink);margin:20px 0 6px}
+.faq p{margin:0 0 8px}
 .cta{margin-top:48px;padding:24px;border:1px solid var(--line2);background:var(--bg);text-align:center}
 .cta a{display:inline-flex;align-items:center;justify-content:center;min-height:48px;margin-top:12px;padding:0 24px;background:var(--orange);color:var(--ink);text-decoration:none;border:1px solid var(--ink);font:500 15px var(--fb);box-shadow:4px 4px 0 var(--ink)}
 .cta a:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink);color:var(--ink)}
@@ -628,6 +733,8 @@ ${cover ? `<img class="cover" src="${cover}" alt="${coverAlt}" width="1200" heig
 ${YANDEX_ADS}
 ${palette.length ? `<h2>Палитра и материалы</h2><div class="swatches">${paletteHtml}</div><p>${esc(body.palette_notes || '')}</p>` : ''}
 ${howto ? `<h2>Как собрать интерьер</h2><ul class="howto">${howto}</ul>` : ''}
+${sections}
+${faqHtml}
 ${productCards ? `<h2>Товары из каталога Hoff</h2><div class="grid">${productCards}</div>${priceDateText ? `<p class="pricedate">Цены и наличие указаны на ${priceDateText} — проверяйте перед покупкой.</p>` : ''}` : ''}
 ${relatedCards ? `<h2>Читать ещё</h2><div class="grid">${relatedCards}</div>` : ''}
 ${body.prompt ? `<h2>Промт дизайна</h2><p>Этот интерьер создан нейросетью. Промт, которым он сделан:</p><details class="prompt"><summary>Показать промт</summary><pre>${esc(body.prompt)}</pre></details>` : ''}
